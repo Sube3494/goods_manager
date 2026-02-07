@@ -55,8 +55,9 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex w-full items-center justify-between rounded-xl bg-secondary/50 border border-border/50 px-4 py-2.5 text-sm transition-all duration-300 hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-primary/20",
-          isOpen && "ring-2 ring-primary/20 border-primary/30"
+          "flex w-full items-center justify-between rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm transition-all outline-none ring-offset-background",
+          isOpen ? "ring-2 ring-primary/20 border-primary/20" : "hover:bg-muted/50 dark:hover:bg-white/10",
+          !selectedDate && "text-muted-foreground"
         )}
       >
         <div className="flex items-center gap-2">
@@ -84,7 +85,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute left-0 top-full z-100 mt-2 w-full rounded-2xl border border-border bg-card/90 p-4 shadow-2xl backdrop-blur-xl"
+            className="absolute left-0 top-full z-100 mt-2 w-full rounded-2xl border border-border dark:border-white/10 bg-white dark:bg-card/70 dark:backdrop-blur-xl p-4 shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-4">

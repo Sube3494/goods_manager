@@ -1,21 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Edit2, Trash2, Truck, Phone, Mail, MapPin, CheckCheck } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Supplier } from "@/lib/types";
 
-import { INITIAL_SUPPLIERS } from "@/lib/mockData";
-
 export default function SuppliersPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(INITIAL_SUPPLIERS);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    onConfirm: () => void;
+    message: string;
+    title?: string;
+    variant?: "danger" | "warning";
+  }>({
+    isOpen: false,
+    onConfirm: () => {},
+    message: "",
+  });
   
   const { showToast } = useToast();
+
+  const fetchSuppliers = async () => {
+    try {
+      const res = await fetch("/api/suppliers");
+      if (res.ok) {
+        setSuppliers(await res.json());
+      }
+    } catch (error) {
+      console.error("Failed to fetch suppliers:", error);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
 
   const handleOpenCreate = () => {
     setEditingSupplier(null);
@@ -27,29 +53,53 @@ export default function SuppliersPage() {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (data: Omit<Supplier, "id"> & { id?: string }) => {
-    if (editingSupplier && data.id) {
-      // Edit mode
-      setSuppliers(suppliers.map(s => s.id === data.id ? { ...data, id: data.id! } as Supplier : s));
-      showToast("供应商已更新", "success");
-    } else {
-      // Create mode
-      const newSupplier: Supplier = {
-        ...data,
-        id: `new-${Date.now()}`
-      };
-      setSuppliers([newSupplier, ...suppliers]);
-      showToast("供应商已创建", "success");
+  const handleSubmit = async (data: Omit<Supplier, "id"> & { id?: string }) => {
+    try {
+      const isEdit = !!editingSupplier;
+      const url = isEdit ? `/api/suppliers/${editingSupplier.id}` : "/api/suppliers";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        fetchSuppliers();
+        showToast(isEdit ? "供应商已更新" : "供应商已创建", "success");
+        setIsModalOpen(false);
+      } else {
+        showToast("操作失败", "error");
+      }
+    } catch (error) {
+      console.error("Supplier submit failed:", error);
+      showToast("网络错误", "error");
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`确定要删除供应商 "${name}" 吗？此操作不可逆。`)) {
-        setSuppliers(suppliers.filter(s => s.id !== id));
-        setSelectedIds(selectedIds.filter(sid => sid !== id));
-        showToast("供应商已删除", "success");
-    }
+  const handleDelete = async (id: string, name: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "删除供应商",
+      message: `确定要删除供应商 "${name}" 吗？此操作不可逆，将影响已关联的商品数据。`,
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/suppliers/${id}`, { method: "DELETE" });
+          if (res.ok) {
+            fetchSuppliers();
+            setSelectedIds(selectedIds.filter(sid => sid !== id));
+            showToast("供应商已删除", "success");
+          } else {
+            showToast("删除失败", "error");
+          }
+        } catch (error) {
+          console.error("Delete supplier failed:", error);
+          showToast("网络错误", "error");
+        }
+      }
+    });
   };
 
   const toggleSelect = (id: string) => {
@@ -61,11 +111,17 @@ export default function SuppliersPage() {
   };
 
   const handleBulkDelete = () => {
-    if (window.confirm(`确定要删除选中的 ${selectedIds.length} 个供应商吗？`)) {
+    setConfirmConfig({
+      isOpen: true,
+      title: "批量删除供应商",
+      message: `确定要删除选中的 ${selectedIds.length} 个供应商吗？一旦执行，相关联系信息将彻底移除。`,
+      variant: "danger",
+      onConfirm: () => {
         setSuppliers(suppliers.filter(s => !selectedIds.includes(s.id)));
         setSelectedIds([]);
         showToast(`已批量删除 ${selectedIds.length} 个供应商`, "success");
-    }
+      }
+    });
   };
 
   const handleSelectAll = () => {
@@ -119,18 +175,16 @@ export default function SuppliersPage() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card/50 p-4 backdrop-blur-md md:flex-row md:items-center shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="搜索供应商..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg bg-secondary/50 px-10 py-2 text-sm text-foreground outline-none ring-1 ring-border transition-all placeholder:text-muted-foreground focus:bg-background focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
+      {/* Search Box */}
+      <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+        <Search size={18} className="text-muted-foreground shrink-0" />
+        <input
+          type="text"
+          placeholder="搜索供应商..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm"
+        />
       </div>
 
       {/* Grid */}
@@ -220,6 +274,16 @@ export default function SuppliersPage() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSubmit}
         initialData={editingSupplier}
+      />
+
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        message={confirmConfig.message}
+        title={confirmConfig.title}
+        variant={confirmConfig.variant}
+        confirmLabel="确认执行"
       />
     </div>
   );

@@ -1,35 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera } from "lucide-react";
-
-// ... (lines 6-30 remain the same, simplified for brevity in replacement context if needed, but I'll likely target blocks)
-
-// Actually, let's target the exact lines or blocks.
-// Start with import
-
+import { useRouter, usePathname } from "next/navigation";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, LogOut, LogIn } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { motion } from "framer-motion";
+import { useUser } from "@/hooks/useUser";
+import md5 from "blueimp-md5";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 const navItems = [
-  { name: "概览", href: "/", icon: LayoutDashboard },
-  { name: "库存管理", href: "/goods", icon: Package },
-  { name: "分类管理", href: "/categories", icon: Layers },
-  { name: "供应商管理", href: "/suppliers", icon: Truck },
-  { name: "采购管理", href: "/purchases", icon: ShoppingCart },
-  { name: "入库登记", href: "/import", icon: PlusCircle },
+  { name: "概览", href: "/", icon: LayoutDashboard, adminOnly: true },
+  { name: "库存管理", href: "/goods", icon: Package, adminOnly: true },
+  { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true },
+  { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true },
+  { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true },
+  { name: "入库登记", href: "/import", icon: PlusCircle, adminOnly: true },
   { name: "实物相册", href: "/gallery", icon: Camera },
   { name: "系统设置", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { showToast } = useToast();
+  const { user, isLoading } = useUser();
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", { method: "POST" });
+      showToast("已退出登录", "success");
+      // Force hard refresh to clear state and re-run middleware/hooks
+      window.location.href = "/gallery";
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  if (isLoading) return null; // Or a skeleton
+  if (pathname === "/login") return null;
 
   return (
     <aside className="fixed left-4 top-4 z-40 h-[calc(100vh-2rem)] w-64 rounded-2xl glass border-border transition-transform">
@@ -40,8 +55,8 @@ export function Sidebar() {
               L
             </div>
             <div className="flex flex-col">
-                <span className="text-lg font-bold tracking-tight text-foreground bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
-                Luxe库存
+                <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
+                PickNote
                 </span>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-widest scale-90 origin-left">
                     PROFESSIONAL
@@ -52,16 +67,18 @@ export function Sidebar() {
         
         <div className="flex-1 space-y-2">
           {navItems.map((item) => {
+            if (item.adminOnly && !user) return null;
+            
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "relative group flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300",
+                  "relative group flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0",
                   isActive
-                    ? "text-primary-foreground shadow-md shadow-primary/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {isActive && (
@@ -84,13 +101,38 @@ export function Sidebar() {
         </div>
         
         <div className="mt-auto pt-6 border-t border-white/10">
-          <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
-             <div className="h-9 w-9 rounded-full bg-linear-to-tr from-purple-500 to-pink-500 border-2 border-white/20 shadow-sm"></div>
-             <div>
-                <p className="text-sm font-bold text-foreground">管理员</p>
-                <p className="text-xs text-muted-foreground">超级权限</p>
-             </div>
-          </div>
+          {user ? (
+            <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer">
+              <div className="relative h-9 w-9 rounded-full overflow-hidden border-2 border-white/20 shadow-sm">
+                <img 
+                    src={`https://cravatar.cn/avatar/${md5(user.email || "")}?d=mp`} 
+                    alt="Current user"
+                    className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="flex-1">
+                  <p className="text-sm font-bold text-foreground truncate max-w-[100px]">{user.name || "管理员"}</p>
+                  <p className="text-xs text-muted-foreground">超级权限</p>
+              </div>
+              <button 
+                  onClick={handleLogout}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all"
+                  title="退出登录"
+              >
+                  <LogOut size={16} />
+              </button>
+            </div>
+          ) : (
+            <Link href="/login" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group">
+              <div className="h-9 w-9 rounded-full bg-secondary/80 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                <LogIn size={18} />
+              </div>
+              <div className="flex-1">
+                  <p className="text-sm font-bold text-foreground">未登录</p>
+                  <p className="text-xs text-muted-foreground">点击登录管理员</p>
+              </div>
+            </Link>
+          )}
         </div>
       </div>
     </aside>

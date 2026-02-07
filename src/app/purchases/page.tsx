@@ -1,22 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Filter, ShoppingBag, Calendar, DollarSign, Edit2, Trash2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
-import { INITIAL_SUPPLIERS, INITIAL_PURCHASES } from "@/lib/mockData";
-import { PurchaseOrder, PurchaseStatus } from "@/lib/types";
+import { PurchaseOrder, PurchaseStatus, Supplier } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 export default function PurchasesPage() {
-  const [purchases, setPurchases] = useState<PurchaseOrder[]>(INITIAL_PURCHASES);
+  const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    onConfirm: () => void;
+    message: string;
+    title?: string;
+  }>({
+    isOpen: false,
+    onConfirm: () => {},
+    message: "",
+  });
   const { showToast } = useToast();
 
+  const fetchData = async () => {
+    try {
+      const [pRes, sRes] = await Promise.all([
+        fetch("/api/purchases"),
+        fetch("/api/suppliers")
+      ]);
+      if (pRes.ok && sRes.ok) {
+        setPurchases(await pRes.json());
+        setSuppliers(await sRes.json());
+      }
+    } catch (error) {
+      console.error("Failed to fetch purchases data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   const getSupplierName = (id: string) => {
-    return INITIAL_SUPPLIERS.find(s => s.id === id)?.name || "未知供应商";
+    return suppliers.find(s => s.id === id)?.name || "未知供应商";
   };
 
   const getStatusColor = (status: PurchaseStatus) => {
@@ -45,32 +78,70 @@ export default function PurchasesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("确定要删除这张采购单吗？")) {
-        setPurchases(purchases.filter(p => p.id !== id));
-        showToast("采购单已删除", "success");
-    }
-  };
-
-  const handleConfirmReceipt = (id: string) => {
-    setPurchases(purchases.map(p => {
-        if (p.id === id) {
-            return { ...p, status: "Received" as const };
+  const handleDelete = async (id: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "删除采购单",
+      message: `确定要删除单号为 ${id} 的采购单吗？此操作将移除所有关联的采购项目，且不可恢复。`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
+          if (res.ok) {
+            fetchData();
+            showToast("采购单已删除", "success");
+          } else {
+            showToast("删除失败", "error");
+          }
+        } catch (error) {
+          console.error("Delete purchase failed:", error);
+          showToast("网络错误", "error");
         }
-        return p;
-    }));
-    showToast("采购入库成功", "success");
+      }
+    });
   };
 
-  const handleSave = (data: PurchaseOrder) => {
-    if (editingPurchase) {
-      setPurchases(purchases.map(p => p.id === data.id ? data : p));
-      showToast("采购单已保存", "success");
-    } else {
-      setPurchases([data, ...purchases]);
-      showToast("采购单已创建", "success");
+  const handleConfirmReceipt = async (id: string) => {
+    try {
+      const res = await fetch(`/api/purchases/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Received" }),
+      });
+      if (res.ok) {
+        fetchData();
+        showToast("采购入库成功", "success");
+      } else {
+        showToast("入库失败", "error");
+      }
+    } catch (error) {
+      console.error("Confirm receipt failed:", error);
+      showToast("网络错误", "error");
     }
-    setIsModalOpen(false);
+  };
+
+  const handleSave = async (data: Partial<PurchaseOrder>) => {
+    try {
+      const isEdit = !!editingPurchase;
+      const url = isEdit ? `/api/purchases/${editingPurchase.id}` : "/api/purchases";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        fetchData();
+        showToast(isEdit ? "采购单已保存" : "采购单已创建", "success");
+        setIsModalOpen(false);
+      } else {
+        showToast("保存失败", "error");
+      }
+    } catch (error) {
+      console.error("Purchase save failed:", error);
+      showToast("网络错误", "error");
+    }
   };
 
   const filteredPurchases = purchases.filter(p => 
@@ -96,26 +167,20 @@ export default function PurchasesPage() {
         </button>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card/50 p-4 backdrop-blur-md md:flex-row md:items-center shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="搜索采购单号或供应商..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg bg-secondary/50 px-10 py-2 text-sm text-foreground outline-none ring-1 ring-border transition-all placeholder:text-muted-foreground focus:bg-background focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
-        <button className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted/50 transition-colors">
-          <Filter size={16} />
-          筛选
-        </button>
+      {/* Search Box */}
+      <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+        <Search size={18} className="text-muted-foreground shrink-0" />
+        <input
+          type="text"
+          placeholder="搜索采购记录..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm"
+        />
       </div>
 
       {/* Table/List View */}
-      <div className="rounded-2xl border border-border bg-card/50 backdrop-blur-md overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-border bg-white dark:bg-gray-900/70 backdrop-blur-md overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -215,6 +280,16 @@ export default function PurchasesPage() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSave}
         initialData={editingPurchase}
+      />
+
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        message={confirmConfig.message}
+        title={confirmConfig.title}
+        confirmLabel="确认删除"
+        variant="danger"
       />
     </div>
   );

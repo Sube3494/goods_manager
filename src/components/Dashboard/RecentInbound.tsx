@@ -2,6 +2,8 @@
 
 import { Package, ChevronRight, Clock } from "lucide-react";
 import { motion } from "framer-motion";
+import { formatDistanceToNow } from "date-fns";
+import { zhCN } from "date-fns/locale";
 
 const container = {
   hidden: { opacity: 0 },
@@ -18,14 +20,18 @@ const itemAnim = {
   show: { opacity: 1, x: 0 }
 };
 
-export function RecentInbound() {
-  const items = [
-    { name: "高端真皮手提包", qty: 20, time: "2小时前", id: "#8832", cat: "箱包", img: "bg-orange-100 dark:bg-orange-900/20" },
-    { name: "极简陶瓷花瓶组", qty: 50, time: "5小时前", id: "#2219", cat: "家居", img: "bg-stone-200 dark:bg-stone-800" },
-    { name: "设计师款机械表", qty: 10, time: "昨天", id: "#9921", cat: "配饰", img: "bg-slate-200 dark:bg-slate-800" },
-    { name: "冬季羊绒围巾", qty: 15, time: "昨天", id: "#1102", cat: "服饰", img: "bg-red-100 dark:bg-red-900/20" },
-    { name: "蓝牙降噪耳机", qty: 32, time: "2天前", id: "#3301", cat: "数码", img: "bg-blue-100 dark:bg-blue-900/20" },
-  ];
+interface InboundItem {
+  id: string;
+  totalAmount: number;
+  status: string;
+  date: string;
+  supplier?: {
+    name: string;
+  };
+}
+
+export function RecentInbound({ data }: { data: InboundItem[] }) {
+  const items = data || [];
 
   return (
     <div className="glass-panel flex flex-col rounded-2xl border border-border p-6 h-full">
@@ -48,32 +54,32 @@ export function RecentInbound() {
         animate="show"
         className="flex-1 space-y-3 overflow-y-auto pr-1"
       >
-        {items.map((item, i) => (
+        {items.map((item) => (
           <motion.div
-            key={i}
+            key={item.id}
             variants={itemAnim}
             className="group flex items-center justify-between rounded-xl border border-transparent p-3 transition-all hover:border-border hover:bg-muted/50"
           >
             <div className="flex items-center gap-4">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${item.img} text-muted-foreground/50 transition-transform group-hover:scale-105`}>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/5 text-muted-foreground/50 transition-transform group-hover:scale-105">
                 <Package size={20} className="text-foreground/40" />
               </div>
               <div>
-                <p className="font-bold text-foreground text-sm">{item.name}</p>
+                <p className="font-bold text-foreground text-sm truncate max-w-[120px]">{item.supplier?.name || "未知供应商"}</p>
                 <div className="mt-1 flex items-center gap-2">
                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                     {item.cat}
+                     {item.status}
                    </span>
-                   <span className="text-[10px] font-mono text-muted-foreground/70">{item.id}</span>
+                   <span className="text-[10px] font-mono text-muted-foreground/70">{item.id.slice(0, 8)}</span>
                 </div>
               </div>
             </div>
             
             <div className="text-right">
-              <div className="font-mono text-sm font-bold text-emerald-500">+{item.qty}</div>
+              <div className="font-mono text-sm font-bold text-emerald-500">￥{item.totalAmount.toLocaleString()}</div>
               <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-muted-foreground">
                 <Clock size={10} />
-                {item.time}
+                {formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: zhCN })}
               </div>
             </div>
           </motion.div>

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Check, Package, Tag } from "lucide-react";
 import { Product } from "@/lib/types";
-import { INITIAL_GOODS } from "@/lib/mockData";
+
+
+import { getCategoryName } from "@/lib/utils";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -24,8 +26,29 @@ interface ProductSelectionModalProps {
 export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, supplierId }: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const filteredProducts = INITIAL_GOODS.filter(p => {
+  useEffect(() => {
+    if (isOpen) {
+      const fetchProducts = async () => {
+        setIsLoading(true);
+        try {
+          const res = await fetch("/api/products");
+          if (res.ok) {
+            setProducts(await res.json());
+          }
+        } catch (error) {
+          console.error("Failed to fetch products:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchProducts();
+    }
+  }, [isOpen]);
+
+  const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          (p.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
     const matchesSupplier = !supplierId || p.supplierId === supplierId;
@@ -39,7 +62,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   };
 
   const handleConfirm = () => {
-    const selectedProducts = INITIAL_GOODS.filter(p => tempSelectedIds.includes(p.id));
+    const selectedProducts = products.filter(p => tempSelectedIds.includes(p.id));
     onSelect(selectedProducts);
     onClose();
   };
@@ -61,9 +84,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-10001 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-10001 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-border p-8 bg-muted/30 shrink-0">
+            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-foreground">选择商品</h2>
                 <p className="text-xs text-muted-foreground mt-1">勾选您需要采购的商品（已自动过滤当前供应商）</p>
@@ -81,67 +104,75 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                   placeholder="搜索商品名称或编号..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-secondary/50 border-transparent outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                 />
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar min-h-0">
-                {filteredProducts.map(product => {
-                  const isSelected = tempSelectedIds.includes(product.id);
-                  return (
-                    <div 
-                      key={product.id}
-                      onClick={() => toggleProduct(product.id)}
-                      className={cn(
-                        "group flex items-center gap-4 p-3 rounded-xl border transition-all cursor-pointer",
-                        isSelected ? "bg-primary/5 border-primary/30" : "bg-card border-border/50 hover:border-primary/20 hover:bg-muted/30"
-                      )}
-                    >
-                      <div className={cn(
-                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-all",
-                        isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-background border-border"
-                      )}>
-                        {isSelected && <Check size={14} strokeWidth={3} />}
-                      </div>
+                 {isLoading ? (
+                    <div className="py-12 text-center text-muted-foreground animate-pulse">
+                        加载中...
+                    </div>
+                 ) : (
+                    <>
+                    {filteredProducts.map(product => {
+                      const isSelected = tempSelectedIds.includes(product.id);
+                      return (
+                        <div 
+                          key={product.id}
+                          onClick={() => toggleProduct(product.id)}
+                          className={cn(
+                            "group flex items-center gap-4 p-3 rounded-xl border transition-all cursor-pointer",
+                            isSelected ? "bg-primary/5 border-primary/30" : "bg-card border-border/50 hover:border-primary/20 hover:bg-muted/30"
+                          )}
+                        >
+                          <div className={cn(
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-all",
+                            isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-background border-border"
+                          )}>
+                            {isSelected && <Check size={14} strokeWidth={3} />}
+                          </div>
 
-                      <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50">
-                        {product.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-                        ) : (
-                            <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                                <Package size={20} />
+                          <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50">
+                            {product.image ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                            ) : (
+                                <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                                    <Package size={20} />
+                                </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                               <span className="font-bold text-foreground truncate">{product.name}</span>
+                               <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground font-mono">{product.sku}</span>
                             </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                           <span className="font-bold text-foreground truncate">{product.name}</span>
-                           <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground font-mono">{product.sku}</span>
+                            <div className="flex items-center gap-3 mt-1">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Tag size={12} /> {getCategoryName(product.category)}
+                                </span>
+                                <span className="text-xs font-bold text-primary">
+                                    ￥{product.price}
+                                </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3 mt-1">
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Tag size={12} /> {product.category}
-                            </span>
-                            <span className="text-xs font-bold text-primary">
-                                ￥{product.price}
-                            </span>
+                      );
+                    })}
+                    
+                    {filteredProducts.length === 0 && (
+                        <div className="py-12 text-center text-muted-foreground">
+                            未找到相关商品
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {filteredProducts.length === 0 && (
-                    <div className="py-12 text-center text-muted-foreground">
-                        未找到相关商品
-                    </div>
-                )}
-              </div>
+                    )}
+                    </>
+                 )}
+                </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-border p-8 bg-muted/30 shrink-0">
+            <div className="flex items-center justify-between border-t border-white/10 p-8 shrink-0">
               <div className="text-sm font-medium text-muted-foreground">
                 已选择 <span className="text-primary font-bold">{tempSelectedIds.length}</span> 项
               </div>

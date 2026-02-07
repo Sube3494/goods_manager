@@ -1,10 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Edit, Package, Truck, Trash2 } from "lucide-react";
+import { Edit, Package, Truck, Trash2, Camera } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { Product } from "@/lib/types";
 import { INITIAL_SUPPLIERS } from "@/lib/mockData";
+import { getCategoryName } from "@/lib/utils";
 
 export function GoodsCard({ 
   product, 
@@ -12,8 +14,8 @@ export function GoodsCard({
   onDelete
 }: { 
   product: Product; 
-  onEdit: (product: Product) => void;
-  onDelete: (id: string) => void;
+  onEdit?: (product: Product) => void;
+  onDelete?: (id: string, name: string) => void;
 }) {
   return (
     <motion.div
@@ -35,7 +37,7 @@ export function GoodsCard({
         )}
         
         <div className="absolute top-3 left-3 bg-secondary/80 backdrop-blur-md border border-border px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground rounded-full shadow-sm">
-          {product.category}
+          {getCategoryName(product.category)}
         </div>
       </div>
 
@@ -75,14 +77,21 @@ export function GoodsCard({
       
       {/* Quick Actions Overlay */}
       <div className="absolute top-3 right-3 flex flex-col gap-2 translate-x-10 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
+         <Link
+            href={`/gallery?productId=${product.id}`}
+            className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-primary p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn flex items-center justify-center"
+            title="查看实拍图库"
+         >
+           <Camera size={16} className="group-hover/btn:scale-110 transition-transform" />
+         </Link>
          <button 
-            onClick={() => onEdit(product)}
+            onClick={() => onEdit?.(product)}
             className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-primary p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
          >
            <Edit size={16} className="group-hover/btn:scale-110 transition-transform" />
          </button>
          <button 
-            onClick={() => onDelete(product.id)}
+            onClick={() => onDelete?.(product.id, product.name)}
             className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-destructive hover:bg-destructive hover:text-white p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
          >
            <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />

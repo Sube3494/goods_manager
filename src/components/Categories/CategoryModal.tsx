@@ -5,19 +5,13 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Tag, FileText, Palette } from "lucide-react";
 
-interface Category {
-  id?: string;
-  name: string;
-  description: string;
-  color: string;
-  count?: number;
-}
+import { Category } from "@/lib/types";
 
 interface CategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Category) => void;
-  initialData?: Category | null;
+  onSubmit: (data: Partial<Category>) => void;
+  initialData?: Partial<Category> | null;
 }
 
 const COLORS = [
@@ -30,7 +24,7 @@ const COLORS = [
 
 export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: CategoryModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [formData, setFormData] = useState<Category>(initialData || {
+  const [formData, setFormData] = useState<Partial<Category>>(initialData || {
     name: "",
     description: "",
     color: "bg-blue-500"
@@ -76,9 +70,9 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-border p-8 bg-muted/30 shrink-0">
+            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">
                 {initialData ? "编辑分类" : "新建分类"}
               </h2>
@@ -99,7 +93,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
                             type="text" 
                             value={formData.name}
                             onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="w-full rounded-xl bg-secondary/50 border-transparent focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                             placeholder="例如：箱包配饰"
                         />
                     </div>
@@ -112,7 +106,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
                         <textarea 
                             value={formData.description}
                             onChange={(e) => setFormData({...formData, description: e.target.value})}
-                            className="w-full rounded-xl bg-secondary/50 border-transparent focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all resize-none h-24"
+                            className="w-full rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all resize-none h-24 dark:hover:bg-white/10"
                             placeholder="简要描述该分类..."
                         />
                     </div>
@@ -122,7 +116,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                             <Palette size={16} /> 标签颜色
                         </label>
-                        <div className="grid grid-cols-6 gap-2 p-2 rounded-xl border border-border bg-secondary/30">
+                        <div className="grid grid-cols-6 gap-2 p-2 rounded-xl border border-border dark:border-white/10 bg-white/50 dark:bg-white/5">
                             {COLORS.map((color) => (
                                 <button
                                     key={color}
@@ -139,17 +133,17 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-3 border-t border-border p-8 bg-muted/30 shrink-0">
+                <div className="flex justify-end gap-3 border-t border-white/10 p-8 shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-xl px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all"
+                        className="rounded-full px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all"
                     >
                         取消
                     </button>
                     <button
                         type="submit"
-                        className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/40 active:scale-[0.98]"
+                        className="flex items-center gap-2 rounded-full bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/40 active:scale-[0.98]"
                     >
                         <CheckCircle size={18} />
                         保存分类

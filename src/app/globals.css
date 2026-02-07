@@ -86,25 +86,25 @@
   }
  
   .dark {
-    /* Dark: Rich Zinc/Slate */
-    --background: hsl(240 10% 4%); /* Zinc 950 */
-    --foreground: hsl(0 0% 98%);
+    /* Dark: Deep Navy (MinPic Style) */
+    --background: hsl(223 47% 6%); /* #080c16 */
+    --foreground: hsl(210 40% 98%); /* #f8fafc */
  
-    --card: hsl(240 10% 4%);
-    --card-foreground: hsl(0 0% 98%);
+    --card: hsl(221 45% 8%); /* #0b111e */
+    --card-foreground: hsl(210 40% 98%);
  
-    --popover: hsl(240 10% 4%);
-    --popover-foreground: hsl(0 0% 98%);
+    --popover: hsl(221 45% 8%);
+    --popover-foreground: hsl(210 40% 98%);
  
-    /* Primary: White */
-    --primary: hsl(0 0% 98%);
-    --primary-foreground: hsl(240 6% 10%);
+    /* Primary: Blue-ish White or Keep standard White */
+    --primary: hsl(210 40% 98%);
+    --primary-foreground: hsl(222 47% 11%);
  
-    --secondary: hsl(240 4% 16%); /* Zinc 800 */
-    --secondary-foreground: hsl(0 0% 98%);
+    --secondary: hsl(217 33% 17%); /* #1d2839 */
+    --secondary-foreground: hsl(210 40% 98%);
  
-    --muted: hsl(240 4% 16%);
-    --muted-foreground: hsl(240 5% 65%);
+    --muted: hsl(217 33% 17%); /* #1d2839 */
+    --muted-foreground: hsl(216 20% 75%); /* #b3bdcc */
  
     --accent: hsl(240 4% 16%);
     --accent-foreground: hsl(0 0% 98%);
@@ -151,3 +151,43 @@
   mix-blend-mode: normal;
 }
 
+@layer utilities {
+  /* 隐藏所有元素的滚动条，但保留滚动功能 (Hide all scrollbars but keep scrolling) */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 全球应用：隐藏 body 及所有具备滚动条的容器视觉 (Global application: hide scrollbar visuals for body and all scrollable containers) */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, and Opera */
+}
+
+/* Ensure backdrop-filter works properly */
+@supports (backdrop-filter: blur(0)) or (-webkit-backdrop-filter: blur(0)) {
+  .backdrop-blur-xl {
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  .backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .backdrop-blur-2xl {
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+  }
+  .backdrop-blur-lg {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+}

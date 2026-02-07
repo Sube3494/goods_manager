@@ -45,8 +45,8 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex w-full items-center justify-between rounded-xl bg-secondary/50 border border-transparent px-4 py-2.5 text-left text-sm transition-all outline-none ring-offset-background",
-          isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-secondary/70",
+          "flex w-full items-center justify-between rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-left text-sm transition-all outline-none ring-offset-background",
+          isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/50 dark:hover:bg-white/10",
           !value && "text-muted-foreground"
         )}
       >
@@ -64,7 +64,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 5, scale: 0.98 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-xl backdrop-blur-md"
+            className="absolute z-50 mt-2 max-h-60 w-full overflow-auto rounded-2xl bg-white dark:bg-card/70 dark:backdrop-blur-xl border border-border dark:border-white/10 p-1 shadow-xl ring-1 ring-black/5 focus:outline-none"
           >
             <div className="max-h-60 overflow-auto p-1 py-1.5 scrollbar-hide">
               {options.map((option) => (
@@ -76,8 +76,8 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
                     setIsOpen(false);
                   }}
                   className={cn(
-                    "relative flex w-full select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer data-disabled:pointer-events-none data-disabled:opacity-50",
-                    option.value === value && "bg-accent/50 text-accent-foreground font-medium"
+                    "relative flex w-full select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer data-disabled:pointer-events-none data-disabled:opacity-50",
+                    option.value === value && "bg-black/10 dark:bg-white/10 font-medium"
                   )}
                 >
                   <span className="truncate">{option.label}</span>

@@ -53,9 +53,9 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-border p-8 bg-muted/30 shrink-0">
+            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">
                 {initialData ? "编辑供应商" : "新建供应商"}
               </h2>
@@ -76,7 +76,7 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
                             type="text" 
                             value={formData.name}
                             onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="w-full rounded-xl bg-secondary/50 border-transparent focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                             placeholder="例如：卓越物流供应链"
                         />
                     </div>
@@ -91,7 +91,7 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
                                 type="text" 
                                 value={formData.contact}
                                 onChange={(e) => setFormData({...formData, contact: e.target.value})}
-                                className="w-full rounded-xl bg-secondary/50 border-transparent focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                                className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                 placeholder="联系人姓名"
                             />
                         </div>
@@ -105,7 +105,7 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
                                 type="tel" 
                                 value={formData.phone}
                                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                                className="w-full rounded-xl bg-secondary/50 border-transparent focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                                className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                 placeholder="电话号码"
                             />
                         </div>
@@ -120,7 +120,7 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
                             type="email" 
                             value={formData.email}
                             onChange={(e) => setFormData({...formData, email: e.target.value})}
-                            className="w-full rounded-xl bg-secondary/50 border-transparent focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                             placeholder="example@supplier.com"
                         />
                     </div>
@@ -133,13 +133,13 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
                         <textarea 
                             value={formData.address}
                             onChange={(e) => setFormData({...formData, address: e.target.value})}
-                            className="w-full rounded-xl bg-secondary/50 border-transparent focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all resize-none h-20"
+                            className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all resize-none h-20 dark:hover:bg-white/10"
                             placeholder="公司地址..."
                         />
                     </div>
                 </div>
 
-                <div className="flex justify-end gap-3 border-t border-border p-8 bg-muted/30 shrink-0">
+                <div className="flex justify-end gap-3 border-t border-white/10 p-8 shrink-0">
                     <button
                         type="button"
                         onClick={onClose}

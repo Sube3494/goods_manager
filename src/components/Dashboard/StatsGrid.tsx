@@ -3,51 +3,65 @@
 import { Archive, Package, AlertTriangle, ArrowDownRight, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 
-const stats = [
-  { 
-    title: "库存总货值", 
-    value: "¥452,310", 
-    icon: Archive, 
-    sub: "共计 450 个SKU", 
-    trend: "+12%", 
-    trendUp: true,
-    color: "from-blue-500/20 to-cyan-500/20",
-    iconColor: "text-blue-500"
-  },
-  { 
-    title: "商品总数", 
-    value: "3,450", 
-    icon: Package, 
-    sub: "分布于 12 个分类", 
-    trend: "+5%", 
-    trendUp: true,
-    color: "from-purple-500/20 to-pink-500/20",
-    iconColor: "text-purple-500"
-  },
-  { 
-    title: "库存预警", 
-    value: "8", 
-    icon: AlertTriangle, 
-    sub: "需要立即补货", 
-    trend: "急需", 
-    trendUp: false,
-    warning: true,
-    color: "from-orange-500/20 to-red-500/20",
-    iconColor: "text-orange-500"
-  },
-  { 
-    title: "本周入库", 
-    value: "+120", 
-    icon: ArrowDownRight, 
-    sub: "过去7天新增", 
-    trend: "+20%", 
-    trendUp: true,
-    color: "from-emerald-500/20 to-teal-500/20",
-    iconColor: "text-emerald-500"
-  },
-];
 
-export function StatsGrid() {
+
+
+interface StatsData {
+  productCount: number;
+  totalStock: number;
+  lowStockCount: number;
+  totalValue: number;
+  recentPurchases: any[]; // refined later if needed
+}
+
+export function StatsGrid({ data }: { data: StatsData | null }) {
+  const stats = [
+    { 
+      title: "库存总货值", 
+      value: data ? `¥${data.totalValue.toLocaleString()}` : "¥0", 
+      icon: Archive, 
+      sub: data ? `共计 ${data.productCount} 个SKU` : "加载中...", 
+      trend: "+0%", 
+      trendUp: true,
+      warning: false,
+      color: "from-blue-500/20 to-cyan-500/20",
+      iconColor: "text-blue-500"
+    },
+    { 
+      title: "商品总量", 
+      value: data ? data.totalStock.toLocaleString() : "0", 
+      icon: Package, 
+      sub: "动态更新", 
+      trend: "+0%", 
+      trendUp: true,
+      warning: false,
+      color: "from-purple-500/20 to-pink-500/20",
+      iconColor: "text-purple-500"
+    },
+    { 
+      title: "库存预警", 
+      value: data ? data.lowStockCount.toString() : "0", 
+      icon: AlertTriangle, 
+      sub: "需要补货", 
+      trend: (data?.lowStockCount ?? 0) > 0 ? "急需" : "正常", 
+      trendUp: false,
+      warning: (data?.lowStockCount ?? 0) > 0,
+      color: "from-orange-500/20 to-red-500/20",
+      iconColor: "text-orange-500"
+    },
+    { 
+      title: "本周入库", 
+      value: data ? `+${data.recentPurchases.length}` : "+0", 
+      icon: ArrowDownRight, 
+      sub: "近期采购单", 
+      trend: "实时", 
+      trendUp: true,
+      warning: false,
+      color: "from-emerald-500/20 to-teal-500/20",
+      iconColor: "text-emerald-500"
+    },
+  ];
+
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, i) => (

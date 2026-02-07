@@ -3,35 +3,70 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Camera, ChevronRight, Eye, ArrowLeft, X, Download } from "lucide-react";
+import { Search, Camera, ChevronRight, Eye, ArrowLeft, X, Download, Plus, Upload, CheckCircle, Tag as TagIcon, Package } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { INITIAL_GALLERY, INITIAL_GOODS } from "@/lib/mockData";
-import { GalleryItem } from "@/lib/types";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { useUser } from "@/hooks/useUser";
 
 function GalleryContent() {
+  const { user } = useUser();
+  const isAdmin = !!user;
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useRouter();  
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
+  const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [items, setItems] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
+  
+  // Upload States
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [uploadForm, setUploadForm] = useState({
+    productId: "",
+    tags: "",
+    isPublic: true,
+    url: ""
+  });
+
+  const fetchData = async () => {
+    try {
+      const productId = searchParams.get("productId");
+      const galleryUrl = productId ? `/api/gallery?productId=${productId}` : "/api/gallery";
+      
+      const [galleryRes, categoriesRes, productsRes] = await Promise.all([
+        fetch(galleryUrl),
+        fetch("/api/categories"),
+        fetch("/api/products")
+      ]);
+
+      if (galleryRes.ok && categoriesRes.ok && productsRes.ok) {
+        const galleryData = await galleryRes.json();
+        const categoriesData = await categoriesRes.json();
+        const productsData = await productsRes.json();
+        setItems(galleryData);
+        setCategories(["All", ...categoriesData.map((c: any) => c.name)]);
+        setProducts(productsData);
+      }
+    } catch (error) {
+      console.error("Gallery fetch failed:", error);
+    }
+  };
 
   useEffect(() => {
-    const handle = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(handle);
-  }, []);
+    setMounted(true);
+    fetchData();
+  }, [searchParams]);
 
   // Body Scroll Lock
   useEffect(() => {
-    if (selectedImage) {
+    if (selectedImage || isUploadModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -39,35 +74,95 @@ function GalleryContent() {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [selectedImage]);
+  }, [selectedImage, isUploadModalOpen]);
 
+  // Upload Handlers
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const { url } = await res.json();
+        setUploadForm(prev => ({ ...prev, url }));
+      }
+    } catch (error) {
+      console.error("Upload failed:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadForm.url || !uploadForm.productId) return;
+
+    try {
+      const res = await fetch("/api/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...uploadForm,
+          tags: uploadForm.tags.split(",").map(t => t.trim()).filter(Boolean)
+        })
+      });
+
+      if (res.ok) {
+        setIsUploadModalOpen(false);
+        setUploadForm({ productId: "", tags: "", isPublic: true, url: "" });
+        fetchData(); // Refresh
+      }
+    } catch (error) {
+      console.error("Gallery submit failed:", error);
+    }
+  };
+
+  // Helper logic
   const productIdFilter = searchParams.get("productId");
 
-  const categories = ["All", ...Array.from(new Set(INITIAL_GOODS.map(g => g.category)))];
+  const filteredItems = items.filter(item => {
+    const product = item.product;
+    if (!isAdmin && !item.isPublic) return false;
 
-  const filteredItems = INITIAL_GALLERY.filter(item => {
-    const product = INITIAL_GOODS.find(g => g.id === item.productId);
-    
-    // If productId filter is active, only show that product
-    if (productIdFilter && item.productId !== productIdFilter) return false;
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = 
+      product?.name.toLowerCase().includes(searchLower) || 
+      product?.sku?.toLowerCase().includes(searchLower) ||
+      item.tags.some((t: string) => t.toLowerCase().includes(searchLower));
 
-    const matchesSearch = product?.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         item.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory = selectedCategory === "All" || product?.category === selectedCategory;
+    const matchesCategory = selectedCategory === "All" || item.product?.category?.name === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const filteredProduct = productIdFilter ? INITIAL_GOODS.find(g => g.id === productIdFilter) : null;
+  const filteredProduct = items.length > 0 ? items[0].product : null;
 
-  const handleOpenImage = (item: GalleryItem) => {
+  const handleOpenImage = (item: any) => {
     setSelectedImage(item);
   };
 
-  const relatedImages = selectedImage ? INITIAL_GALLERY.filter(img => img.productId === selectedImage.productId) : [];
+  // Navigation logic
+  const relatedImages = selectedImage ? items.filter(img => {
+      const isCorrectProduct = img.productId === selectedImage.productId;
+      const isVisible = isAdmin || img.isPublic;
+      return isCorrectProduct && isVisible;
+  }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 
   const handlePrev = () => {
     if (currentIndex > 0) setSelectedImage(relatedImages[currentIndex - 1]);
+  };
+
+  const handleNext = () => {
+    if (currentIndex < relatedImages.length - 1) setSelectedImage(relatedImages[currentIndex + 1]);
   };
 
   const handleDownload = async (url: string, filename: string) => {
@@ -84,7 +179,6 @@ function GalleryContent() {
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error("Download failed:", error);
-      // Fallback to direct link if fetch fails
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
@@ -93,18 +187,16 @@ function GalleryContent() {
     }
   };
 
-  const handleNext = () => {
-    if (currentIndex < relatedImages.length - 1) setSelectedImage(relatedImages[currentIndex + 1]);
-  };
-
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-primary">
+            <div className="flex items-center gap-2 text-black dark:text-white">
               <Camera size={20} />
-              <span className="text-sm font-bold uppercase tracking-wider">Physical Album</span>
+              <span className="text-sm font-bold uppercase tracking-wider">
+                {isAdmin ? "Internal Management Album" : "Product Exhibition"}
+              </span>
             </div>
             <h1 className="text-4xl font-black tracking-tight text-foreground">
               {productIdFilter ? (
@@ -117,11 +209,24 @@ function GalleryContent() {
               )}
             </h1>
             <p className="text-muted-foreground text-lg">
-              {productIdFilter ? `正在查看此款商品的专属随拍记录` : `查看商品实拍图、细节展示及入库验货记录`}
+              {isAdmin 
+                ? "管理商品实拍、验货详情及内部档案" 
+                : "查看商品实拍图、细节展示，确认真实品质"}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
+             {isAdmin && (
+               <button 
+                 onClick={() => setIsUploadModalOpen(true)}
+                 className="h-14 px-8 rounded-2xl bg-primary text-white flex items-center gap-2 transition-all font-black shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
+               >
+                 <Plus size={24} /> 上传照片
+               </button>
+             )}
+             
+             {/* Remove the "switch view" button, since it's now real auth */ }
+
              {productIdFilter && (
                  <button 
                     onClick={() => router.push("/gallery")}
@@ -130,20 +235,20 @@ function GalleryContent() {
                     <ArrowLeft size={20} /> 返回全集
                  </button>
              )}
-             <div className="h-14 px-6 rounded-2xl glass border-border/50 flex items-center gap-4 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                <Search size={20} className="text-muted-foreground" />
+             <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+                <Search size={18} className="text-muted-foreground" />
                 <input 
                     type="text" 
-                    placeholder="搜索商品或标签..." 
+                    placeholder="按商品名、SKU或标签检索..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-64"
+                    className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-64 text-sm"
                 />
              </div>
           </div>
         </div>
 
-        {/* Filters - Added py-4 and adjusted margins to prevent shadow/scale truncation */}
+        {/* Filters */}
         <div className="flex items-center gap-2 overflow-x-auto py-4 -mx-2 px-2 scrollbar-none">
             {categories.map(cat => (
                 <button
@@ -165,7 +270,7 @@ function GalleryContent() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
            <AnimatePresence mode="popLayout">
             {filteredItems.map((item, index) => {
-                const product = INITIAL_GOODS.find(g => g.id === item.productId);
+                const product = item.product;
                 return (
                     <motion.div
                         key={item.id}
@@ -174,7 +279,9 @@ function GalleryContent() {
                         exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ duration: 0.4, delay: index * 0.05 }}
                     >
-                        <div className="group relative rounded-3xl overflow-hidden bg-white dark:bg-card border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full">
+                        <div className="group relative rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
+                             onClick={() => handleOpenImage(item)}
+                        >
                             {/* Image Container */}
                             <div className="relative aspect-4/3 overflow-hidden bg-muted">
                                 <Image 
@@ -184,32 +291,35 @@ function GalleryContent() {
                                     unoptimized
                                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                                 />
-                                <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                                
+                                {/* 元数据浮层 - SKU + 快速发图引导 */}
+                                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                                    <span className="px-3 py-1 bg-black/70 backdrop-blur-md rounded-lg text-[10px] font-black text-white border border-white/10 tracking-widest uppercase">
+                                        {product?.sku}
+                                    </span>
+                                    {!item.isPublic && isAdmin && (
+                                        <span className="px-2 py-0.5 bg-yellow-500/90 text-black text-[9px] font-bold rounded shadow-sm w-fit">
+                                            内部可见
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                                    <div className="flex flex-col gap-1 mb-4">
+                                        <p className="text-white font-bold text-base line-clamp-1">{product?.name}</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {item.tags.map((tag: string) => (
+                                                <span key={tag} className="text-[9px] text-white/70 bg-white/10 px-1.5 py-0.5 rounded border border-white/5">
+                                                    #{tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
                                     <button 
-                                        onClick={() => handleOpenImage(item)}
-                                        className="w-full py-3 rounded-xl bg-white text-black font-black text-sm flex items-center justify-center gap-2 hover:bg-primary hover:text-white transition-all transform translate-y-4 group-hover:translate-y-0 duration-500"
+                                        className="w-full py-3 rounded-xl bg-white dark:bg-white/10 text-black dark:text-white font-black text-sm flex items-center justify-center gap-2 hover:bg-primary hover:text-white dark:hover:bg-primary transition-all transform translate-y-4 group-hover:translate-y-0 duration-500 backdrop-blur-sm"
                                     >
                                         <Eye size={16} /> 查看大图
                                     </button>
-                                </div>
-                            </div>
-
-                            {/* Content */}
-                            <div className="p-5 space-y-2 flex-1 flex flex-col justify-between">
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <h3 className="font-bold text-foreground truncate group-hover:text-primary transition-colors text-sm">
-                                            {product?.name}
-                                        </h3>
-                                        <span className="shrink-0 text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                            {product?.sku}
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="pt-2 border-t border-border/30 flex items-center justify-between text-[10px]">
-                                        <span className="font-bold text-primary uppercase tracking-wider">{product?.category}</span>
-                                        <ChevronRight size={12} className="text-muted-foreground/50" />
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -219,7 +329,7 @@ function GalleryContent() {
 
             {filteredItems.length === 0 && productIdFilter && (
                 <div className="col-span-full py-24 text-center glass border-dashed border-2 border-border/50 rounded-3xl">
-                <Camera size={48} className="mx-auto text-muted-foreground/30 mb-4" />
+                <Camera size={48} className="mx-auto text-black/30 dark:text-white/30 mb-4" />
                 <h3 className="text-xl font-bold text-foreground">该商品暂无实拍图</h3>
                 <p className="text-muted-foreground mt-1">您可以尝试上传第一张实拍照片</p>
                 </div>
@@ -230,17 +340,109 @@ function GalleryContent() {
         {/* Empty State */}
         {filteredItems.length === 0 && !productIdFilter && (
             <div className="py-32 flex flex-col items-center justify-center text-center space-y-6">
-                <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center text-muted-foreground/30">
+                <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center text-black/30 dark:text-white/30">
                     <Camera size={48} />
                 </div>
                 <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-foreground">暂无符合条件的随拍</h3>
+                    <h3 className="text-2xl font-bold text-foreground">暂无符合条件的图片</h3>
                     <p className="text-muted-foreground">尝试更换搜索词或选择其他分类</p>
                 </div>
             </div>
         )}
 
-        {/* Image Viewer Modal - Using Portal to cover entire screen including sidebar */}
+        {/* Upload Modal */}
+        {mounted && createPortal(
+            <AnimatePresence>
+                {isUploadModalOpen && (
+                    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+                            onClick={() => setIsUploadModalOpen(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="relative z-10 w-full max-w-lg rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col"
+                        >
+                            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
+                                <h2 className="text-xl font-bold text-foreground">上传实拍照片</h2>
+                                <button onClick={() => setIsUploadModalOpen(false)} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleUploadSubmit} className="p-6 space-y-5">
+                                {/* Upload Box */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                        <Camera size={16} className="text-black dark:text-white" /> 选择照片
+                                    </label>
+                                    <label className="relative aspect-video rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer overflow-hidden group">
+                                        <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+                                        {uploadForm.url ? (
+                                            <Image src={uploadForm.url} alt="upload preview" fill className="object-cover" />
+                                        ) : (
+                                            <>
+                                                <div className="p-4 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
+                                                    <Upload size={32} className={cn("text-muted-foreground group-hover:text-primary transition-all", isUploading && "animate-bounce")} />
+                                                </div>
+                                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{isUploading ? "正在处理照片..." : "点击或拖拽上传"}</span>
+                                            </>
+                                        )}
+                                    </label>
+                                </div>
+
+                                {/* Product Select */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                        <Package size={16} /> 关联商品
+                                    </label>
+                                    <CustomSelect 
+                                        value={uploadForm.productId}
+                                        onChange={(val) => setUploadForm({...uploadForm, productId: val})}
+                                        options={products.map(p => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+                                        placeholder="选择关联商品..."
+                                    />
+                                </div>
+
+                                {/* Tags */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                        <TagIcon size={16} /> 标签 (英文逗号分隔)
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        value={uploadForm.tags}
+                                        onChange={(e) => setUploadForm({...uploadForm, tags: e.target.value})}
+                                        className="w-full rounded-xl bg-secondary/50 border-transparent px-4 py-2.5 text-sm outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                                        placeholder="例如: 实拍, 细节, 验货"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end gap-3 pt-4">
+                                    <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">取消</button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={!uploadForm.url || !uploadForm.productId || isUploading}
+                                        className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all"
+                                    >
+                                        <CheckCircle size={18} />
+                                        确认发布
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>,
+            document.body
+        )}
+
+        {/* Image Viewer Modal */}
         {mounted && createPortal(
             <AnimatePresence>
                 {selectedImage && (
@@ -304,17 +506,28 @@ function GalleryContent() {
                                     onClick={(e) => e.stopPropagation()}
                                 />
 
-                                {/* Info Overlay - Forced Dark Theme - Compacted Layout */}
+                                {/* Info Overlay */}
                                 <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-black/70 border border-white/10 px-7 py-4 rounded-[28px] flex items-center gap-8 min-w-fit shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 backdrop-blur-2xl">
                                     <div className="flex flex-col shrink-0">
                                         <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">Product Name</span>
-                                        <span className="text-white font-bold text-base whitespace-nowrap tracking-tight">{INITIAL_GOODS.find(g => g.id === selectedImage.productId)?.name}</span>
+                                        <span className="text-white font-bold text-base whitespace-nowrap tracking-tight">{selectedImage.product?.name}</span>
                                     </div>
                                     <div className="h-8 w-px bg-white/10 shrink-0" />
                                     <div className="flex flex-col shrink-0">
                                         <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">SKU ID</span>
-                                        <span className="text-white font-mono text-base bg-white/15 px-2.5 py-0.5 rounded-lg border border-white/10 whitespace-nowrap">{INITIAL_GOODS.find(g => g.id === selectedImage.productId)?.sku}</span>
+                                        <span className="text-white font-mono text-base bg-white/15 px-2.5 py-0.5 rounded-lg border border-white/10 whitespace-nowrap">{selectedImage.product?.sku}</span>
                                     </div>
+                                    {isAdmin && selectedImage.product?.stock !== undefined && (
+                                        <>
+                                            <div className="h-8 w-px bg-white/10 shrink-0" />
+                                            <div className="flex flex-col shrink-0">
+                                                <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">Current Stock</span>
+                                                <span className="text-white font-bold text-base whitespace-nowrap">
+                                                    {selectedImage.product?.stock} <span className="text-[10px] font-normal opacity-50 text-white/60">件</span>
+                                                </span>
+                                            </div>
+                                        </>
+                                    )}
                                     {relatedImages.length > 1 && (
                                         <>
                                             <div className="h-8 w-px bg-white/10 shrink-0" />
@@ -329,8 +542,8 @@ function GalleryContent() {
                                     <div className="h-8 w-px bg-white/10 shrink-0" />
                                     <button 
                                         onClick={() => {
-                                            const product = INITIAL_GOODS.find(g => g.id === selectedImage.productId);
-                                            const fileName = `${product?.sku || 'image'}-${selectedImage.id}.jpg`;
+                                            const product = selectedImage.product;
+                                            const fileName = `${product?.name || 'product'}_${product?.sku || 'image'}_${selectedImage.id}.jpg`;
                                             handleDownload(selectedImage.url, fileName);
                                         }}
                                         className="flex items-center gap-2 bg-white text-black hover:bg-primary hover:text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 group/dl whitespace-nowrap shrink-0"

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Goods Manager",
-  description: "Modern Inventory Management",
+  title: "PickNote",
+  description: "专业库存管理系统",
 };
 
 export default function RootLayout({

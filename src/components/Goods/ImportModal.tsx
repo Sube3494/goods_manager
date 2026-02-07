@@ -102,10 +102,10 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-card p-0 shadow-2xl border border-border flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl p-0 shadow-2xl border border-border/50 flex flex-col max-h-[90vh]"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-border p-8 bg-muted/30 shrink-0">
+            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">导入商品</h2>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={24} />
@@ -194,7 +194,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-3 border-t border-border p-8 bg-muted/30 shrink-0">
+            <div className="flex justify-end gap-3 border-t border-white/10 p-8 shrink-0">
               <button
                 type="button"
                 onClick={onClose}

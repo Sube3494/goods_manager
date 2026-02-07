@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, DollarSign, ListOrdered, FileText } from "lucide-react";
-import { INITIAL_SUPPLIERS, INITIAL_GOODS } from "@/lib/mockData";
-import { PurchaseOrder, PurchaseOrderItem, Product } from "@/lib/types";
+import { PurchaseOrder, PurchaseOrderItem, Product, Supplier } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -35,14 +34,32 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(handle);
-  }, []);
+    
+    const fetchData = async () => {
+      try {
+        const [sRes, pRes] = await Promise.all([
+          fetch("/api/suppliers"),
+          fetch("/api/products")
+        ]);
+        if (sRes.ok && pRes.ok) {
+          setSuppliers(await sRes.json());
+          setProducts(await pRes.json());
+        }
+      } catch (error) {
+        console.error("Failed to fetch modal data:", error);
+      }
+    };
 
-  const suppliers = INITIAL_SUPPLIERS;
-  const availableGoodsFiltered = INITIAL_GOODS.filter(g => !formData.supplierId || g.supplierId === formData.supplierId);
+    if (isOpen) fetchData();
+    return () => cancelAnimationFrame(handle);
+  }, [isOpen]);
+
+  const availableGoodsFiltered = products.filter(g => !formData.supplierId || g.supplierId === formData.supplierId);
 
   const calculateTotal = () => {
     return formData.items.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
@@ -82,7 +99,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
     
     // Auto-fill cost price if product changes
     if (field === "productId") {
-        const product = INITIAL_GOODS.find(g => g.id === value);
+        const product = products.find(g => g.id === value);
         if (product) {
             newItems[index].costPrice = product.price * 0.7; // Mock cost price at 70% of retail
         }
@@ -118,9 +135,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-border p-8 bg-muted/30 shrink-0">
+            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">
                 {initialData ? "编辑采购单" : "新建采购单"}
               </h2>
@@ -141,7 +158,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
                                 disabled
                                 type="text" 
                                 value={formData.id}
-                                className="w-full rounded-xl bg-background/50 border-transparent px-4 py-2.5 text-foreground outline-none ring-1 ring-border opacity-70 font-mono"
+                                className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent opacity-70 font-mono"
                             />
                         </div>
                         <div className="space-y-2">
@@ -188,10 +205,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
                             {formData.items.map((item, index) => (
                                 <div key={index} className="group flex gap-3 items-end p-3 rounded-xl bg-secondary/20 border border-border/50 hover:border-primary/30 transition-all animate-in fade-in slide-in-from-top-2">
                                     <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50 self-center mt-4">
-                                        {INITIAL_GOODS.find(g => g.id === item.productId)?.image ? (
+                                        {products.find(g => g.id === item.productId)?.image ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img 
-                                                src={INITIAL_GOODS.find(g => g.id === item.productId)?.image} 
+                                                src={products.find(g => g.id === item.productId)?.image} 
                                                 alt="product" 
                                                 className="h-full w-full object-cover" 
                                             />
@@ -217,7 +234,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
                                             min="1"
                                             value={item.quantity}
                                             onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 0)}
-                                            className="w-full rounded-xl bg-background border-transparent px-3 py-2 text-foreground outline-none ring-1 ring-border text-center focus:ring-2 focus:ring-primary/20 transition-all"
+                                            className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3 py-2 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                             placeholder="数量"
                                         />
                                     </div>
@@ -230,7 +247,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
                                                 step="0.01"
                                                 value={item.costPrice}
                                                 onChange={(e) => updateItem(index, "costPrice", parseFloat(e.target.value) || 0)}
-                                                className="w-full rounded-xl bg-background border-transparent pl-8 pr-3 py-2 text-foreground outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                                                className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-8 pr-3 py-2 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                                 placeholder="单价"
                                             />
                                         </div>
@@ -273,7 +290,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData }: P
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-12 border-t border-border px-8 py-6 bg-muted/30">
+                <div className="flex items-center justify-end gap-12 border-t border-white/10 px-8 py-6 shrink-0">
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-muted-foreground">总计金额:</span>
                         <span className="text-2xl font-bold text-foreground font-mono">
