@@ -164,17 +164,17 @@ export default function GoodsPage() {
         
         <div className="flex items-center gap-3">
            {user && (
-             <div className="glass p-1 rounded-xl flex gap-2">
+             <div className="glass p-1 rounded-full flex gap-1 items-center h-10">
                 <button 
                   onClick={() => setIsImportOpen(true)}
-                  className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-2 rounded-full px-4 h-8 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                 >
                   <Download size={18} />
                   Excel 导入
                 </button>
                 <button 
                   onClick={handleCreate}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+                  className="flex items-center gap-2 rounded-full bg-primary px-6 h-8 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
                 >
                   <Plus size={18} />
                   新建商品
@@ -185,7 +185,7 @@ export default function GoodsPage() {
       </div>
 
       {/* Search Box */}
-      <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
         <Search size={18} className="text-muted-foreground shrink-0" />
         <input
           type="text"

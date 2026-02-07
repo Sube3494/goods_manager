@@ -11,6 +11,8 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 import { useUser } from "@/hooks/useUser";
+import { Product, GalleryItem } from "@/lib/types";
+import { useCallback } from "react";
 
 function GalleryContent() {
   const { user } = useUser();
@@ -19,15 +21,29 @@ function GalleryContent() {
   const router = useRouter();  
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedImage, setSelectedImage] = useState<any | null>(null);
+  const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<GalleryItem[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
+  const [isUploadAllowed, setIsUploadAllowed] = useState(true);
+
+  useEffect(() => {
+    const checkUploadSetting = () => {
+      const saved = localStorage.getItem("app_allow_upload");
+      if (saved !== null) {
+        setIsUploadAllowed(saved === "true");
+      }
+    };
+    
+    checkUploadSetting();
+    window.addEventListener("storage", checkUploadSetting);
+    return () => window.removeEventListener("storage", checkUploadSetting);
+  }, []);
   
   // Upload States
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [uploadForm, setUploadForm] = useState({
     productId: "",
     tags: "",
@@ -35,7 +51,7 @@ function GalleryContent() {
     url: ""
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const productId = searchParams.get("productId");
       const galleryUrl = productId ? `/api/gallery?productId=${productId}` : "/api/gallery";
@@ -57,12 +73,12 @@ function GalleryContent() {
     } catch (error) {
       console.error("Gallery fetch failed:", error);
     }
-  };
+  }, [searchParams]);
 
   useEffect(() => {
     setMounted(true);
     fetchData();
-  }, [searchParams]);
+  }, [fetchData]);
 
   // Body Scroll Lock
   useEffect(() => {
@@ -145,7 +161,7 @@ function GalleryContent() {
 
   const filteredProduct = items.length > 0 ? items[0].product : null;
 
-  const handleOpenImage = (item: any) => {
+  const handleOpenImage = (item: GalleryItem) => {
     setSelectedImage(item);
   };
 
@@ -190,38 +206,30 @@ function GalleryContent() {
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-black dark:text-white">
-              <Camera size={20} />
-              <span className="text-sm font-bold uppercase tracking-wider">
-                {isAdmin ? "Internal Management Album" : "Product Exhibition"}
-              </span>
-            </div>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
+          <div className="space-y-1">
             <h1 className="text-4xl font-black tracking-tight text-foreground">
               {productIdFilter ? (
-                  <div className="flex items-center gap-3">
-                    实物<span className="text-primary">档案</span>
-                    <span className="text-2xl font-normal text-muted-foreground">/ {filteredProduct?.name}</span>
+                  <div className="flex items-center gap-2">
+                    实物相册
+                    <span className="text-xl font-bold text-muted-foreground/60 ml-2">/ {filteredProduct?.name}</span>
                   </div>
               ) : (
                 <>实物<span className="text-primary">相册</span></>
               )}
             </h1>
-            <p className="text-muted-foreground text-lg">
-              {isAdmin 
-                ? "管理商品实拍、验货详情及内部档案" 
-                : "查看商品实拍图、细节展示，确认真实品质"}
+            <p className="text-muted-foreground/60 text-sm font-medium">
+              {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
-             {isAdmin && (
+             {isAdmin && isUploadAllowed && (
                <button 
                  onClick={() => setIsUploadModalOpen(true)}
-                 className="h-14 px-8 rounded-2xl bg-primary text-white flex items-center gap-2 transition-all font-black shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
+                 className="h-10 px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95"
                >
-                 <Plus size={24} /> 上传照片
+                 <Plus size={18} /> 上传照片
                </button>
              )}
              
@@ -230,12 +238,12 @@ function GalleryContent() {
              {productIdFilter && (
                  <button 
                     onClick={() => router.push("/gallery")}
-                    className="h-14 px-6 rounded-2xl glass border-border/50 text-muted-foreground hover:text-foreground flex items-center gap-2 transition-all font-bold"
+                    className="h-10 px-6 rounded-full glass border-border/50 text-muted-foreground hover:text-foreground flex items-center gap-2 transition-all font-bold"
                  >
-                    <ArrowLeft size={20} /> 返回全集
+                    <ArrowLeft size={18} /> 返回全集
                  </button>
              )}
-             <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+             <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
                 <Search size={18} className="text-muted-foreground" />
                 <input 
                     type="text" 
@@ -255,9 +263,9 @@ function GalleryContent() {
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
                     className={cn(
-                        "px-6 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap border",
+                        "px-6 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border",
                         selectedCategory === cat 
-                        ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105" 
+                        ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
                         : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
                     )}
                 >
@@ -294,11 +302,11 @@ function GalleryContent() {
                                 
                                 {/* 元数据浮层 - SKU + 快速发图引导 */}
                                 <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-                                    <span className="px-3 py-1 bg-black/70 backdrop-blur-md rounded-lg text-[10px] font-black text-white border border-white/10 tracking-widest uppercase">
+                                    <span className="px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-[10px] font-black text-white border border-white/10 tracking-widest uppercase">
                                         {product?.sku}
                                     </span>
                                     {!item.isPublic && isAdmin && (
-                                        <span className="px-2 py-0.5 bg-yellow-500/90 text-black text-[9px] font-bold rounded shadow-sm w-fit">
+                                        <span className="px-2 py-0.5 bg-yellow-500/90 text-black text-[9px] font-bold rounded-full shadow-sm w-fit">
                                             内部可见
                                         </span>
                                     )}
@@ -309,7 +317,7 @@ function GalleryContent() {
                                         <p className="text-white font-bold text-base line-clamp-1">{product?.name}</p>
                                         <div className="flex flex-wrap gap-1.5">
                                             {item.tags.map((tag: string) => (
-                                                <span key={tag} className="text-[9px] text-white/70 bg-white/10 px-1.5 py-0.5 rounded border border-white/5">
+                                                <span key={tag} className="text-[9px] text-white/70 bg-white/10 px-2 py-0.5 rounded-full border border-white/5">
                                                     #{tag}
                                                 </span>
                                             ))}
@@ -418,7 +426,7 @@ function GalleryContent() {
                                         type="text" 
                                         value={uploadForm.tags}
                                         onChange={(e) => setUploadForm({...uploadForm, tags: e.target.value})}
-                                        className="w-full rounded-xl bg-secondary/50 border-transparent px-4 py-2.5 text-sm outline-none ring-1 ring-border focus:ring-2 focus:ring-primary/20 transition-all"
+                                        className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                         placeholder="例如: 实拍, 细节, 验货"
                                     />
                                 </div>
@@ -509,19 +517,19 @@ function GalleryContent() {
                                 {/* Info Overlay */}
                                 <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-black/70 border border-white/10 px-7 py-4 rounded-[28px] flex items-center gap-8 min-w-fit shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 backdrop-blur-2xl">
                                     <div className="flex flex-col shrink-0">
-                                        <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">Product Name</span>
+                                        <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品名称</span>
                                         <span className="text-white font-bold text-base whitespace-nowrap tracking-tight">{selectedImage.product?.name}</span>
                                     </div>
                                     <div className="h-8 w-px bg-white/10 shrink-0" />
                                     <div className="flex flex-col shrink-0">
-                                        <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">SKU ID</span>
+                                        <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品编码</span>
                                         <span className="text-white font-mono text-base bg-white/15 px-2.5 py-0.5 rounded-lg border border-white/10 whitespace-nowrap">{selectedImage.product?.sku}</span>
                                     </div>
                                     {isAdmin && selectedImage.product?.stock !== undefined && (
                                         <>
                                             <div className="h-8 w-px bg-white/10 shrink-0" />
                                             <div className="flex flex-col shrink-0">
-                                                <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">Current Stock</span>
+                                                <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">当前库存</span>
                                                 <span className="text-white font-bold text-base whitespace-nowrap">
                                                     {selectedImage.product?.stock} <span className="text-[10px] font-normal opacity-50 text-white/60">件</span>
                                                 </span>
@@ -532,7 +540,7 @@ function GalleryContent() {
                                         <>
                                             <div className="h-8 w-px bg-white/10 shrink-0" />
                                             <div className="flex flex-col items-center shrink-0">
-                                                <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">Gallery</span>
+                                                <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">图集浏览</span>
                                                 <span className="text-white font-black text-base bg-primary/40 px-3 py-0.5 rounded-full border border-primary/20 whitespace-nowrap">
                                                     {currentIndex + 1} <span className="text-white/30 mx-0.5">/</span> {relatedImages.length}
                                                 </span>

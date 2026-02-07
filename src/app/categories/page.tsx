@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, Tag, Layers, CheckCheck, RefreshCw } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Tag, Layers, Check, RefreshCw } from "lucide-react";
 import { Category } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
 import { CategoryModal } from "@/components/Categories/CategoryModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ActionBar } from "@/components/ui/ActionBar";
 
 import { useUser } from "@/hooks/useUser";
 
@@ -130,7 +131,7 @@ export default function CategoriesPage() {
         
         <div className="flex gap-2">
             {/* Search */}
-            <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-64">
+            <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-64">
                 <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
                     type="text"
@@ -149,7 +150,7 @@ export default function CategoriesPage() {
             {user && (
               <button 
                   onClick={handleOpenCreate}
-                  className="h-12 flex items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+                  className="h-10 flex items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
               >
                   <Plus size={18} />
                   新建分类
@@ -185,7 +186,7 @@ export default function CategoriesPage() {
                                     }`}
                                 >
                                     {isSelected && (
-                                        <CheckCheck size={14} />
+                                        <Check size={14} strokeWidth={4} />
                                     )}
                                 </button>
                             )}
@@ -238,6 +239,44 @@ export default function CategoriesPage() {
         title={confirmConfig.title}
         confirmLabel="确认删除"
         variant="danger"
+      />
+
+      <ActionBar 
+        selectedCount={selectedIds.length}
+        totalCount={filteredCategories.length}
+        onToggleSelectAll={() => {
+          if (selectedIds.length === filteredCategories.length) {
+            setSelectedIds([]);
+          } else {
+            setSelectedIds(filteredCategories.map(c => c.id));
+          }
+        }}
+        onClear={() => setSelectedIds([])}
+        label="个分类"
+        onDelete={() => {
+          setConfirmConfig({
+            isOpen: true,
+            title: "批量删除分类",
+            message: `确定要删除选中的 ${selectedIds.length} 个分类吗？此操作不可恢复。`,
+            onConfirm: async () => {
+              try {
+                const res = await fetch(`/api/categories/${selectedIds.join(",")}`, {
+                  method: "DELETE",
+                });
+                if (res.ok) {
+                  showToast("所选分类已删除", "success");
+                  setSelectedIds([]);
+                  fetchCategories();
+                } else {
+                  const data = await res.json();
+                  showToast(data.error || "删除失败", "error");
+                }
+              } catch (error) {
+                showToast("删除请求失败", "error");
+              }
+            },
+          });
+        }}
       />
     </div>
   );

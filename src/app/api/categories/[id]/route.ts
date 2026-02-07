@@ -36,24 +36,34 @@ export async function DELETE(
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const { id } = await params;
-    // 检查是否有商品属于该分类
+    const { id: idParam } = await params;
+    
+    // 支持逗号分隔的批量 ID
+    const ids = idParam.split(",");
+
+    // 检查是否有任何分类下仍有商品 (Check if any category has products)
     const productCount = await prisma.product.count({
-      where: { categoryId: id }
+      where: {
+        categoryId: { in: ids }
+      }
     });
 
     if (productCount > 0) {
       return NextResponse.json(
-        { error: "无法删除：该分类下仍有商品。" },
+        { error: "无法删除：选中的某些分类下仍有商品。" },
         { status: 400 }
       );
     }
 
-    await prisma.category.delete({
-      where: { id }
+    await prisma.category.deleteMany({
+      where: {
+        id: { in: ids }
+      }
     });
+    
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
+  } catch (error) {
+    console.error("Bulk delete failed:", error);
+    return NextResponse.json({ error: "Failed to delete categories" }, { status: 500 });
   }
 }

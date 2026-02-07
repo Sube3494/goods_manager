@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, Truck, Phone, Mail, MapPin, CheckCheck } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Truck, Phone, Mail, MapPin, Check } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ActionBar } from "@/components/ui/ActionBar";
 import { Supplier } from "@/lib/types";
 
 export default function SuppliersPage() {
@@ -110,28 +111,6 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleBulkDelete = () => {
-    setConfirmConfig({
-      isOpen: true,
-      title: "批量删除供应商",
-      message: `确定要删除选中的 ${selectedIds.length} 个供应商吗？一旦执行，相关联系信息将彻底移除。`,
-      variant: "danger",
-      onConfirm: () => {
-        setSuppliers(suppliers.filter(s => !selectedIds.includes(s.id)));
-        setSelectedIds([]);
-        showToast(`已批量删除 ${selectedIds.length} 个供应商`, "success");
-      }
-    });
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.length === suppliers.length) {
-        setSelectedIds([]);
-    } else {
-        setSelectedIds(suppliers.map(s => s.id));
-    }
-  };
-
   const filteredSuppliers = suppliers.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.contact.toLowerCase().includes(searchQuery.toLowerCase())
@@ -147,27 +126,9 @@ export default function SuppliersPage() {
         </div>
         
         <div className="flex gap-2">
-            {selectedIds.length > 0 && (
-                <>
-                    <button
-                        onClick={handleSelectAll}
-                        className="flex items-center gap-2 rounded-lg bg-white/80 dark:bg-zinc-800/80 border border-border/50 px-4 py-2.5 text-sm font-bold text-foreground hover:bg-white dark:hover:bg-zinc-800 hover:border-primary/50 hover:text-primary shadow-sm hover:shadow-md transition-all duration-300"
-                    >
-                        <CheckCheck size={18} />
-                        {selectedIds.length === suppliers.length ? "取消全选" : "全选"}
-                    </button>
-                    <button 
-                        onClick={handleBulkDelete}
-                        className="flex items-center gap-2 rounded-lg bg-destructive px-5 py-2.5 text-sm font-bold text-destructive-foreground shadow-lg shadow-destructive/30 hover:shadow-destructive/50 hover:-translate-y-0.5 transition-all"
-                    >
-                        <Trash2 size={18} />
-                        批量删除 ({selectedIds.length})
-                    </button>
-                </>
-            )}
             <button 
                 onClick={handleOpenCreate}
-                className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+                className="h-10 flex items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
             >
                 <Plus size={18} />
                 新建供应商
@@ -176,7 +137,7 @@ export default function SuppliersPage() {
       </div>
 
       {/* Search Box */}
-      <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
         <Search size={18} className="text-muted-foreground shrink-0" />
         <input
           type="text"
@@ -212,18 +173,7 @@ export default function SuppliersPage() {
                             }`}
                         >
                             {isSelected && (
-                                <svg 
-                                    xmlns="http://www.w3.org/2000/svg" 
-                                    viewBox="0 0 24 24" 
-                                    fill="none" 
-                                    stroke="currentColor" 
-                                    strokeWidth="3" 
-                                    strokeLinecap="round" 
-                                    strokeLinejoin="round" 
-                                    className="h-3.5 w-3.5"
-                                >
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
+                                <Check size={14} strokeWidth={4} />
                             )}
                         </button>
                     </div>
@@ -284,6 +234,44 @@ export default function SuppliersPage() {
         title={confirmConfig.title}
         variant={confirmConfig.variant}
         confirmLabel="确认执行"
+      />
+
+      <ActionBar 
+        selectedCount={selectedIds.length}
+        totalCount={filteredSuppliers.length}
+        onToggleSelectAll={() => {
+          if (selectedIds.length === filteredSuppliers.length) {
+            setSelectedIds([]);
+          } else {
+            setSelectedIds(filteredSuppliers.map(s => s.id));
+          }
+        }}
+        onClear={() => setSelectedIds([])}
+        label="个供应商"
+        onDelete={() => {
+          setConfirmConfig({
+            isOpen: true,
+            title: "批量删除供应商",
+            message: `确定要删除选中的 ${selectedIds.length} 个供应商吗？此操作不可恢复。`,
+            variant: "danger",
+            onConfirm: async () => {
+              try {
+                const res = await fetch(`/api/suppliers/${selectedIds.join(",")}`, {
+                  method: "DELETE",
+                });
+                if (res.ok) {
+                  showToast("所选供应商已删除", "success");
+                  setSelectedIds([]);
+                  fetchSuppliers();
+                } else {
+                  showToast("批量删除失败", "error");
+                }
+              } catch (error) {
+                showToast("网络请求失败", "error");
+              }
+            },
+          });
+        }}
       />
     </div>
   );

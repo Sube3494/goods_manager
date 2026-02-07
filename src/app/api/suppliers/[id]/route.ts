@@ -41,12 +41,20 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    await prisma.supplier.delete({
-      where: { id }
+    const { id: idParam } = await params;
+    
+    // 支持逗号分隔的批量 ID
+    const ids = idParam.split(",");
+
+    await prisma.supplier.deleteMany({
+      where: {
+        id: { in: ids }
+      }
     });
+    
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to delete supplier" }, { status: 500 });
+  } catch (error) {
+    console.error("Bulk delete suppliers failed:", error);
+    return NextResponse.json({ error: "Failed to delete suppliers" }, { status: 500 });
   }
 }

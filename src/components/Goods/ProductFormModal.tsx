@@ -11,6 +11,7 @@ import { twMerge } from "tailwind-merge";
 
 import { Product, GalleryItem, Supplier, Category } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { Switch } from "@/components/ui/Switch";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -291,35 +292,22 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             />
                         </div>
 
-                        {/* Visibility Toggle */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                 <Eye size={16} /> 对外展示
                             </label>
-                            <button
-                                type="button"
+                            <div
                                 onClick={() => setFormData({...formData, isPublic: !formData.isPublic})}
-                                className="w-full rounded-full px-4 py-2.5 flex items-center justify-between border border-border bg-white dark:bg-white/5 transition-all duration-300 font-bold text-foreground dark:hover:bg-white/10"
+                                className="w-full rounded-full px-5 py-3 flex items-center justify-between border border-border bg-white dark:bg-white/5 transition-all duration-300 font-bold text-foreground cursor-pointer dark:hover:bg-white/10 group"
                             >
-                                <span>{formData.isPublic ? "公开 (客户可见)" : "私有 (仅管理员)"}</span>
-                                <div className={cn(
-                                    "w-11 h-6 rounded-full relative transition-colors duration-300 shrink-0",
-                                    formData.isPublic ? "bg-primary" : "bg-muted-foreground/30"
-                                )}>
-                                    <motion.div 
-                                        className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-md"
-                                        animate={{
-                                            x: formData.isPublic ? 24 : 4
-                                        }}
-                                        transition={{
-                                            type: "spring",
-                                            stiffness: 700,
-                                            damping: 35,
-                                            mass: 0.8
-                                        }}
-                                    />
-                                </div>
-                            </button>
+                                <span className="group-hover:text-primary transition-colors">
+                                    {formData.isPublic ? "公开 (客户可见)" : "私有 (仅管理员)"}
+                                </span>
+                                <Switch 
+                                    checked={formData.isPublic} 
+                                    onChange={(val) => setFormData({...formData, isPublic: val})} 
+                                />
+                            </div>
                         </div>
                     </div>
 

@@ -57,17 +57,24 @@ export function ConfirmModal({
   if (!mounted) return null;
 
   const icons = {
-    danger: <AlertTriangle className="text-destructive" size={24} />,
-    warning: <AlertTriangle className="text-yellow-500" size={24} />,
-    info: <Info className="text-primary" size={24} />,
-    success: <CheckCircle2 className="text-green-500" size={24} />
+    danger: <AlertTriangle className="text-destructive mb-0.5" size={24} />,
+    warning: <AlertTriangle className="text-amber-500 mb-0.5" size={24} />,
+    info: <Info className="text-primary mb-0.5" size={24} />,
+    success: <CheckCircle2 className="text-emerald-500 mb-0.5" size={24} />
   };
 
   const buttonStyles = {
-    danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-destructive/20",
-    warning: "bg-yellow-500 text-white hover:bg-yellow-600 shadow-yellow-500/20",
-    info: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/20",
-    success: "bg-green-500 text-white hover:bg-green-600 shadow-green-500/20"
+    danger: "bg-destructive text-white hover:bg-destructive/90 shadow-lg shadow-destructive/20",
+    warning: "bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20",
+    info: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20",
+    success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20"
+  };
+
+  const variantBgs = {
+    danger: "bg-destructive/10 border-destructive/20 text-destructive",
+    warning: "bg-amber-500/10 border-amber-500/20 text-amber-500",
+    info: "bg-primary/10 border-primary/20 text-primary",
+    success: "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
   };
 
   return createPortal(
@@ -78,34 +85,48 @@ export function ConfirmModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/40 backdrop-blur-md"
             onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-            className="relative z-10 w-full max-w-sm rounded-4xl bg-white dark:bg-gray-900/70 backdrop-blur-2xl border border-border/50 shadow-2xl overflow-hidden p-8 flex flex-col items-center text-center gap-6"
+            className="relative z-10 w-full max-w-md rounded-3xl bg-white/90 dark:bg-gray-900/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col"
           >
-            <div className={cn(
-                "w-16 h-16 rounded-3xl flex items-center justify-center mb-2 shadow-inner",
-                variant === "danger" ? "bg-destructive/10" : 
-                variant === "warning" ? "bg-yellow-500/10" : 
-                variant === "info" ? "bg-primary/10" : "bg-green-500/10"
-            )}>
-              {icons[variant]}
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 p-6 shrink-0">
+              <h2 className="text-xl font-bold text-foreground tracking-tight">
+                {title}
+              </h2>
+              <button 
+                onClick={onClose} 
+                className="rounded-full p-2 text-muted-foreground hover:bg-white/10 hover:text-foreground transition-all outline-none"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-xl font-black tracking-tight text-foreground">{title}</h3>
-              <p className="text-muted-foreground font-medium leading-relaxed">{message}</p>
+            {/* Body */}
+            <div className="p-8 flex gap-6 items-center">
+              <div className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0 shadow-inner",
+                variantBgs[variant]
+              )}>
+                {icons[variant]}
+              </div>
+              <div className="space-y-1">
+                <p className="text-[15px] font-medium text-foreground/90 leading-relaxed text-left">
+                  {message}
+                </p>
+              </div>
             </div>
 
-            <div className="flex gap-3 w-full mt-2">
+            {/* Footer */}
+            <div className="flex justify-end gap-3 p-6 pt-0 shrink-0">
               <button
                 onClick={onClose}
-                className="flex-1 px-6 py-4 rounded-2xl bg-secondary/50 hover:bg-secondary text-foreground font-bold transition-all active:scale-95"
+                className="rounded-full px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all active:scale-95"
               >
                 {cancelLabel}
               </button>
@@ -115,20 +136,13 @@ export function ConfirmModal({
                   onClose();
                 }}
                 className={cn(
-                  "flex-1 px-6 py-4 rounded-2xl font-black shadow-lg transition-all active:scale-95",
+                  "rounded-full px-10 py-2.5 text-sm font-bold transition-all active:scale-[0.98] shadow-lg",
                   buttonStyles[variant]
                 )}
               >
                 {confirmLabel}
               </button>
             </div>
-
-            <button 
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 text-muted-foreground/50 hover:text-foreground transition-colors"
-            >
-              <X size={20} />
-            </button>
           </motion.div>
         </div>
       )}
