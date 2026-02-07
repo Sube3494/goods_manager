@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Camera, ChevronRight, Eye, ArrowLeft, X, Download, Plus, Upload, CheckCircle, Tag as TagIcon, Package } from "lucide-react";
+import { Search, Camera, ChevronRight, ArrowLeft, X, Download, Plus, Upload, CheckCircle, Package } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -11,7 +11,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 import { useUser } from "@/hooks/useUser";
-import { Product, GalleryItem } from "@/lib/types";
+import { Product, GalleryItem, Category } from "@/lib/types";
 import { useCallback } from "react";
 
 function GalleryContent() {
@@ -24,7 +24,7 @@ function GalleryContent() {
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
-  const [categories, setCategories] = useState<any[]>([]); // Full category objects
+  const [categories, setCategories] = useState<Category[]>([]); // Full category objects
   const [isUploadAllowed, setIsUploadAllowed] = useState(true);
 
   useEffect(() => {
@@ -47,7 +47,8 @@ function GalleryContent() {
   const [uploadForm, setUploadForm] = useState({
     productId: "",
     isPublic: true,
-    url: ""
+    url: "",
+    tags: ""
   });
 
   const fetchData = useCallback(async () => {
@@ -133,7 +134,7 @@ function GalleryContent() {
 
       if (res.ok) {
         setIsUploadModalOpen(false);
-        setUploadForm({ productId: "", isPublic: true, url: "" });
+        setUploadForm({ productId: "", isPublic: true, url: "", tags: "" });
         fetchData(); // Refresh
       }
     } catch (error) {
@@ -307,7 +308,7 @@ function GalleryContent() {
                                     src={item.url} 
                                     alt={product?.name || "Product image"} 
                                     fill
-                                    unoptimized
+                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                                 />
                                 
@@ -496,7 +497,7 @@ function GalleryContent() {
                                     alt="Full screen"
                                     width={1200}
                                     height={800}
-                                    unoptimized
+                                    priority
                                     className="max-w-full max-h-full object-contain rounded-3xl shadow-[0_0_150px_rgba(0,0,0,0.8)]"
                                     onClick={(e) => e.stopPropagation()}
                                 />
