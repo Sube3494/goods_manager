@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -9,7 +8,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function LoginPage() {
-  const router = useRouter();
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -48,7 +46,7 @@ export default function LoginPage() {
       } else {
         showToast(data.error || "发送失败", "error");
       }
-    } catch (error) {
+    } catch {
       showToast("网络错误，请稍后重试", "error");
     } finally {
       setIsLoading(false);
@@ -78,7 +76,7 @@ export default function LoginPage() {
       } else {
         showToast(data.error || "登录失败", "error");
       }
-    } catch (error) {
+    } catch {
       showToast("网络错误，请稍后重试", "error");
     } finally {
       setIsLoading(false);
@@ -153,7 +151,7 @@ export default function LoginPage() {
             initial={{ scale: 0.5, rotate: -10, opacity: 0 }}
             animate={{ scale: 1, rotate: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-            className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-blue-600 mb-6 shadow-lg shadow-blue-500/30"
+            className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-blue-600 mb-6 shadow-lg shadow-blue-500/30"
           >
             <Lock className="h-8 w-8 text-white" />
           </motion.div>
@@ -162,7 +160,7 @@ export default function LoginPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="text-4xl font-bold tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70"
+            className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70"
           >
             PickNote Admin
           </motion.h1>
@@ -177,7 +175,7 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-[2.5rem] border border-white/20 bg-background/60 p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <div className="absolute inset-0 bg-linear-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             
             <AnimatePresence mode="wait">
               {step === "email" ? (
@@ -226,7 +224,7 @@ export default function LoginPage() {
                         )}
                     </div>
                     {/* Button Glare Effect */}
-                    <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent z-0" />
+                    <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-linear-to-r from-transparent via-white/20 to-transparent z-0" />
                   </button>
                     
                   <p className="text-center text-xs text-muted-foreground/60 mt-4">

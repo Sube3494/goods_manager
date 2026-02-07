@@ -303,7 +303,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             >
                                 <span>{formData.isPublic ? "公开 (客户可见)" : "私有 (仅管理员)"}</span>
                                 <div className={cn(
-                                    "w-11 h-6 rounded-full relative transition-colors duration-300 flex-shrink-0",
+                                    "w-11 h-6 rounded-full relative transition-colors duration-300 shrink-0",
                                     formData.isPublic ? "bg-primary" : "bg-muted-foreground/30"
                                 )}>
                                     <motion.div 
