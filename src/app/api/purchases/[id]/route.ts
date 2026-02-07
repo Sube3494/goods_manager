@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { PurchaseOrderItem } from "@/lib/types";
+import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 
 export async function PUT(
   request: Request,
@@ -12,6 +12,13 @@ export async function PUT(
     const { 
       status, 
       items, 
+      totalAmount,
+      shippingFees,
+      extraFees,
+      trackingData,
+      date
+    } = body;
+
     // 更新采购订单
     const purchase = await prisma.purchaseOrder.update({
       where: { id },
@@ -26,7 +33,7 @@ export async function PUT(
         ...(items && {
           items: {
             deleteMany: {},
-            create: items.map((item: PurchaseOrderItem) => ({
+            create: items.map((item: PurchaseOrderItemType) => ({
               productId: item.productId,
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
@@ -42,7 +49,7 @@ export async function PUT(
             supplier: true
           }
         }
-      }
+      } as any // eslint-disable-line @typescript-eslint/no-explicit-any
     });
 
     // 如果状态变为 "Received"，自动增加商品库存
@@ -62,6 +69,8 @@ export async function PUT(
         });
       }
     }
+
+
 
     return NextResponse.json(purchase);
   } catch (error) {
