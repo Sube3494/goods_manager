@@ -3,11 +3,6 @@ import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const categories = await prisma.category.findMany({
       include: {
@@ -23,7 +18,7 @@ export async function GET() {
       id: c.id,
       name: c.name,
       description: c.description || "",
-      color: c.color || "#3b82f6",
+
       count: c._count.products
     }));
 
@@ -44,7 +39,7 @@ export async function POST(request: Request) {
       data: {
         name: body.name,
         description: body.description,
-        color: body.color
+
       }
     });
     return NextResponse.json(category);

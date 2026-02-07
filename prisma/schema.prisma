@@ -11,7 +11,7 @@ model Category {
   id          String    @id @default(cuid())
   name        String    @unique
   description String?
-  color       String?   @default("#3b82f6")
+
   products    Product[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -43,21 +43,22 @@ model Supplier {
   email          String?
   address        String?
   products       Product[]
-  purchaseOrders PurchaseOrder[]
+  purchaseOrderItems PurchaseOrderItem[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }
 
 model PurchaseOrder {
-  id          String              @id @default(cuid())
-  supplierId  String
-  supplier    Supplier            @relation(fields: [supplierId], references: [id])
-  status      String              @default("Draft") // Draft, Ordered, Received
-  totalAmount Float               @default(0)
-  date        DateTime            @default(now())
-  items       PurchaseOrderItem[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id            String              @id @default(cuid())
+  status        String              @default("Draft") // Draft, Ordered, Received
+  totalAmount   Float               @default(0)
+  date          DateTime            @default(now())
+  items         PurchaseOrderItem[]
+  shippingFees  Float               @default(0)
+  extraFees     Float               @default(0)
+  trackingData  Json?               @default("[]")
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 }
 
 model PurchaseOrderItem {
@@ -66,6 +67,8 @@ model PurchaseOrderItem {
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   productId       String
   product         Product       @relation(fields: [productId], references: [id])
+  supplierId      String?
+  supplier        Supplier?     @relation(fields: [supplierId], references: [id])
   quantity        Int
   costPrice       Float
   createdAt       DateTime      @default(now())

@@ -25,13 +25,16 @@ export async function middleware(request: NextRequest) {
   // We allow the exact paths and their sub-paths (e.g. /gallery/123)
   const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + "/"));
 
+  // Check for public GET APIs
+  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info"];
+  const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
+
   // Get session from cookies
   const session = request.cookies.get("session")?.value;
 
-  // Protect private routes (Settings, Purchases, Suppliers, Import, etc.)
-  // Protect private routes (Settings, Purchases, Suppliers, Import, etc.)
-  // If pass is NOT public AND no session
-  if (!isPublicPath && !session) {
+  // Protect private routes
+  // If pass is NOT public AND NOT a public GET API AND no session
+  if (!isPublicPath && !isPublicGetApi && !session) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -8,8 +8,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");
 
+    const session = await getSession();
     const galleryItems = await prisma.galleryItem.findMany({
-      where: productId ? { productId } : {},
+      where: {
+        ...(productId ? { productId } : {}),
+        ...(session ? {} : { 
+          product: { isPublic: true }
+        }),
+      },
       include: {
         product: {
           select: {

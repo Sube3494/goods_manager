@@ -15,7 +15,13 @@ interface DocumentWithViewTransition {
   startViewTransition(callback: () => void): ViewTransition;
 }
 
-export function ThemeToggle() {
+import { cn } from "@/lib/utils";
+
+interface ThemeToggleProps {
+  className?: string;
+}
+
+export function ThemeToggle({ className }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme();
 
   const toggleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -61,11 +67,16 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="relative grid place-items-center h-10 w-10 rounded-full hover:bg-muted/50 transition-colors"
+      className={cn(
+        "group relative flex items-center justify-center h-10 w-10 rounded-full bg-white dark:bg-white/5 hover:bg-muted/50 border border-border dark:border-white/10 transition-all active:scale-95 shadow-sm",
+        className
+      )}
       aria-label="Toggle theme"
     >
-      <Sun className="col-start-1 row-start-1 h-6 w-6 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-orange-500" />
-      <Moon className="col-start-1 row-start-1 h-6 w-6 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />
+      <div className="relative grid place-items-center h-6 w-6">
+        <Sun className="col-start-1 row-start-1 h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-orange-500" />
+        <Moon className="col-start-1 row-start-1 h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />
+      </div>
     </button>
   );
 }

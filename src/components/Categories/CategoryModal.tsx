@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Tag, FileText, Palette } from "lucide-react";
+import { X, CheckCircle, Tag } from "lucide-react";
 
 import { Category } from "@/lib/types";
 
@@ -14,20 +14,12 @@ interface CategoryModalProps {
   initialData?: Partial<Category> | null;
 }
 
-const COLORS = [
-  "bg-red-500", "bg-orange-500", "bg-amber-500", "bg-yellow-500", 
-  "bg-lime-500", "bg-green-500", "bg-emerald-500", "bg-teal-500", 
-  "bg-cyan-500", "bg-sky-500", "bg-blue-500", "bg-indigo-500", 
-  "bg-violet-500", "bg-purple-500", "bg-fuchsia-500", "bg-pink-500", 
-  "bg-rose-500", "bg-slate-500"
-];
 
 export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: CategoryModalProps) {
   const [mounted, setMounted] = useState(false);
   const [formData, setFormData] = useState<Partial<Category>>(initialData || {
     name: "",
-    description: "",
-    color: "bg-blue-500"
+    description: ""
   });
 
   useEffect(() => {
@@ -41,7 +33,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
         if (initialData) {
           setFormData(initialData);
         } else {
-          setFormData({ name: "", description: "", color: "bg-blue-500" });
+          setFormData({ name: "", description: "" });
         }
       });
     }
@@ -96,40 +88,6 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
                             className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                             placeholder="例如：箱包配饰"
                         />
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <FileText size={16} /> 描述
-                        </label>
-                        <textarea 
-                            value={formData.description}
-                            onChange={(e) => setFormData({...formData, description: e.target.value})}
-                            className="w-full rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all resize-none h-24 dark:hover:bg-white/10"
-                            placeholder="简要描述该分类..."
-                        />
-                    </div>
-                    
-                    {/* Color Picker */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Palette size={16} /> 标签颜色
-                        </label>
-                        <div className="grid grid-cols-6 gap-2 p-2 rounded-xl border border-border dark:border-white/10 bg-white/50 dark:bg-white/5">
-                            {COLORS.map((color) => (
-                                <button
-                                    key={color}
-                                    type="button"
-                                    onClick={() => setFormData({...formData, color})}
-                                    className={`relative h-8 w-8 rounded-full ${color} transition-transform hover:scale-110 focus:outline-none flex items-center justify-center`}
-                                >
-                                    {formData.color === color && (
-                                        <CheckCircle className="text-white drop-shadow-md" size={16} />
-                                    )}
-                                </button>
-                            ))}
-                        </div>
                     </div>
                 </div>
 

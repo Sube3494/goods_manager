@@ -24,7 +24,9 @@ export function ActionBar({
   const isAllSelected = selectedCount === totalCount && totalCount > 0;
 
   useEffect(() => {
-    setMounted(true);
+    requestAnimationFrame(() => {
+      setMounted(true);
+    });
   }, []);
 
   if (!mounted) return null;

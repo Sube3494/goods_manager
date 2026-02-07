@@ -121,8 +121,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   url,
-                  productId: initialData.id,
-                  tags: ["实拍"]
+                  productId: initialData.id
                 })
               });
               if (gRes.ok) {
@@ -135,8 +134,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                 url,
                 productId: "", // 临时 ID 为空
-                uploadDate: new Date().toISOString(),
-                tags: ["实拍"]
+                uploadDate: new Date().toISOString()
               };
               setGalleryImages(prev => [tempImg, ...prev]);
             }
@@ -207,7 +205,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-2rem)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">{initialData ? "编辑商品" : "新增商品"}</h2>
@@ -301,7 +299,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 className="w-full rounded-full px-5 py-3 flex items-center justify-between border border-border bg-white dark:bg-white/5 transition-all duration-300 font-bold text-foreground cursor-pointer dark:hover:bg-white/10 group"
                             >
                                 <span className="group-hover:text-primary transition-colors">
-                                    {formData.isPublic ? "公开 (客户可见)" : "私有 (仅管理员)"}
+                                    {formData.isPublic ? "公开" : "私有"}
                                 </span>
                                 <Switch 
                                     checked={formData.isPublic} 
@@ -381,12 +379,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 <div className="p-3 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
                                     <Plus size={24} className={cn("text-muted-foreground group-hover:text-primary transition-all duration-300 group-hover:rotate-90", isUploading && "animate-spin")} />
                                 </div>
-                                <span className="text-[11px] font-black text-muted-foreground group-hover:text-primary tracking-tighter uppercase">
+                                <span className="hidden sm:block text-[11px] font-black text-muted-foreground group-hover:text-primary tracking-tighter uppercase">
                                     {isUploading ? "正在上传..." : "添加实拍"}
                                 </span>
                             </label>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">提示：在此上传的照片将自动绑定当前商品的 SKU 和分类信息。</p>
+
                     </div>
 
 

@@ -29,7 +29,7 @@ export async function GET() {
       // Backup logic can be expanded here later
       lastBackup: "尚未建立自动备份任务" 
     });
-  } catch (_error) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch system info" }, { status: 500 });
   }
 }

@@ -29,20 +29,42 @@ export interface PurchaseOrderItem {
   costPrice: number;
 }
 
+export interface TrackingInfo {
+  courier: string;
+  number: string;
+  waybillImage?: string;
+  waybillImages?: string[];
+}
+
 export interface PurchaseOrder {
   id: string;
-  supplierId: string;
-  status: PurchaseStatus;
+  status: "Draft" | "Ordered" | "Received";
+  totalAmount: number;
   date: string;
   items: PurchaseOrderItem[];
-  totalAmount: number;
+  shippingFees: number;
+  extraFees: number;
+  trackingData?: TrackingInfo[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PurchaseOrderItem {
+  id?: string;
+  purchaseOrderId?: string;
+  productId: string;
+  product?: Product;
+  supplierId?: string;
+  supplier?: Supplier;
+  quantity: number;
+  costPrice: number;
 }
 export interface Category {
   id: string;
   name: string;
   count: number;
   description?: string;
-  color?: string;
+
   products?: Product[];
   items?: Product[]; // For compatibility if used elsewhere
 }

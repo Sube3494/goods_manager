@@ -9,23 +9,26 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, items, supplierId, totalAmount, date } = body;
-
+    const { 
+      status, 
+      items, 
     // 更新采购订单
     const purchase = await prisma.purchaseOrder.update({
       where: { id },
       data: {
         status,
-        supplierId,
         totalAmount: totalAmount !== undefined ? Number(totalAmount) : undefined,
+        shippingFees: shippingFees !== undefined ? Number(shippingFees) : undefined,
+        extraFees: extraFees !== undefined ? Number(extraFees) : undefined,
+        trackingData: trackingData !== undefined ? trackingData : undefined,
         date: date ? new Date(date) : undefined,
-        // 如果提供了 items，通常需要处理复杂的同步（删除旧的，创建新的，或者更新现有的）
-        // 这里简化处理：如果有 items，先删除所有旧的，再创建新的
+        // 如果提供了 items，先删除所有旧的，再创建新的
         ...(items && {
           items: {
             deleteMany: {},
             create: items.map((item: PurchaseOrderItem) => ({
               productId: item.productId,
+              supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
               costPrice: Number(item.costPrice) || 0
             }))
@@ -33,7 +36,12 @@ export async function PUT(
         })
       },
       include: {
-        items: true
+        items: {
+          include: {
+            product: true,
+            supplier: true
+          }
+        }
       }
     });
 

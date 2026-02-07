@@ -35,21 +35,24 @@ export function GoodsCard({
             <Package size={32} strokeWidth={1.5} />
           </div>
         )}
-        
-        <div className="absolute top-3 left-3 bg-secondary/80 backdrop-blur-md border border-border px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground rounded-full shadow-sm">
-          {getCategoryName(product.category)}
-        </div>
       </div>
 
       {/* Content */}
       <div className="flex flex-1 flex-col p-5">
         <div className="flex-1">
-          <h3 className="font-bold text-lg leading-tight text-foreground mb-1 group-hover:text-primary transition-colors">
+          <h3 className="font-bold text-lg leading-tight text-foreground mb-4 group-hover:text-primary transition-colors">
             {product.name}
           </h3>
-          <p className="text-xs text-muted-foreground mt-1 mb-2 font-mono opacity-70">
-             {product.sku ? product.sku : `REF__${product.id.slice(0, 6)}`}
-          </p>
+          
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+              <span className="text-[10px] bg-secondary border border-border/50 px-2 py-0.5 rounded text-muted-foreground font-mono shrink-0">
+                {product.sku ? product.sku : `REF__${product.id.slice(0, 6)}`}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
+                <Package size={12} strokeWidth={2.5} />
+                {getCategoryName(product.category)}
+              </span>
+          </div>
           
           {product.supplierId && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary/30 w-fit px-2 py-1 rounded-md">
@@ -76,7 +79,7 @@ export function GoodsCard({
       </div>
       
       {/* Quick Actions Overlay */}
-      <div className="absolute top-3 right-3 flex flex-col gap-2 translate-x-10 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
+      <div className="absolute top-3 right-3 flex flex-col gap-2 translate-x-0 opacity-100 lg:translate-x-10 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100 transition-all duration-300">
          <Link
             href={`/gallery?productId=${product.id}`}
             className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-primary p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn flex items-center justify-center"

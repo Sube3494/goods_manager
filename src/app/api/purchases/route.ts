@@ -7,10 +7,10 @@ export async function GET() {
   try {
     const purchases = await prisma.purchaseOrder.findMany({
       include: {
-        supplier: true,
         items: {
           include: {
-            product: true
+            product: true,
+            supplier: true
           }
         }
       },
@@ -25,28 +25,53 @@ export async function GET() {
   }
 }
 
+// 辅助函数：生成业务友好的单号 (PO-YYYYMMDD-XXXX)
+function generateOrderId() {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `PO-${date}-${random}`;
+}
+
 // 创建新采购订单
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { supplierId, status, date, totalAmount, items } = body;
+    const { 
+      status, 
+      date, 
+      totalAmount, 
+      items, 
+      shippingFees, 
+      extraFees,
+      trackingData
+    } = body;
+
+    const orderId = generateOrderId();
 
     const purchase = await prisma.purchaseOrder.create({
       data: {
-        supplierId,
+        id: orderId,
         status: status || "Draft",
         date: date ? new Date(date) : new Date(),
         totalAmount: Number(totalAmount) || 0,
+        shippingFees: Number(shippingFees) || 0,
+        extraFees: Number(extraFees) || 0,
+        trackingData: trackingData || [],
         items: {
           create: items.map((item: PurchaseOrderItem) => ({
             productId: item.productId,
+            supplierId: item.supplierId,
             quantity: Number(item.quantity) || 0,
             costPrice: Number(item.costPrice) || 0
           }))
         }
       },
       include: {
-        items: true
+        items: {
+          include: {
+            supplier: true
+          }
+        }
       }
     });
 

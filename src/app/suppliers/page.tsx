@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Edit2, Trash2, Truck, Phone, Mail, MapPin, Check } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
@@ -28,7 +28,7 @@ export default function SuppliersPage() {
   
   const { showToast } = useToast();
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     try {
       const res = await fetch("/api/suppliers");
       if (res.ok) {
@@ -37,12 +37,11 @@ export default function SuppliersPage() {
     } catch (error) {
       console.error("Failed to fetch suppliers:", error);
     }
-  };
-
+  }, []);
 
   useEffect(() => {
     fetchSuppliers();
-  }, []);
+  }, [fetchSuppliers]);
 
   const handleOpenCreate = () => {
     setEditingSupplier(null);
@@ -73,7 +72,7 @@ export default function SuppliersPage() {
       } else {
         showToast("操作失败", "error");
       }
-    } catch (error) {
+    } catch {
       console.error("Supplier submit failed:", error);
       showToast("网络错误", "error");
     }
@@ -95,7 +94,7 @@ export default function SuppliersPage() {
           } else {
             showToast("删除失败", "error");
           }
-        } catch (error) {
+        } catch {
           console.error("Delete supplier failed:", error);
           showToast("网络错误", "error");
         }
@@ -266,7 +265,7 @@ export default function SuppliersPage() {
                 } else {
                   showToast("批量删除失败", "error");
                 }
-              } catch (error) {
+              } catch {
                 showToast("网络请求失败", "error");
               }
             },

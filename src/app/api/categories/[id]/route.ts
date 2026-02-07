@@ -18,7 +18,7 @@ export async function PUT(
       data: {
         name: body.name,
         description: body.description,
-        color: body.color
+
       }
     });
     return NextResponse.json(category);

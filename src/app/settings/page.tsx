@@ -3,7 +3,6 @@
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Monitor, Globe, Shield, Save, HardDrive, Loader2, Zap } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/Switch";
 import { useToast } from "@/components/ui/Toast";
@@ -32,7 +31,9 @@ export default function SettingsPage() {
     // 使用异步方式加载存储的数据，避免同步渲染冲突
     const saved = localStorage.getItem("app_allow_upload");
     if (saved !== null) {
-      setAllowUpload(saved === "true");
+      requestAnimationFrame(() => {
+        setAllowUpload(saved === "true");
+      });
     }
   }, []);
 
@@ -48,6 +49,24 @@ export default function SettingsPage() {
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground font-medium">验证访问权限...</p>
+      </div>
+    );
+  }
+
+  if (!user && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <div className="p-4 rounded-full bg-destructive/10 text-destructive">
+          <Shield size={48} />
+        </div>
+        <h2 className="text-2xl font-bold">无权访问</h2>
+        <p className="text-muted-foreground">该页面仅供管理员使用，请登录后重试。</p>
+        <button 
+          onClick={() => window.location.href = "/login"}
+          className="mt-2 h-10 px-8 rounded-full bg-primary text-primary-foreground font-bold shadow-lg hover:opacity-90 transition-opacity"
+        >
+          前往登录
+        </button>
       </div>
     );
   }

@@ -6,12 +6,14 @@ import { motion } from "framer-motion";
 
 
 
+import { PurchaseOrder } from "@/lib/types";
+
 interface StatsData {
   productCount: number;
   totalStock: number;
   lowStockCount: number;
   totalValue: number;
-  recentPurchases: any[]; // refined later if needed
+  recentPurchases: PurchaseOrder[]; 
 }
 
 export function StatsGrid({ data }: { data: StatsData | null }) {

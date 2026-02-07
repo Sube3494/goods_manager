@@ -144,39 +144,38 @@ export default function LoginPage() {
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="w-full max-w-md relative z-10 px-4"
       >
-        <div className="relative glass border-white/10 shadow-2xl rounded-3xl p-8 overflow-hidden group">
+        <div className="relative glass border-white/10 shadow-2xl rounded-[2.5rem] p-10 overflow-hidden group">
+          <div className="absolute inset-0 bg-linear-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
           
-          <div className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0.5, rotate: -10, opacity: 0 }}
-            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-            className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-blue-600 mb-6 shadow-lg shadow-blue-500/30"
-          >
-            <Lock className="h-8 w-8 text-white" />
-          </motion.div>
-          
-          <motion.h1 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70"
-          >
-            PickNote Admin
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="mt-3 text-muted-foreground text-lg"
-          >
-            安全登录您的管理控制台
-          </motion.p>
-        </div>
-
-        <div className="rounded-[2.5rem] border border-white/20 bg-background/60 p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden group">
-            <div className="absolute inset-0 bg-linear-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+          <div className="text-center mb-10">
+            <motion.div
+              initial={{ scale: 0.5, rotate: -10, opacity: 0 }}
+              animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+              className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-blue-600 mb-6 shadow-lg shadow-blue-500/30"
+            >
+              <Lock className="h-8 w-8 text-white" />
+            </motion.div>
             
+            <motion.h1 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70"
+            >
+              PickNote Admin
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="mt-3 text-muted-foreground text-lg"
+            >
+              安全登录您的管理控制台
+            </motion.p>
+          </div>
+
+          <div className="relative z-10">
             <AnimatePresence mode="wait">
               {step === "email" ? (
                 <motion.form 
@@ -186,20 +185,18 @@ export default function LoginPage() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.3 }}
                     onSubmit={handleSendCode} 
-                    className="space-y-6 relative z-10"
+                    className="space-y-6"
                 >
-                  {/* ... form content ... */}
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground ml-1">管理员邮箱</label>
+                  <div className="space-y-1.5 flex flex-col">
+                    <label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/60 ml-1">管理员邮箱</label>
                     <div className="relative group/input">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-primary transition-colors" size={20} />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
                       <input
                         type="email"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-2xl bg-secondary/30 pl-12 pr-4 py-4 text-foreground outline-none ring-1 ring-border/50 transition-all focus:bg-background focus:ring-2 focus:ring-primary/30 focus:shadow-lg focus:shadow-primary/5 placeholder:text-muted-foreground/50"
+                        className="w-full rounded-2xl bg-white/5 pl-12 pr-4 py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30"
                         placeholder="name@company.com"
                         autoFocus
                       />
@@ -223,7 +220,6 @@ export default function LoginPage() {
                             </>
                         )}
                     </div>
-                    {/* Button Glare Effect */}
                     <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-linear-to-r from-transparent via-white/20 to-transparent z-0" />
                   </button>
                     
@@ -239,7 +235,7 @@ export default function LoginPage() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.3 }}
                     onSubmit={handleLogin} 
-                    className="space-y-6 relative z-10"
+                    className="space-y-6"
                 >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -257,14 +253,14 @@ export default function LoginPage() {
                     </div>
                     
                     <div className="relative group/input">
-                      <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within/input:text-primary transition-colors" size={20} />
+                      <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
                       <input
                         type="text"
                         required
                         maxLength={6}
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
-                        className="w-full rounded-2xl bg-secondary/30 font-mono text-2xl tracking-[0.5em] text-center py-4 text-foreground outline-none ring-1 ring-border/50 transition-all focus:bg-background focus:ring-2 focus:ring-primary/30 focus:shadow-lg focus:shadow-primary/5 placeholder:text-muted-foreground/30"
+                        className="w-full rounded-2xl bg-white/5 font-mono text-2xl tracking-[0.5em] text-center py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/20"
                         placeholder="000000"
                         autoFocus
                       />
@@ -311,8 +307,8 @@ export default function LoginPage() {
                 </motion.form>
               )}
             </AnimatePresence>
+          </div>
         </div>
-      </div>
         
         <motion.div 
             initial={{ opacity: 0 }}

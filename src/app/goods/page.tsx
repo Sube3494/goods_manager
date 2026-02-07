@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download, RefreshCw } from "lucide-react";
+import { Search, Plus, Download } from "lucide-react";
 import { Product, Category } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
@@ -41,7 +41,7 @@ export default function GoodsPage() {
         const data = await res.json();
         setGoods(data);
       }
-    } catch (error) {
+    } catch {
       console.error("Failed to fetch goods", error);
     } finally {
       setIsLoading(false);
@@ -79,7 +79,7 @@ export default function GoodsPage() {
           } else {
             showToast("删除失败", "error");
           }
-        } catch (error) {
+        } catch {
           showToast("删除请求失败", "error");
         }
       },
@@ -106,7 +106,7 @@ export default function GoodsPage() {
       } else {
         showToast("操作失败", "error");
       }
-    } catch (error) {
+    } catch {
       showToast("请求失败", "error");
     }
   };
@@ -126,7 +126,7 @@ export default function GoodsPage() {
       } else {
         showToast("导入失败", "error");
       }
-    } catch (error) {
+    } catch {
       showToast("导入请求失败", "error");
     }
   };
@@ -156,8 +156,8 @@ export default function GoodsPage() {
       {/* Header Section */}
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between relative z-10">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">商品库</h1>
-          <p className="text-muted-foreground mt-2 text-lg">
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">商品库</h1>
+          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-lg">
             {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU。"}
           </p>
         </div>
@@ -165,19 +165,20 @@ export default function GoodsPage() {
         <div className="flex items-center gap-3">
            {user && (
              <div className="glass p-1 rounded-full flex gap-1 items-center h-10">
-                <button 
+               <button 
                   onClick={() => setIsImportOpen(true)}
-                  className="flex items-center gap-2 rounded-full px-4 h-8 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-2 rounded-full px-3 sm:px-4 h-8 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                 >
                   <Download size={18} />
-                  Excel 导入
+                  <span className="hidden sm:inline">Excel 导入</span>
                 </button>
                 <button 
                   onClick={handleCreate}
-                  className="flex items-center gap-2 rounded-full bg-primary px-6 h-8 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+                  className="flex items-center gap-2 rounded-full bg-primary px-4 sm:px-6 h-8 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
                 >
                   <Plus size={18} />
-                  新建商品
+                  <span className="hidden sm:inline">新建商品</span>
+                  <span className="inline sm:hidden">新建</span>
                 </button>
              </div>
            )}

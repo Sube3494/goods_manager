@@ -24,7 +24,7 @@ function GalleryContent() {
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
-  const [categories, setCategories] = useState<string[]>(["All"]);
+  const [categories, setCategories] = useState<any[]>([]); // Full category objects
   const [isUploadAllowed, setIsUploadAllowed] = useState(true);
 
   useEffect(() => {
@@ -46,7 +46,6 @@ function GalleryContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [uploadForm, setUploadForm] = useState({
     productId: "",
-    tags: "",
     isPublic: true,
     url: ""
   });
@@ -67,7 +66,7 @@ function GalleryContent() {
         const categoriesData = await categoriesRes.json();
         const productsData = await productsRes.json();
         setItems(galleryData);
-        setCategories(["All", ...categoriesData.map((c: any) => c.name)]);
+        setCategories(categoriesData);
         setProducts(productsData);
       }
     } catch (error) {
@@ -134,7 +133,7 @@ function GalleryContent() {
 
       if (res.ok) {
         setIsUploadModalOpen(false);
-        setUploadForm({ productId: "", tags: "", isPublic: true, url: "" });
+        setUploadForm({ productId: "", isPublic: true, url: "" });
         fetchData(); // Refresh
       }
     } catch (error) {
@@ -151,9 +150,8 @@ function GalleryContent() {
 
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = 
-      product?.name.toLowerCase().includes(searchLower) || 
-      product?.sku?.toLowerCase().includes(searchLower) ||
-      item.tags.some((t: string) => t.toLowerCase().includes(searchLower));
+      (product?.name?.toLowerCase()?.includes(searchLower) ?? false) || 
+      (product?.sku?.toLowerCase()?.includes(searchLower) ?? false);
 
     const matchesCategory = selectedCategory === "All" || item.product?.category?.name === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -243,39 +241,52 @@ function GalleryContent() {
                     <ArrowLeft size={18} /> 返回全集
                  </button>
              )}
-             <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
-                <Search size={18} className="text-muted-foreground" />
+             <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-auto">
+                <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
                     type="text" 
-                    placeholder="按商品名、SKU或标签检索..." 
+                    placeholder="按商品名或 SKU 检索..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-64 text-sm"
+                    className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full sm:w-64 text-sm"
                 />
              </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2 overflow-x-auto py-4 -mx-2 px-2 scrollbar-none">
+        <div className="flex flex-wrap items-center gap-2 py-4">
+            {/* All Button */}
+            <button
+                onClick={() => setSelectedCategory("All")}
+                className={cn(
+                    "px-6 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border",
+                    selectedCategory === "All" 
+                    ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
+                    : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
+                )}
+            >
+                全部展示
+            </button>
+
             {categories.map(cat => (
                 <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.name)}
                     className={cn(
                         "px-6 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border",
-                        selectedCategory === cat 
+                        selectedCategory === cat.name
                         ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
                         : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
                     )}
                 >
-                    {cat === "All" ? "全部展示" : cat}
+                    {cat.name}
                 </button>
             ))}
         </div>
 
         {/* Responsive Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6">
            <AnimatePresence mode="popLayout">
             {filteredItems.map((item, index) => {
                 const product = item.product;
@@ -313,21 +324,9 @@ function GalleryContent() {
                                 </div>
 
                                 <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
-                                    <div className="flex flex-col gap-1 mb-4">
+                                    <div className="flex flex-col gap-1">
                                         <p className="text-white font-bold text-base line-clamp-1">{product?.name}</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {item.tags.map((tag: string) => (
-                                                <span key={tag} className="text-[9px] text-white/70 bg-white/10 px-2 py-0.5 rounded-full border border-white/5">
-                                                    #{tag}
-                                                </span>
-                                            ))}
-                                        </div>
                                     </div>
-                                    <button 
-                                        className="w-full py-3 rounded-xl bg-white dark:bg-white/10 text-black dark:text-white font-black text-sm flex items-center justify-center gap-2 hover:bg-primary hover:text-white dark:hover:bg-primary transition-all transform translate-y-4 group-hover:translate-y-0 duration-500 backdrop-blur-sm"
-                                    >
-                                        <Eye size={16} /> 查看大图
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -417,19 +416,7 @@ function GalleryContent() {
                                     />
                                 </div>
 
-                                {/* Tags */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                        <TagIcon size={16} /> 标签 (英文逗号分隔)
-                                    </label>
-                                    <input 
-                                        type="text" 
-                                        value={uploadForm.tags}
-                                        onChange={(e) => setUploadForm({...uploadForm, tags: e.target.value})}
-                                        className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                        placeholder="例如: 实拍, 细节, 验货"
-                                    />
-                                </div>
+
 
                                 <div className="flex justify-end gap-3 pt-4">
                                     <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">取消</button>
@@ -515,50 +502,58 @@ function GalleryContent() {
                                 />
 
                                 {/* Info Overlay */}
-                                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-black/70 border border-white/10 px-7 py-4 rounded-[28px] flex items-center gap-8 min-w-fit shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 backdrop-blur-2xl">
-                                    <div className="flex flex-col shrink-0">
-                                        <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品名称</span>
-                                        <span className="text-white font-bold text-base whitespace-nowrap tracking-tight">{selectedImage.product?.name}</span>
+                                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/80 border border-white/10 px-5 py-4 rounded-[24px] flex flex-col md:flex-row items-center gap-4 md:gap-8 w-[90vw] md:w-auto md:min-w-fit shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 backdrop-blur-2xl">
+                                    <div className="flex flex-row md:flex-row gap-4 md:gap-8 w-full md:w-auto justify-between md:justify-start">
+                                        <div className="flex flex-col shrink-0">
+                                            <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品名称</span>
+                                            <span className="text-white font-bold text-sm md:text-base whitespace-nowrap tracking-tight max-w-[120px] md:max-w-none truncate">{selectedImage.product?.name}</span>
+                                        </div>
+                                        {/* Mobile Separator hidden */}
+                                        <div className="h-8 w-px bg-white/10 shrink-0 hidden md:block" />
+                                        <div className="flex flex-col shrink-0 items-end md:items-start">
+                                            <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品编码</span>
+                                            <span className="text-white font-mono text-sm md:text-base bg-white/15 px-2 py-0.5 rounded-lg border border-white/10 whitespace-nowrap">{selectedImage.product?.sku}</span>
+                                        </div>
                                     </div>
-                                    <div className="h-8 w-px bg-white/10 shrink-0" />
-                                    <div className="flex flex-col shrink-0">
-                                        <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品编码</span>
-                                        <span className="text-white font-mono text-base bg-white/15 px-2.5 py-0.5 rounded-lg border border-white/10 whitespace-nowrap">{selectedImage.product?.sku}</span>
-                                    </div>
-                                    {isAdmin && selectedImage.product?.stock !== undefined && (
-                                        <>
-                                            <div className="h-8 w-px bg-white/10 shrink-0" />
+                                    
+                                    <div className="hidden md:block h-8 w-px bg-white/10 shrink-0" />
+                                    
+                                    <div className="flex flex-row justify-between w-full md:w-auto gap-4 md:gap-8 items-center">
+                                        {isAdmin && selectedImage.product?.stock !== undefined && (
                                             <div className="flex flex-col shrink-0">
                                                 <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">当前库存</span>
-                                                <span className="text-white font-bold text-base whitespace-nowrap">
+                                                <span className="text-white font-bold text-sm md:text-base whitespace-nowrap">
                                                     {selectedImage.product?.stock} <span className="text-[10px] font-normal opacity-50 text-white/60">件</span>
                                                 </span>
                                             </div>
-                                        </>
-                                    )}
-                                    {relatedImages.length > 1 && (
-                                        <>
-                                            <div className="h-8 w-px bg-white/10 shrink-0" />
-                                            <div className="flex flex-col items-center shrink-0">
-                                                <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">图集浏览</span>
-                                                <span className="text-white font-black text-base bg-primary/40 px-3 py-0.5 rounded-full border border-primary/20 whitespace-nowrap">
-                                                    {currentIndex + 1} <span className="text-white/30 mx-0.5">/</span> {relatedImages.length}
-                                                </span>
-                                            </div>
-                                        </>
-                                    )}
-                                    <div className="h-8 w-px bg-white/10 shrink-0" />
-                                    <button 
-                                        onClick={() => {
-                                            const product = selectedImage.product;
-                                            const fileName = `${product?.name || 'product'}_${product?.sku || 'image'}_${selectedImage.id}.jpg`;
-                                            handleDownload(selectedImage.url, fileName);
-                                        }}
-                                        className="flex items-center gap-2 bg-white text-black hover:bg-primary hover:text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 group/dl whitespace-nowrap shrink-0"
-                                    >
-                                        <Download size={18} className="group-hover:animate-bounce" />
-                                        <span>下载原图</span>
-                                    </button>
+                                        )}
+                                        
+                                        {relatedImages.length > 1 && (
+                                            <>
+                                                <div className="h-8 w-px bg-white/10 shrink-0 hidden md:block" />
+                                                <div className="flex flex-col items-center shrink-0">
+                                                    <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">图集浏览</span>
+                                                    <span className="text-white font-black text-sm md:text-base bg-primary/40 px-3 py-0.5 rounded-full border border-primary/20 whitespace-nowrap">
+                                                        {currentIndex + 1} <span className="text-white/30 mx-0.5">/</span> {relatedImages.length}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
+                                        
+                                        <div className="h-8 w-px bg-white/10 shrink-0 hidden md:block" />
+                                        
+                                        <button 
+                                            onClick={() => {
+                                                const product = selectedImage.product;
+                                                const fileName = `${product?.name || 'product'}_${product?.sku || 'image'}_${selectedImage.id}.jpg`;
+                                                handleDownload(selectedImage.url, fileName);
+                                            }}
+                                            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white text-black hover:bg-primary hover:text-white px-4 py-2 md:px-5 md:py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 group/dl whitespace-nowrap shrink-0 text-sm md:text-base"
+                                        >
+                                            <Download size={16} className="group-hover:animate-bounce" />
+                                            <span>下载</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </motion.div>
