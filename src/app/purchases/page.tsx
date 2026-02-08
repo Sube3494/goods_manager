@@ -1,22 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
-import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, ChevronLeft, ChevronRight, X as CloseIcon } from "lucide-react";
-import { useRef } from "react";
+import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
-import { PurchaseOrder, PurchaseStatus, Supplier, TrackingInfo } from "@/lib/types";
+import { PurchaseOrder, PurchaseStatus, TrackingInfo } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ImageGallery } from "@/components/ui/ImageGallery";
 import TrackingNumberModal from "@/components/Purchases/TrackingNumberModal";
 
+
+
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { formatLocalDateTime } from "@/lib/dateUtils";
+
 export default function PurchasesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     onConfirm: () => void;
@@ -31,23 +38,33 @@ export default function PurchasesPage() {
     isOpen: boolean;
     purchaseId: string | null;
     initialValue: TrackingInfo[];
+    lockPackages: boolean;
   }>({
     isOpen: false,
     purchaseId: null,
     initialValue: [],
+    lockPackages: false,
   });
-  const [uploadingParcelInfo, setUploadingParcelInfo] = useState<{ poId: string; index: number } | null>(null);
+
   const [galleryState, setGalleryState] = useState<{
     isOpen: boolean;
     images: string[];
     currentIndex: number;
+    scale: number;
+    direction: number;
   }>({
     isOpen: false,
     images: [],
-    currentIndex: 0
+    currentIndex: 0,
+    scale: 1,
+    direction: 0
   });
   const [mounted, setMounted] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
+  }, []);
+
   const { showToast } = useToast();
 
   const fetchData = async () => {
@@ -58,20 +75,55 @@ export default function PurchasesPage() {
       ]);
       if (pRes.ok && sRes.ok) {
         setPurchases(await pRes.json());
-        setSuppliers(await sRes.json());
       }
     } catch (error) {
       console.error("Failed to fetch purchases data:", error);
     }
   };
 
+  // 1. Initial Data Fetch & Mounted Status
   useEffect(() => {
-    fetchData();
-    setMounted(true);
-  }, []);
+    const handle = requestAnimationFrame(() => {
+        fetchData();
+        
+        // Sync filter from URL on mount
+        const statusParam = searchParams.get('status');
+        if (statusParam) {
+            setStatusFilter(statusParam);
+        }
+    });
+    return () => cancelAnimationFrame(handle);
+  }, [searchParams]); // Added searchParams as dependency
 
-  const getSupplierName = (id: string) => {
-    return suppliers.find(s => s.id === id)?.name || "未知供应商";
+  // 2. Auto-open detail if orderId in URL (Depends on purchases being loaded)
+  useEffect(() => {
+    const orderIdParam = searchParams.get('orderId');
+    if (orderIdParam && purchases.length > 0) {
+      const order = purchases.find(p => p.id === orderIdParam);
+      if (order) {
+        const handle = requestAnimationFrame(() => {
+            setEditingPurchase(order);
+            setIsModalOpen(true);
+            // Clean up URL parameter
+            const params = new URLSearchParams(searchParams);
+            params.delete('orderId');
+            router.replace(`${pathname}?${params.toString()}`);
+        });
+        return () => cancelAnimationFrame(handle);
+      }
+    }
+  }, [searchParams, purchases, router, pathname]);
+
+
+  const handleStatusFilterChange = (status: string) => {
+    setStatusFilter(status);
+    const params = new URLSearchParams(searchParams);
+    if (status === 'All') {
+        params.delete('status');
+    } else {
+        params.set('status', status);
+    }
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   const getStatusColor = (status: PurchaseStatus) => {
@@ -96,6 +148,11 @@ export default function PurchasesPage() {
   };
 
   const handleEdit = (po: PurchaseOrder) => {
+    setEditingPurchase(po);
+    setIsModalOpen(true);
+  };
+
+  const handleView = (po: PurchaseOrder) => {
     setEditingPurchase(po);
     setIsModalOpen(true);
   };
@@ -141,123 +198,6 @@ export default function PurchasesPage() {
     }
   };
 
-  const handleWaybillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !uploadingParcelInfo) return;
-
-    const { poId, index } = uploadingParcelInfo;
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (res.ok) {
-        const { url } = await res.json();
-        
-        // Find the purchase and update its trackingData array
-        const po = purchases.find(p => p.id === poId);
-        if (!po) return;
-
-        const newTrackingData = [...(po.trackingData || [])];
-        if (newTrackingData[index]) {
-          const currentData = newTrackingData[index];
-          let images = currentData.waybillImages || [];
-          
-          // Migrate old single image if modern array doesn't exist yet but old field does
-          if (images.length === 0 && currentData.waybillImage) {
-            images = [currentData.waybillImage];
-          }
-          
-          // Append new image
-          images = [...images, url];
-          
-          newTrackingData[index] = { 
-            ...currentData, 
-            waybillImage: images[0], // Keep for backward compatibility/quick preview
-            waybillImages: images 
-          };
-        }
-
-        const updateRes = await fetch(`/api/purchases/${poId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trackingData: newTrackingData }),
-        });
-
-        if (updateRes.ok) {
-          fetchData();
-          showToast("面单已上传", "success");
-          
-          // Keep modal in sync if it's open
-          if (trackingModal.isOpen && trackingModal.purchaseId === poId) {
-            setTrackingModal(prev => ({
-              ...prev,
-              initialValue: newTrackingData
-            }));
-          }
-        } else {
-          showToast("更新采购单失败", "error");
-        }
-      } else {
-        showToast("上传失败", "error");
-      }
-    } catch (error) {
-      console.error("Waybill upload failed:", error);
-      showToast("网络错误", "error");
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      setUploadingParcelInfo(null);
-    }
-  };
-
-  const handleRemoveWaybillImage = async (poId: string, rowIndex: number, imgIdx: number) => {
-    try {
-      const po = purchases.find(p => p.id === poId);
-      if (!po) return;
-
-      const newTrackingData = [...(po.trackingData || [])];
-      if (newTrackingData[rowIndex]) {
-        const currentData = newTrackingData[rowIndex];
-        let images = currentData.waybillImages || [];
-        if (images.length === 0 && currentData.waybillImage) {
-          images = [currentData.waybillImage];
-        }
-        
-        const newImages = images.filter((_, i) => i !== imgIdx);
-        newTrackingData[rowIndex] = {
-          ...currentData,
-          waybillImage: newImages[0] || "",
-          waybillImages: newImages
-        };
-      }
-
-      const res = await fetch(`/api/purchases/${poId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackingData: newTrackingData }),
-      });
-
-      if (res.ok) {
-        fetchData();
-        showToast("面单已移除", "success");
-        
-        if (trackingModal.isOpen && trackingModal.purchaseId === poId) {
-          setTrackingModal(prev => ({
-            ...prev,
-            initialValue: newTrackingData
-          }));
-        }
-      }
-    } catch (error) {
-      console.error("Remove waybill image failed:", error);
-    }
-  };
-
   const handleUpdateTracking = async (id: string, trackingData: TrackingInfo[]) => {
     try {
       const res = await fetch(`/api/purchases/${id}`, {
@@ -267,7 +207,7 @@ export default function PurchasesPage() {
       });
       if (res.ok) {
         fetchData();
-        showToast("单号已更新", "success");
+        showToast("物流信息已更新", "success");
       } else {
         showToast("更新失败", "error");
       }
@@ -277,10 +217,7 @@ export default function PurchasesPage() {
     }
   };
 
-  const triggerUpload = (poId: string, index: number) => {
-    setUploadingParcelInfo({ poId, index });
-    if (fileInputRef.current) fileInputRef.current.click();
-  };
+
 
   const handleSave = async (data: Partial<PurchaseOrder>) => {
     try {
@@ -312,8 +249,12 @@ export default function PurchasesPage() {
     const matchesSupplier = p.items.some(item => 
       item.supplier?.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    return matchesId || matchesSupplier;
+    const matchesStatus = statusFilter === 'All' || p.status === statusFilter;
+    
+    return (matchesId || matchesSupplier) && matchesStatus;
   });
+
+  if (!mounted) return null;
 
   return (
     <div className="max-w-6xl mx-auto w-full space-y-8 animate-in fade-in zoom-in-95 duration-500">
@@ -345,6 +286,27 @@ export default function PurchasesPage() {
         />
       </div>
 
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+          {['All', 'Ordered', 'Received', 'Draft'].map(status => (
+              <button
+                key={status}
+                onClick={() => handleStatusFilterChange(status)}
+                className={`
+                    px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap
+                    ${statusFilter === status 
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' 
+                        : 'bg-white dark:bg-white/5 border border-border text-muted-foreground hover:bg-muted'
+                    }
+                `}
+              >
+                {status === 'All' ? '全部' : 
+                 status === 'Ordered' ? '已下单' :
+                 status === 'Received' ? '已入库' : '草稿'}
+              </button>
+          ))}
+      </div>
+
       {/* Table/List View */}
       {/* Desktop Table View */}
       <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-gray-900/70 backdrop-blur-md overflow-hidden shadow-sm">
@@ -355,14 +317,15 @@ export default function PurchasesPage() {
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">采购单编号</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">交易金额</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">状态</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">日期</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单时间</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">物流信息</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               <AnimatePresence mode="popLayout">
                 {filteredPurchases.map((po) => (
-                  <motion.tr 
+                   <motion.tr 
                     key={po.id}
                     layout
                     initial={{ opacity: 0 }}
@@ -385,72 +348,90 @@ export default function PurchasesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center justify-center gap-2">
-                            <Calendar size={14} />
-                            {new Date(po.date).toISOString().slice(0, 10)}
-                        </div>
-                        <div className="flex flex-col gap-1.5 min-w-[120px]">
+                      <div className="flex items-center justify-center gap-2">
+                          <Calendar size={14} />
+                          <span className="font-mono">
+                              {formatLocalDateTime(po.date)}
+                          </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                        <div className="flex flex-col gap-1.5 min-w-[120px] max-w-[180px] mx-auto">
                           {(po.trackingData && po.trackingData.length > 0) ? (
                             po.trackingData.map((td, idx) => (
                               <div key={idx} className="flex items-center gap-2 text-[10px] text-orange-500 font-mono bg-orange-500/5 px-2 py-0.5 rounded-md border border-orange-500/10">
                                 <Truck size={10} className="shrink-0" />
-                                <span className="opacity-70">{td.courier}:</span>
-                                <span>{td.number}</span>
+                                <span className="opacity-70 truncate max-w-[60px]">{td.courier}:</span>
+                                <span className="font-bold">{td.number}</span>
                               </div>
                             ))
                           ) : (
-                            <span className="text-[10px] text-muted-foreground opacity-30 italic">暂无物流信息</span>
+                            po.status !== "Draft" && <span className="text-[10px] text-muted-foreground opacity-30 italic">暂由仓库处理中</span>
                           )}
                         </div>
-                      </div>
                     </td>
                     <td className="px-6 py-4 text-center whitespace-nowrap">
                       <div className="flex justify-center items-center gap-1 transition-opacity">
-                        {/* Management Actions: Show Truck for both Ordered and Received */}
-                        {(po.status === "Ordered" || po.status === "Received") && (
-                          <div className="flex items-center gap-1">
-                            <button 
-                                onClick={() => setTrackingModal({
-                                    isOpen: true,
-                                    purchaseId: po.id,
-                                    initialValue: po.trackingData || []
-                                })}
-                                className="p-2 rounded-lg text-orange-500 hover:bg-orange-500/10 transition-colors" 
-                                title="物流与面单"
-                            >
-                                <Truck size={16} />
-                            </button>
-                            
-                            {/* Flow actions: Inbound only for Ordered */}
-                            {po.status === "Ordered" && po.trackingData && po.trackingData.length > 0 && po.trackingData.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && (
-                              <button 
-                                  onClick={() => handleConfirmReceipt(po.id)}
-                                  className="p-2 rounded-lg text-emerald-500 hover:bg-emerald-500/10 transition-colors" 
-                                  title="确认入库"
-                              >
-                                  <CheckCircle2 size={16} />
-                              </button>
-                            )}
-                          </div>
+                        {po.status !== "Draft" && (
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); handleView(po); }}
+                              className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+                              title="查看详情"
+                          >
+                            <Eye size={16} />
+                          </button>
                         )}
+
+                        {/* Management Actions: Show Truck for both Ordered and Received */}
+                              {po.status === "Ordered" && (
+                               <div className="flex items-center gap-1">
+                                  {!(po.trackingData && po.trackingData.length > 0 && po.trackingData.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0))) && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); setTrackingModal({
+                                            isOpen: true,
+                                            purchaseId: po.id,
+                                            initialValue: po.trackingData || [],
+                                            lockPackages: false
+                                        }); }}
+                                        className="p-2 rounded-lg text-orange-500 bg-orange-500/10 animate-pulse flex items-center gap-2"
+                                        title="补全快递信息"
+                                    >
+                                        <Truck size={16} />
+                                        <span className="text-[10px] font-bold">补全信息</span>
+                                    </button>
+                                  )}
+
+                                  {/* Show Confirm button only if all waybills are present */}
+                                  {po.trackingData && po.trackingData.length > 0 && po.trackingData.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && (
+                                      <button 
+                                          onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
+                                          className="p-2 rounded-lg text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center gap-2 animate-in zoom-in-95 duration-300"
+                                          title="确认入库"
+                                      >
+                                          <CheckCircle2 size={16} />
+                                          <span className="text-[10px] font-bold ml-1">确认入库</span>
+                                      </button>
+                                  )}
+                              </div>
+                            )}
+
                         {/* Actions: Only allow edit/delete for Drafts */}
                         {po.status === "Draft" ? (
                           <>
                             <button 
-                                onClick={() => handleEdit(po)}
+                                onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
                                 className="p-2 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors"
                                 title="编辑"
                             >
-                              <Edit2 size={16} />
+                               <Edit2 size={16} />
                             </button>
-                            <button 
-                                onClick={() => handleDelete(po.id)}
-                                className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                                title="删除"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                             <button 
+                                 onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
+                                 className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                                 title="删除"
+                             >
+                               <Trash2 size={16} />
+                             </button>
                           </>
                         ) : null}
                       </div>
@@ -490,31 +471,22 @@ export default function PurchasesPage() {
               {/* Card Body */}
               <div className="space-y-3 text-sm mb-4 bg-muted/30 p-3 rounded-xl">
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">供应商</span>
-                    <span className="font-medium text-xs text-right truncate max-w-[150px]">
-                      {(() => {
-                        const supplierNames = Array.from(new Set(po.items.map(item => item.supplier?.name).filter(Boolean)));
-                        if (supplierNames.length === 0) return "未知供应商";
-                        if (supplierNames.length === 1) return supplierNames[0];
-                        return `${supplierNames[0]} 等 ${supplierNames.length} 家`;
-                      })()}
-                    </span>
-                  </div>
-                 <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">交易金额</span>
                     <span className="font-bold flex items-center text-foreground">
                         <span className="mr-0.5 opacity-70">￥</span>
                         {po.totalAmount.toLocaleString()}
                     </span>
-                 </div>
-                 <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">创建日期</span>
-                    <div className="flex items-center gap-1.5 text-foreground/80 text-xs text-right">
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">下单时间</span>
+                    <div className="flex items-center gap-1.5 text-foreground/80 text-xs text-right font-mono">
                         <Calendar size={13} />
-                        <span>{new Date(po.date).toISOString().slice(0, 10)}</span>
+                        <span>
+                            {formatLocalDateTime(po.date)}
+                        </span>
                     </div>
-                 </div>
-                 {po.trackingData && po.trackingData.length > 0 && (
+                  </div>
+                  {po.trackingData && po.trackingData.length > 0 && (
                     <div className="pt-2 border-t border-border/10 space-y-1.5">
                         <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">物流包裹 ({po.trackingData.length})</span>
                         <div className="grid grid-cols-1 gap-1.5">
@@ -528,37 +500,51 @@ export default function PurchasesPage() {
                           ))}
                         </div>
                     </div>
-                 )}
+                  )}
               </div>
 
-              {/* Actions */}
+               {/* Actions */}
               <div className="flex items-center gap-2">
+                 {po.status !== "Draft" && (
+                   <button 
+                      onClick={() => handleView(po)}
+                      className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-secondary text-foreground font-medium hover:bg-secondary/80 active:scale-95 transition-all text-xs"
+                  >
+                      <Eye size={14} />
+                      详情
+                  </button>
+                 )}
+
                   {/* Management Actions: Show Truck for Ordered/Received */}
-                  {(po.status === "Ordered" || po.status === "Received") && (
-                    <div className="flex-1 flex gap-2">
-                        <button 
-                            onClick={() => setTrackingModal({
-                                isOpen: true,
-                                purchaseId: po.id,
-                                initialValue: po.trackingData || []
-                            })}
-                            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-orange-500/10 text-orange-500 font-medium hover:bg-orange-500/20 active:scale-95 transition-all text-xs"
-                        >
-                            <Truck size={14} />
-                            {po.status === "Received" ? "查看物流" : "管理物流"}
-                        </button>
-                        {po.status === "Ordered" && po.trackingData && po.trackingData.length > 0 && po.trackingData.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && (
-                          <button 
-                              onClick={() => handleConfirmReceipt(po.id)}
-                              className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 font-medium hover:bg-emerald-500/20 active:scale-95 transition-all text-xs"
-                          >
-                              <CheckCircle2 size={14} />
-                              入库
-                          </button>
-                        )}
+                   {po.status === "Ordered" && (
+                    <div className="flex-2 flex gap-2 w-full">
+                         {!(po.trackingData && po.trackingData.length > 0 && po.trackingData.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0))) && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setTrackingModal({
+                                    isOpen: true,
+                                    purchaseId: po.id,
+                                    initialValue: po.trackingData || [],
+                                    lockPackages: false
+                                }); }}
+                                className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-orange-500 text-white shadow-lg shadow-orange-500/20 animate-pulse font-medium active:scale-95 transition-all text-xs"
+                            >
+                                <Truck size={14} />
+                                补全快递信息
+                            </button>
+                         )}
+
+                                {po.trackingData?.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
+                                        className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-500 text-white font-medium hover:bg-emerald-600 active:scale-95 transition-all text-xs shadow-lg shadow-emerald-500/20"
+                                    >
+                                        <CheckCircle2 size={14} />
+                                        确认入库
+                                    </button>
+                                )}
                     </div>
                   )}
-                  
+
                   
                   {/* Actions: Only allow edit/delete for Drafts */}
                   {po.status === "Draft" ? (
@@ -576,10 +562,7 @@ export default function PurchasesPage() {
                         <Trash2 size={16} />
                       </button>
                     </div>
-                  ) : (
-                    // On mobile card, if it's already ordered/received, the edit/delete are hidden
-                    null
-                  )}
+                  ) : null}
               </div>
             </motion.div>
           ))}
@@ -596,19 +579,14 @@ export default function PurchasesPage() {
         )}
       </div>
 
-      <input 
-        type="file" 
-        hidden 
-        ref={fileInputRef} 
-        accept="image/*"
-        onChange={handleWaybillUpload}
-      />
 
-      <PurchaseOrderModal 
+
+       <PurchaseOrderModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSave}
         initialData={editingPurchase}
+        readOnly={editingPurchase ? editingPurchase.status !== "Draft" : false}
       />
 
       <ConfirmModal 
@@ -625,126 +603,25 @@ export default function PurchasesPage() {
         isOpen={trackingModal.isOpen}
         onClose={() => setTrackingModal(prev => ({ ...prev, isOpen: false }))}
         initialValue={trackingModal.initialValue}
+        readOnly={purchases.find(p => p.id === trackingModal.purchaseId)?.status === "Received"}
+        lockPackages={trackingModal.lockPackages}
         onConfirm={(val) => {
             if (trackingModal.purchaseId) {
                 handleUpdateTracking(trackingModal.purchaseId, val);
             }
         }}
-        onUpload={(index) => {
-          if (trackingModal.purchaseId) {
-            triggerUpload(trackingModal.purchaseId, index);
-          }
-        }}
-        onRemoveImage={(rowIndex, imgIdx) => {
-          if (trackingModal.purchaseId) {
-            handleRemoveWaybillImage(trackingModal.purchaseId, rowIndex, imgIdx);
-          }
-        }}
-        onViewImages={(images) => {
-          setGalleryState({ isOpen: true, images, currentIndex: 0 });
+        onViewImages={(images: string[], index?: number) => {
+          setGalleryState({ isOpen: true, images, currentIndex: index || 0, scale: 1, direction: 0 });
         }}
       />
 
       {/* Waybill Gallery Preview */}
-      {mounted && typeof document !== 'undefined' && createPortal(
-        <AnimatePresence>
-          {galleryState.isOpen && (
-            <div className="fixed inset-0 z-10001 flex items-center justify-center">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
-                className="absolute inset-0 bg-black/90 backdrop-blur-xl"
-              />
-              
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="relative z-10 w-full max-w-4xl max-h-[90vh] flex flex-col items-center p-4"
-              >
-                {/* Top Bar */}
-                <div className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between text-white z-20">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold opacity-70 uppercase tracking-widest">面单预览</span>
-                    <span className="text-xl font-black">{galleryState.currentIndex + 1} / {galleryState.images.length}</span>
-                  </div>
-                  <button 
-                    onClick={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
-                    className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all active:scale-90"
-                  >
-                    <CloseIcon size={20} />
-                  </button>
-                </div>
-
-                {/* Navigation */}
-                {galleryState.images.length > 1 && (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setGalleryState(prev => ({
-                          ...prev,
-                          currentIndex: (prev.currentIndex - 1 + prev.images.length) % prev.images.length
-                        }));
-                      }}
-                      className="absolute left-6 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all active:scale-90 z-20"
-                    >
-                      <ChevronLeft size={32} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setGalleryState(prev => ({
-                          ...prev,
-                          currentIndex: (prev.currentIndex + 1) % prev.images.length
-                        }));
-                      }}
-                      className="absolute right-6 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all active:scale-90 z-20"
-                    >
-                      <ChevronRight size={32} />
-                    </button>
-                  </>
-                )}
-
-                {/* Image Content */}
-                <div className="w-full h-full flex items-center justify-center overflow-hidden rounded-2xl bg-black/40 border border-white/10">
-                  <AnimatePresence mode="wait">
-                    <motion.img
-                      key={galleryState.currentIndex}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      src={galleryState.images[galleryState.currentIndex]}
-                      alt="waybill"
-                      className="max-w-full max-h-[80vh] object-contain shadow-2xl"
-                    />
-                  </AnimatePresence>
-                </div>
-
-                {/* Thumbnails */}
-                {galleryState.images.length > 1 && (
-                  <div className="flex gap-2 mt-6 p-2 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 overflow-x-auto max-w-full scrollbar-none">
-                    {galleryState.images.map((img, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setGalleryState(prev => ({ ...prev, currentIndex: idx }))}
-                        className={`h-16 w-16 rounded-lg overflow-hidden border-2 transition-all ${
-                          idx === galleryState.currentIndex ? "border-primary scale-110 shadow-lg" : "border-transparent opacity-40 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={img} alt="thumb" className="h-full w-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+      <ImageGallery 
+        isOpen={galleryState.isOpen}
+        images={galleryState.images}
+        initialIndex={galleryState.currentIndex}
+        onClose={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

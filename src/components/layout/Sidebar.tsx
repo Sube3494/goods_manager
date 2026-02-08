@@ -135,6 +135,7 @@ export function Sidebar({ onClose, isOpen }: SidebarProps) {
                       src={`https://cravatar.cn/avatar/${md5(user.email || "")}?d=mp`} 
                       alt="Current user"
                       fill
+                      sizes="36px"
                       className="object-cover"
                   />
                 </div>

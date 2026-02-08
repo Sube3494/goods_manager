@@ -31,7 +31,7 @@ export async function GET(request: Request) {
         }
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'asc'
       }
     });
 
@@ -50,11 +50,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
-    const { url, productId, tags, isPublic } = body;
+    const { url, urls, productId, tags, isPublic } = body;
 
+    // Handle batch creation if urls array is provided
+    if (urls && Array.isArray(urls) && urls.length > 0) {
+        const data = urls.map((u: string) => ({
+            url: u,
+            productId,
+            tags: tags || [],
+            isPublic: isPublic ?? true,
+        }));
+
+        const result = await prisma.galleryItem.createMany({
+            data
+        });
+        
+        return NextResponse.json({ count: result.count });
+    }
+
+    // Fallback to single item creation
     const item = await prisma.galleryItem.create({
       data: {
-        url,
+        url: url || "", // Ensure url is not undefined if falling back
         productId,
         tags: tags || [],
         isPublic: isPublic ?? true,

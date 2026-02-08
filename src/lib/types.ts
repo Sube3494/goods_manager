@@ -1,10 +1,14 @@
 export interface Supplier {
   id: string;
+  code?: string;
   name: string;
   contact: string;
   phone: string;
   email: string;
   address: string;
+  _count?: {
+    products: number;
+  };
 }
 
 export interface Product {
@@ -78,4 +82,38 @@ export interface GalleryItem {
   uploadDate: string;
   tags: string[];
   isPublic?: boolean;
+  createdAt?: string;
+}
+
+export interface RecentInboundItem {
+  id: string;
+  productId: string;
+  product: {
+    id: string;
+    name: string;
+    sku?: string;
+    image?: string;
+  };
+  supplier?: {
+    id: string;
+    name: string;
+  };
+  quantity: number;
+  costPrice: number;
+  purchaseOrder: {
+    id: string;
+    date: string;
+    status: string;
+  };
+  subtotal: number;
+}
+
+export interface StatsData {
+  productCount: number;
+  totalStock: number;
+  lowStockCount: number;
+  totalValue: number;
+  recentInboundItems: RecentInboundItem[];
+  pendingInboundCount: number;
+  recentPurchases?: PurchaseOrder[];
 }

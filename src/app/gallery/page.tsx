@@ -1,18 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Camera, ChevronRight, ArrowLeft, X, Download, Plus, Upload, CheckCircle, Package } from "lucide-react";
+import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check } from "lucide-react";
+
+import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense } from "react";
-import { CustomSelect } from "@/components/ui/CustomSelect";
+
+import { ActionBar } from "@/components/ui/ActionBar";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { useToast } from "@/components/ui/Toast";
+
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 import { useUser } from "@/hooks/useUser";
 import { Product, GalleryItem, Category } from "@/lib/types";
 import { useCallback } from "react";
+import { pinyin } from 'pinyin-pro';
 
 function GalleryContent() {
   const { user } = useUser();
@@ -24,30 +30,54 @@ function GalleryContent() {
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]); // Full category objects
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isUploadAllowed, setIsUploadAllowed] = useState(true);
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { showToast } = useToast();
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
   useEffect(() => {
-    const checkUploadSetting = () => {
-      const saved = localStorage.getItem("app_allow_upload");
-      if (saved !== null) {
-        setIsUploadAllowed(saved === "true");
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/system/settings");
+        if (res.ok) {
+          const data = await res.json();
+          setIsUploadAllowed(data.allowGalleryUpload ?? true);
+        }
+      } catch (error) {
+        console.error("Failed to fetch settings:", error);
       }
     };
     
-    checkUploadSetting();
-    window.addEventListener("storage", checkUploadSetting);
-    return () => window.removeEventListener("storage", checkUploadSetting);
+    fetchSettings();
   }, []);
   
   // Upload States
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [uploadForm, setUploadForm] = useState({
+  const [uploadForm, setUploadForm] = useState<{
+    productId: string;
+    isPublic: boolean;
+    urls: string[];
+    tags: string;
+  }>({
     productId: "",
     isPublic: true,
-    url: "",
+    urls: [],
     tags: ""
   });
 
@@ -66,7 +96,23 @@ function GalleryContent() {
         const galleryData = await galleryRes.json();
         const categoriesData = await categoriesRes.json();
         const productsData = await productsRes.json();
-        setItems(galleryData);
+        
+        const sortedGalleryData = galleryData.sort((a: GalleryItem, b: GalleryItem) => {
+          const productA = productsData.find((p: Product) => p.id === a.productId);
+          const productB = productsData.find((p: Product) => p.id === b.productId);
+          
+          const isACover = productA?.image === a.url;
+          const isBCover = productB?.image === b.url;
+          
+          if (isACover && !isBCover) return -1;
+          if (!isACover && isBCover) return 1;
+          
+          const dateA = a.createdAt || a.uploadDate || new Date(0).toISOString();
+          const dateB = b.createdAt || b.uploadDate || new Date(0).toISOString();
+          return new Date(dateA).getTime() - new Date(dateB).getTime();
+        });
+        
+        setItems(sortedGalleryData);
         setCategories(categoriesData);
         setProducts(productsData);
       }
@@ -80,7 +126,6 @@ function GalleryContent() {
     fetchData();
   }, [fetchData]);
 
-  // Body Scroll Lock
   useEffect(() => {
     if (selectedImage || isUploadModalOpen) {
       document.body.style.overflow = 'hidden';
@@ -92,35 +137,45 @@ function GalleryContent() {
     };
   }, [selectedImage, isUploadModalOpen]);
 
-  // Upload Handlers
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        const res = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (res.ok) {
+            const { url } = await res.json();
+            return url;
+        }
+        return null;
       });
 
-      if (res.ok) {
-        const { url } = await res.json();
-        setUploadForm(prev => ({ ...prev, url }));
-      }
+      const results = await Promise.all(uploadPromises);
+      const successfulUrls = results.filter((url): url is string => url !== null);
+      
+      setUploadForm(prev => ({ ...prev, urls: [...prev.urls, ...successfulUrls] }));
+      
     } catch (error) {
       console.error("Upload failed:", error);
     } finally {
       setIsUploading(false);
+      e.target.value = '';
     }
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadForm.url || !uploadForm.productId) return;
+    if (uploadForm.urls.length === 0 || !uploadForm.productId) return;
 
     try {
       const res = await fetch("/api/gallery", {
@@ -134,13 +189,25 @@ function GalleryContent() {
 
       if (res.ok) {
         setIsUploadModalOpen(false);
-        setUploadForm({ productId: "", isPublic: true, url: "", tags: "" });
-        fetchData(); // Refresh
+        setUploadForm({ productId: "", isPublic: true, urls: [], tags: "" });
+        fetchData();
       }
     } catch (error) {
       console.error("Gallery submit failed:", error);
     }
   };
+
+  // Pre-calculate pinyin for products to optimize search
+  const productPinyinMap = useMemo(() => {
+    const map: Record<string, { full: string, first: string }> = {};
+    products.forEach(p => {
+      if (!p.name) return;
+      const full = pinyin(p.name, { toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
+      const first = pinyin(p.name, { pattern: 'first', toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
+      map[p.id] = { full, first };
+    });
+    return map;
+  }, [products]);
 
   // Helper logic
   const productIdFilter = searchParams.get("productId");
@@ -149,10 +216,24 @@ function GalleryContent() {
     const product = item.product;
     if (!isAdmin && !item.isPublic) return false;
 
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = 
-      (product?.name?.toLowerCase()?.includes(searchLower) ?? false) || 
-      (product?.sku?.toLowerCase()?.includes(searchLower) ?? false);
+    const searchLower = searchQuery.toLowerCase().replace(/\s+/g, '');
+    
+    // Safety check if product exists
+    if (!product) return false;
+
+    // Match Name or SKU
+    const matchesNameOrSku = 
+      (product.name?.toLowerCase()?.includes(searchLower) ?? false) || 
+      (product.sku?.toLowerCase()?.includes(searchLower) ?? false);
+
+    // Match Pinyin
+    const pinyinData = productPinyinMap[product.id];
+    const matchesPinyin = pinyinData ? (
+        pinyinData.full.includes(searchLower) || 
+        pinyinData.first.includes(searchLower)
+    ) : false;
+
+    const matchesSearch = matchesNameOrSku || matchesPinyin;
 
     const matchesCategory = selectedCategory === "All" || item.product?.category?.name === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -163,6 +244,42 @@ function GalleryContent() {
   const handleOpenImage = (item: GalleryItem) => {
     setSelectedImage(item);
   };
+
+  const toggleSelect = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    const count = selectedIds.length;
+    setConfirmConfig({
+      isOpen: true,
+      title: "批量删除图片",
+      message: `确定要删除选中的 ${count} 张实拍图吗？此操作不可恢复。`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch("/api/gallery/batch", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: selectedIds }),
+          });
+          if (res.ok) {
+            showToast(`成功删除 ${count} 张图片`, "success");
+            setSelectedIds([]);
+            fetchData();
+            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          } else {
+            showToast("删除失败", "error");
+          }
+        } catch {
+          showToast("请求失败", "error");
+        }
+      },
+    });
+  };
+
 
   // Navigation logic
   const relatedImages = selectedImage ? items.filter(img => {
@@ -204,12 +321,12 @@ function GalleryContent() {
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
-          <div className="space-y-1">
-            <h1 className="text-4xl font-black tracking-tight text-foreground">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+          <div className="space-y-2">
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
               {productIdFilter ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-baseline gap-2">
                     实物相册
                     <span className="text-xl font-bold text-muted-foreground/60 ml-2">/ {filteredProduct?.name}</span>
                   </div>
@@ -223,7 +340,7 @@ function GalleryContent() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-             {isAdmin && isUploadAllowed && (
+             {isUploadAllowed && (
                <button 
                  onClick={() => setIsUploadModalOpen(true)}
                  className="h-10 px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95"
@@ -286,6 +403,8 @@ function GalleryContent() {
             ))}
         </div>
 
+
+
         {/* Responsive Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6">
            <AnimatePresence mode="popLayout">
@@ -306,10 +425,11 @@ function GalleryContent() {
                             <div className="relative aspect-4/3 overflow-hidden bg-muted">
                                 <Image 
                                     src={item.url} 
-                                    alt={product?.name || "Product image"} 
-                                    fill
-                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                    className="object-cover transition-transform duration-700 group-hover:scale-110"
+                                    alt={item.product?.name || "Product image"} 
+                                    fill 
+                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                    priority={index < 4}
+                                    className="object-cover transition-transform duration-700 group-hover:scale-110" 
                                 />
                                 
                                 {/* 元数据浮层 - SKU + 快速发图引导 */}
@@ -323,6 +443,26 @@ function GalleryContent() {
                                         </span>
                                     )}
                                 </div>
+
+                                {/* Selection Checkbox (Hover or Selected) */}
+                                {isAdmin && (
+                                    <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${
+                                        selectedIds.includes(item.id) || selectedIds.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                    }`}>
+                                        <button 
+                                            onClick={(e) => toggleSelect(item.id, e)}
+                                            className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
+                                                selectedIds.includes(item.id)
+                                                ? "bg-foreground border-foreground text-background scale-110" 
+                                                : "bg-black/40 border-white/40 backdrop-blur hover:border-white"
+                                            }`}
+                                        >
+                                            {selectedIds.includes(item.id) && (
+                                                <Check size={14} strokeWidth={4} />
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
 
                                 <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
                                     <div className="flex flex-col gap-1">
@@ -383,25 +523,59 @@ function GalleryContent() {
                                 </button>
                             </div>
 
-                            <form onSubmit={handleUploadSubmit} className="p-6 space-y-5">
+                            <form onSubmit={handleUploadSubmit} className="p-6 space-y-5 flex-1 overflow-y-auto">
                                 {/* Upload Box */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                        <Camera size={16} className="text-black dark:text-white" /> 选择照片
+                                        <Camera size={16} className="text-black dark:text-white" /> 选择照片 ({uploadForm.urls.length})
                                     </label>
-                                    <label className="relative aspect-video rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer overflow-hidden group">
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-                                        {uploadForm.url ? (
-                                            <Image src={uploadForm.url} alt="upload preview" fill className="object-cover" />
-                                        ) : (
-                                            <>
-                                                <div className="p-4 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
-                                                    <Upload size={32} className={cn("text-muted-foreground group-hover:text-primary transition-all", isUploading && "animate-bounce")} />
-                                                </div>
-                                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{isUploading ? "正在处理照片..." : "点击或拖拽上传"}</span>
-                                            </>
-                                        )}
-                                    </label>
+                                    {uploadForm.urls.length > 0 && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setUploadForm(prev => ({ ...prev, urls: [] }))}
+                                            className="text-xs text-destructive hover:underline"
+                                        >
+                                            清空所有
+                                        </button>
+                                    )}
+                                    
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {/* Existing Images */}
+                                        {uploadForm.urls.map((url, idx) => (
+                                            <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group border border-border">
+                                                <Image 
+                                                  src={url} 
+                                                  alt={`preview ${idx}`} 
+                                                  fill 
+                                                  sizes="(max-width: 640px) 33vw, 150px"
+                                                  className="object-cover" 
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setUploadForm(prev => ({ ...prev, urls: prev.urls.filter((_, i) => i !== idx) }))}
+                                                    className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-destructive transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        {/* Add Button */}
+                                        <label className="relative aspect-square rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer overflow-hidden group">
+                                            <input type="file" className="hidden" accept="image/*" multiple onChange={handleFileUpload} />
+                                            <div className="p-2 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
+                                                {isUploading ? (
+                                                    <div className="h-6 w-6 animate-spin border-2 border-primary border-t-transparent rounded-full" />
+                                                ) : (
+                                                    <Plus size={24} className="text-muted-foreground group-hover:text-primary transition-all" />
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-center px-2">
+                                                {isUploading ? "上传中" : "添加"}
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-2">支持多选，每次最多上传 9 张。</p>
                                 </div>
 
                                 {/* Product Select */}
@@ -409,25 +583,63 @@ function GalleryContent() {
                                     <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                         <Package size={16} /> 关联商品
                                     </label>
-                                    <CustomSelect 
-                                        value={uploadForm.productId}
-                                        onChange={(val) => setUploadForm({...uploadForm, productId: val})}
-                                        options={products.map(p => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
-                                        placeholder="选择关联商品..."
-                                    />
+                                    <div 
+                                        onClick={() => setIsProductSelectOpen(true)}
+                                        className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border hover:bg-muted transition-colors cursor-pointer flex items-center justify-between group"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            {uploadForm.productId ? (() => {
+                                                const p = products.find(p => p.id === uploadForm.productId);
+                                                if (!p) return null;
+                                                return (
+                                                    <div className="h-10 w-10 rounded-lg overflow-hidden bg-background border border-border/50 shrink-0 flex items-center justify-center">
+                                                        {p.image ? (
+                                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                                            <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                                                        ) : (
+                                                            <Package size={18} className="text-muted-foreground/50" />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })() : (
+                                                <div className="h-10 w-10 rounded-lg bg-background/50 border border-border/50 shrink-0 flex items-center justify-center border-dashed">
+                                                    <Package size={18} className="text-muted-foreground/30" />
+                                                </div>
+                                            )}
+                                            
+                                            <div className="flex flex-col truncate">
+                                                <span className={cn("text-sm font-medium truncate", !uploadForm.productId ? "text-muted-foreground" : "text-foreground")}>
+                                                    {uploadForm.productId 
+                                                        ? (() => {
+                                                            const p = products.find(p => p.id === uploadForm.productId);
+                                                            return p ? p.name : "未知商品";
+                                                        })()
+                                                        : "点击选择关联商品..."
+                                                    }
+                                                </span>
+                                                {uploadForm.productId && (() => {
+                                                     const p = products.find(p => p.id === uploadForm.productId);
+                                                     return p && (
+                                                         <span className="text-xs text-muted-foreground font-mono truncate opacity-70">
+                                                             {p.sku}
+                                                         </span>
+                                                     );
+                                                })()}
+                                            </div>
+                                        </div>
+                                        <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
+                                    </div>
                                 </div>
 
-
-
-                                <div className="flex justify-end gap-3 pt-4">
+                                <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
                                     <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">取消</button>
                                     <button 
                                         type="submit" 
-                                        disabled={!uploadForm.url || !uploadForm.productId || isUploading}
+                                        disabled={uploadForm.urls.length === 0 || !uploadForm.productId || isUploading}
                                         className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all"
                                     >
                                         <CheckCircle size={18} />
-                                        确认发布
+                                        确认发布 ({uploadForm.urls.length})
                                     </button>
                                 </div>
                             </form>
@@ -438,26 +650,39 @@ function GalleryContent() {
             document.body
         )}
 
+        {/* Product Selection Modal */}
+        {mounted && (
+            <ProductSelectionModal 
+                isOpen={isProductSelectOpen}
+                onClose={() => setIsProductSelectOpen(false)}
+                singleSelect={true}
+
+                showPrice={false}
+                selectedIds={uploadForm.productId ? [uploadForm.productId] : []}
+                onSelect={(products) => {
+                    if (products.length > 0) {
+                        setUploadForm(prev => ({ ...prev, productId: products[0].id }));
+                    }
+                }}
+            />
+        )}
+
         {/* Image Viewer Modal */}
         {mounted && createPortal(
             <AnimatePresence>
                 {selectedImage && (
-                    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 overflow-hidden">
+                    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/95 backdrop-blur-2xl"
+                            transition={{ duration: 0.15 }}
+                            className="fixed inset-0 bg-black/95"
                             onClick={() => setSelectedImage(null)}
                         />
                         
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="relative z-10 w-full h-full flex items-center justify-center pointer-events-none"
-                        >
-                            <div className="relative w-full max-w-[90vw] h-[85vh] flex items-center justify-center pointer-events-auto">
+                        <div className="relative w-full max-w-[90vw] h-[85vh] flex items-center justify-center pointer-events-none">
+                            <div className="relative w-full h-full flex items-center justify-center pointer-events-auto">
                                 {/* Close Button */}
                                 <button 
                                     onClick={() => setSelectedImage(null)}
@@ -492,18 +717,29 @@ function GalleryContent() {
                                     </>
                                 )}
                                 
-                                <Image 
-                                    src={selectedImage.url} 
-                                    alt="Full screen"
-                                    width={1200}
-                                    height={800}
-                                    priority
-                                    className="max-w-full max-h-full object-contain rounded-3xl shadow-[0_0_150px_rgba(0,0,0,0.8)]"
-                                    onClick={(e) => e.stopPropagation()}
-                                />
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="relative w-full h-full flex items-center justify-center"
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img 
+                                        src={selectedImage.url} 
+                                        alt="Gallery View" 
+                                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                                    />
+                                </motion.div>
 
                                 {/* Info Overlay */}
-                                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/80 border border-white/10 px-5 py-4 rounded-[24px] flex flex-col md:flex-row items-center gap-4 md:gap-8 w-[90vw] md:w-auto md:min-w-fit shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 backdrop-blur-2xl">
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 20 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/70 dark:bg-black/80 border border-white/10 px-5 py-4 rounded-[24px] flex flex-col md:flex-row items-center gap-4 md:gap-8 w-[90vw] md:w-auto md:min-w-fit shadow-2xl backdrop-blur-2xl"
+                                >
                                     <div className="flex flex-row md:flex-row gap-4 md:gap-8 w-full md:w-auto justify-between md:justify-start">
                                         <div className="flex flex-col shrink-0">
                                             <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品名称</span>
@@ -546,7 +782,8 @@ function GalleryContent() {
                                         <button 
                                             onClick={() => {
                                                 const product = selectedImage.product;
-                                                const fileName = `${product?.name || 'product'}_${product?.sku || 'image'}_${selectedImage.id}.jpg`;
+                                                const timestamp = new Date().getTime();
+                                                const fileName = `${product?.sku || 'IMG'}_${timestamp}.jpg`;
                                                 handleDownload(selectedImage.url, fileName);
                                             }}
                                             className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white text-black hover:bg-primary hover:text-white px-4 py-2 md:px-5 md:py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 group/dl whitespace-nowrap shrink-0 text-sm md:text-base"
@@ -555,14 +792,43 @@ function GalleryContent() {
                                             <span>下载</span>
                                         </button>
                                     </div>
-                                </div>
+                                </motion.div>
                             </div>
-                        </motion.div>
+                        </div>
                     </div>
                 )}
             </AnimatePresence>,
             document.body
         )}
+
+    {isAdmin && (
+      <>
+        <ConfirmModal 
+            isOpen={confirmConfig.isOpen}
+            onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+            onConfirm={confirmConfig.onConfirm}
+            message={confirmConfig.message}
+            title={confirmConfig.title}
+            confirmLabel="确认删除"
+            variant="danger"
+        />
+
+        <ActionBar 
+            selectedCount={selectedIds.length}
+            totalCount={filteredItems.length}
+            onToggleSelectAll={() => {
+                if (selectedIds.length === filteredItems.length) {
+                    setSelectedIds([]);
+                } else {
+                    setSelectedIds(filteredItems.map(i => i.id));
+                }
+            }}
+            onClear={() => setSelectedIds([])}
+            label="张图片"
+            onDelete={handleBatchDelete}
+        />
+      </>
+    )}
       </div>
   );
 }

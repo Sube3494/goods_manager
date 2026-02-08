@@ -171,27 +171,29 @@ export default function CategoriesPage() {
                                 <Layers className="opacity-90 drop-shadow-sm" size={18} />
                             </div>
                             {user && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); toggleSelect(category.id); }}
-                                    className={`relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
-                                        isSelected 
-                                        ? "bg-foreground border-foreground text-background scale-110" 
-                                        : "border-muted-foreground/30 hover:border-foreground/50"
-                                    }`}
-                                >
-                                    {isSelected && (
-                                        <Check size={12} strokeWidth={4} />
-                                    )}
-                                </button>
+                                <div className={`relative transition-all duration-300 ${isSelected || selectedIds.length > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); toggleSelect(category.id); }}
+                                        className={`relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
+                                            isSelected 
+                                            ? "bg-foreground border-foreground text-background scale-110" 
+                                            : "border-muted-foreground/30 hover:border-foreground/50"
+                                        }`}
+                                    >
+                                        {isSelected && (
+                                            <Check size={12} strokeWidth={4} />
+                                        )}
+                                    </button>
+                                </div>
                             )}
                         </div>
                         
                         <h3 className="text-lg font-bold text-foreground mb-3">{category.name}</h3>
                         
                         <div className="flex justify-between items-center w-full">
-                              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-md">
-                                  <Tag size={10} />
-                                  {category.products?.length || 0}
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground bg-secondary/50 px-2.5 py-1 rounded-md">
+                                  <Tag size={13} />
+                                  {category.count || 0}
                               </div>
                               
                               {user && (

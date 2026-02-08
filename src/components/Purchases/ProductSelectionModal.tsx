@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Check, Package, Tag } from "lucide-react";
+import { X, Search, Check, Package, Tag, Truck } from "lucide-react";
 import { Product, Supplier } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 
@@ -21,10 +21,12 @@ interface ProductSelectionModalProps {
   onClose: () => void;
   onSelect: (products: Product[]) => void;
   selectedIds: string[];
-  selectedIds: string[];
+  singleSelect?: boolean;
+  showPrice?: boolean;
 }
 
-export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds }: ProductSelectionModalProps) {
+export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, singleSelect = false, showPrice = true }: ProductSelectionModalProps) {
+
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
   const [products, setProducts] = useState<Product[]>([]);
@@ -32,29 +34,40 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds }
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
+  // 1. Sync selection when modal opens
   useEffect(() => {
     if (isOpen) {
-      const fetchData = async () => {
-        setIsLoading(true);
-        try {
-          const [pRes, sRes] = await Promise.all([
-            fetch("/api/products"),
-            fetch("/api/suppliers")
-          ]);
-          if (pRes.ok && sRes.ok) {
-            const [pData, sData] = await Promise.all([pRes.json(), sRes.json()]);
-            setProducts(pData);
-            setSuppliers(sData);
-          }
-        } catch (error) {
-          console.error("Failed to fetch products or suppliers:", error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchData();
+      setTempSelectedIds(selectedIds);
+      setSearchQuery("");
+      setSelectedSupplierId("");
     }
-  }, [isOpen]);
+  }, [isOpen, selectedIds]);
+
+  // 2. Data fetching when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [pRes, sRes] = await Promise.all([
+          fetch("/api/products"),
+          fetch("/api/suppliers")
+        ]);
+        if (pRes.ok && sRes.ok) {
+          const [pData, sData] = await Promise.all([pRes.json(), sRes.json()]);
+          setProducts(pData);
+          setSuppliers(sData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch products or suppliers:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [isOpen]); // Only depends on isOpen
 
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -64,9 +77,13 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds }
   });
 
   const toggleProduct = (id: string) => {
-    setTempSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    if (singleSelect) {
+        setTempSelectedIds([id]);
+    } else {
+        setTempSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    }
   };
 
   const handleConfirm = () => {
@@ -97,7 +114,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds }
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-foreground">选择商品</h2>
-                <p className="text-xs text-muted-foreground mt-1">勾选您需要采购的商品</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                    {singleSelect ? "请选择一个关联商品" : "勾选您需要采购的商品"}
+                </p>
               </div>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={24} />
@@ -148,7 +167,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds }
                             isSelected ? "bg-primary/5 border-primary/30" : "bg-card border-border/50 hover:border-primary/20 hover:bg-muted/30"
                           )}
                         >
-                          {/* Circular Checkbox Top-Right */}
+                          {/* Circular Checkbox/Radio Top-Right */}
                           <div className={cn(
                             "absolute top-2 right-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all z-10",
                             isSelected ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20" : "bg-background border-border"
@@ -178,12 +197,17 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds }
                                 <span className="text-xs text-muted-foreground flex items-center gap-1 truncate opacity-70">
                                     <Tag size={12} className="shrink-0" /> {getCategoryName(product.category)}
                                 </span>
+                                <span className="text-xs text-muted-foreground flex items-center gap-1 truncate opacity-70">
+                                    <Truck size={12} className="shrink-0" /> {suppliers.find(s => s.id === product.supplierId)?.name || "未知供应商"}
+                                </span>
                             </div>
-                            <div className="mt-1">
-                              <span className="text-xs font-bold text-primary">
-                                  ￥{product.price}
-                              </span>
-                            </div>
+                            {showPrice && (
+                                <div className="mt-1">
+                                <span className="text-xs font-bold text-primary">
+                                    ￥{product.price}
+                                </span>
+                                </div>
+                            )}
                           </div>
                         </div>
                       );

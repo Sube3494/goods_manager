@@ -17,9 +17,10 @@ interface DatePickerProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  showClear?: boolean;
 }
 
-export function DatePicker({ value, onChange, placeholder = "选择日期", className }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = "选择日期", className, showClear = true }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(value ? new Date(value) : new Date());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +67,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
             {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: zhCN }) : placeholder}
             </span>
         </div>
-        {selectedDate && (
+        {showClear && selectedDate && (
             <X 
                 size={14} 
                 className="text-muted-foreground hover:text-foreground transition-colors" 

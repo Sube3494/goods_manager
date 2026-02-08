@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Edit2, Trash2, Truck, Phone, Mail, MapPin, Check } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Truck, Phone, Mail, MapPin, Check, Package } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -72,7 +72,7 @@ export default function SuppliersPage() {
       } else {
         showToast("操作失败", "error");
       }
-    } catch {
+    } catch (error) {
       console.error("Supplier submit failed:", error);
       showToast("网络错误", "error");
     }
@@ -94,7 +94,7 @@ export default function SuppliersPage() {
           } else {
             showToast("删除失败", "error");
           }
-        } catch {
+        } catch (error) {
           console.error("Delete supplier failed:", error);
           showToast("网络错误", "error");
         }
@@ -112,7 +112,8 @@ export default function SuppliersPage() {
 
   const filteredSuppliers = suppliers.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.contact.toLowerCase().includes(searchQuery.toLowerCase())
+    s.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.code?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -160,41 +161,61 @@ export default function SuppliersPage() {
                             </div>
                             <div>
                                 <h3 className="text-lg font-bold text-foreground line-clamp-1">{supplier.name}</h3>
-                                <p className="text-xs text-muted-foreground">ID: {supplier.id}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <p className="text-[10px] text-muted-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                        {supplier.code ? `${supplier.code}` : `ID: ${supplier.id.substring(0, 6)}`}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 text-[10px] font-bold">
+                                        <Package size={12} />
+                                        <span>{supplier._count?.products || 0} 件商品</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); toggleSelect(supplier.id); }}
-                            className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
-                                isSelected 
-                                ? "bg-foreground border-foreground text-background scale-110" 
-                                : "border-muted-foreground/30 hover:border-foreground/50"
-                            }`}
-                        >
-                            {isSelected && (
-                                <Check size={14} strokeWidth={4} />
-                            )}
-                        </button>
+                        <div className={`relative transition-all duration-300 ${isSelected || selectedIds.length > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); toggleSelect(supplier.id); }}
+                                className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
+                                    isSelected 
+                                    ? "bg-foreground border-foreground text-background scale-110" 
+                                    : "border-muted-foreground/30 hover:border-foreground/50"
+                                }`}
+                            >
+                                {isSelected && (
+                                    <Check size={14} strokeWidth={4} />
+                                )}
+                            </button>
+                        </div>
                     </div>
                     
-                    <div className="space-y-2 mt-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                            <Truck size={14} className="text-primary/70" />
-                            <span className="text-foreground/80">{supplier.contact}</span>
+                    {(supplier.contact || supplier.phone || supplier.email || supplier.address) && (
+                        <div className="space-y-2 mt-4 text-sm text-muted-foreground">
+                            {supplier.contact && (
+                                <div className="flex items-center gap-2">
+                                    <Truck size={14} className="text-primary/70" />
+                                    <span className="text-foreground/80">{supplier.contact}</span>
+                                </div>
+                            )}
+                            {supplier.phone && (
+                                <div className="flex items-center gap-2">
+                                    <Phone size={14} />
+                                    <span>{supplier.phone}</span>
+                                </div>
+                            )}
+                            {supplier.email && (
+                                <div className="flex items-center gap-2">
+                                    <Mail size={14} />
+                                    <span>{supplier.email}</span>
+                                </div>
+                            )}
+                            {supplier.address && (
+                                <div className="flex items-start gap-2">
+                                    <MapPin size={14} className="mt-0.5" />
+                                    <span className="line-clamp-2">{supplier.address}</span>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex items-center gap-2">
-                             <Phone size={14} />
-                             <span>{supplier.phone}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                             <Mail size={14} />
-                             <span>{supplier.email}</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                             <MapPin size={14} className="mt-0.5" />
-                             <span className="line-clamp-2">{supplier.address}</span>
-                        </div>
-                    </div>
+                    )}
                     
                     <div className="flex justify-end pt-4 mt-4 border-t border-border opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
                          <div className="flex gap-1">

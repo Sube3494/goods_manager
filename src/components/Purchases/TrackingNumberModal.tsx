@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Truck, Plus, Trash2, CheckCircle2, Camera, Eye, Image as ImageIcon } from "lucide-react";
+import { X, Truck, Plus, Trash2, CheckCircle2, Camera } from "lucide-react";
 import { TrackingInfo } from "@/lib/types";
 
 interface TrackingNumberModalProps {
@@ -11,9 +11,9 @@ interface TrackingNumberModalProps {
   onClose: () => void;
   onConfirm: (trackingData: TrackingInfo[]) => void;
   initialValue?: TrackingInfo[];
-  onUpload?: (index: number) => void;
-  onRemoveImage?: (rowIndex: number, imgIndex: number) => void;
-  onViewImages?: (images: string[]) => void;
+  readOnly?: boolean;
+  lockPackages?: boolean;
+  onViewImages?: (images: string[], index?: number) => void;
 }
 
 const COURIER_OPTIONS = [
@@ -25,26 +25,58 @@ const CourierSelect: React.FC<{
   value: string;
   isStandard: boolean;
   onSelect: (val: string) => void;
-}> = ({ value, isStandard, onSelect }) => {
+  readOnly?: boolean;
+}> = ({ value, isStandard, onSelect, readOnly }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const menuRef = React.useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  React.useLayoutEffect(() => {
+    const updatePosition = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width
+        });
+      }
+    };
+
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+
+    if (isOpen) {
+      updatePosition();
+      document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("scroll", updatePosition);
+      window.addEventListener("resize", updatePosition);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", updatePosition);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [isOpen]);
 
   return (
     <div className="relative" ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-11 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all flex items-center justify-between group overflow-hidden"
+        disabled={readOnly}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="w-full h-11 rounded-xl bg-zinc-500/5 dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all flex items-center justify-between group overflow-hidden disabled:opacity-70 disabled:cursor-default"
       >
         <span className="truncate">{isStandard ? value : "其他"}</span>
         <motion.span
@@ -55,32 +87,56 @@ const CourierSelect: React.FC<{
         </motion.span>
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute left-0 right-0 top-full z-100 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-border/50 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 backdrop-blur-2xl p-1.5 shadow-2xl shadow-black/10 dark:shadow-black/50 ring-1 ring-black/5 dark:ring-white/10"
-          >
-            {COURIER_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => {
-                  onSelect(opt);
-                  setIsOpen(false);
-                }}
-                className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition-all hover:bg-primary/20 hover:text-primary ${
-                  (isStandard ? value : "其他") === opt ? "bg-primary/30 text-primary font-bold" : "text-foreground"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {createPortal(
+        <AnimatePresence mode="wait">
+          {isOpen && (
+            <motion.div
+              ref={menuRef}
+              initial={{ opacity: 0, scale: 0.95, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+              style={{ 
+                position: 'fixed',
+                top: coords.top + 8,
+                left: coords.left,
+                width: coords.width,
+                zIndex: 999999
+              }}
+              className="rounded-2xl border border-border/40 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-[0_20px_50px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] p-1.5 overflow-hidden ring-1 ring-black/5"
+            >
+              <div className="max-h-60 overflow-y-auto px-1 space-y-1">
+                {COURIER_OPTIONS.map((opt) => {
+                  const isSelected = (isStandard ? value : "其他") === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        onSelect(opt);
+                        setIsOpen(false);
+                      }}
+                      className={`relative w-full rounded-xl px-4 py-2 text-left text-sm transition-all duration-200 group flex items-center justify-between ${
+                        isSelected 
+                          ? "bg-primary/10 text-primary font-bold" 
+                          : "text-foreground/70 hover:bg-zinc-500/10 hover:text-foreground"
+                      }`}
+                    >
+                      <span className="relative z-10">{opt}</span>
+                      {isSelected && (
+                          <motion.div 
+                              layoutId="active-indicator"
+                              className="h-1.5 w-1.5 rounded-full bg-primary"
+                          />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
@@ -89,10 +145,10 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  onUpload,
-  onRemoveImage,
-  onViewImages,
   initialValue = [],
+  readOnly = false,
+  lockPackages = false,
+  onViewImages,
 }) => {
   const [rows, setRows] = useState<TrackingInfo[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -118,14 +174,15 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
     setRows(rows.filter((_, i) => i !== index));
   };
 
-  const updateRow = (index: number, field: keyof TrackingInfo, value: string) => {
+  const updateRow = (index: number, field: keyof TrackingInfo, value: string | string[]) => {
     const newRows = [...rows];
-    newRows[index] = { ...newRows[index], [field]: value };
+    newRows[index] = { ...newRows[index], [field]: value } as TrackingInfo;
     setRows(newRows);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     const validRows = rows.filter(r => r.number.trim());
     if (validRows.length > 0) {
       onConfirm(validRows);
@@ -147,43 +204,49 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
             className="fixed inset-0 z-9998 bg-black/40 backdrop-blur-md"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white/95 dark:bg-gray-900/60 backdrop-blur-3xl border border-border/50 dark:border-white/10 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-[2.5rem] bg-white/95 dark:bg-gray-900/60 backdrop-blur-3xl border border-border/40 dark:border-white/10 shadow-2xl flex flex-col min-h-[500px] max-h-[85vh] overflow-hidden"
           >
-            <div className="relative p-10 border-b border-white/5 shrink-0 flex flex-col items-center text-center">
+            <div className="relative p-10 border-b border-border/40 shrink-0 flex items-center gap-6">
+              <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
+                <Truck size={24} />
+              </div>
+              
+              <div className="flex flex-col">
+                <h3 className="text-xl font-black text-foreground tracking-tight">管理物流单号</h3>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">录入包裹追踪信息与面单凭证</p>
+              </div>
+
               <button 
                 onClick={onClose}
-                className="absolute right-6 top-6 rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                className="ml-auto rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
               >
                 <X size={20} />
               </button>
-              
-              <div className="h-16 w-16 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500 mb-4 shadow-lg shadow-orange-500/10">
-                <Truck size={32} />
-              </div>
-              
-              <h3 className="text-2xl font-black text-foreground tracking-tight">管理物流单号</h3>
-              <p className="text-sm text-muted-foreground mt-1">支持录入多个包裹的追踪信息与多张面单</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto p-8 space-y-6">
+             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 bg-background/20">
+              <div className="flex-1 overflow-y-auto p-12 space-y-8">
                 {rows.map((row, index) => {
                   const isStandard = COURIER_OPTIONS.filter(o => o !== "其他").includes(row.courier);
                   const showCustomInput = !isStandard;
 
-                  // Get images list (supporting both old single field and new array)
-                  const images = row.waybillImages && row.waybillImages.length > 0 
-                    ? row.waybillImages 
+                  // Normalize images list
+                  const images = row.waybillImages && row.waybillImages.length > 0
+                    ? row.waybillImages
                     : (row.waybillImage ? [row.waybillImage] : []);
 
+
                   return (
-                    <div key={index} className="relative flex flex-col gap-4 p-5 rounded-2xl bg-zinc-500/5 dark:bg-white/5 border border-border/40 dark:border-white/5 group animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div 
+                      key={index} 
+                      className="relative flex flex-col gap-4 p-5 rounded-2xl bg-zinc-500/5 dark:bg-white/5 border border-border/40 dark:border-white/5 group animate-in fade-in slide-in-from-top-2 duration-300"
+                    >
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest bg-zinc-500/5 dark:bg-white/5 px-2.5 py-1 rounded-full">包裹 #{index + 1}</span>
-                        {rows.length > 1 && (
+                        <span className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest bg-zinc-500/5 dark:bg-white/5 px-3 py-1.5 rounded-full">包裹 #{index + 1}</span>
+                        {rows.length > 1 && !readOnly && !lockPackages && (
                           <button
                             type="button"
                             onClick={() => removeRow(index)}
@@ -194,109 +257,160 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider ml-1">快递公司</label>
-                          <div className="space-y-2.5">
-                            <CourierSelect 
-                              value={row.courier} 
-                              isStandard={isStandard}
-                              onSelect={(val) => {
-                                if (val === "其他") {
-                                  updateRow(index, "courier", "");
-                                } else {
-                                  updateRow(index, "courier", val);
-                                }
-                              }}
-                            />
-                            
-                            {showCustomInput && (
-                              <input
-                                autoFocus
-                                type="text"
-                                placeholder="输入快递品牌名称"
-                                value={row.courier}
-                                onChange={(e) => updateRow(index, "courier", e.target.value)}
-                                className="w-full h-11 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all animate-in fade-in zoom-in-95"
+                      <div className="grid grid-cols-[180px_1fr] gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-muted-foreground/50 uppercase tracking-tighter ml-1">快递公司</label>
+                          <div className="relative">
+                            {showCustomInput ? (
+                              <div className="relative group/custom animate-in zoom-in-95 duration-200">
+                                <input
+                                  autoFocus={!readOnly && !lockPackages}
+                                  type="text"
+                                  placeholder="输入快递名称"
+                                  value={row.courier === "其他" ? "" : row.courier}
+                                  readOnly={readOnly || lockPackages}
+                                  onChange={(e) => updateRow(index, "courier", e.target.value)}
+                                  className="w-full h-11 rounded-xl bg-zinc-500/5 dark:bg-white/5 border border-border dark:border-white/10 px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all read-only:opacity-70"
+                                />
+                                {!readOnly && !lockPackages && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => updateRow(index, "courier", "顺丰速运")}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground p-1.5 rounded-lg hover:bg-zinc-500/10 transition-all"
+                                    title="返回列表"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <CourierSelect 
+                                value={row.courier} 
+                                isStandard={isStandard}
+                                readOnly={readOnly || lockPackages}
+                                onSelect={(val) => updateRow(index, "courier", val)} 
                               />
                             )}
                           </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider ml-1">快递单号</label>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-muted-foreground/50 uppercase tracking-tighter ml-1">快递单号</label>
                           <input
                             type="text"
-                            placeholder="请输入单号"
+                            placeholder={readOnly ? "未填写" : "单号..."}
                             value={row.number}
+                            readOnly={readOnly || lockPackages}
                             onChange={(e) => updateRow(index, "number", e.target.value)}
-                            className="w-full h-11 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm text-foreground outline-none ring-primary/20 focus:ring-2 focus:border-primary transition-all font-mono"
+                            className="w-full h-11 rounded-xl bg-zinc-500/5 dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm text-foreground outline-none ring-primary/20 focus:ring-2 focus:border-primary transition-all font-mono read-only:opacity-70"
                           />
                         </div>
                       </div>
 
-                      {/* Waybill Images Management Section */}
-                      <div className="space-y-2 mt-1">
-                        <div className="flex items-center justify-between ml-1">
-                          <label className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider flex items-center gap-1.5">
-                            <ImageIcon size={10} /> 物流面单 {images.length > 0 && `(${images.length})`}
-                          </label>
-                          {images.length > 0 && onViewImages && (
-                            <button 
-                              type="button" 
-                              onClick={() => onViewImages(images)}
-                              className="text-[10px] font-bold text-primary hover:text-primary/70 transition-colors flex items-center gap-1"
-                            >
-                              <Eye size={10} /> 全屏预览
-                            </button>
-                          )}
-                        </div>
 
-                        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+
+
+                      {/* Waybill Images Management */}
+                      <div className="space-y-2 pt-2">
+                        <label className="text-xs font-bold text-muted-foreground/50 uppercase tracking-tighter ml-1">物流面单</label>
+                        <div className="flex flex-wrap gap-3">
+                          {/* Existing Images */}
                           {images.map((img, imgIdx) => (
-                            <div 
-                              key={imgIdx} 
-                              onClick={() => onViewImages?.([img])}
-                              className="relative h-14 w-14 shrink-0 rounded-xl overflow-hidden border border-white/10 group/img cursor-pointer hover:border-primary/50 transition-all active:scale-95"
-                            >
+                            <div key={imgIdx} className="group/img relative h-20 w-28 rounded-xl overflow-hidden border border-border bg-muted/30 shadow-sm animate-in zoom-in-50 duration-200">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={img} alt="waybill" className="h-full w-full object-cover" />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRemoveImage?.(index, imgIdx);
+                              <img 
+                                src={img} 
+                                alt="waybill" 
+                                className="h-full w-full object-cover cursor-pointer hover:scale-105 transition-transform" 
+                                onClick={() => {
+                                  if (onViewImages) {
+                                    // Collect all images across all rows for a unified gallery experience if possible, 
+                                    // but usually we just view the current row's images.
+                                    onViewImages(images, imgIdx);
+                                  }
                                 }}
-                                className="absolute top-1 right-1 h-4 w-4 rounded-full bg-destructive/80 flex items-center justify-center text-white opacity-0 group-hover/img:opacity-100 transition-opacity hover:bg-destructive shadow-sm"
-                              >
-                                <X size={10} />
-                              </button>
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newImages = [...images];
+                                    newImages.splice(imgIdx, 1);
+                                    updateRow(index, "waybillImages", newImages);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-white/20 hover:bg-destructive/80 text-white transition-colors"
+                                  title="移除"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
                           ))}
-                          <button
-                            type="button"
-                            onClick={() => onUpload?.(index)}
-                            className="h-14 w-14 shrink-0 rounded-xl border-2 border-dashed border-border dark:border-white/10 flex items-center justify-center text-muted-foreground/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
-                            title="添加面单"
-                          >
-                            <Camera size={20} />
-                          </button>
+
+                          {/* Upload Button */}
+                          {!readOnly && (
+                            <label className="h-20 w-28 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 group/up">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const files = e.target.files;
+                                  if (!files || files.length === 0) return;
+                                  
+                                  const uploadPromises = Array.from(files).map(async (file) => {
+                                      const formData = new FormData();
+                                      formData.append("file", file);
+                                      try {
+                                          const res = await fetch("/api/upload", { method: "POST", body: formData });
+                                          if (res.ok) {
+                                              const { url } = await res.json();
+                                              return url;
+                                          }
+                                      } catch (error) {
+                                          console.error("Upload failed:", error);
+                                      }
+                                      return null;
+                                  });
+
+                                  const uploadedUrls = (await Promise.all(uploadPromises)).filter(url => url !== null);
+                                  if (uploadedUrls.length > 0) {
+                                      const newImages = [...images, ...uploadedUrls];
+                                      updateRow(index, "waybillImages", newImages);
+                                  }
+                                }}
+                              />
+                              <Camera size={20} className="text-muted-foreground group-hover/up:text-primary transition-colors" />
+                              <span className="text-[10px] font-bold text-muted-foreground/60 group-hover/up:text-primary mb-1">上传凭证</span>
+                            </label>
+                          )}
+                          
+                          {images.length === 0 && readOnly && (
+                            <div className="h-20 w-28 rounded-xl border border-dashed border-border/40 bg-muted/5 flex items-center justify-center">
+                              <span className="text-[10px] font-bold text-muted-foreground/40 italic">暂无凭证</span>
+                            </div>
+                          )}
                         </div>
                       </div>
+
+
                     </div>
                   );
                 })}
 
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="w-full py-4 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border dark:border-white/5 hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary text-sm font-bold mt-2 group"
-                >
-                  <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
-                  继续添加包裹
-                </button>
+                 {!readOnly && !lockPackages && (
+                  <button
+                    type="button"
+                    onClick={addRow}
+                    className="w-full py-4 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground/60 hover:text-primary text-sm font-bold mt-4 group outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+                    继续添加包裹
+                  </button>
+                )}
               </div>
 
-              <div className="p-8 border-t border-white/5 shrink-0">
+               <div className="p-10 border-t border-border/40 shrink-0 bg-muted/10">
                 <div className="flex gap-4">
                   <button
                     type="button"
@@ -307,11 +421,24 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={rows.every(r => !r.number.trim())}
-                    className="flex-1 h-12 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 text-sm font-black shadow-xl shadow-black/10 dark:shadow-white/5 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                    disabled={readOnly || rows.every(r => !r.number.trim())}
+                    className={`flex-1 h-12 rounded-xl px-4 text-sm font-black shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none ${
+                        readOnly 
+                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                        : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-black/10 dark:shadow-white/5 hover:brightness-110 active:scale-[0.98]'
+                    }`}
                   >
-                    <CheckCircle2 size={20} />
-                    保存追踪信息
+                    {readOnly ? (
+                        <>
+                            <CheckCircle2 size={20} />
+                            数据已锁定
+                        </>
+                    ) : (
+                        <>
+                            <CheckCircle2 size={20} />
+                            保存追踪信息
+                        </>
+                    )}
                   </button>
                 </div>
               </div>

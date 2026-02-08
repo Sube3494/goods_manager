@@ -2,21 +2,19 @@
 
 import { Archive, Package, AlertTriangle, ArrowDownRight, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 
 
 
-import { PurchaseOrder } from "@/lib/types";
+import { PurchaseOrder, StatsData } from "@/lib/types";
 
-interface StatsData {
-  productCount: number;
-  totalStock: number;
-  lowStockCount: number;
-  totalValue: number;
-  recentPurchases: PurchaseOrder[]; 
-}
+
+
 
 export function StatsGrid({ data }: { data: StatsData | null }) {
+  const router = useRouter();
+  
   const stats = [
     { 
       title: "库存总货值", 
@@ -49,18 +47,20 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
       trendUp: false,
       warning: (data?.lowStockCount ?? 0) > 0,
       color: "from-orange-500/20 to-red-500/20",
-      iconColor: "text-orange-500"
+      iconColor: "text-orange-500",
+      href: "/goods?filter=low_stock"
     },
     { 
-      title: "本周入库", 
-      value: data ? `+${data.recentPurchases.length}` : "+0", 
+      title: "待入库订单", 
+      value: data ? `${data.pendingInboundCount.toLocaleString()}` : "0", 
       icon: ArrowDownRight, 
-      sub: "近期采购单", 
-      trend: "实时", 
+      sub: "等待验收订单", 
+      trend: "需处理", 
       trendUp: true,
       warning: false,
       color: "from-emerald-500/20 to-teal-500/20",
-      iconColor: "text-emerald-500"
+      iconColor: "text-emerald-500",
+      href: "/purchases?status=Ordered"
     },
   ];
 
@@ -69,10 +69,12 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
       {stats.map((stat, i) => (
         <motion.div
           key={i}
+          layout
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.1 }}
-          className="group relative overflow-hidden rounded-2xl glass border border-border p-6 transition-all hover:-translate-y-1 hover:shadow-xl"
+          onClick={() => (stat as any).href && router.push((stat as any).href)}
+          className={`group relative overflow-hidden rounded-2xl glass border border-border p-6 transition-all hover:-translate-y-1 hover:shadow-xl ${(stat as any).href ? 'cursor-pointer active:scale-[0.98]' : ''}`}
         >
           {/* Ambient Background Gradient */}
           <div className={`absolute inset-0 bg-linear-to-br ${stat.color} opacity-0 transition-opacity duration-500 group-hover:opacity-100`} />

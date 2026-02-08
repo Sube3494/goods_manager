@@ -4,12 +4,15 @@ import { useState, useEffect } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download } from "lucide-react";
+import { Search, Plus, Download, ListChecks, Trash2, X } from "lucide-react";
 import { Product, Category } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
+import { ActionBar } from "@/components/ui/ActionBar";
+
 
 import { useUser } from "@/hooks/useUser";
+import { useSearchParams } from "next/navigation";
 
 export default function GoodsPage() {
   const { user } = useUser();
@@ -19,6 +22,7 @@ export default function GoodsPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
+  const [settings, setSettings] = useState<{ lowStockThreshold: number }>({ lowStockThreshold: 10 });
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -31,6 +35,10 @@ export default function GoodsPage() {
     onConfirm: () => {},
   });
 
+  // Batch selection states
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+
   const { showToast } = useToast();
 
   const fetchGoods = async () => {
@@ -41,15 +49,27 @@ export default function GoodsPage() {
         const data = await res.json();
         setGoods(data);
       }
-    } catch {
+    } catch (error) {
       console.error("Failed to fetch goods", error);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch("/api/system/settings");
+      if (res.ok) {
+        setSettings(await res.json());
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+    }
+  };
+
   useEffect(() => {
     fetchGoods();
+    fetchSettings();
   }, []);
 
   const handleCreate = () => {
@@ -81,6 +101,42 @@ export default function GoodsPage() {
           }
         } catch {
           showToast("删除请求失败", "error");
+        }
+      },
+    });
+  };
+
+  // Batch selection handlers
+  const toggleSelectProduct = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+
+  const handleBatchDelete = () => {
+    const count = selectedIds.length;
+    setConfirmConfig({
+      isOpen: true,
+      title: "批量删除商品",
+      message: `确定要删除选中的 ${count} 个商品吗?此操作不可恢复。`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch("/api/products/batch", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: selectedIds }),
+          });
+          if (res.ok) {
+            showToast(`成功删除 ${count} 个商品`, "success");
+            setSelectedIds([]);
+            fetchGoods();
+            setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          } else {
+            showToast("批量删除失败", "error");
+          }
+        } catch {
+          showToast("批量删除请求失败", "error");
         }
       },
     });
@@ -131,7 +187,15 @@ export default function GoodsPage() {
     }
   };
   
+  const searchParams = useSearchParams();
+  const filterType = searchParams.get('filter');
+
   const filteredGoods = goods.filter(g => {
+    // 1. Low stock filter
+    if (filterType === 'low_stock') {
+       if (g.stock >= settings.lowStockThreshold) return false;
+    }
+
     const searchLower = searchQuery.toLowerCase();
     const nameMatch = g.name.toLowerCase().includes(searchLower);
     
@@ -158,7 +222,7 @@ export default function GoodsPage() {
         <div>
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">商品库</h1>
           <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-lg">
-            {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU。"}
+            {isLoading ? "正在从数据库加载商品..." : filterType === 'low_stock' ? "仅显示需补货商品" : "统一管理商品信息与SKU。"}
           </p>
         </div>
         
@@ -206,12 +270,17 @@ export default function GoodsPage() {
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredGoods.map((product) => (
+          {filteredGoods.map((product, index) => (
             <GoodsCard 
               key={product.id} 
               product={product} 
               onEdit={user ? handleEdit : undefined} 
               onDelete={user ? handleDelete : undefined} 
+              lowStockThreshold={settings.lowStockThreshold}
+              isSelected={selectedIds.includes(product.id)}
+              anySelected={selectedIds.length > 0}
+              onToggleSelect={toggleSelectProduct}
+              priority={index < 4}
             />
           ))}
         </div>
@@ -250,6 +319,21 @@ export default function GoodsPage() {
         title={confirmConfig.title}
         confirmLabel="确认删除"
         variant="danger"
+      />
+
+      <ActionBar 
+        selectedCount={selectedIds.length}
+        totalCount={filteredGoods.length}
+        onToggleSelectAll={() => {
+          if (selectedIds.length === filteredGoods.length) {
+            setSelectedIds([]);
+          } else {
+            setSelectedIds(filteredGoods.map(g => g.id));
+          }
+        }}
+        onClear={() => setSelectedIds([])}
+        label="个商品"
+        onDelete={handleBatchDelete}
       />
     </div>
   );

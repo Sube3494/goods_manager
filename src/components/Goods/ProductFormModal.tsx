@@ -12,6 +12,8 @@ import { twMerge } from "tailwind-merge";
 import { Product, GalleryItem, Supplier, Category } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Switch } from "@/components/ui/Switch";
+import { useToast } from "@/components/ui/Toast";
+
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -41,6 +43,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [mounted, setMounted] = useState(false);
+  const { showToast } = useToast();
   const [galleryImages, setGalleryImages] = useState<GalleryItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -72,6 +75,33 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
     if (isOpen) {
       fetchData();
+      
+      // 强制同步 initialData 到本地 formData 状态
+      if (initialData) {
+        setFormData({
+            name: initialData.name || "",
+            categoryId: initialData.categoryId || "",
+            price: initialData.price?.toString() || "",
+            stock: initialData.stock?.toString() || "",
+            image: initialData.image || "",
+            supplierId: initialData.supplierId || "",
+            sku: initialData.sku || "",
+            isPublic: initialData.isPublic ?? true
+        });
+      } else {
+        // 新增模式，重置为空
+        setFormData({
+            name: "",
+            categoryId: "",
+            price: "",
+            stock: "",
+            image: "",
+            supplierId: "",
+            sku: "",
+            isPublic: true
+        });
+      }
+
       if (initialData?.id) {
         fetch(`/api/gallery?productId=${initialData.id}`)
           .then(res => res.json())
@@ -126,7 +156,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
               });
               if (gRes.ok) {
                 const newItem = await gRes.json();
-                setGalleryImages(prev => [newItem, ...prev]);
+                setGalleryImages(prev => [...prev, newItem]);
               }
             } else {
               // 临时保存，提交时再处理
@@ -136,7 +166,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 productId: "", // 临时 ID 为空
                 uploadDate: new Date().toISOString()
               };
-              setGalleryImages(prev => [tempImg, ...prev]);
+              setGalleryImages(prev => [...prev, tempImg]);
             }
           }
         }
@@ -179,6 +209,29 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation for mandatory fields
+    if (!formData.sku.trim()) {
+        showToast("请输入商品编号 (SKU)", "error");
+        return;
+    }
+    if (!formData.name.trim()) {
+        showToast("请输入商品名称", "error");
+        return;
+    }
+    if (!formData.categoryId) {
+        showToast("请选择商品分类", "error");
+        return;
+    }
+    if (!formData.supplierId) {
+        showToast("请选择供应商", "error");
+        return;
+    }
+    if (!formData.price || Number(formData.price) <= 0) {
+        showToast("请输入有效的销售价格", "error");
+        return;
+    }
+
     onSubmit({
         ...formData,
         price: Number(formData.price),
@@ -219,7 +272,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {/* SKU */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <FileText size={16} /> 商品编号 (SKU)
+                            <FileText size={16} /> 商品编号 (SKU) <span className="text-red-500">*</span>
                         </label>
                         <input 
                             required
@@ -234,7 +287,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {/* Name */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Package size={16} /> 商品名称
+                            <Package size={16} /> 商品名称 <span className="text-red-500">*</span>
                         </label>
                         <input 
                             required
@@ -249,7 +302,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {/* Category */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Tag size={16} /> 分类
+                            <Tag size={16} /> 分类 <span className="text-red-500">*</span>
                         </label>
                         <CustomSelect 
                             value={formData.categoryId}
@@ -262,7 +315,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {/* Supplier */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Truck size={16} /> 供应商
+                            <Truck size={16} /> 供应商 <span className="text-red-500">*</span>
                         </label>
                         <CustomSelect 
                             value={formData.supplierId || ""}
@@ -272,21 +325,21 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         />
                     </div>
 
-                    {/* Visibility & Stock */}
+                    {/* Visibility & Prices */}
                     <div className="grid grid-cols-2 gap-4">
-                        {/* Stock */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Package size={16} /> 库存数量
+                                <FileText size={16} /> 销售价格 (￥) <span className="text-red-500">*</span>
                             </label>
                             <input 
                                 required
                                 type="number" 
+                                step="0.01"
                                 min="0"
-                                value={formData.stock}
-                                onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                                className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold dark:hover:bg-white/10"
-                                placeholder="0"
+                                value={formData.price}
+                                onChange={(e) => setFormData({...formData, price: e.target.value})}
+                                className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold dark:hover:bg-white/10 no-spinner"
+                                placeholder="0.00"
                             />
                         </div>
 
@@ -296,9 +349,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             </label>
                             <div
                                 onClick={() => setFormData({...formData, isPublic: !formData.isPublic})}
-                                className="w-full rounded-full px-5 py-3 flex items-center justify-between border border-border bg-white dark:bg-white/5 transition-all duration-300 font-bold text-foreground cursor-pointer dark:hover:bg-white/10 group"
+                                className="w-full rounded-full px-5 py-2.5 flex items-center justify-between border border-border bg-white dark:bg-white/5 transition-all duration-300 font-bold text-foreground cursor-pointer dark:hover:bg-white/10 group h-[46px]"
                             >
-                                <span className="group-hover:text-primary transition-colors">
+                                <span className="group-hover:text-primary transition-colors text-sm">
                                     {formData.isPublic ? "公开" : "私有"}
                                 </span>
                                 <Switch 
@@ -306,6 +359,29 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                     onChange={(val) => setFormData({...formData, isPublic: val})} 
                                 />
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Initial Stock */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <Package size={16} /> 期初库存 (Initial Stock)
+                        </label>
+                        <div className="relative">
+                            <input 
+                                required
+                                type="number" 
+                                min="0"
+                                value={formData.stock}
+                                onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                                className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold dark:hover:bg-white/10 no-spinner"
+                                placeholder="0"
+                            />
+                            {!initialData && (
+                                <p className="mt-2 px-4 text-[11px] text-muted-foreground/60 leading-relaxed italic">
+                                    * 仅首次手动建档时填写。常规库存增加请在“入库登记”中操作，以生成交易凭证。
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -326,45 +402,82 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                         
                         <div className="grid grid-cols-4 gap-3">
-                            {/* Display current photos */}
-                            {galleryImages.map(img => {
-                                const isMain = formData.image === img.url;
-                                return (
-                                    <div key={img.id} className={cn(
-                                        "relative aspect-square rounded-2xl overflow-hidden border transition-all group/img bg-muted shadow-sm hover:shadow-md",
-                                        isMain ? "border-primary ring-2 ring-primary/20" : "border-border"
-                                    )}>
-                                        <Image src={img.url} alt="preview" fill className="object-cover transition-transform duration-500 group-hover/img:scale-105" />
-                                        
-                                        {/* Simplified Overlay on Hover */}
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2">
-                                            {!isMain && (
+                            {/* Display current photos (Including the main cover image if not in gallery) */}
+                            {(() => {
+                                // 提取所有图片的 URL 以便查重
+                                const galleryUrls = new Set(galleryImages.map(img => img.url));
+                                
+                                // 构建最终显示的列表
+                                let displayList = [...galleryImages];
+                                
+                                // 排序：封面图置顶，其他按时间升序
+                                displayList.sort((a, b) => {
+                                    const isACover = formData.image === a.url;
+                                    const isBCover = formData.image === b.url;
+                                    
+                                    if (isACover && !isBCover) return -1;
+                                    if (!isACover && isBCover) return 1;
+                                    
+                                    const dateA = new Date((a as any).createdAt || a.uploadDate).getTime();
+                                    const dateB = new Date((b as any).createdAt || b.uploadDate).getTime();
+                                    return dateA - dateB;
+                                });
+
+                                // 如果封面图不在相册里且存在 URL，将其作为一个虚拟项添加进去并置顶
+                                if (formData.image && !galleryUrls.has(formData.image)) {
+                                    displayList.unshift({
+                                        id: 'cover-virtual',
+                                        url: formData.image,
+                                        productId: initialData?.id || '',
+                                        uploadDate: new Date().toISOString()
+                                    } as any);
+                                }
+
+                                return displayList.map(img => {
+                                    const isMain = formData.image === img.url;
+                                    return (
+                                        <div key={img.id} className={cn(
+                                            "relative aspect-square rounded-2xl overflow-hidden border transition-all group/img bg-muted shadow-sm hover:shadow-md",
+                                            isMain ? "border-primary ring-2 ring-primary/20" : "border-border"
+                                        )}>
+                                            <Image 
+                                              src={img.url} 
+                                              alt="preview" 
+                                              fill 
+                                              sizes="(max-width: 640px) 25vw, (max-width: 1024px) 20vw, 150px"
+                                              className="object-cover transition-transform duration-500 group-hover/img:scale-105" 
+                                            />
+                                            
+                                            {/* Simplified Overlay on Hover */}
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2">
+                                                {!isMain && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setAsMainImage(img.url)}
+                                                        className="px-3 py-1.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-lg shadow-xl translate-y-2 group-hover/img:translate-y-0 transition-all duration-300"
+                                                    >
+                                                        设为主图
+                                                    </button>
+                                                )}
                                                 <button 
                                                     type="button"
-                                                    onClick={() => setAsMainImage(img.url)}
-                                                    className="px-3 py-1.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-lg shadow-xl translate-y-2 group-hover/img:translate-y-0 transition-all duration-300"
+                                                    onClick={() => handleDeletePhoto(img)}
+                                                    className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-destructive text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-500 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:scale-110 active:scale-95"
+                                                    title="移除照片"
                                                 >
-                                                    设为主图
+                                                    <X size={12} strokeWidth={3} />
                                                 </button>
-                                            )}
-                                            <button 
-                                                type="button"
-                                                onClick={() => handleDeletePhoto(img)}
-                                                className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-destructive text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-500 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:scale-110 active:scale-95"
-                                                title="移除照片"
-                                            >
-                                                <X size={12} strokeWidth={3} />
-                                            </button>
-                                        </div>
-
-                                        {isMain && (
-                                            <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-primary-foreground text-[9px] font-bold rounded-md shadow-lg">
-                                                封面
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+    
+                                            {isMain && (
+                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-primary-foreground text-[9px] font-bold rounded-md shadow-lg">
+                                                    封面
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                });
+                            })()}
                             
                             {/* Add Photo Action */}
                             <label className="aspect-square rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-inner transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer">

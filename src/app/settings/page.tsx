@@ -1,196 +1,400 @@
 "use client";
 
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { Monitor, Globe, Shield, Save, HardDrive, Loader2, Zap } from "lucide-react";
-import { useUser } from "@/hooks/useUser";
-import { useEffect, useState } from "react";
-import { Switch } from "@/components/ui/Switch";
+import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import { Settings, Save, AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Info } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { useTheme } from "next-themes";
 
 export default function SettingsPage() {
-  const { user, isLoading } = useUser();
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
+  const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
+  const [systemInfo, setSystemInfo] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Use refs to track last saved values to prevent initial auto-save and loops
+  const lastSavedSettings = useRef({ lowStockThreshold: 10, allowGalleryUpload: true });
+  // Add a ref to track if we should verify changes, only true after initial load
+  const isInitialized = useRef(false);
+
   const { showToast } = useToast();
-  const [allowUpload, setAllowUpload] = useState(true);
-  const [systemInfo, setSystemInfo] = useState({
-    version: "...",
-    dbType: "...",
-    lastBackup: "...",
-    nodeVersion: "..."
-  });
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    fetch("/api/system/info")
-      .then(res => res.json())
-      .then(data => {
-        if (!data.error) setSystemInfo(data);
-      })
-      .catch(console.error);
+    const initData = async () => {
+        try {
+            const [settingsRes, infoRes] = await Promise.all([
+                fetch("/api/system/settings"),
+                fetch("/api/system/info")
+            ]);
+
+            if (settingsRes.ok) {
+                const data = await settingsRes.json();
+                setLowStockThreshold(data.lowStockThreshold);
+                setAllowGalleryUpload(data.allowGalleryUpload ?? true);
+                lastSavedSettings.current = {
+                    lowStockThreshold: data.lowStockThreshold,
+                    allowGalleryUpload: data.allowGalleryUpload ?? true
+                };
+            }
+
+            if (infoRes.ok) {
+                setSystemInfo(await infoRes.json());
+            }
+        } catch (error) {
+            console.error("Failed to load settings:", error);
+            showToast("加载配置失败", "error");
+        } finally {
+            setIsLoading(false);
+            // Small delay to allow state to settle before enabling auto-save monitoring
+            setTimeout(() => { isInitialized.current = true; }, 100);
+        }
+    };
+    initData();
   }, []);
 
-  useEffect(() => {
-    // 使用异步方式加载存储的数据，避免同步渲染冲突
-    const saved = localStorage.getItem("app_allow_upload");
-    if (saved !== null) {
-      requestAnimationFrame(() => {
-        setAllowUpload(saved === "true");
+  const saveSettings = async (newSettings: Partial<{ lowStockThreshold: number, allowGalleryUpload: boolean }>) => {
+    setSaveStatus("saving");
+    setIsSaving(true);
+    
+    // Merge with current state (or provided overrides)
+    const payload = {
+        lowStockThreshold,
+        allowGalleryUpload,
+        ...newSettings
+    };
+
+    try {
+      const res = await fetch("/api/system/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
+      
+      if (res.ok) {
+        setSaveStatus("saved");
+        lastSavedSettings.current = { ...lastSavedSettings.current, ...payload };
+      } else {
+        setSaveStatus("error");
+        showToast("自动保存失败", "error");
+      }
+    } catch (error) {
+      setSaveStatus("error");
+    } finally {
+      setIsSaving(false);
     }
-  }, []);
+  };
 
-  const handleSave = () => {
-    localStorage.setItem("app_allow_upload", allowUpload.toString());
-    showToast("系统设置已保存", "success");
-    // 强制触发存储事件以通知其他页面（如果需要实时的话，虽然同源自动有效）
-    window.dispatchEvent(new Event("storage"));
+  // Debounced save for text inputs
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    
+    // Check if actually changed to avoid redundant saves
+    if (lowStockThreshold === lastSavedSettings.current.lowStockThreshold) return;
+
+    const timer = setTimeout(() => {
+        saveSettings({ lowStockThreshold });
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [lowStockThreshold]);
+
+  // Immediate save for toggle
+  const toggleGalleryUpload = () => {
+    const newValue = !allowGalleryUpload;
+    setAllowGalleryUpload(newValue);
+    // Directly call save to avoid waiting for useEffect
+    saveSettings({ allowGalleryUpload: newValue });
   };
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground font-medium">验证访问权限...</p>
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="animate-pulse text-muted-foreground font-medium">读取系统配置中...</div>
       </div>
     );
   }
-
-  if (!user && !isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <div className="p-4 rounded-full bg-destructive/10 text-destructive">
-          <Shield size={48} />
-        </div>
-        <h2 className="text-2xl font-bold">无权访问</h2>
-        <p className="text-muted-foreground">该页面仅供管理员使用，请登录后重试。</p>
-        <button 
-          onClick={() => window.location.href = "/login"}
-          className="mt-2 h-10 px-8 rounded-full bg-primary text-primary-foreground font-bold shadow-lg hover:opacity-90 transition-opacity"
-        >
-          前往登录
-        </button>
-      </div>
-    );
-  }
-
-  if (!user) return null;
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">系统设置</h1>
-          <p className="text-muted-foreground mt-2">管理您的偏好设置与系统参数。</p>
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex items-center justify-between">
+            <div>
+                <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/60">
+                系统设置
+                </h1>
+                <p className="text-muted-foreground mt-2 text-lg">
+                管理全局库存逻辑与系统行为。
+                </p>
+            </div>
+            <div className="flex items-center gap-2">
+                {saveStatus === "saving" && <span className="text-sm text-primary animate-pulse font-medium">自动保存中...</span>}
+                {saveStatus === "saved" && <span className="text-sm text-muted-foreground/60 flex items-center gap-1"><ShieldCheck size={14}/> 已保存</span>}
+                {saveStatus === "error" && <span className="text-sm text-red-500 font-bold">保存失败</span>}
+            </div>
         </div>
-        
-        <button 
-          onClick={handleSave}
-          className="h-10 flex items-center gap-2 px-8 rounded-full bg-primary text-primary-foreground font-bold shadow-lg hover:opacity-90 transition-opacity whitespace-nowrap"
+
+      <div className="grid gap-6">
+        {/* Personalization Section */}
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="glass-panel rounded-3xl border border-border overflow-hidden"
         >
-          <Save size={18} />
-          保存更改
-        </button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Appearance Section */}
-        <section className="glass-panel rounded-2xl p-6 space-y-6">
-          <div className="flex items-center gap-3 border-b border-border pb-4">
-            <div className="p-2 rounded-lg bg-primary/5 text-primary">
-              <Monitor size={20} />
+            <div className="p-8 border-b border-border/50 bg-white/5">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+                        <Monitor size={20} />
+                    </div>
+                    <h3 className="text-xl font-bold">个性化设置</h3>
+                </div>
             </div>
-            <h2 className="text-lg font-bold">外观与显示</h2>
+            <div className="p-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h4 className="font-bold text-foreground">界面主题</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            切换系统外观模式，适应不同的光照环境。
+                        </p>
+                    </div>
+                    <div className="flex bg-muted/50 p-1 rounded-2xl w-full sm:w-fit shrink-0">
+                        {/* Light Mode */}
+                        <button
+                            onClick={(e) => {
+                                if (theme === 'light') return;
+                                const transition = (document as any).startViewTransition ? (document as any).startViewTransition(() => setTheme("light")) : null;
+                                if (!transition) setTheme("light");
+                                
+                                if (transition) {
+                                  const x = e.clientX;
+                                  const y = e.clientY;
+                                  const endRadius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+                                  transition.ready.then(() => {
+                                    const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
+                                    document.documentElement.animate(
+                                      { clipPath: clipPath },
+                                      { duration: 500, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
+                                    );
+                                  });
+                                }
+                            }}
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl transition-all duration-300 ${
+                                theme === 'light' 
+                                ? 'bg-white shadow-sm text-primary font-bold' 
+                                : 'text-muted-foreground hover:text-foreground hover:bg-white/50'
+                            }`}
+                        >
+                            <Sun size={20} className={theme === 'light' ? "fill-current" : ""} />
+                            <span>浅色模式</span>
+                        </button>
+
+                        {/* Dark Mode */}
+                        <button
+                            onClick={(e) => {
+                                if (theme === 'dark') return;
+                                const transition = (document as any).startViewTransition ? (document as any).startViewTransition(() => setTheme("dark")) : null;
+                                if (!transition) setTheme("dark");
+
+                                if (transition) {
+                                  const x = e.clientX;
+                                  const y = e.clientY;
+                                  const endRadius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+                                  transition.ready.then(() => {
+                                    const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
+                                    document.documentElement.animate(
+                                      { clipPath: clipPath },
+                                      { duration: 500, easing: "ease-in-out", pseudoElement: "::view-transition-new(root)" }
+                                    );
+                                  });
+                                }
+                            }}
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl transition-all duration-300 ${
+                                theme === 'dark' 
+                                ? 'bg-slate-800 shadow-sm text-white font-bold' 
+                                : 'text-muted-foreground hover:text-foreground hover:bg-white/50'
+                            }`}
+                        >
+                            <Moon size={20} className={theme === 'dark' ? "fill-current" : ""} />
+                            <span>深色模式</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+
+        {/* Inventory Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass-panel rounded-3xl border border-border overflow-hidden"
+        >
+          <div className="p-8 border-b border-border/50 bg-white/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500">
+                <AlertTriangle size={20} />
+              </div>
+              <h3 className="text-xl font-bold">库存逻辑</h3>
+            </div>
           </div>
           
+          <div className="p-8 space-y-8">
+            <div className="grid gap-6 md:grid-cols-2 items-center">
+              <div className="space-y-1">
+                <label className="text-sm font-bold text-foreground">库存低位预警阈值</label>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  当商品库存数量低于此数值时，系统将会在首页及库存列表中标记为“预警”状态。
+                </p>
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={lowStockThreshold || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setLowStockThreshold(val === "" ? 0 : parseInt(val) || 0);
+                  }}
+                  className="w-full rounded-2xl bg-white dark:bg-white/5 border border-border px-4 py-3 text-lg font-mono font-bold focus:ring-2 focus:ring-primary/20 transition-all outline-none no-spinner"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground/40">
+                  件单位
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* System Info Placeholder */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="glass-panel rounded-3xl border border-border p-8 opacity-60 grayscale hover:grayscale-0 transition-all hover:opacity-100"
+        >
           <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">主题模式</p>
-              <p className="text-sm text-muted-foreground">切换明亮/暗黑主题</p>
+            <div className="flex items-center gap-3">
+               <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+                 <ShieldCheck size={20} />
+               </div>
+               <div>
+                  <h3 className="font-bold">安全与权限</h3>
+                  <p className="text-xs text-muted-foreground">多级管理员权限分配 (即将推出)</p>
+               </div>
             </div>
-            <ThemeToggle />
+            <Zap size={20} className="text-muted-foreground/20" />
           </div>
-        </section>
+        </motion.div>
 
-        {/* System Info */}
-        <section className="glass-panel rounded-2xl p-6 space-y-6">
-          <div className="flex items-center gap-3 border-b border-border pb-4">
-            <div className="p-2 rounded-lg bg-primary/5 text-primary">
-              <HardDrive size={20} />
-            </div>
-            <h2 className="text-lg font-bold">系统信息</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex justify-between items-center text-sm">
-               <span className="text-muted-foreground">软件版本</span>
-               <span className="font-mono font-bold text-primary">v{systemInfo.version}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-               <span className="text-muted-foreground">数据架构</span>
-               <span className="font-mono font-bold text-primary">{systemInfo.dbType}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-               <span className="text-muted-foreground">运行内核</span>
-               <span className="font-mono text-xs opacity-70">{systemInfo.nodeVersion}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-               <span className="text-muted-foreground">备份记录</span>
-               <span className="text-xs italic opacity-60">{systemInfo.lastBackup}</span>
-            </div>
-          </div>
-        </section>
 
-        {/* Localization */}
-        <section className="glass-panel rounded-2xl p-6 space-y-6">
-          <div className="flex items-center gap-3 border-b border-border pb-4">
-            <div className="p-2 rounded-lg bg-primary/5 text-primary">
-              <Globe size={20} />
-            </div>
-            <h2 className="text-lg font-bold">语言与区域</h2>
-          </div>
-          
-           <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">系统语言</p>
-              <p className="text-sm text-muted-foreground">当前仅支持简体中文</p>
-            </div>
-            <div className="px-3 py-1 rounded-md bg-secondary/50 text-xs font-bold border border-border">
-              简体中文
-            </div>
-          </div>
-        </section>
-
-        {/* Feature Management */}
-        <section className="glass-panel rounded-2xl p-6 space-y-6">
-          <div className="flex items-center gap-3 border-b border-border pb-4">
-            <div className="p-2 rounded-lg bg-primary/5 text-primary">
-              <Zap size={20} />
-            </div>
-            <h2 className="text-lg font-bold">功能管控</h2>
-          </div>
-          
-           <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">允许上传照片</p>
-              <p className="text-sm text-muted-foreground">控制相册页面上传按钮的可见性</p>
-            </div>
-            <Switch checked={allowUpload} onChange={setAllowUpload} />
-          </div>
-        </section>
-
-         {/* Security */}
-         <section className="glass-panel rounded-2xl p-6 space-y-6 opacity-60 pointer-events-none grayscale">
-          <div className="flex items-center gap-3 border-b border-border pb-4">
-            <div className="p-2 rounded-lg bg-primary/5 text-primary">
-              <Shield size={20} />
-            </div>
-            <h2 className="text-lg font-bold">安全 (开发中)</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            用户权限管理与审计日志功能正在开发中。
-          </p>
-        </section>
       </div>
-      
-      <div className="h-4" />
+
+
+        {/* Data Management Section */}
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="glass-panel rounded-3xl border border-border overflow-hidden"
+        >
+            <div className="p-8 border-b border-border/50 bg-white/5">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+                        <Database size={20} />
+                    </div>
+                    <h3 className="text-xl font-bold">数据管理</h3>
+                </div>
+            </div>
+
+            <div className="p-8 flex items-center justify-between">
+                <div>
+                    <h4 className="font-bold text-foreground">允许实物照片上传</h4>
+                    <p className="text-sm text-muted-foreground mt-1">开启后，允许用户在实物相册中上传新照片。</p>
+                </div>
+                <button
+                   onClick={toggleGalleryUpload}
+                   className={`relative h-8 w-14 rounded-full cursor-pointer transition-all duration-300 ease-in-out group ${
+                       allowGalleryUpload 
+                       ? 'bg-linear-to-r from-primary to-primary/80 shadow-lg shadow-primary/30' 
+                       : 'bg-muted hover:bg-muted/80'
+                   }`}
+                >
+                    {/* Track glow effect */}
+                    {allowGalleryUpload && (
+                        <div className="absolute inset-0 rounded-full bg-primary/20 blur-md" />
+                    )}
+                    
+                    {/* Slider */}
+                    <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300 ease-in-out flex items-center justify-center ${
+                        allowGalleryUpload ? 'left-7' : 'left-1'
+                    }`}>
+                        {/* Icon */}
+                        <div className={`transition-all duration-200 ${allowGalleryUpload ? 'text-primary scale-100' : 'text-muted-foreground/40 scale-90'}`}>
+                            {allowGalleryUpload ? (
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            ) : (
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                </svg>
+                            )}
+                        </div>
+                    </div>
+                </button>
+            </div>
+            
+            <div className="p-8 border-t border-border/50 flex items-center justify-between">
+                <div>
+                    <h4 className="font-bold text-foreground">导出全站数据</h4>
+                    <p className="text-sm text-muted-foreground mt-1">将所有商品、订单及供应商数据导出为 Excel 备份。</p>
+                </div>
+                <button 
+                  onClick={() => showToast("正在准备数据导出...", "info")}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-muted transition-colors text-sm font-medium"
+                >
+                    <Download size={16} />
+                    立即导出
+                </button>
+            </div>
+        </motion.div>
+
+        {/* System Info Section */}
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="glass-panel rounded-3xl border border-border overflow-hidden"
+        >
+            <div className="p-8 border-b border-border/50 bg-white/5">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-slate-500/10 text-slate-500">
+                        <Info size={20} />
+                    </div>
+                    <h3 className="text-xl font-bold">关于系统</h3>
+                </div>
+            </div>
+            <div className="p-8 grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">当前版本</p>
+                    <p className="text-lg font-mono font-medium">{systemInfo?.version || "Unknown"}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">数据库类型</p>
+                    <p className="text-lg font-mono font-medium">{systemInfo?.dbType || "PostgreSQL"}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">运行时环境</p>
+                    <p className="text-lg font-mono font-medium">Node.js {systemInfo?.nodeVersion || process.version}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">最近备份</p>
+                    <p className="text-lg font-mono font-medium text-muted-foreground/50">{systemInfo?.lastBackup || "未配置"}</p>
+                </div>
+            </div>
+        </motion.div>
+
     </div>
   );
 }

@@ -20,7 +20,8 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
     phone: initialData?.phone || "",
     email: initialData?.email || "",
     address: initialData?.address || "",
-    id: initialData?.id
+    id: initialData?.id,
+    code: initialData?.code || ""
   });
 
   const [mounted, setMounted] = useState(false);

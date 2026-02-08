@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-07 00:08:33
+ * @Author: Sube
+ * @FilePath: page.tsx
+ * @LastEditTime: 2026-02-08 23:18:39
+ * @Description: 
+ */
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -6,9 +13,11 @@ import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { RecentInbound } from "@/components/Dashboard/RecentInbound";
 import { QuickActions } from "@/components/Dashboard/QuickActions";
 import { format } from "date-fns";
+import { StatsData } from "@/lib/types";
+
 
 export default function Home() {
-  const [statsData, setStatsData] = useState(null);
+  const [statsData, setStatsData] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
@@ -81,7 +90,7 @@ export default function Home() {
       {/* Main Content Grid */}
       <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-3 h-full items-stretch pb-10">
         <div className="md:col-span-2 h-full">
-            <RecentInbound data={statsData?.recentPurchases} />
+            <RecentInbound items={statsData?.recentInboundItems || []} isLoading={isLoading} />
         </div>
         <div className="h-full">
            <QuickActions />

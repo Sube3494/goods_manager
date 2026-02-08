@@ -40,6 +40,7 @@ model Product {
 
 model Supplier {
   id             String          @id @default(cuid())
+  code           String?         @unique
   name           String
   contact        String?
   phone          String?
@@ -108,4 +109,12 @@ model VerificationCode {
   createdAt DateTime @default(now())
   
   @@unique([email, code])
+}
+
+model SystemSetting {
+  id                String   @id @default("system")
+  lowStockThreshold Int      @default(10)
+  allowDataImport    Boolean  @default(true)
+  allowGalleryUpload Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
 }

@@ -4,12 +4,19 @@ import prisma from "@/lib/prisma";
 // 获取首页仪表盘统计数据
 export async function GET() {
   try {
+    // 1. 获取系统设置
+    const settings = await prisma.systemSetting.findUnique({
+      where: { id: "system" }
+    });
+    const threshold = settings?.lowStockThreshold ?? 10;
+
     const [
       productCount,
       totalStock,
       lowStockCount,
       totalValueResult,
-      recentPurchases
+      recentInboundItems,
+      pendingOrderCount
     ] = await Promise.all([
       prisma.product.count(),
       prisma.product.aggregate({
@@ -20,7 +27,7 @@ export async function GET() {
       prisma.product.count({
         where: {
           stock: {
-            lt: 10
+            lt: threshold
           }
         }
       }),
@@ -30,16 +37,62 @@ export async function GET() {
           stock: true
         }
       }),
-      prisma.purchaseOrder.findMany({
-        take: 5,
-        orderBy: {
-          date: 'desc'
+      // Query individual product items from received orders
+      prisma.purchaseOrderItem.findMany({
+        take: 10,
+        where: {
+          purchaseOrder: {
+            status: "Received"
+          }
         },
         include: {
-          supplier: true
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              image: true
+            }
+          },
+          supplier: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          purchaseOrder: {
+            select: {
+              id: true,
+              date: true,
+              status: true
+            }
+          }
+        },
+        orderBy: {
+          purchaseOrder: {
+            date: 'desc'
+          }
+        }
+      }),
+      // 获取待入库订单数量 (Status = Ordered)
+      prisma.purchaseOrder.count({
+        where: {
+          status: "Ordered"
         }
       })
     ]);
+
+    // Transform inbound items to include subtotal
+    const transformedInboundItems = recentInboundItems.map(item => ({
+      id: item.id,
+      productId: item.productId,
+      product: item.product,
+      supplier: item.supplier,
+      quantity: item.quantity,
+      costPrice: item.costPrice,
+      purchaseOrder: item.purchaseOrder,
+      subtotal: item.quantity * item.costPrice
+    }));
 
     const totalValue = totalValueResult.reduce((acc, curr) => acc + (curr.price * curr.stock), 0);
 
@@ -48,7 +101,8 @@ export async function GET() {
       totalStock: totalStock._sum.stock || 0,
       lowStockCount,
       totalValue,
-      recentPurchases
+      recentInboundItems: transformedInboundItems,
+      pendingInboundCount: pendingOrderCount
     });
   } catch (error) {
     console.error("Failed to fetch stats:", error);

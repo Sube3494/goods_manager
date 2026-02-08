@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Check } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
@@ -25,9 +26,15 @@ interface CustomSelectProps {
 
 export function CustomSelect({ options, value, onChange, placeholder = "Select...", className }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label || placeholder;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -38,6 +45,17 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  }, [isOpen]);
 
   return (
     <div className={cn("relative", className)} ref={containerRef}>
@@ -57,41 +75,50 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
         />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 5, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 5, scale: 0.98 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute z-50 mt-2 max-h-60 w-full overflow-auto rounded-2xl bg-white dark:bg-card/70 dark:backdrop-blur-xl border border-border dark:border-white/10 p-1 shadow-xl ring-1 ring-black/5 focus:outline-none"
-          >
-            <div className="max-h-60 overflow-auto p-1 py-1.5 scrollbar-hide">
-              {options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    "relative flex w-full select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer data-disabled:pointer-events-none data-disabled:opacity-50",
-                    option.value === value && "bg-black/10 dark:bg-white/10 font-medium"
-                  )}
-                >
-                  <span className="truncate">{option.label}</span>
-                  {option.value === value && (
-                    <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-primary">
-                      <Check size={14} />
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 5, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 5, scale: 0.98 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              style={{
+                position: 'absolute',
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownPosition.width}px`,
+              }}
+              className="z-99999 max-h-60 overflow-auto rounded-2xl bg-white dark:bg-card/70 dark:backdrop-blur-xl border border-border dark:border-white/10 p-1 shadow-xl ring-1 ring-black/5 focus:outline-none"
+            >
+              <div className="max-h-60 overflow-auto p-1 py-1.5 scrollbar-hide">
+                {options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(option.value);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      "relative flex w-full select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer data-disabled:pointer-events-none data-disabled:opacity-50",
+                      option.value === value && "bg-black/10 dark:bg-white/10 font-medium"
+                    )}
+                  >
+                    <span className="truncate">{option.label}</span>
+                    {option.value === value && (
+                      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-primary">
+                        <Check size={14} />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

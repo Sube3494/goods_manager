@@ -18,7 +18,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   
   const isLoginPage = pathname === "/login";
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
-  const showSidebar = !isLoginPage;
+  const showSidebar = !isLoginPage && !!user;
 
   return (
     <ToastProvider>
@@ -30,7 +30,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-400/5 dark:bg-purple-600/5 rounded-full blur-[100px] mix-blend-multiply dark:mix-blend-screen" />
         </div>
 
-        {!isLoginPage && (
+        {showSidebar && (
           <Sidebar 
             isOpen={isSidebarOpen} 
             onClose={() => setIsSidebarOpen(false)} 
@@ -45,6 +45,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <MobileHeader 
                 isOpen={isSidebarOpen} 
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+                showMenu={!!user}
               />
             )}
             {!isLoginPage && (
