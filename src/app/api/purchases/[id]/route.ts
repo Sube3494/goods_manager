@@ -16,6 +16,8 @@ export async function PUT(
       shippingFees,
       extraFees,
       trackingData,
+      paymentVoucher,
+      paymentVouchers,
       date
     } = body;
 
@@ -27,6 +29,8 @@ export async function PUT(
         totalAmount: totalAmount !== undefined ? Number(totalAmount) : undefined,
         shippingFees: shippingFees !== undefined ? Number(shippingFees) : undefined,
         extraFees: extraFees !== undefined ? Number(extraFees) : undefined,
+        paymentVoucher: paymentVoucher !== undefined ? paymentVoucher : undefined,
+        paymentVouchers: paymentVouchers !== undefined ? paymentVouchers : undefined,
         trackingData: trackingData !== undefined ? trackingData : undefined,
         date: date ? new Date(date) : undefined,
         // 如果提供了 items，先删除所有旧的，再创建新的
@@ -53,6 +57,7 @@ export async function PUT(
     });
 
     // 如果状态变为 "Received"，自动增加商品库存
+    // 注意：在更严谨的系统中，这里应该检查“前置状态”以防重复入库，但当前通过状态字匹配实现
     if (status === "Received") {
       const orderItems = await prisma.purchaseOrderItem.findMany({
         where: { purchaseOrderId: id }

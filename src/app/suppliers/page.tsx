@@ -10,6 +10,7 @@ import { Supplier } from "@/lib/types";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -30,14 +31,18 @@ export default function SuppliersPage() {
 
   const fetchSuppliers = useCallback(async () => {
     try {
+      setIsLoading(true);
       const res = await fetch("/api/suppliers");
       if (res.ok) {
         setSuppliers(await res.json());
       }
     } catch (error) {
       console.error("Failed to fetch suppliers:", error);
+      showToast("加载供应商失败", "error");
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     fetchSuppliers();
@@ -150,7 +155,12 @@ export default function SuppliersPage() {
 
       {/* Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredSuppliers.map((supplier) => {
+        {isLoading ? (
+          [1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-48 rounded-2xl bg-muted/20 animate-pulse border border-border" />
+          ))
+        ) : filteredSuppliers.length > 0 ? (
+          filteredSuppliers.map((supplier) => {
             const isSelected = selectedIds.includes(supplier.id);
             return (
                 <div key={supplier.id} className={`group relative overflow-hidden rounded-2xl glass-card border p-6 transition-all duration-300 ${isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
@@ -235,7 +245,18 @@ export default function SuppliersPage() {
                     </div>
                 </div>
             );
-        })}
+          })
+        ) : (
+          <div className="col-span-full py-20 flex flex-col items-center justify-center text-center">
+            <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-6 text-muted-foreground/50 border border-dashed border-border group-hover:scale-110 transition-transform duration-500">
+              <Truck size={40} strokeWidth={1.5} />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">暂无供应商数据</h3>
+            <p className="text-muted-foreground text-sm mt-2 max-w-[280px] leading-relaxed">
+              {searchQuery ? '未找到匹配的供应商，尝试调整关键词。' : '当前没有任何供应商，点击右上角“新建供应商”开始。'}
+            </p>
+          </div>
+        )}
       </div>
 
       <SupplierModal

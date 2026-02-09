@@ -28,21 +28,21 @@ export async function POST(request: Request) {
 
     for (const item of products) {
         try {
-            // Map keys (assuming headers might be Chinese or English)
-            const name = item.name || item['商品名称'] || item['Name'];
+            // Map keys (assuming headers might be Chinese or English, with or without * for required)
+            const name = item.name || item['商品名称'] || item['*商品名称'] || item['Name'];
             if (!name) {
                 failCount++;
                 continue;
             }
 
-            const price = Number(item.price || item['价格'] || item['Price'] || 0);
+            const price = Number(item.price || item['价格'] || item['*价格'] || item['Price'] || 0);
             const stock = Number(item.stock || item['库存'] || item['Stock'] || 0);
             const sku = String(item.sku || item['SKU'] || item['编码'] || "");
             const costPrice = Number(item.costPrice || item['成本价'] || item['Cost'] || 0);
             
             // Try to find category
             let categoryId = item.categoryId;
-            const categoryName = item.category || item['分类'] || item['Category'];
+            const categoryName = item.category || item['分类'] || item['*分类'] || item['Category'];
 
             if (!categoryId && categoryName) {
                 const cat = await prisma.category.findFirst({

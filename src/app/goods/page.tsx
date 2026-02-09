@@ -13,6 +13,7 @@ import { ActionBar } from "@/components/ui/ActionBar";
 
 import { useUser } from "@/hooks/useUser";
 import { useSearchParams } from "next/navigation";
+import { pinyinMatch } from "@/lib/pinyin";
 
 export default function GoodsPage() {
   const { user } = useUser();
@@ -196,21 +197,23 @@ export default function GoodsPage() {
        if (g.stock >= settings.lowStockThreshold) return false;
     }
 
-    const searchLower = searchQuery.toLowerCase();
-    const nameMatch = g.name.toLowerCase().includes(searchLower);
+    const query = searchQuery.trim();
+    if (!query) return true;
+
+    const nameMatch = pinyinMatch(g.name, query);
     
     // Category match
     let categoryMatch = false;
     if (g.category) {
       if (typeof g.category === 'object') {
-        categoryMatch = (g.category as Category).name.toLowerCase().includes(searchLower);
+        categoryMatch = pinyinMatch((g.category as Category).name, query);
       } else {
-        categoryMatch = (g.category as string).toLowerCase().includes(searchLower);
+        categoryMatch = pinyinMatch(String(g.category), query);
       }
     }
     
     // SKU match
-    const skuMatch = g.sku?.toLowerCase().includes(searchLower) || false;
+    const skuMatch = pinyinMatch(g.sku || "", query);
     
     return nameMatch || categoryMatch || skuMatch;
   });
@@ -301,6 +304,20 @@ export default function GoodsPage() {
         isOpen={isImportOpen} 
         onClose={() => setIsImportOpen(false)}
         onImport={handleImport}
+        title="导入商品"
+        description="支持通过 Excel 批量导入商品"
+        templateFileName="商品导入模版.xlsx"
+        templateData={[
+          {
+            "*商品名称": "示例商品1",
+            "*分类": "默认分类",
+            "*价格": 99.00,
+            "成本价": 50.00,
+            "库存": 100,
+            "SKU": "EXAMPLE-001",
+            "供应商": "默认供应商"
+          }
+        ]}
       />
 
       <ProductFormModal 

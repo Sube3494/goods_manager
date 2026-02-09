@@ -43,7 +43,9 @@ export async function POST(request: Request) {
       items, 
       shippingFees, 
       extraFees,
-      trackingData
+      trackingData,
+      paymentVoucher,
+      paymentVouchers
     } = body;
 
     const orderId = generateOrderId();
@@ -56,6 +58,8 @@ export async function POST(request: Request) {
         totalAmount: Number(totalAmount) || 0,
         shippingFees: Number(shippingFees) || 0,
         extraFees: Number(extraFees) || 0,
+        paymentVoucher: paymentVoucher || null,
+        paymentVouchers: paymentVouchers || [],
         trackingData: trackingData || [],
         items: {
           create: items.map((item: PurchaseOrderItem) => ({

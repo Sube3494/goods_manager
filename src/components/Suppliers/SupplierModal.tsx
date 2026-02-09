@@ -70,7 +70,7 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
                     {/* Name */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Truck size={16} /> 供应商名称
+                            <Truck size={16} /> 供应商名称 <span className="text-red-500">*</span>
                         </label>
                         <input 
                             required

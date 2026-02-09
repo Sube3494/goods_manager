@@ -13,6 +13,8 @@ import { Product, GalleryItem, Supplier, Category } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Switch } from "@/components/ui/Switch";
 import { useToast } from "@/components/ui/Toast";
+import { CategoryModal } from "@/components/Categories/CategoryModal";
+import { SupplierModal } from "@/components/Suppliers/SupplierModal";
 
 
 function cn(...inputs: ClassValue[]) {
@@ -56,6 +58,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     onConfirm: () => {},
     message: "",
   });
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -135,7 +139,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         });
 
         if (res.ok) {
-          const { url } = await res.json();
+          const { url, type } = await res.json();
+          const isVideo = type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(url);
+          
           if (isMain) {
             setFormData(prev => ({ ...prev, image: url }));
           } else {
@@ -151,7 +157,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   url,
-                  productId: initialData.id
+                  productId: initialData.id,
+                  type: isVideo ? 'video' : 'image'
                 })
               });
               if (gRes.ok) {
@@ -165,7 +172,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 url,
                 productId: "", // 临时 ID 为空
                 uploadDate: new Date().toISOString(),
-                tags: []
+                tags: [],
+                type: isVideo ? 'video' : 'image'
               };
               setGalleryImages(prev => [...prev, tempImg]);
             }
@@ -208,6 +216,42 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     });
   };
 
+  const handleCreateCategory = async (data: Partial<Category>) => {
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        const newCat = await res.json();
+        setCategories(prev => [...prev, newCat]);
+        setFormData(prev => ({ ...prev, categoryId: newCat.id }));
+        showToast("分类创建成功", "success");
+      }
+    } catch {
+      showToast("分类创建失败", "error");
+    }
+  };
+
+  const handleCreateSupplier = async (data: Omit<Supplier, "id"> & { id?: string }) => {
+    try {
+      const res = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        const newSup = await res.json();
+        setSuppliers(prev => [...prev, newSup]);
+        setFormData(prev => ({ ...prev, supplierId: newSup.id }));
+        showToast("供应商创建成功", "success");
+      }
+    } catch {
+      showToast("供应商创建失败", "error");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -224,10 +268,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         showToast("请选择商品分类", "error");
         return;
     }
-    if (!formData.supplierId) {
-        showToast("请选择供应商", "error");
-        return;
-    }
+
     if (!formData.price || Number(formData.price) <= 0) {
         showToast("请输入有效的销售价格", "error");
         return;
@@ -310,19 +351,26 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             onChange={(value) => setFormData({...formData, categoryId: value})}
                             options={categories.map(c => ({ value: c.id, label: c.name }))}
                             placeholder="选择分类"
+                            triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                            onAddNew={() => setIsCategoryModalOpen(true)}
+                            addNewLabel="新增分类"
                         />
                     </div>
 
                     {/* Supplier */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Truck size={16} /> 供应商 <span className="text-red-500">*</span>
+                            <Truck size={16} /> 供应商
+
                         </label>
                         <CustomSelect 
                             value={formData.supplierId || ""}
                             onChange={(value) => setFormData({...formData, supplierId: value})}
                             options={suppliers.map(s => ({ value: s.id, label: s.name }))}
                             placeholder="选择供应商"
+                            triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                            onAddNew={() => setIsSupplierModalOpen(true)}
+                            addNewLabel="新增供应商"
                         />
                     </div>
 
@@ -366,7 +414,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {/* Initial Stock */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Package size={16} /> 期初库存 (Initial Stock)
+                            <Package size={16} /> 期初库存 (Initial Stock) <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
                             <input 
@@ -442,13 +490,21 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             "relative aspect-square rounded-2xl overflow-hidden border transition-all group/img bg-muted shadow-sm hover:shadow-md",
                                             isMain ? "border-primary ring-2 ring-primary/20" : "border-border"
                                         )}>
-                                            <Image 
-                                              src={img.url} 
-                                              alt="preview" 
-                                              fill 
-                                              sizes="(max-width: 640px) 25vw, (max-width: 1024px) 20vw, 150px"
-                                              className="object-cover transition-transform duration-500 group-hover/img:scale-105" 
-                                            />
+                                            {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
+                                                <video 
+                                                    src={img.url} 
+                                                    className="w-full h-full object-cover"
+                                                    controls
+                                                />
+                                            ) : (
+                                                <Image 
+                                                  src={img.url} 
+                                                  alt="preview" 
+                                                  fill 
+                                                  sizes="(max-width: 640px) 25vw, (max-width: 1024px) 20vw, 150px"
+                                                  className="object-cover transition-transform duration-500 group-hover/img:scale-105" 
+                                                />
+                                            )}
                                             
                                             {/* Simplified Overlay on Hover */}
                                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2">
@@ -486,7 +542,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 <input 
                                     type="file" 
                                     className="hidden" 
-                                    accept="image/*"
+                                    accept="image/*,video/*"
                                     multiple
                                     onChange={(e) => handleFileUpload(e)}
                                     disabled={isUploading}
@@ -531,6 +587,18 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                variant={confirmConfig.variant}
                confirmLabel="确认删除"
                title="移除照片"
+            />
+
+            <CategoryModal 
+                isOpen={isCategoryModalOpen}
+                onClose={() => setIsCategoryModalOpen(false)}
+                onSubmit={handleCreateCategory}
+            />
+
+            <SupplierModal 
+                isOpen={isSupplierModalOpen}
+                onClose={() => setIsSupplierModalOpen(false)}
+                onSubmit={handleCreateSupplier}
             />
           </motion.div>
         </>

@@ -3,11 +3,33 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText } from "lucide-react";
-import { PurchaseOrder, PurchaseOrderItem, Product, Supplier, PurchaseStatus } from "@/lib/types";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink } from "lucide-react";
+import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
+import { useToast } from "@/components/ui/Toast";
+
+const COURIER_CODES: Record<string, string> = {
+  "顺丰速运": "shunfeng",
+  "圆通速递": "yuantong",
+  "中通快递": "zhongtong",
+  "申通快递": "shentong",
+  "韵达快递": "yunda",
+  "极兔速递": "jtexpress",
+  "EMS": "ems",
+  "邮政快递": "youzhengguonei",
+  "京东快递": "jd",
+  "德邦快递": "debangwuliu",
+  "安能物流": "annengwuliu",
+  "跨越速运": "kuayue"
+};
+
+const getTrackingUrl = (num: string, courierName?: string) => {
+  const code = courierName ? COURIER_CODES[courierName] : "";
+  if (!num || !code) return null;
+  return `https://www.kuaidi100.com/chaxun?com=${code}&nu=${num.trim()}`;
+};
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -18,6 +40,7 @@ interface PurchaseOrderModalProps {
 }
 
 export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false }: PurchaseOrderModalProps) {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState<PurchaseOrder>(() => ({
     id: initialData?.id || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
     status: initialData?.status || "Draft",
@@ -110,6 +133,28 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     return itemsTotal + (Number(formData.shippingFees) || 0) + (Number(formData.extraFees) || 0);
   };
 
+  const addTrackingRow = () => {
+      const current = formData.trackingData || [];
+      setFormData({
+          ...formData,
+          trackingData: [...current, { courier: "顺丰速运", number: "", waybillImages: [] }]
+      });
+  };
+
+  const removeTrackingRow = (index: number) => {
+      const current = formData.trackingData || [];
+      setFormData({
+          ...formData,
+          trackingData: current.filter((_, i) => i !== index)
+      });
+  };
+
+  const updateTrackingData = (index: number, field: string, value: string | string[]) => {
+      const current = [...(formData.trackingData || [])];
+      current[index] = { ...current[index], [field]: value };
+      setFormData({ ...formData, trackingData: current });
+  };
+
   const addItem = () => {
     setIsSelectionModalOpen(true);
   };
@@ -175,9 +220,17 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     });
   };
 
+  const isShippedAndReady = useMemo(() => {
+    return formData.status === "Shipped" && 
+           formData.trackingData && 
+           formData.trackingData.length > 0 && 
+           formData.trackingData.every(td => (td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)));
+  }, [formData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    handleAction(formData.status === "Draft" ? "Ordered" : formData.status);
+    if (readOnly && formData.status !== "Confirmed" && formData.status !== "Shipped") return; // Prevent normal form submit if read-only, unless it's for tracking updates
+    handleAction(formData.status === "Draft" ? "Confirmed" : formData.status);
   };
 
   if (!mounted) return null;
@@ -266,9 +319,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                             {/* Desktop Header */}
                             {formData.items.length > 0 && (
                                 <div className={`hidden sm:grid ${readOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_80px_120px_120px_40px]'} gap-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/10 mb-2`}>
-                                    <div className="pl-12">商品信息</div>
-                                    <div className="text-center">数量</div>
-                                    <div className="text-center">单价</div>
+                                    <div className="pl-12">商品信息 <span className="text-red-500">*</span></div>
+                                    <div className="text-center">数量 <span className="text-red-500">*</span></div>
+                                    <div className="text-center">单价 <span className="text-red-500">*</span></div>
                                     <div className="text-right pr-4">小计</div>
                                     {!readOnly && <div></div>}
                                 </div>
@@ -411,83 +464,211 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
 
 
+                    {/* Payment Voucher Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-2">
+                            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-primary pl-2">
+                                支付凭证
+                            </label>
+                        </div>
+                        {(formData.paymentVouchers && formData.paymentVouchers.length > 0) || formData.paymentVoucher ? (
+                            <div className="bg-muted/10 dark:bg-white/5 p-3 rounded-2xl border border-border/40 flex flex-wrap gap-3">
+                                {(() => {
+                                    const vouchers = formData.paymentVouchers && formData.paymentVouchers.length > 0 
+                                        ? formData.paymentVouchers 
+                                        : [formData.paymentVoucher!];
+                                    
+                                    return vouchers.map((url, idx) => (
+                                        <div key={url || idx} className="relative group w-28 sm:w-48 aspect-square sm:aspect-3/2 rounded-xl overflow-hidden border border-border/60 shadow-sm transition-all hover:ring-2 hover:ring-primary/20">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img 
+                                                src={url} 
+                                                alt={`payment voucher ${idx + 1}`} 
+                                                className="h-full w-full object-cover sm:object-contain bg-black/5 dark:bg-white/5 cursor-zoom-in"
+                                                onClick={() => setGalleryState({
+                                                    isOpen: true,
+                                                    images: vouchers,
+                                                    currentIndex: idx
+                                                })}
+                                            />
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        ) : (
+                            <div className="py-8 rounded-2xl border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-2 opacity-40">
+                                <FileText size={24} className="text-muted-foreground" />
+                                <p className="text-[10px] font-bold">暂无支付凭证</p>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Tracking Info Section - Only visible if tracking data exists */}
-                    {formData.trackingData && formData.trackingData.length > 0 && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between px-2">
-                                <label className="text-sm font-bold text-foreground flex items-center gap-2">
-                                    <Truck size={16} className="text-primary" /> 物流追踪信息 ({formData.trackingData.length})
+                                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-orange-500 pl-2">
+                                    物流包裹 & 进货凭证
                                 </label>
+                                {!readOnly && formData.status !== "Received" && (
+                                    <button
+                                        type="button"
+                                        onClick={addTrackingRow}
+                                        className="text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors flex items-center gap-1"
+                                    >
+                                        <Plus size={12} />
+                                        添加包裹
+                                    </button>
+                                )}
                             </div>
+                            
+                            <div className="space-y-4">
+                                {(formData.trackingData || [])
+                                  .filter(tracking => !readOnly || (tracking.number || (tracking.waybillImages && tracking.waybillImages.length > 0) || tracking.waybillImage))
+                                  .map((tracking, index) => (
+                                        readOnly ? (
+                                            /* Enhanced Compact Parcel Card for ReadOnly */
+                                            <div key={index} className="flex flex-col sm:flex-row gap-3 sm:gap-4 bg-muted/20 dark:bg-white/5 p-3 sm:p-4 rounded-2xl border border-border/40 group/parcel">
+                                                {/* Left: Tracking Info */}
+                                                <div className="flex-1 space-y-2 sm:space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500">
+                                                                <Package size={12} />
+                                                            </div>
+                                                            <span className="text-[10px] font-black uppercase text-muted-foreground/40 tracking-widest">包裹 #{index + 1}</span>
+                                                        </div>
+                                                    </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/20 dark:bg-white/5 p-2 sm:p-4 rounded-3xl border border-border/50">
-                                {formData.trackingData.map((track, idx) => (
-                                    <div key={idx} className="bg-white dark:bg-white/10 p-4 rounded-2xl border border-border dark:border-white/5 shadow-sm flex flex-col gap-3 transition-all">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-bold text-foreground bg-muted dark:bg-white/10 px-2 py-1 rounded-md border border-border/50">
-                                                    {track.courier}
-                                                </span>
-                                                <span className="text-xs font-mono text-muted-foreground select-all font-medium">
-                                                    {track.number}
-                                                </span>
+                                                    <div className="flex flex-col gap-2 sm:gap-2.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-muted-foreground/60 w-12 shrink-0">快递公司</span>
+                                                            <span className="text-xs font-black text-foreground">{tracking.courier}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-muted-foreground/60 w-12 shrink-0">运单号</span>
+                                                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                                <span className="text-xs font-mono font-bold bg-background px-2 py-0.5 rounded border border-border/50 truncate">
+                                                                    {tracking.number || "暂无单号"}
+                                                                </span>
+                                                                {tracking.number && (
+                                                                    <div className="flex items-center gap-1 shrink-0">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                navigator.clipboard.writeText(tracking.number);
+                                                                                showToast("单号已复制", "success");
+                                                                            }}
+                                                                            className="p-1 rounded-md text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all"
+                                                                            title="复制单号"
+                                                                        >
+                                                                            <Copy size={12} />
+                                                                        </button>
+                                                                        {(() => {
+                                                                            const url = getTrackingUrl(tracking.number, tracking.courier);
+                                                                            if (!url) return null;
+                                                                            return (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => window.open(url, '_blank')}
+                                                                                    className="p-1 rounded-md text-muted-foreground/40 hover:text-orange-500 hover:bg-orange-500/10 transition-all"
+                                                                                    title="物流查询"
+                                                                                >
+                                                                                    <ExternalLink size={12} />
+                                                                                </button>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Right: Waybill Thumbnails */}
+                                                <div className="flex flex-wrap gap-1.5 sm:gap-2 min-w-0 sm:min-w-[120px] justify-start sm:justify-end items-start pt-1">
+                                                    {(tracking.waybillImages || (tracking.waybillImage ? [tracking.waybillImage] : [])).map((img, imgIdx) => (
+                                                        <div key={imgIdx} className="relative h-12 w-16 sm:h-14 sm:w-20 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm hover:ring-2 hover:ring-primary/40 transition-all">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img 
+                                                                src={img} 
+                                                                alt="" 
+                                                                className="h-full w-full object-cover cursor-zoom-in" 
+                                                                onClick={() => {
+                                                                    const flatImages = formData.trackingData?.flatMap(t => 
+                                                                        t.waybillImages && t.waybillImages.length > 0 
+                                                                            ? t.waybillImages 
+                                                                            : (t.waybillImage ? [t.waybillImage] : [])
+                                                                    ) || [];
+                                                                    const targetIndex = flatImages.indexOf(img);
+                                                                    setGalleryState({ isOpen: true, images: flatImages, currentIndex: targetIndex });
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                    {(!tracking.waybillImages && !tracking.waybillImage) && (
+                                                        <div className="h-14 w-20 rounded-lg border border-dashed border-border/60 flex items-center justify-center bg-muted/10">
+                                                            <Camera size={14} className="text-muted-foreground/30" />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <span className="text-[10px] font-bold text-muted-foreground/30 uppercase tracking-tight">包裹 #{idx + 1}</span>
-                                        </div>
-                                        
-                                        {/* Waybill Images Preview */}
-                                        {(track.waybillImage || (track.waybillImages && track.waybillImages.length > 0)) && (
-                                            <div className="flex gap-2 overflow-x-auto pb-1 mt-1">
-                                                {(track.waybillImages && track.waybillImages.length > 0 ? track.waybillImages : (track.waybillImage ? [track.waybillImage] : [])).map((img, imgIdx) => (
-                                                    <div key={imgIdx} className="relative h-12 w-16 shrink-0 rounded-lg overflow-hidden border border-border/50 bg-white group cursor-zoom-in">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img 
-                                                            src={img} 
-                                                            alt={`waybill-${idx}-${imgIdx}`} 
-                                                            className="h-full w-full object-cover transition-transform group-hover:scale-110"
-                                                            onClick={() => {
-                                                                // Collect all images from all tracking entries for a complete gallery
-                                                                 const allImages: string[] = [];
-                                                                
-                                                                 formData.trackingData?.forEach((t) => {
-                                                                    const imgs = t.waybillImages && t.waybillImages.length > 0 
-                                                                        ? t.waybillImages 
-                                                                        : (t.waybillImage ? [t.waybillImage] : []);
-                                                                    
-                                                                    allImages.push(...imgs);
-                                                                });
-
-                                                                // Re-calculate index based on flattened array is hard inside map.
-                                                                // Simpler approach: build array first or just pass tracking's own images?
-                                                                // User asked for "switch left and right", implying global navigation.
-                                                                // Let's make it simpler: just pass the current tracking's images for now, OR better:
-                                                                
-                                                                // Better approach:
-                                                                const flatImages = formData.trackingData?.flatMap(t => 
-                                                                    t.waybillImages && t.waybillImages.length > 0 
-                                                                        ? t.waybillImages 
-                                                                        : (t.waybillImage ? [t.waybillImage] : [])
-                                                                ) || [];
-                                                                
-                                                                const targetIndex = flatImages.indexOf(img);
-                                                                
-                                                                setGalleryState({
-                                                                    isOpen: true,
-                                                                    images: flatImages,
-                                                                    currentIndex: targetIndex
-                                                                });
-                                                            }}
+                                        ) : (
+                                            /* Input Mode */
+                                            <div key={index} className="p-4 rounded-3xl bg-white dark:bg-white/5 border border-border/50 space-y-4 relative group">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
+                                                            <Package size={16} />
+                                                        </div>
+                                                        <span className="text-xs font-bold text-foreground">包裹 #{index + 1}</span>
+                                                    </div>
+                                                    {!readOnly && formData.status !== "Received" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeTrackingRow(index)}
+                                                            className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5 text-left">
+                                                        <label className="text-[10px] font-black uppercase text-muted-foreground/40 ml-1">快递公司</label>
+                                                        <select
+                                                            disabled={readOnly || formData.status === "Received"}
+                                                            value={tracking.courier}
+                                                            onChange={(e) => updateTrackingData(index, "courier", e.target.value)}
+                                                            className="w-full h-10 rounded-xl bg-background border border-border/50 px-3 text-xs outline-none focus:ring-2 focus:ring-orange-500/20 disabled:opacity-60"
+                                                        >
+                                                            {["顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", "极兔速递", "EMS", "京东快递", "德邦快递", "其他"].map(opt => (
+                                                                <option key={opt} value={opt}>{opt}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-1.5 text-left">
+                                                        <label className="text-[10px] font-black uppercase text-muted-foreground/40 ml-1">快递单号</label>
+                                                        <input
+                                                            readOnly={readOnly || formData.status === "Received"}
+                                                            type="text"
+                                                            value={tracking.number}
+                                                            onChange={(e) => updateTrackingData(index, "number", e.target.value)}
+                                                            className="w-full h-10 rounded-xl bg-background border border-border/50 px-3 text-xs font-mono outline-none focus:ring-2 focus:ring-orange-500/20 read-only:opacity-60"
+                                                            placeholder={readOnly ? "暂无单号" : "请输入单号..."}
                                                         />
                                                     </div>
-                                                ))}
+                                                </div>
                                             </div>
-                                        )}
+                                        )
+                                 ))}
+                                {(!formData.trackingData || formData.trackingData.length === 0 || (readOnly && (formData.trackingData || []).filter(t => t.number || (t.waybillImages && t.waybillImages.length > 0) || t.waybillImage).length === 0)) && (
+                                    <div className="py-8 rounded-2xl border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-2 opacity-40">
+                                        <Truck size={24} className="text-muted-foreground" />
+                                        <p className="text-[10px] font-bold">暂无物流信息</p>
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </div>
-                    )}
-
 
                 </div>
 
@@ -560,28 +741,90 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
                         {!readOnly && (
                             <div className="flex items-center gap-2">
-                                {formData.status === "Draft" && (
+                            {/* Actions for Draft state */}
+                            {!readOnly && formData.status === "Draft" && (
+                                <>
                                     <button
                                         type="button"
                                         onClick={() => handleAction("Draft")}
                                         disabled={formData.items.length === 0}
                                         className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-secondary px-4 sm:px-5 py-3 sm:py-2.5 text-xs sm:text-sm font-bold text-foreground border border-border/50 transition-all hover:bg-secondary/80 active:scale-[0.98] disabled:opacity-50"
                                     >
-                                        暂存
+                                        暂存草稿
                                     </button>
-                                )}
+                                    <button
+                                        type="submit"
+                                        disabled={formData.items.length === 0}
+                                        className="flex-2 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 sm:px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap"
+                                    >
+                                        <CheckCircle size={18} />
+                                        <span>确认下单</span>
+                                    </button>
+                                </>
+                            )}
 
-                                <button
-                                    type="submit"
-                                    disabled={formData.items.length === 0}
-                                    className="flex-2 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 sm:px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap"
-                                >
-                                    <CheckCircle size={18} />
-                                    <span>{formData.status === "Draft" ? (
-                                        <><span className="hidden sm:inline">确认</span>下单</>
-                                    ) : "保存修改"}</span>
-                                </button>
-                            </div>
+                            {/* Actions for Confirmed (Ordered) state */}
+                            {(formData.status === "Confirmed" || (formData.status as string) === "Ordered") ? (
+                                <div className="flex items-center gap-3">
+                                     <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="rounded-2xl bg-secondary px-8 py-3.5 text-sm font-bold text-foreground transition-all hover:bg-secondary/80"
+                                    >
+                                        取消
+                                    </button>
+                                     <button
+                                        type="button"
+                                        onClick={() => {
+                                            // Handle saving tracking info from within modal
+                                            // If tracking info exists, it transitions to Shipped
+                                            const hasTracking = formData.trackingData && formData.trackingData.length > 0;
+                                            handleAction(hasTracking ? "Shipped" : "Confirmed");
+                                        }}
+                                        className="rounded-2xl bg-primary px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90"
+                                    >
+                                        保存物流资料
+                                    </button>
+                                </div>
+                            ) : null}
+
+                            {/* Actions for Shipped state */}
+                            {formData.status === "Shipped" && (
+                                <div className="flex items-center gap-3">
+                                    {!isShippedAndReady && (
+                                        <p className="text-[10px] text-orange-500 font-bold max-w-[200px] text-right">请补全物流面单照片后即可入库</p>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleAction("Received")}
+                                        disabled={!isShippedAndReady}
+                                        className={`flex items-center justify-center gap-2 rounded-2xl px-8 py-3.5 text-sm font-black transition-all shadow-lg whitespace-nowrap ${isShippedAndReady ? 'bg-emerald-500 text-white shadow-emerald-500/25 hover:bg-emerald-600' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
+                                    >
+                                        <CheckCircle size={18} />
+                                        确认入库完成
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        )}
+
+                        {!readOnly && (
+                        <div className="flex items-center gap-3">
+                             <button
+                                type="button"
+                                onClick={onClose}
+                                className="rounded-2xl border border-border px-8 py-3.5 text-sm font-black transition-all hover:bg-muted"
+                            >
+                                取消
+                            </button>
+                            
+                            <button
+                                type="submit"
+                                className="rounded-2xl bg-primary px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90"
+                            >
+                                {formData.status === "Draft" ? "创建采购单" : "保存修改"}
+                            </button>
+                        </div>
                         )}
                     </div>
                 </div>

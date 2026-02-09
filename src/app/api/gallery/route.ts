@@ -50,15 +50,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
-    const { url, urls, productId, tags, isPublic } = body;
+    const { url, urls, productId, tags, isPublic, type } = body;
 
     // Handle batch creation if urls array is provided
     if (urls && Array.isArray(urls) && urls.length > 0) {
-        const data = urls.map((u: string) => ({
-            url: u,
+        const data = urls.map((u: any) => ({
+            url: typeof u === 'string' ? u : u.url,
             productId,
             tags: tags || [],
             isPublic: isPublic ?? true,
+            type: (typeof u !== 'string' && u.type) ? u.type : "image", 
         }));
 
         const result = await prisma.galleryItem.createMany({
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
         productId,
         tags: tags || [],
         isPublic: isPublic ?? true,
+        type: type || "image",
       }
     });
 

@@ -125,18 +125,18 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
 
             <div className="flex-1 overflow-hidden flex flex-col p-8 space-y-4">
               <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                <div className="relative flex-1 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
                   <input 
                     type="text"
                     placeholder="搜索商品名称或编号..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                    className="w-full h-11 pl-11 pr-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-sm"
                   />
                 </div>
 
-                <div className="w-full sm:w-48 shrink-0">
+                <div className="w-full sm:w-56 shrink-0">
                   <CustomSelect
                     options={[
                       { value: "", label: "全部供应商" },
@@ -145,6 +145,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                     value={selectedSupplierId}
                     onChange={setSelectedSupplierId}
                     placeholder="按供应商筛选"
+                    triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                   />
                 </div>
               </div>

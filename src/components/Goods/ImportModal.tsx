@@ -10,15 +10,35 @@ interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (data: Record<string, unknown>[]) => void;
+  title?: string;
+  description?: string;
+  templateData?: Record<string, unknown>[];
+  templateFileName?: string;
 }
 
-export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
+export function ImportModal({ 
+  isOpen, 
+  onClose, 
+  onImport,
+  title = "导入数据",
+  description = "点击上传或拖拽 Excel 文件",
+  templateData,
+  templateFileName = "导入模版.xlsx"
+}: ImportModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleDownloadTemplate = () => {
+    if (!templateData) return;
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, templateFileName);
+  };
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
@@ -106,7 +126,7 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-              <h2 className="text-2xl font-bold text-foreground">导入商品</h2>
+              <h2 className="text-2xl font-bold text-foreground">{title}</h2>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={24} />
               </button>
@@ -137,8 +157,21 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                   <div className="mb-4 rounded-full bg-primary/10 p-4 text-primary">
                     <Upload size={32} />
                   </div>
-                  <p className="text-lg font-medium">点击上传或拖拽 Excel 文件</p>
+                  <p className="text-lg font-medium">{description}</p>
                   <p className="mt-2 text-sm text-muted-foreground">支持 .xlsx, .xls, .csv 格式</p>
+                  {templateData && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadTemplate();
+                      }}
+                      className="mt-6 text-sm text-primary font-bold hover:underline flex items-center gap-1.5"
+                    >
+                      <FileSpreadsheet size={16} />
+                      下载模版文件
+                    </button>
+                  )}
                   {error && (
                     <div className="mt-4 flex items-center text-destructive">
                       <AlertCircle size={16} className="mr-2" />
@@ -173,7 +206,16 @@ export function ImportModal({ isOpen, onClose, onImport }: ImportModalProps) {
                             <thead className="bg-muted/30 text-muted-foreground sticky top-0">
                                 <tr>
                                     {Object.keys(previewData[0] || {}).map((key) => (
-                                        <th key={key} className="px-4 py-2 font-medium">{key}</th>
+                                        <th key={key} className="px-4 py-2 font-medium">
+                                            {key.startsWith("*") ? (
+                                                <>
+                                                    <span className="text-red-500">*</span>
+                                                    {key.slice(1)}
+                                                </>
+                                            ) : (
+                                                key
+                                            )}
+                                        </th>
                                     ))}
                                 </tr>
                             </thead>

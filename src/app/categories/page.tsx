@@ -216,6 +216,17 @@ export default function CategoriesPage() {
                         </div>
                     );
                 })}
+                {filteredCategories.length === 0 && (
+                  <div className="col-span-full py-20 flex flex-col items-center justify-center text-center">
+                    <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-6 text-muted-foreground/50 border border-dashed border-border group-hover:scale-110 transition-transform duration-500">
+                      <Tag size={40} strokeWidth={1.5} />
+                    </div>
+                    <h3 className="text-xl font-bold text-foreground">暂无分类数据</h3>
+                    <p className="text-muted-foreground text-sm mt-2 max-w-[280px] leading-relaxed">
+                      {searchQuery ? '未找到匹配结果，尝试更改搜索关键词。' : '还没有任何分类，点击右上角“新建分类”开始。'}
+                    </p>
+                  </div>
+                )}
             </div>
       )}
 

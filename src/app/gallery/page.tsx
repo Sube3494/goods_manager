@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check } from "lucide-react";
+import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -72,8 +72,8 @@ function GalleryContent() {
   const [uploadForm, setUploadForm] = useState<{
     productId: string;
     isPublic: boolean;
-    urls: string[];
-    tags: string;
+    urls: { url: string; type: 'image' | 'video' }[],
+    tags: ""
   }>({
     productId: "",
     isPublic: true,
@@ -161,9 +161,9 @@ function GalleryContent() {
       });
 
       const results = await Promise.all(uploadPromises);
-      const successfulUrls = results.filter((url): url is string => url !== null);
+      const successfulFiles = results.filter((res): res is { url: string; type: 'image' | 'video' } => res !== null);
       
-      setUploadForm(prev => ({ ...prev, urls: [...prev.urls, ...successfulUrls] }));
+      setUploadForm(prev => ({ ...prev, urls: [...prev.urls, ...successfulFiles] }));
       
     } catch (error) {
       console.error("Upload failed:", error);
@@ -423,14 +423,28 @@ function GalleryContent() {
                         >
                             {/* Image Container */}
                             <div className="relative aspect-4/3 overflow-hidden bg-muted">
-                                <Image 
-                                    src={item.url} 
-                                    alt={item.product?.name || "Product image"} 
-                                    fill 
-                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                    priority={index < 4}
-                                    className="object-cover transition-transform duration-700 group-hover:scale-110" 
-                                />
+                                {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
+                                    <div className="relative w-full h-full bg-black flex items-center justify-center">
+                                        <video 
+                                            src={item.url} 
+                                            className="w-full h-full object-cover pointer-events-none"
+                                            muted
+                                            preload="metadata"
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <PlayCircle size={48} className="text-white/80 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <Image 
+                                        src={item.url} 
+                                        alt={item.product?.name || "Product image"} 
+                                        fill 
+                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                        priority={index < 4}
+                                        className="object-cover transition-transform duration-700 group-hover:scale-110" 
+                                    />
+                                )}
                                 
                                 {/* 元数据浮层 - SKU + 快速发图引导 */}
                                 <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
@@ -541,15 +555,23 @@ function GalleryContent() {
                                     
                                     <div className="grid grid-cols-3 gap-3">
                                         {/* Existing Images */}
-                                        {uploadForm.urls.map((url, idx) => (
+                                        {uploadForm.urls.map((file, idx) => (
                                             <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group border border-border">
-                                                <Image 
-                                                  src={url} 
-                                                  alt={`preview ${idx}`} 
-                                                  fill 
-                                                  sizes="(max-width: 640px) 33vw, 150px"
-                                                  className="object-cover" 
-                                                />
+                                                {file.type === 'video' ? (
+                                                     <video 
+                                                        src={file.url} 
+                                                        className="w-full h-full object-cover"
+                                                        muted
+                                                    />
+                                                ) : (
+                                                    <Image 
+                                                      src={file.url} 
+                                                      alt={`preview ${idx}`} 
+                                                      fill 
+                                                      sizes="(max-width: 640px) 33vw, 150px"
+                                                      className="object-cover" 
+                                                    />
+                                                )}
                                                 <button
                                                     type="button"
                                                     onClick={() => setUploadForm(prev => ({ ...prev, urls: prev.urls.filter((_, i) => i !== idx) }))}
@@ -724,12 +746,21 @@ function GalleryContent() {
                                     transition={{ duration: 0.15 }}
                                     className="relative w-full h-full flex items-center justify-center"
                                 >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img 
-                                        src={selectedImage.url} 
-                                        alt="Gallery View" 
-                                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                                    />
+                                    {selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url) ? (
+                                        <video 
+                                            src={selectedImage.url} 
+                                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                                            controls
+                                            autoPlay
+                                        />
+                                    ) : (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img 
+                                            src={selectedImage.url} 
+                                            alt="Gallery View" 
+                                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                                        />
+                                    )}
                                 </motion.div>
 
                                 {/* Info Overlay */}

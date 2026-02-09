@@ -25,7 +25,7 @@ export interface Product {
   isPublic?: boolean;
 }
 
-export type PurchaseStatus = "Draft" | "Ordered" | "Received";
+export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered"; // 暂时保留 Ordered 以防万一，但主推前四个
 
 export interface PurchaseOrderItem {
   productId: string;
@@ -42,12 +42,14 @@ export interface TrackingInfo {
 
 export interface PurchaseOrder {
   id: string;
-  status: "Draft" | "Ordered" | "Received";
+  status: PurchaseStatus;
   totalAmount: number;
   date: string;
   items: PurchaseOrderItem[];
   shippingFees: number;
   extraFees: number;
+  paymentVoucher?: string;
+  paymentVouchers?: string[];
   trackingData?: TrackingInfo[];
   createdAt?: string;
   updatedAt?: string;
@@ -82,6 +84,7 @@ export interface GalleryItem {
   uploadDate: string;
   tags: string[];
   isPublic?: boolean;
+  type?: "image" | "video";
   createdAt?: string;
 }
 
@@ -116,4 +119,29 @@ export interface StatsData {
   recentInboundItems: RecentInboundItem[];
   pendingInboundCount: number;
   recentPurchases?: PurchaseOrder[];
+}
+
+export type BrushStatus = "Draft" | "Completed";
+
+export interface BrushOrderItem {
+  id?: string;
+  brushOrderId?: string;
+  productId: string;
+  product?: Product;
+  quantity: number;
+}
+
+export interface BrushOrder {
+  id: string;
+  date: Date | string;
+  type: string;
+  status: BrushStatus | string;
+  principalAmount: number; // 本金
+  paymentAmount: number;   // 实付
+  receivedAmount: number;  // 到手金额
+  commission: number;      // 佣金
+  note?: string;           // 备注
+  items: BrushOrderItem[];
+  createdAt?: string;
+  updatedAt?: string;
 }

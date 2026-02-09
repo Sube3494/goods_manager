@@ -78,7 +78,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
                     {/* Name */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Tag size={16} /> 分类名称
+                            <Tag size={16} /> 分类名称 <span className="text-red-500">*</span>
                         </label>
                         <input 
                             required

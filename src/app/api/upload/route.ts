@@ -31,10 +31,15 @@ export async function POST(request: Request) {
     await writeFile(path, buffer);
     console.log(`File uploaded to: ${path}`);
 
+    // Determine type based on extension or MIME type (simple extension check for now)
+    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(fileName);
+    const type = isVideo ? "video" : "image";
+
     // 返回相对于 public 的 URL
     return NextResponse.json({ 
       url: `/uploads/${fileName}`,
-      name: file.name
+      name: file.name,
+      type
     });
   } catch (error) {
     console.error("Upload Error:", error);

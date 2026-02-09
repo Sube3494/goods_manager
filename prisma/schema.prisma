@@ -11,83 +11,87 @@ model Category {
   id          String    @id @default(cuid())
   name        String    @unique
   description String?
-
-  products    Product[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  products    Product[]
 }
 
 model Product {
-  id          String              @id @default(cuid())
-  sku         String?             @unique
-  name        String
-  price       Float               @default(0)
-  stock       Int                 @default(0)
-  image       String?
-  isPublic    Boolean             @default(true)
-  categoryId  String
-  category    Category            @relation(fields: [categoryId], references: [id])
-  supplierId  String?
-  supplier    Supplier?           @relation(fields: [supplierId], references: [id])
-  gallery     GalleryItem[]
-  orderItems  PurchaseOrderItem[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id              String              @id @default(cuid())
+  sku             String?             @unique
+  name            String
+  price           Float               @default(0)
+  stock           Int                 @default(0)
+  image           String?
+  isPublic        Boolean             @default(true)
+  categoryId      String
+  supplierId      String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  brushOrderItems BrushOrderItem[]
+  gallery         GalleryItem[]
+  category        Category            @relation(fields: [categoryId], references: [id])
+  supplier        Supplier?           @relation(fields: [supplierId], references: [id])
+  orderItems      PurchaseOrderItem[]
 
   @@index([categoryId])
   @@index([supplierId])
 }
 
 model Supplier {
-  id             String          @id @default(cuid())
-  code           String?         @unique
-  name           String
-  contact        String?
-  phone          String?
-  email          String?
-  address        String?
-  products       Product[]
+  id                 String              @id @default(cuid())
+  code               String?             @unique
+  name               String
+  contact            String?
+  phone              String?
+  email              String?
+  address            String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  products           Product[]
   purchaseOrderItems PurchaseOrderItem[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
 }
 
 model PurchaseOrder {
-  id            String              @id @default(cuid())
-  status        String              @default("Draft") // Draft, Ordered, Received
-  totalAmount   Float               @default(0)
-  date          DateTime            @default(now())
-  items         PurchaseOrderItem[]
-  shippingFees  Float               @default(0)
-  extraFees     Float               @default(0)
-  trackingData  Json?               @default("[]")
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id              String              @id @default(cuid())
+  status          String              @default("Draft")
+  totalAmount     Float               @default(0)
+  date            DateTime            @default(now())
+  shippingFees    Float               @default(0)
+  extraFees       Float               @default(0)
+  paymentVoucher  String?
+  paymentVouchers Json?               @default("[]")
+  trackingData    Json?               @default("[]")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  items           PurchaseOrderItem[]
 }
 
 model PurchaseOrderItem {
   id              String        @id @default(cuid())
   purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   productId       String
-  product         Product       @relation(fields: [productId], references: [id])
   supplierId      String?
-  supplier        Supplier?     @relation(fields: [supplierId], references: [id])
   quantity        Int
   costPrice       Float
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  product         Product       @relation(fields: [productId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  supplier        Supplier?     @relation(fields: [supplierId], references: [id])
 }
 
 model GalleryItem {
   id        String   @id @default(cuid())
   url       String
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   tags      String[] @default([])
   isPublic  Boolean  @default(true)
+  type      String   @default("image")
   createdAt DateTime @default(now())
+
   updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
 }
@@ -96,7 +100,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
-  role      String   @default("admin") // admin, user
+  role      String   @default("admin")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -107,14 +111,40 @@ model VerificationCode {
   code      String
   expires   DateTime
   createdAt DateTime @default(now())
-  
+
   @@unique([email, code])
 }
 
 model SystemSetting {
-  id                String   @id @default("system")
-  lowStockThreshold Int      @default(10)
+  id                 String   @id @default("system")
+  lowStockThreshold  Int      @default(10)
   allowDataImport    Boolean  @default(true)
   allowGalleryUpload Boolean  @default(true)
   updatedAt          DateTime @updatedAt
+}
+
+model BrushOrder {
+  id              String           @id @default(cuid())
+  date            DateTime         @default(now())
+  type            String
+  status          String           @default("Draft")
+  principalAmount Float            @default(0)
+  paymentAmount   Float            @default(0)
+  receivedAmount  Float            @default(0)
+  commission      Float            @default(0)
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  items           BrushOrderItem[]
+}
+
+model BrushOrderItem {
+  id           String     @id @default(cuid())
+  brushOrderId String
+  productId    String
+  quantity     Int        @default(1)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  brushOrder   BrushOrder @relation(fields: [brushOrderId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id])
 }
