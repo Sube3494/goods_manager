@@ -5,7 +5,7 @@ import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { useToast } from "@/components/ui/Toast";
 import { Product } from "@/lib/types";
-import { ArrowDown, FileSpreadsheet, Keyboard, Package, Clock, ExternalLink, ReceiptText } from "lucide-react";
+import { FileSpreadsheet, Package, Clock, ExternalLink, ReceiptText, Plus } from "lucide-react";
 import { PurchaseOrder } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -86,47 +86,30 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">入库登记</h1>
           <p className="text-muted-foreground mt-2">选择一种方式将商品录入系统。</p>
         </div>
-        <div className="p-3 rounded-xl bg-primary/5 text-primary">
-           <ArrowDown size={24} />
+        
+        <div className="flex flex-wrap items-center gap-2">
+            <button 
+                onClick={() => setShowImportModal(true)}
+                className="h-10 flex items-center gap-2 rounded-full bg-emerald-500/10 px-6 text-sm font-bold text-emerald-600 hover:bg-emerald-500/20 transition-all border border-emerald-500/10 shadow-lg shadow-emerald-500/5 hover:-translate-y-0.5"
+            >
+                <FileSpreadsheet size={18} />
+                Excel 批量导入
+            </button>
+            <button 
+                onClick={() => setShowManualModal(true)}
+                className="h-10 flex items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+            >
+                <Plus size={18} />
+                手动录入
+            </button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Excel Import Card */}
-        <button 
-          onClick={() => setShowImportModal(true)}
-          className="group relative flex flex-col items-center justify-center p-8 rounded-2xl glass-panel border-2 border-transparent hover:border-primary/20 hover:bg-card/80 transition-all duration-300 text-center space-y-4"
-        >
-           <div className="h-16 w-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform duration-500">
-              <FileSpreadsheet size={32} />
-           </div>
-           <div>
-              <h3 className="text-lg font-bold text-foreground">Excel 批量导入</h3>
-              <p className="text-sm text-muted-foreground mt-1">支持拖拽上传 .xlsx 文件</p>
-           </div>
-        </button>
-
-        {/* Manual Entry Card */}
-        <button 
-           onClick={() => setShowManualModal(true)}
-           className="group relative flex flex-col items-center justify-center p-8 rounded-2xl glass-panel border-2 border-transparent hover:border-primary/20 hover:bg-card/80 transition-all duration-300 text-center space-y-4"
-        >
-           <div className="h-16 w-16 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform duration-500">
-              <Keyboard size={32} />
-           </div>
-           <div>
-              <h3 className="text-lg font-bold text-foreground">手动录入</h3>
-              <p className="text-sm text-muted-foreground mt-1">单件商品详细登记</p>
-           </div>
-        </button>
-
-
-      </div>
 
       {/* Recent Activity */}
       <div className="glass-panel rounded-3xl border border-border overflow-hidden">
@@ -192,6 +175,17 @@ export default function ImportPage() {
         isOpen={showImportModal} 
         onClose={() => setShowImportModal(false)} 
         onImport={handleImport} 
+        templateData={[
+          {
+            "*SKU": "SKU001",
+            "*入库数量": 50
+          },
+          {
+            "*SKU": "SKU002",
+            "*入库数量": 100
+          }
+        ]}
+        templateFileName="入库导入模板.xlsx"
       />
 
       <ProductFormModal 

@@ -28,64 +28,42 @@ export async function POST(request: Request) {
 
     for (const item of products) {
         try {
-            // Map keys (assuming headers might be Chinese or English, with or without * for required)
-            const name = item.name || item['商品名称'] || item['*商品名称'] || item['Name'];
-            if (!name) {
+            // Map keys for SKU and Quantity
+            const sku = String(item.sku || item['SKU'] || item['编码'] || item['*SKU'] || "");
+            const quantity = Number(item['入库数量'] || item['*入库数量'] || item.stock || item['数量'] || item['Quantity'] || 0);
+            
+            if (!sku || quantity <= 0) {
                 failCount++;
                 continue;
             }
 
-            const price = Number(item.price || item['价格'] || item['*价格'] || item['Price'] || 0);
-            const stock = Number(item.stock || item['库存'] || item['Stock'] || 0);
-            const sku = String(item.sku || item['SKU'] || item['编码'] || "");
-            const costPrice = Number(item.costPrice || item['成本价'] || item['Cost'] || 0);
-            
-            // Try to find category
-            let categoryId = item.categoryId;
-            const categoryName = item.category || item['分类'] || item['*分类'] || item['Category'];
-
-            if (!categoryId && categoryName) {
-                const cat = await prisma.category.findFirst({
-                    where: { name: String(categoryName) }
-                });
-                if (cat) categoryId = cat.id;
-                else {
-                    const newCat = await prisma.category.create({
-                        data: { name: String(categoryName) }
-                    });
-                    categoryId = newCat.id;
-                }
-            }
-
-            if (!categoryId) {
-                 let defaultCat = await prisma.category.findFirst({ where: { name: "未分类" } });
-                 if (!defaultCat) {
-                     defaultCat = await prisma.category.create({ data: { name: "未分类" } });
-                 }
-                 categoryId = defaultCat.id;
-            }
-
-            const product = await prisma.product.create({
-                data: {
-                    name: String(name),
-                    price,
-                    stock,
-                    sku,
-                    categoryId,
-                    isPublic: true
-                }
+            // Find existing product by SKU
+            const existingProduct = await prisma.product.findUnique({
+                where: { sku }
             });
-            
-            if (stock > 0) {
-                importedItems.push({
-                    productId: product.id,
-                    quantity: stock,
-                    costPrice: costPrice || 0
-                });
-            }
-            
-            successCount++;
 
+            if (existingProduct) {
+                // Simplified flow: Update existing product stock
+                
+                await prisma.product.update({
+                    where: { id: existingProduct.id },
+                    data: {
+                        stock: { increment: quantity }
+                    }
+                });
+
+                importedItems.push({
+                    productId: existingProduct.id,
+                    quantity: quantity,
+                    costPrice: 0 // No longer providing cost price in simple replenishment
+                });
+
+                successCount++;
+            } else {
+                // If SKU doesn't exist, we can't replenish
+                console.warn(`Import: SKU ${sku} not found. Skipping.`);
+                failCount++;
+            }
         } catch (e) {
             console.error("Import item error:", e);
             failCount++;
