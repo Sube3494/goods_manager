@@ -74,11 +74,11 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(product);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to create product:", error);
     
     // Handle Prisma Foreign Key Constraint Violated error
-    if (error.code === 'P2003') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
       return NextResponse.json({ 
         error: "无效的分类或供应商 ID，请检查关联选项" 
       }, { status: 400 });

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Plus, ChevronLeft, ChevronRight, Minimize2, Maximize2 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 
 interface ImageGalleryProps {
     isOpen: boolean;
@@ -40,8 +41,9 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
     useEffect(() => {
         if (isOpen) {
              // Ensure transform is reset on open too
-            setTransform({ scale: 1, x: 0, y: 0 });
+            const handle = requestAnimationFrame(() => setTransform({ scale: 1, x: 0, y: 0 }));
             document.body.style.overflow = 'hidden';
+            return () => cancelAnimationFrame(handle);
         } else {
             document.body.style.overflow = '';
         }
@@ -52,10 +54,16 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
 
     // Reset transform on image change
     useEffect(() => {
-        setTransform({ scale: 1, x: 0, y: 0 });
+        const handle = requestAnimationFrame(() => setTransform({ scale: 1, x: 0, y: 0 }));
+        return () => cancelAnimationFrame(handle);
     }, [currentIndex]);
 
     // Handle Keyboard
+    const navigate = useCallback((dir: number) => {
+        setDirection(dir);
+        setCurrentIndex(prev => (prev + dir + images.length) % images.length);
+    }, [images.length]);
+
     useEffect(() => {
         if (!isOpen) return;
 
@@ -67,12 +75,7 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, onClose]); // Dependencies
-
-    const navigate = (dir: number) => {
-        setDirection(dir);
-        setCurrentIndex(prev => (prev + dir + images.length) % images.length);
-    };
+    }, [isOpen, onClose, navigate]); // Dependencies
 
     // Wheel Zoom Logic (Mouse Centered)
     const handleWheel = (e: React.WheelEvent) => {
@@ -141,7 +144,8 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
 
     const [mounted, setMounted] = useState(false);
     useEffect(() => {
-        setMounted(true);
+        const handle = requestAnimationFrame(() => setMounted(true));
+        return () => cancelAnimationFrame(handle);
     }, []);
 
     if (!mounted || typeof document === 'undefined') return null;
@@ -234,19 +238,26 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
                                 className="flex items-center justify-center w-full h-full pointer-events-none" // Inner pointer events handled by img
                             >
                                 {/* The Image Itself - Handles Drag and Zoom Transform */}
-                                <img
-                                    src={images[currentIndex]}
-                                    alt={`Gallery Image ${currentIndex + 1}`}
+                                <div 
+                                    className={`relative max-w-full max-h-full drop-shadow-2xl pointer-events-auto ${transform.scale > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
+                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                    }}
                                     onPointerDown={handlePointerDown}
                                     onPointerMove={handlePointerMove}
-                                    // pointer-events-auto is crucial here because parent has pointer-events-none
-                                    className={`max-w-full max-h-full object-contain drop-shadow-2xl pointer-events-auto ${transform.scale > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                                    style={{
-                                        transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
-                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out' // Smooth zoom, instant drag
-                                    }}
-                                    draggable={false} // Prevent native drag
-                                />
+                                >
+                                    <Image
+                                        src={images[currentIndex]}
+                                        alt={`Gallery Image ${currentIndex + 1}`}
+                                        fill
+                                        className="object-contain"
+                                        draggable={false}
+                                        unoptimized // Since these are likely external/dynamic URLs from /api/upload
+                                    />
+                                </div>
                             </motion.div>
                         </AnimatePresence>
                     </div>

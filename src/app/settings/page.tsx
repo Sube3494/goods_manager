@@ -1,16 +1,33 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Settings, Save, AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Info } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Info } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
+
+interface SystemInfo {
+  version: string;
+  dbType: string;
+  nodeVersion: string;
+  lastBackup: string;
+}
+
+interface ViewTransition {
+  ready: Promise<void>;
+  finished: Promise<void>;
+  updateCallbackDone: Promise<void>;
+  skipTransition: () => void;
+}
+
+interface DocumentWithViewTransition extends Document {
+  startViewTransition?: (callback: () => void | Promise<void>) => ViewTransition;
+}
 
 export default function SettingsPage() {
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
-  const [systemInfo, setSystemInfo] = useState<any>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
   
@@ -53,11 +70,10 @@ export default function SettingsPage() {
         }
     };
     initData();
-  }, []);
+  }, [showToast]);
 
-  const saveSettings = async (newSettings: Partial<{ lowStockThreshold: number, allowGalleryUpload: boolean }>) => {
+  const saveSettings = useCallback(async (newSettings: Partial<{ lowStockThreshold: number, allowGalleryUpload: boolean }>) => {
     setSaveStatus("saving");
-    setIsSaving(true);
     
     // Merge with current state (or provided overrides)
     const payload = {
@@ -80,12 +96,10 @@ export default function SettingsPage() {
         setSaveStatus("error");
         showToast("自动保存失败", "error");
       }
-    } catch (error) {
-      setSaveStatus("error");
     } finally {
-      setIsSaving(false);
+      // Done saving
     }
-  };
+  }, [allowGalleryUpload, lowStockThreshold, showToast]);
 
   // Debounced save for text inputs
   useEffect(() => {
@@ -99,7 +113,7 @@ export default function SettingsPage() {
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [lowStockThreshold]);
+  }, [lowStockThreshold, saveSettings]);
 
   // Immediate save for toggle
   const toggleGalleryUpload = () => {
@@ -164,8 +178,13 @@ export default function SettingsPage() {
                         <button
                             onClick={(e) => {
                                 if (theme === 'light') return;
-                                const transition = (document as any).startViewTransition ? (document as any).startViewTransition(() => setTheme("light")) : null;
-                                if (!transition) setTheme("light");
+                                const doc = document as DocumentWithViewTransition;
+                                if (!doc.startViewTransition) {
+                                  setTheme("light");
+                                  return;
+                                }
+                                
+                                const transition = doc.startViewTransition(() => setTheme("light"));
                                 
                                 if (transition) {
                                   const x = e.clientX;
@@ -194,8 +213,13 @@ export default function SettingsPage() {
                         <button
                             onClick={(e) => {
                                 if (theme === 'dark') return;
-                                const transition = (document as any).startViewTransition ? (document as any).startViewTransition(() => setTheme("dark")) : null;
-                                if (!transition) setTheme("dark");
+                                const doc = document as DocumentWithViewTransition;
+                                if (!doc.startViewTransition) {
+                                  setTheme("dark");
+                                  return;
+                                }
+
+                                const transition = doc.startViewTransition(() => setTheme("dark"));
 
                                 if (transition) {
                                   const x = e.clientX;
@@ -329,7 +353,7 @@ export default function SettingsPage() {
                     <div className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-all duration-300 ease-in-out flex items-center justify-center ${
                         allowGalleryUpload ? 'left-7' : 'left-1'
                     }`}>
-                        {/* Icon */}
+                        {/*  icon: React.ElementType; */}
                         <div className={`transition-all duration-200 ${allowGalleryUpload ? 'text-primary scale-100' : 'text-muted-foreground/40 scale-90'}`}>
                             {allowGalleryUpload ? (
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">

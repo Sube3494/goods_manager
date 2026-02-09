@@ -33,7 +33,8 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
   const selectedLabel = options.find((opt) => opt.value === value)?.label || placeholder;
 
   useEffect(() => {
-    setMounted(true);
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   useEffect(() => {

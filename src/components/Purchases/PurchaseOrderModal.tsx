@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText } from "lucide-react";
-import { PurchaseOrder, PurchaseOrderItem, Product, Supplier } from "@/lib/types";
+import { PurchaseOrder, PurchaseOrderItem, Product, Supplier, PurchaseStatus } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
@@ -447,8 +447,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                             className="h-full w-full object-cover transition-transform group-hover:scale-110"
                                                             onClick={() => {
                                                                 // Collect all images from all tracking entries for a complete gallery
-                                                                const allImages: string[] = [];
-                                                                let clickedIndex = 0;
+                                                                 const allImages: string[] = [];
                                                                 
                                                                  formData.trackingData?.forEach((t) => {
                                                                     const imgs = t.waybillImages && t.waybillImages.length > 0 

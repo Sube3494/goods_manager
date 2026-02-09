@@ -164,7 +164,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                 url,
                 productId: "", // 临时 ID 为空
-                uploadDate: new Date().toISOString()
+                uploadDate: new Date().toISOString(),
+                tags: []
               };
               setGalleryImages(prev => [...prev, tempImg]);
             }
@@ -408,7 +409,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 const galleryUrls = new Set(galleryImages.map(img => img.url));
                                 
                                 // 构建最终显示的列表
-                                let displayList = [...galleryImages];
+                                const displayList = [...galleryImages];
                                 
                                 // 排序：封面图置顶，其他按时间升序
                                 displayList.sort((a, b) => {
@@ -418,8 +419,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                     if (isACover && !isBCover) return -1;
                                     if (!isACover && isBCover) return 1;
                                     
-                                    const dateA = new Date((a as any).createdAt || a.uploadDate).getTime();
-                                    const dateB = new Date((b as any).createdAt || b.uploadDate).getTime();
+                                    const dateA = new Date((a as GalleryItem).createdAt || a.uploadDate).getTime();
+                                    const dateB = new Date((b as GalleryItem).createdAt || b.uploadDate).getTime();
                                     return dateA - dateB;
                                 });
 
@@ -429,8 +430,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         id: 'cover-virtual',
                                         url: formData.image,
                                         productId: initialData?.id || '',
-                                        uploadDate: new Date().toISOString()
-                                    } as any);
+                                        uploadDate: new Date().toISOString(),
+                                        tags: []
+                                    } as GalleryItem);
                                 }
 
                                 return displayList.map(img => {

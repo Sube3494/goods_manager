@@ -7,7 +7,20 @@ import { useRouter } from "next/navigation";
 
 
 
-import { PurchaseOrder, StatsData } from "@/lib/types";
+import { StatsData } from "@/lib/types";
+
+interface StatItem {
+  title: string;
+  value: string;
+  icon: React.ElementType;
+  sub: string;
+  trend: string;
+  trendUp: boolean;
+  warning: boolean;
+  color: string;
+  iconColor: string;
+  href?: string;
+}
 
 
 
@@ -62,7 +75,7 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
       iconColor: "text-emerald-500",
       href: "/purchases?status=Ordered"
     },
-  ];
+  ] as StatItem[];
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -73,8 +86,8 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.1 }}
-          onClick={() => (stat as any).href && router.push((stat as any).href)}
-          className={`group relative overflow-hidden rounded-2xl glass border border-border p-6 transition-all hover:-translate-y-1 hover:shadow-xl ${(stat as any).href ? 'cursor-pointer active:scale-[0.98]' : ''}`}
+          onClick={() => stat.href && router.push(stat.href)}
+          className={`group relative overflow-hidden rounded-2xl glass border border-border p-6 transition-all hover:-translate-y-1 hover:shadow-xl ${stat.href ? 'cursor-pointer active:scale-[0.98]' : ''}`}
         >
           {/* Ambient Background Gradient */}
           <div className={`absolute inset-0 bg-linear-to-br ${stat.color} opacity-0 transition-opacity duration-500 group-hover:opacity-100`} />

@@ -4,6 +4,7 @@ import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { useToast } from "@/components/ui/Toast";
+import { Product } from "@/lib/types";
 import { ArrowDown, FileSpreadsheet, Keyboard, Package, Clock, ExternalLink, ReceiptText } from "lucide-react";
 import { PurchaseOrder } from "@/lib/types";
 import { useState, useEffect } from "react";
@@ -39,7 +40,7 @@ export default function ImportPage() {
     fetchRecentRecords();
   }, []);
 
-  const handleManualAdd = async (data: any) => {
+  const handleManualAdd = async (data: Omit<Product, "id">) => {
     try {
       const res = await fetch("/api/products", {
         method: "POST",

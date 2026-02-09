@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download, ListChecks, Trash2, X } from "lucide-react";
+import { Search, Plus, Download } from "lucide-react";
 import { Product, Category } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
