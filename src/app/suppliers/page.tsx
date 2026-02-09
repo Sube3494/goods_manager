@@ -97,7 +97,8 @@ export default function SuppliersPage() {
             setSelectedIds(selectedIds.filter(sid => sid !== id));
             showToast("供应商已删除", "success");
           } else {
-            showToast("删除失败", "error");
+            const data = await res.json();
+            showToast(data.error || "删除失败", "error");
           }
         } catch (error) {
           console.error("Delete supplier failed:", error);
@@ -154,98 +155,75 @@ export default function SuppliersPage() {
       </div>
 
       {/* Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {isLoading ? (
-          [1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-48 rounded-2xl bg-muted/20 animate-pulse border border-border" />
+          [1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-32 rounded-2xl bg-muted/20 animate-pulse border border-border" />
           ))
         ) : filteredSuppliers.length > 0 ? (
-          filteredSuppliers.map((supplier) => {
-            const isSelected = selectedIds.includes(supplier.id);
-            return (
-                <div key={supplier.id} className={`group relative overflow-hidden rounded-2xl glass-card border p-6 transition-all duration-300 ${isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
-                    <div className="flex items-start justify-between mb-4 relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-sm">
-                                <Truck size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-foreground line-clamp-1">{supplier.name}</h3>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <p className="text-[10px] text-muted-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                        {supplier.code ? `${supplier.code}` : `ID: ${supplier.id.substring(0, 6)}`}
-                                    </p>
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 text-[10px] font-bold">
-                                        <Package size={12} />
-                                        <span>{supplier._count?.products || 0} 件商品</span>
-                                    </div>
-                                </div>
-                            </div>
+           filteredSuppliers.map((supplier) => {
+             const isSelected = selectedIds.includes(supplier.id);
+             return (
+                <div 
+                  key={supplier.id} 
+                  className={`group relative overflow-hidden rounded-2xl glass-card border p-4 transition-all duration-300 ${
+                    isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                  }`}
+                >
+                    <div className="flex items-start justify-between mb-3 relative z-10">
+                        <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-sm transition-transform duration-300 group-hover:scale-110">
+                            <Truck size={18} strokeWidth={1.5} />
                         </div>
+                        
                         <div className={`relative transition-all duration-300 ${isSelected || selectedIds.length > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); toggleSelect(supplier.id); }}
-                                className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
+                                className={`relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
                                     isSelected 
                                     ? "bg-foreground border-foreground text-background scale-110" 
                                     : "border-muted-foreground/30 hover:border-foreground/50"
                                 }`}
                             >
-                                {isSelected && (
-                                    <Check size={14} strokeWidth={4} />
-                                )}
+                                {isSelected && <Check size={12} strokeWidth={4} />}
                             </button>
                         </div>
                     </div>
                     
-                    {(supplier.contact || supplier.phone || supplier.email || supplier.address) && (
-                        <div className="space-y-2 mt-4 text-sm text-muted-foreground">
-                            {supplier.contact && (
-                                <div className="flex items-center gap-2">
-                                    <Truck size={14} className="text-primary/70" />
-                                    <span className="text-foreground/80">{supplier.contact}</span>
-                                </div>
-                            )}
-                            {supplier.phone && (
-                                <div className="flex items-center gap-2">
-                                    <Phone size={14} />
-                                    <span>{supplier.phone}</span>
-                                </div>
-                            )}
-                            {supplier.email && (
-                                <div className="flex items-center gap-2">
-                                    <Mail size={14} />
-                                    <span>{supplier.email}</span>
-                                </div>
-                            )}
-                            {supplier.address && (
-                                <div className="flex items-start gap-2">
-                                    <MapPin size={14} className="mt-0.5" />
-                                    <span className="line-clamp-2">{supplier.address}</span>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <h3 className="text-lg font-bold text-foreground mb-3 truncate group-hover:text-primary transition-colors">
+                      {supplier.name}
+                    </h3>
                     
-                    <div className="flex justify-end pt-4 mt-4 border-t border-border opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
-                         <div className="flex gap-1">
+                    <div className="flex justify-between items-center w-full">
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                                {supplier.code ? supplier.code : `SUP__${supplier.id.substring(0, 4)}`}
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full w-fit">
+                                <Package size={12} strokeWidth={2.5} />
+                                <span>{supplier._count?.products || 0}</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex gap-1 opacity-100 translate-y-0 lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 transition-all duration-300">
                             <button 
-                                onClick={() => handleOpenEdit(supplier)} 
-                                className="p-2 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); handleOpenEdit(supplier); }} 
+                                className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+                                title="编辑"
                             >
-                                <Edit2 size={16} />
+                                <Edit2 size={14} />
                             </button>
                             <button 
-                                onClick={() => handleDelete(supplier.id, supplier.name)} 
-                                className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                                onClick={(e) => { e.stopPropagation(); handleDelete(supplier.id, supplier.name); }} 
+                                className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                title="删除"
                             >
-                                <Trash2 size={16} />
+                                <Trash2 size={14} />
                             </button>
                         </div>
                     </div>
                 </div>
-            );
-          })
+             );
+           })
         ) : (
           <div className="col-span-full py-20 flex flex-col items-center justify-center text-center">
             <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-6 text-muted-foreground/50 border border-dashed border-border group-hover:scale-110 transition-transform duration-500">
@@ -305,7 +283,8 @@ export default function SuppliersPage() {
                   setSelectedIds([]);
                   fetchSuppliers();
                 } else {
-                  showToast("批量删除失败", "error");
+                  const data = await res.json();
+                  showToast(data.error || "删除失败", "error");
                 }
               } catch {
                 showToast("网络请求失败", "error");

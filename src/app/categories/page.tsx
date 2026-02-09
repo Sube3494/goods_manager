@@ -76,7 +76,8 @@ export default function CategoriesPage() {
             fetchCategories();
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           } else {
-            showToast("删除失败", "error");
+            const data = await res.json();
+            showToast(data.error || "删除失败", "error");
           }
         } catch {
           showToast("删除请求失败", "error");

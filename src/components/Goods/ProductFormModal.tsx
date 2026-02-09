@@ -269,10 +269,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         return;
     }
 
-    if (!formData.price || Number(formData.price) <= 0) {
-        showToast("请输入有效的销售价格", "error");
-        return;
-    }
+
 
     onSubmit({
         ...formData,
@@ -378,10 +375,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <FileText size={16} /> 销售价格 (￥) <span className="text-red-500">*</span>
+                                <FileText size={16} /> 销售价格 (￥)
                             </label>
                             <input 
-                                required
+
                                 type="number" 
                                 step="0.01"
                                 min="0"
@@ -414,11 +411,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {/* Initial Stock */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Package size={16} /> 期初库存 (Initial Stock) <span className="text-red-500">*</span>
+                            <Package size={16} /> 期初库存 (Initial Stock)
                         </label>
                         <div className="relative">
                             <input 
-                                required
                                 type="number" 
                                 min="0"
                                 value={formData.stock}

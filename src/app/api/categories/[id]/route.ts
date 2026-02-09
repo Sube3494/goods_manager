@@ -64,6 +64,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Bulk delete failed:", error);
-    return NextResponse.json({ error: "Failed to delete categories" }, { status: 500 });
+    return NextResponse.json({ error: "无法删除：该分类可能正在被商品或其他模块引用。" }, { status: 500 });
   }
 }
