@@ -54,6 +54,7 @@ model Supplier {
 
 model PurchaseOrder {
   id              String              @id @default(cuid())
+  type            String              @default("Purchase")
   status          String              @default("Draft")
   totalAmount     Float               @default(0)
   date            DateTime            @default(now())

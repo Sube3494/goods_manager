@@ -98,7 +98,7 @@ export default function PurchasesPage() {
     setIsLoading(true);
     try {
       const [pRes, sRes] = await Promise.all([
-        fetch("/api/purchases"),
+        fetch("/api/purchases?type=Purchase"),
         fetch("/api/suppliers")
       ]);
       if (pRes.ok && sRes.ok) {

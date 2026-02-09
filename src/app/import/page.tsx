@@ -5,7 +5,7 @@ import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { useToast } from "@/components/ui/Toast";
 import { Product } from "@/lib/types";
-import { FileSpreadsheet, Package, Clock, ExternalLink, ReceiptText, Plus } from "lucide-react";
+import { FileSpreadsheet, Package, Clock, ExternalLink, ReceiptText, Plus, AlertCircle, X } from "lucide-react";
 import { PurchaseOrder } from "@/lib/types";
 import { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
@@ -18,12 +18,13 @@ export default function ImportPage() {
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [recentPurchases, setRecentPurchases] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [importErrors, setImportErrors] = useState<{ sku: string; reason: string }[]>([]);
   const { showToast } = useToast();
 
   const fetchRecentRecords = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/purchases");
+      const res = await fetch("/api/purchases?type=Inbound");
       if (res.ok) {
         const data = await res.json();
         const receivedOnly = data.filter((p: PurchaseOrder) => p.status === "Received");
@@ -71,7 +72,14 @@ export default function ImportPage() {
 
       if (res.ok) {
         const result = await res.json();
-        showToast(`成功导入 ${result.successCount} 件商品${result.failCount > 0 ? `，失败 ${result.failCount} 件` : ""}`, "success");
+        setImportErrors(result.errors || []);
+        
+        if (result.failCount > 0) {
+          showToast(`导入完成：成功 ${result.successCount} 件，失败 ${result.failCount} 件。请查看下方详情。`, "warning");
+        } else {
+          showToast(`成功导入 ${result.successCount} 件商品`, "success");
+        }
+        
         fetchRecentRecords();
       } else {
         showToast("导入失败", "error");
@@ -110,6 +118,43 @@ export default function ImportPage() {
         </div>
       </div>
 
+      {/* Import Error Report */}
+      {importErrors.length > 0 && (
+        <div className="animate-in slide-in-from-top-4 duration-500 overflow-hidden rounded-3xl border border-destructive/20 bg-destructive/5 glass-panel">
+          <div className="flex items-center justify-between border-b border-destructive/10 p-4 px-6 bg-destructive/5">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle size={18} />
+              <h3 className="font-bold">导入异常报告 ({importErrors.length})</h3>
+            </div>
+            <button 
+              onClick={() => setImportErrors([])}
+              className="p-1 hover:bg-destructive/10 rounded-full text-destructive/60 hover:text-destructive transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="p-6">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {importErrors.map((err, idx) => (
+                <div key={idx} className="flex flex-col gap-1 p-3 rounded-xl bg-white/50 dark:bg-gray-900/50 border border-destructive/10 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">SKU</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">失败</span>
+                  </div>
+                  <div className="text-sm font-mono font-bold text-foreground truncate">{err.sku}</div>
+                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <div className="size-1 rounded-full bg-destructive/40" />
+                    {err.reason}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-[10px] text-muted-foreground/60 text-center italic">
+              提示：请检查 Excel 文件中以上 SKU 是否存在拼写错误或商品是否已被删除。
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Recent Activity */}
       <div className="glass-panel rounded-3xl border border-border overflow-hidden">
@@ -178,11 +223,13 @@ export default function ImportPage() {
         templateData={[
           {
             "*SKU": "SKU001",
-            "*入库数量": 50
+            "*入库数量": 50,
+            "*成本价": 15.5
           },
           {
             "*SKU": "SKU002",
-            "*入库数量": 100
+            "*入库数量": 100,
+            "*成本价": 22.0
           }
         ]}
         templateFileName="入库导入模板.xlsx"

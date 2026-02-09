@@ -254,7 +254,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">
-                {readOnly ? "查看采购详情" : (initialData ? "编辑采购单" : "新建采购单")}
+                {formData.type === "Inbound" ? (readOnly ? "查看入库详情" : "编辑入库记录") : (readOnly ? "查看采购详情" : (initialData ? "编辑采购单" : "新建采购单"))}
               </h2>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={24} />
@@ -265,27 +265,28 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                 <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-8">
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-muted/20 dark:bg-white/5 p-3 sm:p-6 rounded-2xl border border-border/50">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] sm:text-sm font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                                <FileText size={14} /> 采购单号
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                <FileText size={14} /> {formData.type === "Inbound" ? "入库单号" : "采购单号"}
                             </label>
                             <input 
                                 disabled
                                 type="text" 
                                 value={formData.id}
-                                className="w-full rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent opacity-70 font-mono"
+                                className="w-full h-10 sm:h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent opacity-70 font-mono"
                             />
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] sm:text-sm font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                                <Calendar size={14} /> {readOnly ? "订单时间" : "时间"}
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                <Calendar size={14} /> {formData.type === "Inbound" ? "入库时间" : (readOnly ? "订单时间" : "时间")}
                             </label>
-                            <div className={`h-9 sm:h-auto ${readOnly ? "pointer-events-none opacity-80" : ""}`}>
+                            <div className={`w-full h-10 sm:h-[42px] ${readOnly ? "pointer-events-none opacity-80" : ""}`}>
                                 <DatePicker 
                                     value={formData.date}
                                     onChange={(val) => setFormData({...formData, date: val})}
                                     placeholder="选择日期"
                                     showClear={false}
+                                    className="h-full"
                                 />
                             </div>
                         </div>
@@ -302,7 +303,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-2">
                             <label className="text-sm font-bold text-foreground flex items-center gap-2">
-                                <ListOrdered size={16} className="text-primary" /> 采购项目 {formData.items.length > 0 && `(${formData.items.length})`}
+                                <ListOrdered size={16} className="text-primary" /> {formData.type === "Inbound" ? "入库项目" : "采购项目"} {formData.items.length > 0 && `(${formData.items.length})`}
                             </label>
                             {formData.items.length > 0 && !readOnly && (
                                 <button 
@@ -464,7 +465,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
 
 
-                    {/* Payment Voucher Section */}
+                    {/* Payment Voucher Section - Only for Purchases */}
+                    {formData.type !== "Inbound" && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-2">
                             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-primary pl-2">
@@ -502,8 +504,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                             </div>
                         )}
                     </div>
-
+                    )}
+                    
                     {/* Tracking Info Section - Only visible if tracking data exists */}
+                    {formData.type !== "Inbound" && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between px-2">
                                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-orange-500 pl-2">
@@ -669,12 +673,15 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                 )}
                             </div>
                         </div>
+                    )}
 
                 </div>
 
                 {/* Footer Totals & Actions */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 sm:p-6 bg-white dark:bg-white/5 border-t border-border/10 shrink-0 z-10">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                        {formData.type !== "Inbound" && (
+                        <>
                         <div className="flex items-center gap-2 min-w-fit pr-0 sm:pr-4 border-r-0 sm:border-r border-border/50">
                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-2">附加金额</span>
                         </div>
@@ -726,6 +733,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                 )}
                             </div>
                         </div>
+                        </>
+                        )}
                     </div>
 
                     <div className="flex items-center justify-end gap-6 w-full sm:w-auto mt-4 sm:mt-0 text-right">

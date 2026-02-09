@@ -3,9 +3,13 @@ import prisma from "@/lib/prisma";
 import { PurchaseOrderItem } from "@/lib/types";
 
 // 获取所有采购订单
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get("type");
+
   try {
     const purchases = await prisma.purchaseOrder.findMany({
+      where: type ? { type } : {},
       include: {
         items: {
           include: {

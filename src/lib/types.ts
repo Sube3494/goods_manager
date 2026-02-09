@@ -42,6 +42,7 @@ export interface TrackingInfo {
 
 export interface PurchaseOrder {
   id: string;
+  type?: string;
   status: PurchaseStatus;
   totalAmount: number;
   date: string;

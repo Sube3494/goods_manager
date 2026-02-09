@@ -19,10 +19,7 @@ export async function POST(request: Request) {
 
     let successCount = 0;
     let failCount = 0;
-
-    // Simple implementation: Loop and create. For better performance use createMany if possible,
-    // but createMany doesn't support generic relations easily (need IDs).
-    // Here we might need to lookup category by name.
+    const errors: { sku: string; reason: string }[] = [];
 
     const importedItems: { productId: string, quantity: number, costPrice: number }[] = [];
 
@@ -31,9 +28,17 @@ export async function POST(request: Request) {
             // Map keys for SKU and Quantity
             const sku = String(item.sku || item['SKU'] || item['编码'] || item['*SKU'] || "");
             const quantity = Number(item['入库数量'] || item['*入库数量'] || item.stock || item['数量'] || item['Quantity'] || 0);
+            const costPrice = Number(item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
             
-            if (!sku || quantity <= 0) {
+            if (!sku) {
                 failCount++;
+                errors.push({ sku: "未知", reason: "未填写 SKU" });
+                continue;
+            }
+
+            if (quantity <= 0) {
+                failCount++;
+                errors.push({ sku, reason: `入库数量无效 (${quantity})` });
                 continue;
             }
 
@@ -55,7 +60,7 @@ export async function POST(request: Request) {
                 importedItems.push({
                     productId: existingProduct.id,
                     quantity: quantity,
-                    costPrice: 0 // No longer providing cost price in simple replenishment
+                    costPrice: costPrice
                 });
 
                 successCount++;
@@ -63,10 +68,12 @@ export async function POST(request: Request) {
                 // If SKU doesn't exist, we can't replenish
                 console.warn(`Import: SKU ${sku} not found. Skipping.`);
                 failCount++;
+                errors.push({ sku, reason: "系统内未找到该 SKU" });
             }
         } catch (e) {
             console.error("Import item error:", e);
             failCount++;
+            errors.push({ sku: item.sku || "未知", reason: "数据解析或数据库更新失败" });
         }
     }
 
@@ -76,6 +83,8 @@ export async function POST(request: Request) {
         await prisma.purchaseOrder.create({
             data: {
                 id: orderId,
+                // @ts-expect-error: Prisma Client types might not reflect the 'type' field yet
+                type: "Inbound",
                 status: "Received",
                 date: new Date(),
                 totalAmount: importedItems.reduce((acc, curr) => acc + (curr.quantity * curr.costPrice), 0),
@@ -90,7 +99,7 @@ export async function POST(request: Request) {
         });
     }
 
-    return NextResponse.json({ success: true, successCount, failCount });
+    return NextResponse.json({ success: true, successCount, failCount, errors });
 
   } catch (error) {
     console.error("Import failed:", error);

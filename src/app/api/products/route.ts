@@ -58,6 +58,8 @@ export async function POST(request: Request) {
       await prisma.purchaseOrder.create({
         data: {
           id: orderId,
+          // @ts-expect-error: Prisma Client types might not reflect the 'type' field yet
+          type: "Inbound",
           status: "Received",
           totalAmount: 0, // 初始库存可能没有准确的进货价记录，暂记为 0 或同步售价
           date: new Date(),
