@@ -33,9 +33,6 @@ export function QuickActions() {
       <div>
         <div className="mb-6 flex items-center justify-between">
             <h3 className="text-lg font-bold text-foreground">快捷操作</h3>
-            <button className="text-muted-foreground hover:text-foreground">
-                <MoreHorizontal size={18} />
-            </button>
         </div>
         
         <motion.div 
@@ -45,7 +42,7 @@ export function QuickActions() {
           className="space-y-3"
         >
           <motion.button 
-             onClick={() => router.push("/import")}
+             onClick={() => router.push("/inbound?action=import")}
              variants={itemAnim} 
              className="group relative flex w-full items-center gap-3 overflow-hidden rounded-xl bg-primary px-4 py-4 text-left text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:shadow-primary/40"
           >
@@ -55,17 +52,6 @@ export function QuickActions() {
             <span className="relative z-10">登记新入库</span>
             {/* Hover shine effect */}
             <div className="absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 ease-in-out group-hover:translate-x-full" />
-          </motion.button>
-
-          <motion.button 
-            onClick={() => showToast("报表导出中 (模拟)...", "info")}
-            variants={itemAnim} 
-            className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card/50 px-4 py-4 text-left text-sm font-semibold text-foreground backdrop-blur-md transition-all hover:bg-card hover:border-primary/20"
-           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-primary transition-colors">
-              <Archive size={18} />
-            </div>
-            <span>导出报表 (Excel)</span>
           </motion.button>
 
           <motion.button 

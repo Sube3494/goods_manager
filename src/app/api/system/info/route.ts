@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import prisma from "@/lib/prisma";
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -21,13 +24,25 @@ export async function GET() {
     const nodeVersion = process.version;
     const platform = process.platform;
 
+    // 4. Public Settings (Safe to expose)
+    const settings = await prisma.systemSetting.findUnique({
+        where: { id: "system" },
+        select: {
+            allowGalleryUpload: true,
+            allowDataImport: true
+        }
+    });
+
     return NextResponse.json({
       version,
       dbType,
       nodeVersion,
       platform,
       // Backup logic can be expanded here later
-      lastBackup: "尚未建立自动备份任务" 
+      lastBackup: "尚未建立自动备份任务",
+      // Public flags
+      allowGalleryUpload: settings?.allowGalleryUpload ?? true,
+      allowDataImport: settings?.allowDataImport ?? true
     });
   } catch {
     return NextResponse.json({ error: "Failed to fetch system info" }, { status: 500 });

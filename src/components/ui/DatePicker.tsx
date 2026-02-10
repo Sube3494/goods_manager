@@ -22,9 +22,10 @@ interface DatePickerProps {
   maxDate?: string;
   isCompact?: boolean;
   align?: "left" | "right";
+  triggerClassName?: string;
 }
 
-export function DatePicker({ value, onChange, placeholder = "选择日期", className, showClear = true, minDate, maxDate, isCompact, align = "left" }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = "选择日期", className, showClear = true, minDate, maxDate, isCompact, align = "left", triggerClassName }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(value ? new Date(value) : new Date());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +67,8 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
           "flex w-full h-full items-center justify-between rounded-xl max-md:rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm transition-all outline-none ring-offset-background",
           isCompact && "px-2 text-xs",
           isOpen ? "ring-2 ring-primary/20 border-primary/20" : "hover:bg-muted/50 dark:hover:bg-white/10",
-          !selectedDate && "text-muted-foreground"
+          !selectedDate && "text-muted-foreground",
+          triggerClassName
         )}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">

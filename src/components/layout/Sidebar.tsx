@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, LogOut, LogIn, X, CreditCard } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, LogOut, LogIn, X, CreditCard, ArrowUpRight } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -17,12 +17,13 @@ function cn(...inputs: ClassValue[]) {
 
 const navItems = [
   { name: "概览", href: "/", icon: LayoutDashboard, adminOnly: true },
-  { name: "库存管理", href: "/goods", icon: Package, adminOnly: true },
+  { name: "商品管理", href: "/goods", icon: Package, adminOnly: true },
   { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true },
   { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true },
   { name: "刷单管理", href: "/brush-orders", icon: CreditCard, adminOnly: true },
-  { name: "入库登记", href: "/import", icon: PlusCircle, adminOnly: true },
+  { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true },
+  { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true },
   { name: "实物相册", href: "/gallery", icon: Camera },
   { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true },
 ];
@@ -84,9 +85,6 @@ export function Sidebar({ onClose, isOpen }: SidebarProps) {
               <div className="flex flex-col">
                   <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
                   PickNote
-                  </span>
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-widest scale-90 origin-left">
-                      PROFESSIONAL
                   </span>
               </div>
             </div>

@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         note: note || null,
         status: status || 'Draft',
         items: {
-          create: items.map((item: any) => ({
+          create: items.map((item: { productId: string; quantity: number }) => ({
             productId: item.productId,
             quantity: item.quantity,
           })),
@@ -80,10 +80,11 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(order, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating brush order:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: `Failed to create brush order: ${error.message}` },
+      { error: `Failed to create brush order: ${errorMessage}` },
       { status: 500 }
     );
   }

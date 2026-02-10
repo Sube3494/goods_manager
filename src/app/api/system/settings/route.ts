@@ -1,16 +1,9 @@
-/*
- * @Date: 2026-02-08 16:29:57
- * @Author: Sube
- * @FilePath: route.ts
- * @LastEditTime: 2026-02-08 16:55:56
- * @Description: 
- */
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import type { SystemSetting } from "@prisma/client";
-
+import { Prisma } from "../../../../../prisma/generated-client";
 
 // 获取系统设置
+export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     // 使用 upsert 确保记录存在
@@ -21,7 +14,8 @@ export async function GET() {
         id: "system",
         lowStockThreshold: 10,
         allowDataImport: true,
-        allowGalleryUpload: true
+        allowGalleryUpload: true,
+        storageType: "local"
       }
     });
     
@@ -35,12 +29,36 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { lowStockThreshold, allowGalleryUpload, allowDataImport } = body;
+    const { 
+      lowStockThreshold, 
+      allowGalleryUpload, 
+      allowDataImport,
+      storageType,
+      minioEndpoint,
+      minioPort,
+      minioAccessKey,
+      minioSecretKey,
+      minioBucket,
+      minioUseSSL,
+      minioPublicUrl,
+      uploadConflictStrategy
+    } = body;
 
-    const updateData: { lowStockThreshold?: number; allowGalleryUpload?: boolean; allowDataImport?: boolean } = {};
+    const updateData: Prisma.SystemSettingUpdateInput = {};
     if (typeof lowStockThreshold === 'number') updateData.lowStockThreshold = lowStockThreshold;
     if (typeof allowGalleryUpload === 'boolean') updateData.allowGalleryUpload = allowGalleryUpload;
     if (typeof allowDataImport === 'boolean') updateData.allowDataImport = allowDataImport;
+    
+    // Storage settings
+    if (storageType) updateData.storageType = storageType;
+    if (minioEndpoint !== undefined) updateData.minioEndpoint = minioEndpoint; // null is valid for Prisma?
+    if (minioPort !== undefined) updateData.minioPort = (minioPort === "" || Number(minioPort) === 0) ? null : Number(minioPort);
+    if (minioAccessKey !== undefined) updateData.minioAccessKey = minioAccessKey;
+    if (minioSecretKey !== undefined) updateData.minioSecretKey = minioSecretKey;
+    if (minioBucket !== undefined) updateData.minioBucket = minioBucket;
+    if (minioUseSSL !== undefined) updateData.minioUseSSL = Boolean(minioUseSSL);
+    if (minioPublicUrl !== undefined) updateData.minioPublicUrl = minioPublicUrl;
+    if (uploadConflictStrategy !== undefined) updateData.uploadConflictStrategy = uploadConflictStrategy;
 
     const settings = await prisma.systemSetting.upsert({
       where: { id: "system" },
@@ -49,7 +67,9 @@ export async function POST(request: Request) {
         id: "system",
         lowStockThreshold: lowStockThreshold ?? 10,
         allowDataImport: allowDataImport ?? true,
-        allowGalleryUpload: allowGalleryUpload ?? true
+        allowGalleryUpload: allowGalleryUpload ?? true,
+        storageType: storageType || "local",
+        ...(updateData as any)
       }
     });
 

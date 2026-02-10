@@ -17,7 +17,7 @@ export interface Product {
   name: string;
   categoryId: string;
   category?: Category;
-  price: number;
+  costPrice: number;
   stock: number;
   image?: string;
   supplierId?: string;
@@ -27,11 +27,6 @@ export interface Product {
 
 export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered"; // 暂时保留 Ordered 以防万一，但主推前四个
 
-export interface PurchaseOrderItem {
-  productId: string;
-  quantity: number;
-  costPrice: number;
-}
 
 export interface TrackingInfo {
   courier: string;
@@ -64,7 +59,12 @@ export interface PurchaseOrderItem {
   supplierId?: string;
   supplier?: Supplier;
   quantity: number;
+  remainingQuantity?: number;
   costPrice: number;
+}
+
+export interface PurchaseOrderItemWithOrder extends PurchaseOrderItem {
+  purchaseOrder: PurchaseOrder;
 }
 export interface Category {
   id: string;
@@ -143,6 +143,26 @@ export interface BrushOrder {
   commission: number;      // 佣金
   note?: string;           // 备注
   items: BrushOrderItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface OutboundOrderItem {
+  id?: string;
+  outboundOrderId?: string;
+  productId: string;
+  product?: Product;
+  quantity: number;
+  price: number;
+}
+
+export interface OutboundOrder {
+  id: string;
+  type: string;
+  date: string | Date;
+  note?: string;
+  totalAmount?: number;
+  items: OutboundOrderItem[];
   createdAt?: string;
   updatedAt?: string;
 }

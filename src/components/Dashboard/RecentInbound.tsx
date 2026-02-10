@@ -32,7 +32,7 @@ export function RecentInbound({ items, isLoading }: Props) {
   };
 
   const handleViewAll = () => {
-    router.push("/purchases");
+    router.push("/inbound");
   };
 
   if (isLoading) {

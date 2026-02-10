@@ -347,7 +347,7 @@ export default function PurchasesPage() {
       </div>
 
       {/* Search Box */}
-      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+      <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
         <Search size={18} className="text-muted-foreground shrink-0" />
         <input
           type="text"

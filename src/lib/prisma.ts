@@ -5,7 +5,7 @@
  * @LastEditTime: 2026-02-07 16:26:46
  * @Description: 
  */
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../../prisma/generated-client'
 
 const prismaClientSingleton = () => {
   return new PrismaClient()

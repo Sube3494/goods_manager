@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
-    const { name, sku, price, stock, categoryId, supplierId, image, isPublic } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
 
     const stockNum = Number(stock) || 0;
 
@@ -40,7 +40,8 @@ export async function POST(request: Request) {
       data: {
         name,
         sku,
-        price: Number(price) || 0,
+        costPrice: Number(costPrice) || 0,
+        hideCost: body.hideCost ?? false,
         stock: stockNum,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
@@ -58,7 +59,6 @@ export async function POST(request: Request) {
       await prisma.purchaseOrder.create({
         data: {
           id: orderId,
-          // @ts-expect-error: Prisma Client types might not reflect the 'type' field yet
           type: "Inbound",
           status: "Received",
           totalAmount: 0, // 初始库存可能没有准确的进货价记录，暂记为 0 或同步售价
@@ -98,7 +98,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
-    const { id, name, sku, price, stock, categoryId, supplierId, image, isPublic } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -109,7 +109,8 @@ export async function PUT(request: Request) {
       data: {
         name,
         sku,
-        price: Number(price) || 0,
+        costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
+        hideCost: body.hideCost !== undefined ? body.hideCost : undefined,
         stock: Number(stock) || 0,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,

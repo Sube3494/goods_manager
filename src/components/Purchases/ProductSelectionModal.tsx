@@ -205,7 +205,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                             {showPrice && (
                                 <div className="mt-1">
                                 <span className="text-xs font-bold text-primary">
-                                    ￥{product.price}
+                                    ￥{product.costPrice}
                                 </span>
                                 </div>
                             )}

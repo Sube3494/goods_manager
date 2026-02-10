@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "./generated-client"
 }
 
 datasource db {
@@ -20,7 +21,8 @@ model Product {
   id              String              @id @default(cuid())
   sku             String?             @unique
   name            String
-  price           Float               @default(0)
+  costPrice       Float               @default(0)
+  hideCost        Boolean             @default(false)
   stock           Int                 @default(0)
   image           String?
   isPublic        Boolean             @default(true)
@@ -30,6 +32,7 @@ model Product {
   updatedAt       DateTime            @updatedAt
   brushOrderItems BrushOrderItem[]
   gallery         GalleryItem[]
+  outboundItems   OutboundOrderItem[]
   category        Category            @relation(fields: [categoryId], references: [id])
   supplier        Supplier?           @relation(fields: [supplierId], references: [id])
   orderItems      PurchaseOrderItem[]
@@ -74,12 +77,34 @@ model PurchaseOrderItem {
   productId       String
   supplierId      String?
   quantity        Int
+  remainingQuantity Int?         // 新增：剩余可用数量 (用于 FIFO 成本计算)
   costPrice       Float
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   product         Product       @relation(fields: [productId], references: [id])
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   supplier        Supplier?     @relation(fields: [supplierId], references: [id])
+}
+
+model OutboundOrder {
+  id              String              @id @default(cuid())
+  type            String              @default("Sale") // Sale, Sample, Loss, Return
+  date            DateTime            @default(now())
+  note            String?
+  totalAmount     Float               @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  items           OutboundOrderItem[]
+}
+
+model OutboundOrderItem {
+  id              String        @id @default(cuid())
+  outboundOrderId String
+  productId       String
+  quantity        Int
+  price           Float         @default(0)
+  product         Product       @relation(fields: [productId], references: [id])
+  outboundOrder   OutboundOrder @relation(fields: [outboundOrderId], references: [id], onDelete: Cascade)
 }
 
 model GalleryItem {
@@ -121,6 +146,20 @@ model SystemSetting {
   lowStockThreshold  Int      @default(10)
   allowDataImport    Boolean  @default(true)
   allowGalleryUpload Boolean  @default(true)
+  
+  // Storage settings
+  storageType        String   @default("local") // "local" or "minio"
+  minioEndpoint      String?
+  minioPort          Int?
+  minioAccessKey     String?
+  minioSecretKey     String?
+  minioBucket        String?
+  minioUseSSL        Boolean  @default(true)
+  minioPublicUrl     String?  // Custom public URL for access
+
+  // Upload settings
+  uploadConflictStrategy String   @default("uuid") // "overwrite", "rename", "skip", "uuid"
+
   updatedAt          DateTime @updatedAt
 }
 

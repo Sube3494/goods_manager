@@ -31,10 +31,14 @@ export async function GET() {
           }
         }
       }),
-      prisma.product.findMany({
+      prisma.purchaseOrderItem.findMany({
+        where: {
+          remainingQuantity: { gt: 0 },
+          purchaseOrder: { status: "Received" }
+        },
         select: {
-          price: true,
-          stock: true
+          costPrice: true,
+          remainingQuantity: true
         }
       }),
       // Query individual product items from received orders
@@ -94,7 +98,7 @@ export async function GET() {
       subtotal: item.quantity * item.costPrice
     }));
 
-    const totalValue = totalValueResult.reduce((acc, curr) => acc + (curr.price * curr.stock), 0);
+    const totalValue = totalValueResult.reduce((acc, curr) => acc + (curr.costPrice * (curr.remainingQuantity || 0)), 0);
 
     return NextResponse.json({
       productCount,

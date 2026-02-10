@@ -323,7 +323,7 @@ export default function BrushOrdersPage() {
           </button>
           <button 
             onClick={handleCreate}
-            className="h-11 col-span-2 sm:flex-none flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+            className="h-12 md:h-11 col-span-2 sm:flex-none flex items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
           >
             <Plus size={18} />
             新建刷单
@@ -350,14 +350,14 @@ export default function BrushOrdersPage() {
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3">
-        <div className="h-12 md:h-11 px-4 md:px-5 w-full md:flex-1 rounded-2xl md:rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+        <div className="h-12 md:h-11 px-5 w-full md:flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"
             placeholder="搜索记录..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm"
+            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
           />
           {searchQuery && (
             <button
@@ -368,7 +368,7 @@ export default function BrushOrdersPage() {
             </button>
           )}
         </div>
-        <div className="w-full sm:w-32 md:w-40 shrink-0">
+        <div className="w-full sm:w-32 md:w-40 shrink-0 h-12 md:h-11">
             <CustomSelect
                 value={selectedType}
                 onChange={setSelectedType}
@@ -382,16 +382,18 @@ export default function BrushOrdersPage() {
                   { value: "美团", label: "美团" }
                 ]}
                 placeholder="全部平台"
-                className="h-12 md:h-11 rounded-2xl md:rounded-xl bg-white dark:bg-white/5"
+                className="h-full"
+                triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 shadow-sm"
             />
         </div>
-        <div className="flex flex-nowrap items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-2 h-12 md:h-11">
             <DatePicker 
                 value={startDate} 
                 onChange={handleStartDateChange} 
                 maxDate={endDate}
                 placeholder="开始" 
-                className="h-12 md:h-11 flex-1 min-w-0 md:w-40 md:flex-none"
+                className="h-full flex-1 min-w-0 md:w-36 md:flex-none"
+                triggerClassName="rounded-full shadow-sm"
                 isCompact
                 align="left"
             />
@@ -401,7 +403,8 @@ export default function BrushOrdersPage() {
                 onChange={handleEndDateChange} 
                 minDate={startDate}
                 placeholder="结束" 
-                className="h-12 md:h-11 flex-1 min-w-0 md:w-40 md:flex-none"
+                className="h-full flex-1 min-w-0 md:w-36 md:flex-none"
+                triggerClassName="rounded-full shadow-sm"
                 isCompact
                 align="right"
             />

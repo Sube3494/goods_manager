@@ -167,9 +167,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
       if (!currentProductIds.includes(product.id)) {
         newItems.push({
           productId: product.id,
+          image: product.image,
           supplierId: product.supplierId,
           quantity: 1,
-          costPrice: product.price * 0.7 // Default cost 70%
+          costPrice: product.costPrice
         });
       }
     });
@@ -204,7 +205,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     if (field === "productId") {
         const product = products.find(g => g.id === value);
         if (product) {
-            newItems[index].costPrice = product.price * 0.7; // Mock cost price at 70% of retail
+            newItems[index].costPrice = product.costPrice; // Use exact cost price
         }
     }
     

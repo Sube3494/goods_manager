@@ -41,6 +41,7 @@ export async function PUT(
               productId: item.productId,
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
+              remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
               costPrice: Number(item.costPrice) || 0
             }))
           }
@@ -64,14 +65,45 @@ export async function PUT(
       });
 
       for (const item of orderItems) {
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              increment: item.quantity
-            }
-          }
+        // Calculate new Weighted Average Cost
+        const product = await prisma.product.findUnique({
+          where: { id: item.productId }
         });
+
+        if (product) {
+          const currentStock = product.stock;
+          const currentCost = product.costPrice || 0;
+          const incomingQty = item.quantity;
+          const incomingCost = item.costPrice || 0;
+
+          let newCostPrice = currentCost;
+
+          if (incomingCost > 0) {
+              if (currentStock <= 0) {
+                  newCostPrice = incomingCost;
+              } else {
+                  const totalValue = (currentStock * currentCost) + (incomingQty * incomingCost);
+                  const totalQty = currentStock + incomingQty;
+                  newCostPrice = totalValue / totalQty;
+              }
+          }
+
+          await prisma.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { increment: incomingQty },
+              costPrice: newCostPrice
+            }
+          });
+
+          // FIFO 支持：如果该项还没有设置余量，将其设置为入库量
+          if (item.remainingQuantity === null) {
+            await prisma.purchaseOrderItem.update({
+              where: { id: item.id },
+              data: { remainingQuantity: incomingQty }
+            });
+          }
+        }
       }
     }
 

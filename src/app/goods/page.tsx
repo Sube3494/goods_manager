@@ -9,6 +9,7 @@ import { Product, Category } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { ActionBar } from "@/components/ui/ActionBar";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 
 
 import { useUser } from "@/hooks/useUser";
@@ -40,18 +41,29 @@ export default function GoodsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
 
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+
   const { showToast } = useToast();
 
   const fetchGoods = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/products");
-      if (res.ok) {
-        const data = await res.json();
-        setGoods(data);
+      const [productsRes, categoriesRes] = await Promise.all([
+        fetch("/api/products"),
+        fetch("/api/categories")
+      ]);
+
+      if (productsRes.ok && categoriesRes.ok) {
+        const productsData = await productsRes.json();
+        const categoriesData = await categoriesRes.json();
+        setGoods(productsData);
+        setCategories(categoriesData);
       }
     } catch (error) {
-      console.error("Failed to fetch goods", error);
+      console.error("Failed to fetch data", error);
     } finally {
       setIsLoading(false);
     }
@@ -125,8 +137,6 @@ export default function GoodsPage() {
         try {
           const res = await fetch("/api/products/batch", {
             method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids: selectedIds }),
           });
           if (res.ok) {
             showToast(`成功删除 ${count} 个商品`, "success");
@@ -188,13 +198,20 @@ export default function GoodsPage() {
     }
   };
   
-  const searchParams = useSearchParams();
-  const filterType = searchParams.get('filter');
-
+  
+  // Sync URL filter to state on mount if needed, or just use state
+  // For simplicity and unified UI, we prioritize local state controlled by dropdowns
+  
   const filteredGoods = goods.filter(g => {
-    // 1. Low stock filter
-    if (filterType === 'low_stock') {
+    // 1. Status Filter
+    if (selectedStatus === 'low_stock') {
        if (g.stock >= settings.lowStockThreshold) return false;
+    }
+
+    // 2. Category Filter
+    if (selectedCategory !== 'all') {
+      const catName = typeof g.category === 'object' ? (g.category as Category).name : String(g.category);
+      if (catName !== selectedCategory) return false;
     }
 
     const query = searchQuery.trim();
@@ -202,7 +219,7 @@ export default function GoodsPage() {
 
     const nameMatch = pinyinMatch(g.name, query);
     
-    // Category match
+    // Category match (for search input)
     let categoryMatch = false;
     if (g.category) {
       if (typeof g.category === 'object') {
@@ -225,7 +242,7 @@ export default function GoodsPage() {
         <div>
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">商品库</h1>
           <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-lg">
-            {isLoading ? "正在从数据库加载商品..." : filterType === 'low_stock' ? "仅显示需补货商品" : "统一管理商品信息与SKU。"}
+            {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU。"}
           </p>
         </div>
         
@@ -252,16 +269,45 @@ export default function GoodsPage() {
         </div>
       </div>
 
-      {/* Search Box */}
-      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
-        <Search size={18} className="text-muted-foreground shrink-0" />
-        <input
-          type="text"
-          placeholder="搜索商品名称、SKU 或分类..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm"
-        />
+      {/* Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+            <Search size={18} className="text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              placeholder="搜索商品名称、SKU..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+            />
+          </div>
+          
+          <div className="flex gap-3 h-12">
+             <div className="w-36 sm:w-40 h-full">
+                <CustomSelect 
+                    value={selectedStatus}
+                    onChange={setSelectedStatus}
+                    options={[
+                        { value: 'all', label: '所有状态' },
+                        { value: 'low_stock', label: '库存预警' }
+                    ]}
+                    className="h-full"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10"
+                />
+             </div>
+             <div className="w-36 sm:w-40 h-full">
+                <CustomSelect 
+                    value={selectedCategory}
+                    onChange={setSelectedCategory}
+                    options={[
+                        { value: 'all', label: '所有分类' },
+                        ...categories.map(c => ({ value: c.name, label: c.name }))
+                    ]}
+                    className="h-full"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10"
+                />
+             </div>
+          </div>
       </div>
 
       {/* Grid */}
@@ -296,7 +342,7 @@ export default function GoodsPage() {
                 <Search size={32} className="text-muted-foreground" />
             </div>
             <h3 className="text-lg font-semibold">未找到商品</h3>
-            <p className="text-sm text-muted-foreground">尝试调整搜索关键词或添加新商品。</p>
+            <p className="text-sm text-muted-foreground">尝试调整搜索关键词或筛选条件。</p>
         </div>
       )}
 
@@ -311,8 +357,7 @@ export default function GoodsPage() {
           {
             "*商品名称": "示例商品1",
             "*分类": "默认分类",
-            "*价格": 99.00,
-            "成本价": 50.00,
+            "*进货单价": 99.00,
             "库存": 100,
             "SKU": "EXAMPLE-001",
             "供应商": "默认供应商"

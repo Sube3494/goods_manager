@@ -6,10 +6,21 @@ import { PurchaseOrderItem } from "@/lib/types";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
+  const productId = searchParams.get("productId");
 
   try {
+    const where: any = {};
+    if (type) where.type = type;
+    if (productId) {
+      where.items = {
+        some: {
+          productId: productId
+        }
+      };
+    }
+
     const purchases = await prisma.purchaseOrder.findMany({
-      where: type ? { type } : {},
+      where,
       include: {
         items: {
           include: {
@@ -70,6 +81,7 @@ export async function POST(request: Request) {
             productId: item.productId,
             supplierId: item.supplierId,
             quantity: Number(item.quantity) || 0,
+            remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
             costPrice: Number(item.costPrice) || 0
           }))
         }

@@ -26,10 +26,11 @@ export async function GET(
     }
 
     return NextResponse.json(order);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching brush order:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: `Failed to fetch brush order: ${error.message}` },
+      { error: `Failed to fetch brush order: ${errorMessage}` },
       { status: 500 }
     );
   }
@@ -73,7 +74,7 @@ export async function PUT(
           note: note || null,
           status: status || 'Draft',
           items: {
-            create: items.map((item: any) => ({
+            create: items.map((item: { productId: string; quantity: number }) => ({
               productId: item.productId,
               quantity: item.quantity,
             })),
@@ -86,10 +87,11 @@ export async function PUT(
     });
 
     return NextResponse.json(order);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating brush order:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: `Failed to update brush order: ${error.message}` },
+      { error: `Failed to update brush order: ${errorMessage}` },
       { status: 500 }
     );
   }
@@ -106,10 +108,11 @@ export async function DELETE(
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting brush order:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: `Failed to delete brush order: ${error.message}` },
+      { error: `Failed to delete brush order: ${errorMessage}` },
       { status: 500 }
     );
   }

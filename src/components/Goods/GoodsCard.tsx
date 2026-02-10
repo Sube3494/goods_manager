@@ -112,10 +112,10 @@ export function GoodsCard({
             </p>
           </div>
           <div className="text-right">
-             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">单价 (CNY)</p>
+             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">进货单价</p>
              <p className="font-bold text-foreground">
-                {product.price > 0 
-                  ? <span className="text-lg">¥{product.price.toLocaleString()}</span> 
+                {product.costPrice > 0 
+                  ? <span className="text-lg">¥{product.costPrice.toLocaleString()}</span> 
                   : <span className="text-base opacity-90">以实际为准</span>
                 }
              </p>

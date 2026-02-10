@@ -16,10 +16,11 @@ export async function DELETE(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Batch delete brush orders failed:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: `批量删除失败: ${error.message}` },
+      { error: `批量删除失败: ${errorMessage}` },
       { status: 500 }
     );
   }

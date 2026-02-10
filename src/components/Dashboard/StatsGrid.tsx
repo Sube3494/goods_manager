@@ -34,7 +34,7 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
       value: data ? `¥${data.totalValue.toLocaleString()}` : "¥0", 
       icon: Archive, 
       sub: data ? `共计 ${data.productCount} 个SKU` : "加载中...", 
-      trend: "+0%", 
+      trend: "持平", 
       trendUp: true,
       warning: false,
       color: "from-blue-500/20 to-cyan-500/20",
@@ -45,11 +45,12 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
       value: data ? data.totalStock.toLocaleString() : "0", 
       icon: Package, 
       sub: "动态更新", 
-      trend: "+0%", 
+      trend: "持平", 
       trendUp: true,
       warning: false,
       color: "from-purple-500/20 to-pink-500/20",
-      iconColor: "text-purple-500"
+      iconColor: "text-purple-500",
+      href: "/goods"
     },
     { 
       title: "库存预警", 

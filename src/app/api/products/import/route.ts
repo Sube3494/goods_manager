@@ -28,7 +28,7 @@ export async function POST(request: Request) {
             // Map keys for SKU and Quantity
             const sku = String(item.sku || item['SKU'] || item['编码'] || item['*SKU'] || "");
             const quantity = Number(item['入库数量'] || item['*入库数量'] || item.stock || item['数量'] || item['Quantity'] || 0);
-            const costPrice = Number(item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
+            const costPrice = Number(item['进货单价'] || item['*进货单价'] || item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
             
             if (!sku) {
                 failCount++;
@@ -50,11 +50,33 @@ export async function POST(request: Request) {
             if (existingProduct) {
                 // Simplified flow: Update existing product stock
                 
+                const currentStock = existingProduct.stock;
+                const currentCost = existingProduct.costPrice || 0;
+                
+                let newCostPrice = currentCost;
+                
+                // Calculate Weighted Average Cost
+                if (costPrice > 0) {
+                    if (currentStock <= 0) {
+                        // If current stock is 0 or negative, reset cost to incoming price
+                        newCostPrice = costPrice;
+                    } else {
+                        // Weighted Average Formula
+                        // ((Current Stock * Current Cost) + (Incoming Qty * Incoming Cost)) / (Current Stock + Incoming Qty)
+                        const totalValue = (currentStock * currentCost) + (quantity * costPrice);
+                        const totalQty = currentStock + quantity;
+                        newCostPrice = totalValue / totalQty;
+                    }
+                }
+
+                const updateData = {
+                    stock: { increment: quantity },
+                    costPrice: newCostPrice
+                } as Parameters<typeof prisma.product.update>[0]['data'];
+
                 await prisma.product.update({
                     where: { id: existingProduct.id },
-                    data: {
-                        stock: { increment: quantity }
-                    }
+                    data: updateData
                 });
 
                 importedItems.push({
@@ -83,7 +105,6 @@ export async function POST(request: Request) {
         await prisma.purchaseOrder.create({
             data: {
                 id: orderId,
-                // @ts-expect-error: Prisma Client types might not reflect the 'type' field yet
                 type: "Inbound",
                 status: "Received",
                 date: new Date(),

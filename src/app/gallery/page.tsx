@@ -2,8 +2,8 @@
 
 import { useState, useEffect, Suspense, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle } from "lucide-react";
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
+import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle, Info } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -32,11 +32,52 @@ function GalleryContent() {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [isUploadAllowed, setIsUploadAllowed] = useState(true);
+  const [isUploadAllowed, setIsUploadAllowed] = useState(false);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { showToast } = useToast();
+  
+  // Lightbox Enhancements (High Performance Architecture)
+  const [previewDirection, setPreviewDirection] = useState(0);
+  
+  // Motion Values for bypass React rendering
+  const scaleValue = useMotionValue(1);
+  const xValue = useMotionValue(0);
+  const yValue = useMotionValue(0);
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isZoomed, setIsZoomed] = useState(false);
+  // State for toggling info card
+  const [showInfo, setShowInfo] = useState(false);
+
+  // Dual-mode physics configs
+  const softSpringConfig = useMemo(() => ({ stiffness: 300, damping: 30, mass: 0.5 }), []);
+  const hardSpringConfig = useMemo(() => ({ stiffness: 5000, damping: 200, mass: 0.05 }), []); // "Instant" feel for dragging
+
+  // Stabilize configs to prevent reset focus loop
+  const smoothScale = useSpring(scaleValue, softSpringConfig);
+  // Switch to hard spring when dragging for 1:1 response, soft for zooming
+  const smoothX = useSpring(xValue, isDragging ? hardSpringConfig : softSpringConfig);
+  const smoothY = useSpring(yValue, isDragging ? hardSpringConfig : softSpringConfig);
+
+  // UI Auto-hide deriving from scale
+  // UI Auto-hide deriving from scale (More sensitive)
+  const uiOpacity = useTransform(scaleValue, [1, 1.05], [1, 0]);
+  const uiYOffset = useTransform(scaleValue, [1, 1.05], [0, -20]);
+  const bottomUiYOffset = useTransform(scaleValue, [1, 1.05], [0, 20]);
+
+
+  // Low-frequency state synchronization for UI logic
+  useEffect(() => {
+    const unsub = scaleValue.on("change", (v) => {
+        if (v > 1.05 && !isZoomed) setIsZoomed(true);
+        if (v <= 1.05 && isZoomed) setIsZoomed(false);
+    });
+    return unsub;
+  }, [isZoomed, scaleValue]);
+
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -52,7 +93,7 @@ function GalleryContent() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch("/api/system/settings");
+        const res = await fetch("/api/system/info");
         if (res.ok) {
           const data = await res.json();
           setIsUploadAllowed(data.allowGalleryUpload ?? true);
@@ -215,6 +256,12 @@ function GalleryContent() {
   const filteredItems = items.filter(item => {
     const product = item.product;
     if (!isAdmin && !item.isPublic) return false;
+    if (!item.productId) return false; // Safety: must have productId
+
+    // If we are looking at a specific product, only filter by that ID
+    if (productIdFilter && productIdFilter !== 'undefined') {
+        return item.productId === productIdFilter;
+    }
 
     const searchLower = searchQuery.toLowerCase().replace(/\s+/g, '');
     
@@ -239,6 +286,34 @@ function GalleryContent() {
     return matchesSearch && matchesCategory;
   });
 
+  // Grouped logic: unique products with items
+  const groupedProducts = useMemo(() => {
+    if (productIdFilter && productIdFilter !== 'undefined') return [];
+    
+    const groups: Record<string, { product: Product, items: GalleryItem[] }> = {};
+    
+    filteredItems.forEach(item => {
+      const pid = item.productId;
+      if (!pid) return; // Safety
+      
+      if (!groups[pid]) {
+        // Prepare a robust product object for display
+        const productData = item.product || { id: pid, name: '未知商品', sku: 'N/A' };
+        // Ensure id is present in the object used for grouping
+        if (!productData.id) productData.id = pid;
+        
+        groups[pid] = { product: productData as Product, items: [] };
+      }
+      groups[pid].items.push(item);
+    });
+    
+    return Object.values(groups).sort((a, b) => {
+        const latestA = Math.max(...a.items.map(i => new Date(i.createdAt || 0).getTime()));
+        const latestB = Math.max(...b.items.map(i => new Date(i.createdAt || 0).getTime()));
+        return latestB - latestA;
+    });
+  }, [filteredItems, productIdFilter]);
+
   const filteredProduct = items.length > 0 ? items[0].product : null;
 
   const handleOpenImage = (item: GalleryItem) => {
@@ -256,8 +331,8 @@ function GalleryContent() {
     const count = selectedIds.length;
     setConfirmConfig({
       isOpen: true,
-      title: "批量删除图片",
-      message: `确定要删除选中的 ${count} 张实拍图吗？此操作不可恢复。`,
+      title: "批量删除媒体",
+      message: `确定要删除选中的 ${count} 个实拍项吗？此操作不可恢复。`,
       onConfirm: async () => {
         try {
           const res = await fetch("/api/gallery/batch", {
@@ -266,7 +341,7 @@ function GalleryContent() {
             body: JSON.stringify({ ids: selectedIds }),
           });
           if (res.ok) {
-            showToast(`成功删除 ${count} 张图片`, "success");
+            showToast(`成功删除 ${count} 个项目`, "success");
             setSelectedIds([]);
             fetchData();
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
@@ -289,12 +364,102 @@ function GalleryContent() {
   }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 
-  const handlePrev = () => {
-    if (currentIndex > 0) setSelectedImage(relatedImages[currentIndex - 1]);
+  const resetTransform = useCallback(() => {
+    animate(scaleValue, 1, { type: "spring", ...softSpringConfig }); // Use softSpringConfig for scale reset
+    animate(xValue, 0, { type: "spring", ...softSpringConfig });
+    animate(yValue, 0, { type: "spring", ...softSpringConfig });
+  }, [scaleValue, xValue, yValue, softSpringConfig]);
+
+  useEffect(() => {
+    resetTransform();
+  }, [selectedImage?.id, resetTransform]);
+
+  const navigate = (dir: number) => {
+    if (!selectedImage) return;
+    const nextIndex = (currentIndex + dir + relatedImages.length) % relatedImages.length;
+    setPreviewDirection(dir);
+    setSelectedImage(relatedImages[nextIndex]);
   };
 
-  const handleNext = () => {
-    if (currentIndex < relatedImages.length - 1) setSelectedImage(relatedImages[currentIndex + 1]);
+  const handlePrev = () => navigate(-1);
+  const handleNext = () => navigate(1);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (selectedImage?.type === 'video') return;
+    e.preventDefault();
+    
+    const delta = -e.deltaY;
+    const scaleStep = 0.3;
+    const currentScale = scaleValue.get();
+    const newScale = Math.min(Math.max(currentScale + (delta > 0 ? scaleStep : -scaleStep), 1), 5);
+
+    if (newScale === currentScale) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const mouseX = e.clientX - rect.left - centerX;
+    const mouseY = e.clientY - rect.top - centerY;
+    const scaleRatio = newScale / currentScale;
+    
+    const newX = mouseX - (mouseX - xValue.get()) * scaleRatio;
+    const newY = mouseY - (mouseY - yValue.get()) * scaleRatio;
+
+    if (newScale === 1) {
+        animate(scaleValue, 1, { type: "spring", ...softSpringConfig });
+        animate(xValue, 0, { type: "spring", ...softSpringConfig });
+        animate(yValue, 0, { type: "spring", ...softSpringConfig });
+    } else {
+        scaleValue.set(newScale);
+        xValue.set(newX);
+        yValue.set(newY);
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (selectedImage?.type === 'video') return;
+    // Remove default touch actions to prevent scrolling while dragging
+    // e.preventDefault(); // Note: handled by CSS touch-action: none usually, but explicit prevents ghost clicks
+    
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - xValue.get(), y: e.clientY - yValue.get() });
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    
+    const newX = e.clientX - dragStart.x;
+    
+    // If zoomed out (default state), only allow X-axis drag for swipe
+    if (scaleValue.get() <= 1) {
+        xValue.set(newX);
+        // Add rubber-band resistance or lock Y
+        // yValue.set(0); // Optional: ensure Y stays 0
+    } else {
+        // Zoomed in: 2D Pan
+        xValue.set(newX);
+        yValue.set(e.clientY - dragStart.y);
+    }
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
+    
+    // Swipe Logic for default view
+    if (scaleValue.get() <= 1) {
+        const currentX = xValue.get();
+        const threshold = 100; // Swipe threshold
+
+        if (currentX > threshold) {
+            handlePrev();
+        } else if (currentX < -threshold) {
+            handleNext();
+        } else {
+            // Rebound if threshold not met
+            animate(xValue, 0, { type: "spring", ...softSpringConfig });
+        }
+    }
   };
 
   const handleDownload = async (url: string, filename: string) => {
@@ -322,30 +487,35 @@ function GalleryContent() {
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
-          <div className="space-y-2">
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-8">
+          <div className="space-y-2 flex-1 min-w-0">
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground flex items-center min-w-0 delay-100">
               {productIdFilter ? (
-                  <div className="flex items-baseline gap-2">
-                    实物相册
-                    <span className="text-xl font-bold text-muted-foreground/60 ml-2">/ {filteredProduct?.name}</span>
+                  <div className="flex items-baseline gap-2 min-w-0 w-full">
+                    <span className="shrink-0">实物相册</span>
+                    <span 
+                        className="text-xl font-bold text-muted-foreground/60 ml-2 truncate title-font translate-y-[-2px]"
+                        title={filteredProduct?.name}
+                    >
+                        / {filteredProduct?.name}
+                    </span>
                   </div>
               ) : (
                 <>实物<span className="text-primary">相册</span></>
               )}
             </h1>
-            <p className="text-muted-foreground/60 text-sm font-medium">
+            <p className="text-muted-foreground/60 text-sm font-medium truncate">
               {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-             {isUploadAllowed && (
+          <div className="flex flex-wrap gap-3 shrink-0">
+             {(isUploadAllowed || isAdmin) && (
                <button 
                  onClick={() => setIsUploadModalOpen(true)}
                  className="h-10 px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95"
                >
-                 <Plus size={18} /> 上传照片
+                 <Plus size={18} /> 上传实拍
                </button>
              )}
              
@@ -359,7 +529,8 @@ function GalleryContent() {
                     <ArrowLeft size={18} /> 返回全集
                  </button>
              )}
-             <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-auto">
+
+              <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-auto">
                 <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
                     type="text" 
@@ -408,86 +579,133 @@ function GalleryContent() {
         {/* Responsive Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6">
            <AnimatePresence mode="popLayout">
-            {filteredItems.map((item, index) => {
-                const product = item.product;
-                return (
+            {productIdFilter && productIdFilter !== 'undefined' ? (
+                filteredItems.map((item, index) => {
+                    const product = item.product;
+                    return (
+                        <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ duration: 0.4, delay: index * 0.05 }}
+                        >
+                            <div className="group relative rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
+                                 onClick={() => {
+                                     if (selectedIds.length > 0) {
+                                         toggleSelect(item.id);
+                                     } else {
+                                         handleOpenImage(item);
+                                     }
+                                 }}
+                            >
+                                {/* Image Container */}
+                                <div className="relative aspect-4/3 overflow-hidden bg-muted">
+                                    {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
+                                        <div className="relative w-full h-full bg-black flex items-center justify-center">
+                                            <video 
+                                                src={item.url} 
+                                                className="w-full h-full object-cover pointer-events-none"
+                                                muted
+                                                preload="metadata"
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <PlayCircle size={48} className="text-white/80 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <Image 
+                                            src={item.url} 
+                                            alt={item.product?.name || "Product image"} 
+                                            fill 
+                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                            priority={index < 4}
+                                            className="object-cover transition-transform duration-700 group-hover:scale-110" 
+                                        />
+                                    )}
+                                    
+                                    {/* 元数据浮层 - SKU + 快速发图引导 */}
+                                    <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                                        <span className="px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-[10px] font-black text-white border border-white/10 tracking-widest uppercase">
+                                            {product?.sku}
+                                        </span>
+                                        {!item.isPublic && isAdmin && (
+                                            <span className="px-2 py-0.5 bg-yellow-500/90 text-black text-[9px] font-bold rounded-full shadow-sm w-fit">
+                                                内部可见
+                                            </span>
+                                        )}
+                                    </div>
+    
+                                    {/* Selection Checkbox (Hover or Selected) */}
+                                    {isAdmin && (
+                                        <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${
+                                            selectedIds.includes(item.id) || selectedIds.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                        }`}>
+                                            <button 
+                                                onClick={(e) => toggleSelect(item.id, e)}
+                                                className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
+                                                    selectedIds.includes(item.id)
+                                                    ? "bg-foreground border-foreground text-background scale-110" 
+                                                    : "bg-black/40 border-white/40 backdrop-blur hover:border-white"
+                                                }`}
+                                            >
+                                                {selectedIds.includes(item.id) && (
+                                                    <Check size={14} strokeWidth={4} />
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+    
+                                    <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-white font-bold text-base line-clamp-1">{product?.name}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    );
+                })
+            ) : (
+                groupedProducts.map((group, index) => (
                     <motion.div
-                        key={item.id}
+                        key={group.product.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ duration: 0.4, delay: index * 0.05 }}
                     >
-                        <div className="group relative rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
-                             onClick={() => handleOpenImage(item)}
+                        <div 
+                            className="group relative rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
+                            onClick={() => router.push(`/gallery?productId=${group.product.id}`)}
                         >
-                            {/* Image Container */}
                             <div className="relative aspect-4/3 overflow-hidden bg-muted">
-                                {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
-                                    <div className="relative w-full h-full bg-black flex items-center justify-center">
-                                        <video 
-                                            src={item.url} 
-                                            className="w-full h-full object-cover pointer-events-none"
-                                            muted
-                                            preload="metadata"
-                                        />
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <PlayCircle size={48} className="text-white/80 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <Image 
-                                        src={item.url} 
-                                        alt={item.product?.name || "Product image"} 
-                                        fill 
-                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                        priority={index < 4}
-                                        className="object-cover transition-transform duration-700 group-hover:scale-110" 
-                                    />
-                                )}
+                                <Image 
+                                    src={group.items[0].url} 
+                                    alt={group.product.name} 
+                                    fill 
+                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                    className="object-cover transition-transform duration-700 group-hover:scale-110" 
+                                />
                                 
-                                {/* 元数据浮层 - SKU + 快速发图引导 */}
-                                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-                                    <span className="px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-[10px] font-black text-white border border-white/10 tracking-widest uppercase">
-                                        {product?.sku}
+                                {/* Image Count Badge */}
+                                <div className="absolute top-4 right-4 z-10">
+                                    <span className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-[10px] font-black text-white border border-white/10 tracking-widest">
+                                        {group.items.length} 张图片
                                     </span>
-                                    {!item.isPublic && isAdmin && (
-                                        <span className="px-2 py-0.5 bg-yellow-500/90 text-black text-[9px] font-bold rounded-full shadow-sm w-fit">
-                                            内部可见
-                                        </span>
-                                    )}
                                 </div>
 
-                                {/* Selection Checkbox (Hover or Selected) */}
-                                {isAdmin && (
-                                    <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${
-                                        selectedIds.includes(item.id) || selectedIds.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                    }`}>
-                                        <button 
-                                            onClick={(e) => toggleSelect(item.id, e)}
-                                            className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
-                                                selectedIds.includes(item.id)
-                                                ? "bg-foreground border-foreground text-background scale-110" 
-                                                : "bg-black/40 border-white/40 backdrop-blur hover:border-white"
-                                            }`}
-                                        >
-                                            {selectedIds.includes(item.id) && (
-                                                <Check size={14} strokeWidth={4} />
-                                            )}
-                                        </button>
-                                    </div>
-                                )}
-
-                                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                                <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
                                     <div className="flex flex-col gap-1">
-                                        <p className="text-white font-bold text-base line-clamp-1">{product?.name}</p>
+                                        <p className="text-white font-bold text-lg line-clamp-1">{group.product.name}</p>
+                                        <p className="text-white/60 text-xs font-mono tracking-wider">{group.product.sku}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </motion.div>
-                );
-            })}
+                ))
+            )}
 
             {filteredItems.length === 0 && productIdFilter && (
                 <div className="col-span-full py-24 text-center glass border-dashed border-2 border-border/50 rounded-3xl">
@@ -531,7 +749,7 @@ function GalleryContent() {
                             className="relative z-10 w-full max-w-lg rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col"
                         >
                             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-                                <h2 className="text-xl font-bold text-foreground">上传实拍照片</h2>
+                                <h2 className="text-xl font-bold text-foreground">上传实拍内容</h2>
                                 <button onClick={() => setIsUploadModalOpen(false)} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                                     <X size={20} />
                                 </button>
@@ -541,7 +759,7 @@ function GalleryContent() {
                                 {/* Upload Box */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                        <Camera size={16} className="text-black dark:text-white" /> 选择照片 ({uploadForm.urls.length})
+                                        <Camera size={16} className="text-black dark:text-white" /> 选择文件 ({uploadForm.urls.length})
                                     </label>
                                     {uploadForm.urls.length > 0 && (
                                         <button 
@@ -566,7 +784,7 @@ function GalleryContent() {
                                                 ) : (
                                                     <Image 
                                                       src={file.url} 
-                                                      alt={`preview ${idx}`} 
+                                                      alt="Upload preview"
                                                       fill 
                                                       sizes="(max-width: 640px) 33vw, 150px"
                                                       className="object-cover" 
@@ -597,7 +815,7 @@ function GalleryContent() {
                                             </span>
                                         </label>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-2">支持多选，每次最多上传 9 张。</p>
+                                    <p className="text-xs text-muted-foreground mt-2">支持多选，每次最多上传 9 个文件。</p>
                                 </div>
 
                                 {/* Product Select */}
@@ -693,140 +911,298 @@ function GalleryContent() {
         {mounted && createPortal(
             <AnimatePresence>
                 {selectedImage && (
-                    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className="fixed inset-0 bg-black/95"
-                            onClick={() => setSelectedImage(null)}
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        className="fixed inset-0 z-9999 bg-black overflow-hidden touch-none pointer-events-auto flex flex-col"
+                        onWheel={handleWheel}
+                        onPointerUp={handlePointerUp}
+                        onPointerLeave={handlePointerUp}
+                    >
+                        {/* Layer 0: Ambient Background */}
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={`blur-${selectedImage.id}`}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 0.3 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.8 }}
+                                className="absolute inset-0 -z-20 pointer-events-none"
+                            >
+                                <Image 
+                                    src={selectedImage.url} 
+                                    alt="" 
+                                    fill
+                                    className="object-cover blur-[120px] scale-125"
+                                />
+                                <div className="absolute inset-0 bg-black/40" />
+                            </motion.div>
+                        </AnimatePresence>
+
+                        {/* Background Overlay - Click to Close */}
+                        <div 
+                            className="absolute inset-0 -z-10" 
+                            onClick={() => setSelectedImage(null)} 
                         />
-                        
-                        <div className="relative w-full max-w-[90vw] h-[85vh] flex items-center justify-center pointer-events-none">
-                            <div className="relative w-full h-full flex items-center justify-center pointer-events-auto">
-                                {/* Close Button */}
-                                <button 
-                                    onClick={() => setSelectedImage(null)}
-                                    className="fixed top-8 right-8 z-50 rounded-full p-3 bg-white/10 text-white hover:bg-primary hover:text-white transition-all border border-white/10 group/close backdrop-blur-md"
-                                >
-                                    <X size={28} className="group-hover/close:rotate-90 transition-transform duration-300" />
-                                </button>
 
-                                {/* Navigation Buttons */}
-                                {relatedImages.length > 1 && (
-                                    <>
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handlePrev(); }}
-                                            disabled={currentIndex === 0}
-                                            className={cn(
-                                                "fixed left-8 top-1/2 -translate-y-1/2 z-50 rounded-full p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 disabled:opacity-10 disabled:cursor-not-allowed group/btn backdrop-blur-md",
-                                                currentIndex === 0 ? "hidden" : "block"
-                                            )}
-                                        >
-                                            <ChevronRight size={40} className="rotate-180 group-hover/btn:-translate-x-1 transition-transform" />
-                                        </button>
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleNext(); }}
-                                            disabled={currentIndex === relatedImages.length - 1}
-                                            className={cn(
-                                                "fixed right-8 top-1/2 -translate-y-1/2 z-50 rounded-full p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 disabled:opacity-10 disabled:cursor-not-allowed group/btn backdrop-blur-md",
-                                                currentIndex === relatedImages.length - 1 ? "hidden" : "block"
-                                            )}
-                                        >
-                                            <ChevronRight size={40} className="group-hover/btn:translate-x-1 transition-transform" />
-                                        </button>
-                                    </>
-                                )}
-                                
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="relative w-full h-full flex items-center justify-center"
-                                >
-                                    {selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url) ? (
-                                        <video 
-                                            src={selectedImage.url} 
-                                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                                            controls
-                                            autoPlay
-                                        />
-                                    ) : (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img 
-                                            src={selectedImage.url} 
-                                            alt="Gallery View" 
-                                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                                        />
+                        {/* Top Bar Overlay (Minimalist Float) */}
+                        <motion.div 
+                            style={{ 
+                                opacity: uiOpacity, 
+                                y: uiYOffset,
+                                pointerEvents: isZoomed ? 'none' : 'auto'
+                            }}
+                            className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55 pointer-events-none"
+                        >
+                            <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 pointer-events-auto">
+                                <button
+                                    onClick={() => setShowInfo(!showInfo)}
+                                    className={cn(
+                                        "h-11 w-11 flex items-center justify-center rounded-xl transition-all border backdrop-blur-2xl shadow-xl group",
+                                        showInfo 
+                                            ? "bg-white text-black border-white" 
+                                            : "bg-black/60 text-white border-white/10 hover:bg-white hover:text-black"
                                     )}
-                                </motion.div>
-
-                                {/* Info Overlay */}
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 20 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/70 dark:bg-black/80 border border-white/10 px-5 py-4 rounded-[24px] flex flex-col md:flex-row items-center gap-4 md:gap-8 w-[90vw] md:w-auto md:min-w-fit shadow-2xl backdrop-blur-2xl"
+                                    title="显示商品详情"
                                 >
-                                    <div className="flex flex-row md:flex-row gap-4 md:gap-8 w-full md:w-auto justify-between md:justify-start">
-                                        <div className="flex flex-col shrink-0">
-                                            <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品名称</span>
-                                            <span className="text-white font-bold text-sm md:text-base whitespace-nowrap tracking-tight max-w-[120px] md:max-w-none truncate">{selectedImage.product?.name}</span>
-                                        </div>
-                                        {/* Mobile Separator hidden */}
-                                        <div className="h-8 w-px bg-white/10 shrink-0 hidden md:block" />
-                                        <div className="flex flex-col shrink-0 items-end md:items-start">
-                                            <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">商品编码</span>
-                                            <span className="text-white font-mono text-sm md:text-base bg-white/15 px-2 py-0.5 rounded-lg border border-white/10 whitespace-nowrap">{selectedImage.product?.sku}</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="hidden md:block h-8 w-px bg-white/10 shrink-0" />
-                                    
-                                    <div className="flex flex-row justify-between w-full md:w-auto gap-4 md:gap-8 items-center">
-                                        {isAdmin && selectedImage.product?.stock !== undefined && (
-                                            <div className="flex flex-col shrink-0">
-                                                <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">当前库存</span>
-                                                <span className="text-white font-bold text-sm md:text-base whitespace-nowrap">
-                                                    {selectedImage.product?.stock} <span className="text-[10px] font-normal opacity-50 text-white/60">件</span>
+                                    {showInfo ? <X size={22} /> : <Info size={22} className="group-hover:scale-110 transition-transform" />}
+                                </button>
+                            </div>
+
+                            {/* Info Card Popover */}
+                            <AnimatePresence>
+                                {showInfo && (
+                                    <>
+                                        {/* Click Outside Backdrop */}
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="fixed inset-0 z-40 bg-transparent pointer-events-auto"
+                                            onClick={() => setShowInfo(false)}
+                                        />
+                                        
+                                        {/* Card */}
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="absolute top-16 md:top-20 left-4 md:left-6 z-50 bg-black/80 backdrop-blur-xl px-4 py-3 md:px-5 md:py-4 rounded-xl border border-white/10 shadow-2xl flex flex-col gap-2 max-w-[80vw] md:max-w-md pointer-events-auto"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">商品信息</span>
+                                            <h3 className="text-white font-bold text-base md:text-lg leading-snug">
+                                                {selectedImage.product?.name}
+                                            </h3>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-white/60 font-mono text-[10px] md:text-xs bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
+                                                    {selectedImage.product?.sku}
                                                 </span>
                                             </div>
-                                        )}
+                                        </div>
                                         
-                                        {relatedImages.length > 1 && (
+                                        {isAdmin && selectedImage.product?.stock !== undefined && (
                                             <>
-                                                <div className="h-8 w-px bg-white/10 shrink-0 hidden md:block" />
-                                                <div className="flex flex-col items-center shrink-0">
-                                                    <span className="text-[9px] text-white/40 uppercase tracking-[0.15em] font-black mb-0.5 whitespace-nowrap">图集浏览</span>
-                                                    <span className="text-white font-black text-sm md:text-base bg-primary/40 px-3 py-0.5 rounded-full border border-primary/20 whitespace-nowrap">
-                                                        {currentIndex + 1} <span className="text-white/30 mx-0.5">/</span> {relatedImages.length}
+                                                <div className="h-px w-full bg-white/10 my-1" />
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">当前库存</span>
+                                                    <span className="text-white font-bold text-sm">
+                                                        {selectedImage.product?.stock} <span className="text-[10px] opacity-40">件</span>
                                                     </span>
                                                 </div>
                                             </>
                                         )}
-                                        
-                                        <div className="h-8 w-px bg-white/10 shrink-0 hidden md:block" />
-                                        
-                                        <button 
-                                            onClick={() => {
-                                                const product = selectedImage.product;
-                                                const timestamp = new Date().getTime();
-                                                const fileName = `${product?.sku || 'IMG'}_${timestamp}.jpg`;
-                                                handleDownload(selectedImage.url, fileName);
-                                            }}
-                                            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white text-black hover:bg-primary hover:text-white px-4 py-2 md:px-5 md:py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95 group/dl whitespace-nowrap shrink-0 text-sm md:text-base"
-                                        >
-                                            <Download size={16} className="group-hover:animate-bounce" />
-                                            <span>下载</span>
-                                        </button>
-                                    </div>
-                                </motion.div>
+                                    </motion.div>
+                                    </>
+                                )}
+                            </AnimatePresence>
+
+                            <div className="flex items-center gap-2 md:gap-3 pointer-events-auto">
+                                <button 
+                                    onClick={() => {
+                                        const product = selectedImage.product;
+                                        const timestamp = new Date().getTime();
+                                        const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
+                                        const ext = isVideo ? 'mp4' : 'jpg';
+                                        const fileName = `${product?.sku || 'MEDIA'}_${timestamp}.${ext}`;
+                                        handleDownload(selectedImage.url, fileName);
+                                    }}
+                                    className="flex h-11 w-11 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
+                                    title="下载原始文件"
+                                >
+                                    <Download size={20} className="group-hover:translate-y-0.5 transition-transform" />
+                                </button>
+                                <button 
+                                    onClick={() => setSelectedImage(null)}
+                                    className="h-11 w-11 rounded-xl flex items-center justify-center bg-black/60 text-white hover:bg-destructive hover:text-white transition-all border border-white/20 backdrop-blur-2xl group shadow-xl"
+                                >
+                                    <X size={22} className="group-hover:rotate-90 transition-transform duration-300" />
+                                </button>
                             </div>
+                        </motion.div>
+
+                        {/* Main Interaction Area (Full Screen) */}
+                        <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
+                            
+                            {/* Side Navigation Buttons */}
+                            {relatedImages.length > 1 && (
+                                <motion.div
+                                    style={{ 
+                                        opacity: uiOpacity,
+                                        pointerEvents: isZoomed ? 'none' : 'auto'
+                                    }}
+                                    className="contents"
+                                >
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handlePrev(); }}
+                                        className="hidden md:flex absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden"
+                                    >
+                                        <ChevronRight size={32} className="rotate-180 group-hover/btn:-translate-x-1 transition-transform" />
+                                    </button>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handleNext(); }}
+                                        className="hidden md:flex absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden"
+                                    >
+                                        <ChevronRight size={32} className="group-hover/btn:translate-x-1 transition-transform" />
+                                    </button>
+                                </motion.div>
+                            )}
+
+                            {/* Media Content Switcher */}
+                            <AnimatePresence initial={false} custom={previewDirection} mode="popLayout">
+                                <motion.div
+                                    key={selectedImage.id}
+                                    custom={previewDirection}
+                                    variants={{
+                                        enter: (dir: number) => ({
+                                            x: dir === 0 ? 0 : (dir > 0 ? 300 : -300),
+                                            opacity: 0,
+                                            scale: 0.95
+                                        }),
+                                        center: { x: 0, opacity: 1, scale: 1 },
+                                        exit: (dir: number) => ({
+                                            x: dir === 0 ? 0 : (dir < 0 ? 300 : -300),
+                                            opacity: 0,
+                                            scale: 0.95
+                                        })
+                                    }}
+                                    initial="enter"
+                                    animate="center"
+                                    exit="exit"
+                                    transition={{ 
+                                        x: { type: "spring", stiffness: 500, damping: 35 },
+                                        opacity: { duration: 0.15 },
+                                        scale: { duration: 0.15 }
+                                    }}
+                                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                                >
+                                    <motion.div 
+                                        className={cn(
+                                            "relative drop-shadow-2xl pointer-events-auto flex items-center justify-center",
+                                            isZoomed && !(selectedImage.type === 'video') ? "cursor-grab active:cursor-grabbing" : ""
+                                        )}
+                                        style={{
+                                            x: smoothX,
+                                            y: smoothY,
+                                            scale: smoothScale,
+                                            width: '100vw',
+                                            height: '100vh',
+                                            willChange: "transform"
+                                        }}
+                                        onPointerDown={handlePointerDown}
+                                        onPointerMove={handlePointerMove}
+                                    >
+                                        {selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url) ? (
+                                            <video 
+                                                src={selectedImage.url} 
+                                                className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
+                                                controls
+                                                autoPlay
+                                            />
+                                        ) : (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img 
+                                                src={selectedImage.url} 
+                                                alt="Gallery View" 
+                                                className="max-w-[90%] max-h-[75%] object-contain rounded-2xl shadow-2xl mx-auto border border-white/5"
+                                                draggable={false}
+                                            />
+                                        )}
+                                    </motion.div>
+                                </motion.div>
+                            </AnimatePresence>
                         </div>
-                    </div>
+
+                        {/* Bottom Bar Overlay (Minimalist Float) */}
+                        <div className="absolute bottom-4 left-0 right-0 flex justify-center z-55 pointer-events-none px-4">
+                            <motion.div 
+                                style={{ 
+                                    opacity: uiOpacity, 
+                                    y: bottomUiYOffset,
+                                    pointerEvents: isZoomed ? 'none' : 'auto'
+                                }}
+                                className="bg-black/40 hover:bg-black/80 transition-colors backdrop-blur-xl px-4 py-3 rounded-2xl border border-white/10 shadow-2xl flex flex-col gap-2 pointer-events-auto items-center max-w-[95vw]"
+                            >
+                                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-full">
+                                {relatedImages.map((img, idx) => {
+                                    const isSelected = img.id === selectedImage.id;
+                                    return (
+                                        <div key={img.id} className="flex flex-col items-center gap-2 shrink-0">
+                                            <motion.div 
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                onClick={() => {
+                                                    if (!isSelected) {
+                                                        setPreviewDirection(idx > currentIndex ? 1 : -1);
+                                                        setSelectedImage(img);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "relative h-12 w-12 md:h-14 md:w-14 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 border shrink-0 group",
+                                                    isSelected 
+                                                    ? "border-primary scale-110 shadow-[0_0_20px_rgba(var(--primary-rgb),0.4)] z-10 brightness-100 ring-2 ring-primary/30" 
+                                                    : "border-white/10 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100 hover:border-white/20"
+                                                )}
+                                            >
+                                                {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
+                                                    <div className="w-full h-full bg-black flex items-center justify-center">
+                                                        <video src={img.url} className="w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-black/10 transition-colors" />
+                                                        <PlayCircle size={20} className="absolute text-white/80" />
+                                                    </div>
+                                                ) : (
+                                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                                    <img src={img.url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                                )}
+                                            </motion.div>
+                                            
+                                            {/* Selection Indicator Strip */}
+                                            <div className="h-1 w-8 relative">
+                                                {isSelected && (
+                                                    <motion.div 
+                                                        layoutId="thumbnail-indicator"
+                                                        initial={false}
+                                                        transition={{ 
+                                                            type: "spring", 
+                                                            stiffness: 500, 
+                                                            damping: 30 
+                                                        }}
+                                                        className="absolute inset-0 bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary-rgb),0.8)]"
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                </div>
+                            </motion.div>
+                        </div>
+                    </motion.div>
                 )}
             </AnimatePresence>,
             document.body
@@ -855,7 +1231,7 @@ function GalleryContent() {
                 }
             }}
             onClear={() => setSelectedIds([])}
-            label="张图片"
+            label="个项目"
             onDelete={handleBatchDelete}
         />
       </>

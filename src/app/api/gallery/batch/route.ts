@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { getStorageStrategy } from "@/lib/storage";
 
 export async function DELETE(request: Request) {
   try {
@@ -13,6 +14,26 @@ export async function DELETE(request: Request) {
 
     if (!ids || !Array.isArray(ids)) {
       return NextResponse.json({ error: "Invalid item IDs" }, { status: 400 });
+    }
+
+    // 获取所有待删除项的 URL
+    const items = await prisma.galleryItem.findMany({
+      where: {
+        id: { in: ids }
+      },
+      select: { url: true }
+    });
+
+    // 执行物理清理
+    if (items.length > 0) {
+      try {
+        const storage = await getStorageStrategy();
+        await Promise.allSettled(
+          items.map(item => storage.delete(item.url))
+        );
+      } catch (storageError) {
+        console.error("Batch physical deletion failed:", storageError);
+      }
     }
 
     await prisma.galleryItem.deleteMany({
