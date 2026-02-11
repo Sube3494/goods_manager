@@ -9,11 +9,12 @@ import * as XLSX from "xlsx";
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (data: Record<string, unknown>[]) => void;
+  onImport: (data: Record<string, unknown>[] | Record<string, unknown[]>) => void;
   title?: string;
   description?: string;
   templateData?: Record<string, unknown>[];
   templateFileName?: string;
+  multiSheet?: boolean;
 }
 
 export function ImportModal({ 
@@ -23,7 +24,8 @@ export function ImportModal({
   title = "导入数据",
   description = "点击上传或拖拽 Excel 文件",
   templateData,
-  templateFileName = "导入模版.xlsx"
+  templateFileName = "导入模版.xlsx",
+  multiSheet = false
 }: ImportModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -72,7 +74,7 @@ export function ImportModal({
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-        setPreviewData(json.slice(0, 5)); // Preview first 5 rows
+        setPreviewData(json.slice(0, 5)); // Preview first sheet items
       } catch (err) {
         console.error(err);
         setError("文件解析失败");
@@ -96,9 +98,19 @@ export function ImportModal({
         reader.onload = (e) => {
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: "binary" });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
-            onImport(json);
+            
+            if (multiSheet) {
+                const result: Record<string, unknown[]> = {};
+                workbook.SheetNames.forEach(name => {
+                    const sheet = workbook.Sheets[name];
+                    result[name] = XLSX.utils.sheet_to_json(sheet);
+                });
+                onImport(result);
+            } else {
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+                onImport(json);
+            }
             onClose();
         };
         reader.readAsBinaryString(file);
@@ -122,24 +134,24 @@ export function ImportModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl p-0 shadow-2xl border border-border/50 flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl p-0 shadow-2xl border border-border/50 flex flex-col max-h-[90vh]"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-              <h2 className="text-2xl font-bold text-foreground">{title}</h2>
+            <div className="flex items-center justify-between border-b border-border/50 p-6 md:p-8 shrink-0">
+              <h2 className="text-xl md:text-2xl font-black text-foreground">{title}</h2>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                <X size={24} />
+                <X size={20} className="md:size-6" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 min-h-0">
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 min-h-0">
               {/* Drop Zone */}
               {!previewData.length ? (
                 <div
-                  className={`relative flex h-64 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all duration-300 ${
+                  className={`group relative flex h-72 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed transition-all duration-500 ${
                     dragActive
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50 hover:bg-muted/50"
+                      ? "border-primary bg-primary/5 scale-[0.98]"
+                      : "border-border hover:border-primary/40 hover:bg-muted/30"
                   }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -154,11 +166,15 @@ export function ImportModal({
                     accept=".xlsx,.xls,.csv"
                     onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])}
                   />
-                  <div className="mb-4 rounded-full bg-primary/10 p-4 text-primary">
-                    <Upload size={32} />
+                  <div className="mb-6 relative">
+                    <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150 group-hover:bg-primary/30 transition-colors" />
+                    <div className="relative rounded-2xl bg-white dark:bg-white/10 p-5 text-primary shadow-xl shadow-primary/10 transition-transform group-hover:-translate-y-2 duration-500">
+                        <Upload size={32} />
+                    </div>
                   </div>
-                  <p className="text-lg font-medium">{description}</p>
+                  <p className="text-lg font-bold text-foreground">{description}</p>
                   <p className="mt-2 text-sm text-muted-foreground">支持 .xlsx, .xls, .csv 格式</p>
+                  
                   {templateData && (
                     <button
                       type="button"
@@ -166,52 +182,52 @@ export function ImportModal({
                         e.stopPropagation();
                         handleDownloadTemplate();
                       }}
-                      className="mt-6 text-sm text-primary font-bold hover:underline flex items-center gap-1.5"
+                      className="mt-8 flex items-center gap-2 px-6 h-10 rounded-full bg-white dark:bg-white/5 border border-border hover:bg-muted font-bold text-sm transition-all hover:-translate-y-0.5"
                     >
-                      <FileSpreadsheet size={16} />
-                      下载模版文件
+                      <FileSpreadsheet size={16} className="text-green-500" />
+                      下载模板文件
                     </button>
                   )}
                   {error && (
-                    <div className="mt-4 flex items-center text-destructive">
+                    <div className="mt-6 flex items-center px-4 py-2 rounded-lg bg-destructive/10 text-destructive text-sm font-medium">
                       <AlertCircle size={16} className="mr-2" />
-                      <span className="text-sm">{error}</span>
+                      {error}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-4">
-                    <div className="rounded-lg bg-green-500/10 p-2 text-green-500">
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4 rounded-3xl border border-primary/20 bg-primary/5 p-5 animate-in slide-in-from-top-2">
+                    <div className="rounded-2xl bg-green-500/10 p-3 text-green-500 shadow-sm">
                       <FileSpreadsheet size={24} />
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{file?.name}</p>
-                      <p className="text-xs text-muted-foreground">解析完成，准备导入</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-foreground truncate">{file?.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">文件解析完成，准备导入系统</p>
                     </div>
                     <button 
                         onClick={() => { setFile(null); setPreviewData([]); }}
-                        className="ml-auto text-sm text-destructive hover:underline"
+                        className="h-9 px-4 rounded-full text-xs font-bold text-destructive hover:bg-destructive/10 transition-colors shrink-0"
                     >
-                        移除
+                        移除文件
                     </button>
                   </div>
 
-                  <div className="rounded-xl border border-border overflow-hidden">
-                    <div className="bg-muted/50 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        数据预览 (前5条)
+                  <div className="rounded-2xl border border-border overflow-hidden bg-white/5">
+                    <div className="bg-muted/50 px-5 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">
+                        数据预览 (前 5 条)
                     </div>
-                    <div className="max-h-60 overflow-y-auto">
+                    <div className="max-h-64 overflow-y-auto scrollbar-none">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-muted/30 text-muted-foreground sticky top-0">
+                            <thead className="bg-muted/30 text-muted-foreground sticky top-0 backdrop-blur-md">
                                 <tr>
                                     {Object.keys(previewData[0] || {}).map((key) => (
-                                        <th key={key} className="px-4 py-2 font-medium">
+                                        <th key={key} className="px-5 py-3 font-bold whitespace-nowrap">
                                             {key.startsWith("*") ? (
-                                                <>
-                                                    <span className="text-red-500">*</span>
+                                                <span className="flex items-center gap-0.5">
+                                                    <span className="text-red-500 text-xs">*</span>
                                                     {key.slice(1)}
-                                                </>
+                                                </span>
                                             ) : (
                                                 key
                                             )}
@@ -221,9 +237,9 @@ export function ImportModal({
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {previewData.map((row, i) => (
-                                    <tr key={i} className="hover:bg-muted/20">
+                                    <tr key={i} className="hover:bg-muted/20 transition-colors">
                                         {Object.values(row).map((val, j) => (
-                                            <td key={j} className="px-4 py-2 text-foreground/80 truncate max-w-[150px]">{String(val)}</td>
+                                            <td key={j} className="px-5 py-3 text-foreground/70 truncate max-w-[200px]">{String(val || "-")}</td>
                                         ))}
                                     </tr>
                                 ))}
@@ -236,11 +252,11 @@ export function ImportModal({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-3 border-t border-white/10 p-8 shrink-0">
+            <div className="flex justify-end gap-3 border-t border-border/50 p-6 md:p-8 shrink-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all"
+                className="h-11 px-6 rounded-full text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
               >
                 取消
               </button>
@@ -248,7 +264,7 @@ export function ImportModal({
                 type="button"
                 disabled={!file}
                 onClick={handleConfirm}
-                className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/40 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none pointer-events-auto"
+                className="flex items-center gap-2 h-11 px-8 rounded-full bg-primary text-sm font-black text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0"
               >
                 <CheckCircle size={18} />
                 确认导入

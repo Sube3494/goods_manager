@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
-import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle, Info } from "lucide-react";
+import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle, Info, ArrowUp } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -19,6 +19,165 @@ import { useUser } from "@/hooks/useUser";
 import { Product, GalleryItem, Category } from "@/lib/types";
 import { useCallback } from "react";
 import { pinyin } from 'pinyin-pro';
+
+interface LightboxMediaItemProps {
+    item: GalleryItem;
+    direction: number;
+    onNavigate: (dir: number) => void;
+    onScaleChange: (v: number) => void;
+}
+
+const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: LightboxMediaItemProps) => {
+    const scaleValue = useMotionValue(1);
+    const xValue = useMotionValue(0);
+    const yValue = useMotionValue(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [isZoomed, setIsZoomed] = useState(false);
+
+    const softSpringConfig = { stiffness: 300, damping: 30, mass: 0.5 };
+    const hardSpringConfig = { stiffness: 5000, damping: 200, mass: 0.05 };
+
+    const smoothScale = useSpring(scaleValue, softSpringConfig);
+    const smoothX = useSpring(xValue, isDragging ? hardSpringConfig : softSpringConfig);
+    const smoothY = useSpring(yValue, isDragging ? hardSpringConfig : softSpringConfig);
+
+    useEffect(() => {
+        const unsub = scaleValue.on("change", (v) => {
+            onScaleChange(v);
+            if (v > 1.05 && !isZoomed) setIsZoomed(true);
+            if (v <= 1.05 && isZoomed) setIsZoomed(false);
+        });
+        return unsub;
+    }, [isZoomed, scaleValue, onScaleChange]);
+
+    const handleWheel = (e: React.WheelEvent) => {
+        if (item.type === 'video') return;
+        e.preventDefault();
+        const delta = -e.deltaY;
+        const scaleStep = 0.3;
+        const currentScale = scaleValue.get();
+        const newScale = Math.min(Math.max(currentScale + (delta > 0 ? scaleStep : -scaleStep), 1), 5);
+        if (newScale === currentScale) return;
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left - rect.width / 2;
+        const mouseY = e.clientY - rect.top - rect.height / 2;
+        const scaleRatio = newScale / currentScale;
+        
+        const newX = mouseX - (mouseX - xValue.get()) * scaleRatio;
+        const newY = mouseY - (mouseY - yValue.get()) * scaleRatio;
+
+        if (newScale === 1) {
+            animate(scaleValue, 1, { type: "spring", ...softSpringConfig });
+            animate(xValue, 0, { type: "spring", ...softSpringConfig });
+            animate(yValue, 0, { type: "spring", ...softSpringConfig });
+        } else {
+            scaleValue.set(newScale);
+            xValue.set(newX);
+            yValue.set(newY);
+        }
+    };
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (item.type === 'video') return;
+        setIsDragging(true);
+        setDragStart({ x: e.clientX - xValue.get(), y: e.clientY - yValue.get() });
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!isDragging) return;
+        const newX = e.clientX - dragStart.x;
+        if (scaleValue.get() <= 1) {
+            xValue.set(newX);
+        } else {
+            xValue.set(newX);
+            yValue.set(e.clientY - dragStart.y);
+        }
+    };
+
+    const handlePointerUp = () => {
+        if (!isDragging) return;
+        setIsDragging(false);
+        if (scaleValue.get() <= 1) {
+            const currentX = xValue.get();
+            const threshold = 80;
+            if (currentX > threshold) {
+                onNavigate(-1);
+            } else if (currentX < -threshold) {
+                onNavigate(1);
+            } else {
+                animate(xValue, 0, { type: "spring", ...softSpringConfig });
+            }
+        }
+    };
+
+    return (
+        <motion.div
+            custom={direction}
+            variants={{
+                enter: (dir: number) => ({
+                    x: dir === 0 ? 0 : (dir > 0 ? "100%" : "-100%"),
+                    opacity: 1,
+                    scale: 1,
+                    zIndex: 1
+                }),
+                center: { x: 0, opacity: 1, scale: 1, zIndex: 10 },
+                exit: (dir: number) => ({
+                    x: dir === 0 ? 0 : (dir < 0 ? "100%" : "-100%"),
+                    opacity: 1,
+                    scale: 1,
+                    zIndex: 1
+                })
+            }}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ 
+                x: { type: "spring", stiffness: 400, damping: 40, mass: 1 },
+                opacity: { duration: 0.25 }
+            }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        >
+            <motion.div 
+                className={cn(
+                    "relative drop-shadow-2xl pointer-events-auto flex items-center justify-center",
+                    isZoomed && !(item.type === 'video') ? "cursor-grab active:cursor-grabbing" : ""
+                )}
+                style={{
+                    x: smoothX,
+                    y: smoothY,
+                    scale: smoothScale,
+                    width: '100vw',
+                    height: '100vh',
+                    willChange: "transform"
+                }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                onWheel={handleWheel}
+            >
+                {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
+                    <video 
+                        src={item.url} 
+                        className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
+                        controls
+                        autoPlay
+                    />
+                ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img 
+                        src={item.url} 
+                        alt="Gallery View" 
+                        className="max-w-[95%] sm:max-w-[90%] max-h-[85%] sm:max-h-[75%] object-contain rounded-2xl shadow-2xl mx-auto border border-white/5"
+                        draggable={false}
+                    />
+                )}
+            </motion.div>
+        </motion.div>
+    );
+};
 
 function GalleryContent() {
   const { user } = useUser();
@@ -36,47 +195,34 @@ function GalleryContent() {
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  // Scroll listener for Back to Top button
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   const { showToast } = useToast();
   
-  // Lightbox Enhancements (High Performance Architecture)
+  // Lightbox Enhancements
   const [previewDirection, setPreviewDirection] = useState(0);
-  
-  // Motion Values for bypass React rendering
-  const scaleValue = useMotionValue(1);
-  const xValue = useMotionValue(0);
-  const yValue = useMotionValue(0);
+  const activeScale = useMotionValue(1);
+  const uiOpacity = useTransform(activeScale, [1, 1.05], [1, 0]);
+  const uiYOffset = useTransform(activeScale, [1, 1.05], [0, -20]);
+  const bottomUiYOffset = useTransform(activeScale, [1, 1.05], [0, 20]);
 
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isZoomed, setIsZoomed] = useState(false);
-  // State for toggling info card
-  const [showInfo, setShowInfo] = useState(false);
-
-  // Dual-mode physics configs
-  const softSpringConfig = useMemo(() => ({ stiffness: 300, damping: 30, mass: 0.5 }), []);
-  const hardSpringConfig = useMemo(() => ({ stiffness: 5000, damping: 200, mass: 0.05 }), []); // "Instant" feel for dragging
-
-  // Stabilize configs to prevent reset focus loop
-  const smoothScale = useSpring(scaleValue, softSpringConfig);
-  // Switch to hard spring when dragging for 1:1 response, soft for zooming
-  const smoothX = useSpring(xValue, isDragging ? hardSpringConfig : softSpringConfig);
-  const smoothY = useSpring(yValue, isDragging ? hardSpringConfig : softSpringConfig);
-
-  // UI Auto-hide deriving from scale
-  // UI Auto-hide deriving from scale (More sensitive)
-  const uiOpacity = useTransform(scaleValue, [1, 1.05], [1, 0]);
-  const uiYOffset = useTransform(scaleValue, [1, 1.05], [0, -20]);
-  const bottomUiYOffset = useTransform(scaleValue, [1, 1.05], [0, 20]);
-
-
-  // Low-frequency state synchronization for UI logic
   useEffect(() => {
-    const unsub = scaleValue.on("change", (v) => {
+    return activeScale.on("change", (v) => {
         if (v > 1.05 && !isZoomed) setIsZoomed(true);
         if (v <= 1.05 && isZoomed) setIsZoomed(false);
     });
-    return unsub;
-  }, [isZoomed, scaleValue]);
+  }, [isZoomed, activeScale]);
+
+  const [showInfo, setShowInfo] = useState(false);
 
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -364,16 +510,6 @@ function GalleryContent() {
   }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 
-  const resetTransform = useCallback(() => {
-    animate(scaleValue, 1, { type: "spring", ...softSpringConfig }); // Use softSpringConfig for scale reset
-    animate(xValue, 0, { type: "spring", ...softSpringConfig });
-    animate(yValue, 0, { type: "spring", ...softSpringConfig });
-  }, [scaleValue, xValue, yValue, softSpringConfig]);
-
-  useEffect(() => {
-    resetTransform();
-  }, [selectedImage?.id, resetTransform]);
-
   const navigate = (dir: number) => {
     if (!selectedImage) return;
     const nextIndex = (currentIndex + dir + relatedImages.length) % relatedImages.length;
@@ -381,86 +517,7 @@ function GalleryContent() {
     setSelectedImage(relatedImages[nextIndex]);
   };
 
-  const handlePrev = () => navigate(-1);
-  const handleNext = () => navigate(1);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (selectedImage?.type === 'video') return;
-    e.preventDefault();
-    
-    const delta = -e.deltaY;
-    const scaleStep = 0.3;
-    const currentScale = scaleValue.get();
-    const newScale = Math.min(Math.max(currentScale + (delta > 0 ? scaleStep : -scaleStep), 1), 5);
-
-    if (newScale === currentScale) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const mouseX = e.clientX - rect.left - centerX;
-    const mouseY = e.clientY - rect.top - centerY;
-    const scaleRatio = newScale / currentScale;
-    
-    const newX = mouseX - (mouseX - xValue.get()) * scaleRatio;
-    const newY = mouseY - (mouseY - yValue.get()) * scaleRatio;
-
-    if (newScale === 1) {
-        animate(scaleValue, 1, { type: "spring", ...softSpringConfig });
-        animate(xValue, 0, { type: "spring", ...softSpringConfig });
-        animate(yValue, 0, { type: "spring", ...softSpringConfig });
-    } else {
-        scaleValue.set(newScale);
-        xValue.set(newX);
-        yValue.set(newY);
-    }
-  };
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (selectedImage?.type === 'video') return;
-    // Remove default touch actions to prevent scrolling while dragging
-    // e.preventDefault(); // Note: handled by CSS touch-action: none usually, but explicit prevents ghost clicks
-    
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - xValue.get(), y: e.clientY - yValue.get() });
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    
-    const newX = e.clientX - dragStart.x;
-    
-    // If zoomed out (default state), only allow X-axis drag for swipe
-    if (scaleValue.get() <= 1) {
-        xValue.set(newX);
-        // Add rubber-band resistance or lock Y
-        // yValue.set(0); // Optional: ensure Y stays 0
-    } else {
-        // Zoomed in: 2D Pan
-        xValue.set(newX);
-        yValue.set(e.clientY - dragStart.y);
-    }
-  };
-
-  const handlePointerUp = () => {
-    setIsDragging(false);
-    
-    // Swipe Logic for default view
-    if (scaleValue.get() <= 1) {
-        const currentX = xValue.get();
-        const threshold = 100; // Swipe threshold
-
-        if (currentX > threshold) {
-            handlePrev();
-        } else if (currentX < -threshold) {
-            handleNext();
-        } else {
-            // Rebound if threshold not met
-            animate(xValue, 0, { type: "spring", ...softSpringConfig });
-        }
-    }
-  };
+  // Navigation logic
 
   const handleDownload = async (url: string, filename: string) => {
     try {
@@ -487,97 +544,104 @@ function GalleryContent() {
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-8">
-          <div className="space-y-2 flex-1 min-w-0">
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground flex items-center min-w-0 delay-100">
-              {productIdFilter ? (
-                  <div className="flex items-baseline gap-2 min-w-0 w-full">
-                    <span className="shrink-0">实物相册</span>
+        {/* Header - Refactored for Stability */}
+        <div className="flex flex-col gap-6 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground flex items-center gap-2">
+                {productIdFilter ? (
+                  <div className="flex items-start gap-2 min-w-0 max-w-full">
+                    <span className="shrink-0 mt-0.5 sm:mt-1">实物相册</span>
+                    <span className="text-muted-foreground/30 font-light mt-0.5 sm:mt-1">/</span>
                     <span 
-                        className="text-xl font-bold text-muted-foreground/60 ml-2 truncate title-font translate-y-[-2px]"
-                        title={filteredProduct?.name}
+                      className="text-base sm:text-2xl font-bold text-muted-foreground/60 wrap-break-word line-clamp-2 sm:line-clamp-none"
+                      title={filteredProduct?.name}
                     >
-                        / {filteredProduct?.name}
+                      {filteredProduct?.name || "加载中..."}
                     </span>
                   </div>
-              ) : (
-                <>实物<span className="text-primary">相册</span></>
+                ) : (
+                  <>实物<span className="text-primary">相册</span></>
+                )}
+              </h1>
+              {!productIdFilter && (
+                <p className="text-muted-foreground/60 text-xs sm:text-sm font-medium mt-1">
+                  {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
+                </p>
               )}
-            </h1>
-            <p className="text-muted-foreground/60 text-sm font-medium truncate">
-              {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
-            </p>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+               {(isUploadAllowed || isAdmin) && (
+                 <button 
+                   onClick={() => setIsUploadModalOpen(true)}
+                   className="h-10 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
+                 >
+                   <Plus size={18} /> <span className="hidden xs:inline">上传实拍</span><span className="xs:hidden">上传</span>
+                 </button>
+               )}
+               
+               {productIdFilter && (
+                   <button 
+                      onClick={() => router.push("/gallery")}
+                      className="h-10 px-4 sm:px-6 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-foreground flex items-center justify-center gap-2 transition-all font-bold whitespace-nowrap shadow-sm hover:bg-muted"
+                   >
+                      <ArrowLeft size={18} /> <span className="hidden sm:inline">返回全集</span><span className="sm:hidden">返回</span>
+                   </button>
+               )}
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 shrink-0">
-             {(isUploadAllowed || isAdmin) && (
-               <button 
-                 onClick={() => setIsUploadModalOpen(true)}
-                 className="h-10 px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95"
-               >
-                 <Plus size={18} /> 上传实拍
-               </button>
-             )}
-             
-             {/* Remove the "switch view" button, since it's now real auth */ }
-
-             {productIdFilter && (
-                 <button 
-                    onClick={() => router.push("/gallery")}
-                    className="h-10 px-6 rounded-full glass border-border/50 text-muted-foreground hover:text-foreground flex items-center gap-2 transition-all font-bold"
-                 >
-                    <ArrowLeft size={18} /> 返回全集
-                 </button>
-             )}
-
-              <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-auto">
-                <Search size={18} className="text-muted-foreground shrink-0" />
-                <input 
-                    type="text" 
-                    placeholder="按商品名或 SKU 检索..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground w-full sm:w-64 text-sm"
-                />
-             </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
+              <Search size={18} className="text-muted-foreground shrink-0" />
+              <input 
+                  type="text" 
+                  placeholder="搜索商品名或 SKU..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+              />
+            </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 py-4">
-            {/* All Button */}
-            <button
-                onClick={() => setSelectedCategory("All")}
-                className={cn(
-                    "px-6 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border",
-                    selectedCategory === "All" 
-                    ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
-                    : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
-                )}
-            >
-                全部展示
-            </button>
-
-            {categories.map(cat => (
+        <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-2 pb-2">
                 <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.name)}
+                    onClick={() => setSelectedCategory("All")}
                     className={cn(
-                        "px-6 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap border",
-                        selectedCategory === cat.name
+                        "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
+                        selectedCategory === "All" 
                         ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
                         : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
                     )}
                 >
-                    {cat.name}
+                    全部展示
                 </button>
-            ))}
+
+                {categories.map(cat => (
+                    <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategory(cat.name)}
+                        className={cn(
+                            "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
+                            selectedCategory === cat.name
+                            ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
+                            : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
+                        )}
+                    >
+                        {cat.name}
+                    </button>
+                ))}
+            </div>
         </div>
 
 
 
         {/* Responsive Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6">
            <AnimatePresence mode="popLayout">
             {productIdFilter && productIdFilter !== 'undefined' ? (
                 filteredItems.map((item, index) => {
@@ -590,7 +654,7 @@ function GalleryContent() {
                             exit={{ opacity: 0, scale: 0.9 }}
                             transition={{ duration: 0.4, delay: index * 0.05 }}
                         >
-                            <div className="group relative rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
+                            <div className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
                                  onClick={() => {
                                      if (selectedIds.length > 0) {
                                          toggleSelect(item.id);
@@ -600,7 +664,7 @@ function GalleryContent() {
                                  }}
                             >
                                 {/* Image Container */}
-                                <div className="relative aspect-4/3 overflow-hidden bg-muted">
+                                <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
                                     {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
                                         <div className="relative w-full h-full bg-black flex items-center justify-center">
                                             <video 
@@ -618,19 +682,19 @@ function GalleryContent() {
                                             src={item.url} 
                                             alt={item.product?.name || "Product image"} 
                                             fill 
-                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                                             priority={index < 4}
-                                            className="object-cover transition-transform duration-700 group-hover:scale-110" 
+                                            className="object-cover transition-transform duration-700 group-hover:scale-105" 
                                         />
                                     )}
                                     
                                     {/* 元数据浮层 - SKU + 快速发图引导 */}
-                                    <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-                                        <span className="px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-[10px] font-black text-white border border-white/10 tracking-widest uppercase">
+                                    <div className="absolute top-2 left-2 z-10 flex flex-col gap-1.5">
+                                        <span className="px-2 py-0.5 bg-black/70 backdrop-blur-md rounded-md text-[9px] font-black text-white border border-white/10 tracking-widest uppercase">
                                             {product?.sku}
                                         </span>
                                         {!item.isPublic && isAdmin && (
-                                            <span className="px-2 py-0.5 bg-yellow-500/90 text-black text-[9px] font-bold rounded-full shadow-sm w-fit">
+                                            <span className="px-1.5 py-0.5 bg-yellow-500/90 text-black text-[8px] font-bold rounded-md shadow-sm w-fit whitespace-nowrap">
                                                 内部可见
                                             </span>
                                         )}
@@ -656,9 +720,9 @@ function GalleryContent() {
                                         </div>
                                     )}
     
-                                    <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
+                                    <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-3 sm:p-6">
                                         <div className="flex flex-col gap-1">
-                                            <p className="text-white font-bold text-base line-clamp-1">{product?.name}</p>
+                                            <p className="text-white font-bold text-xs sm:text-base line-clamp-1">{product?.name}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -676,29 +740,29 @@ function GalleryContent() {
                         transition={{ duration: 0.4, delay: index * 0.05 }}
                     >
                         <div 
-                            className="group relative rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
+                            className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
                             onClick={() => router.push(`/gallery?productId=${group.product.id}`)}
                         >
-                            <div className="relative aspect-4/3 overflow-hidden bg-muted">
+                            <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
                                 <Image 
                                     src={group.items[0].url} 
                                     alt={group.product.name} 
                                     fill 
-                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                    className="object-cover transition-transform duration-700 group-hover:scale-110" 
+                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                    className="object-cover transition-transform duration-700 group-hover:scale-105" 
                                 />
                                 
                                 {/* Image Count Badge */}
-                                <div className="absolute top-4 right-4 z-10">
-                                    <span className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-[10px] font-black text-white border border-white/10 tracking-widest">
-                                        {group.items.length} 张图片
+                                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
+                                    <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-black/60 backdrop-blur-md rounded-full text-[9px] sm:text-[10px] font-black text-white border border-white/10 tracking-widest">
+                                        {group.items.length} 张
                                     </span>
                                 </div>
 
-                                <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6">
-                                    <div className="flex flex-col gap-1">
-                                        <p className="text-white font-bold text-lg line-clamp-1">{group.product.name}</p>
-                                        <p className="text-white/60 text-xs font-mono tracking-wider">{group.product.sku}</p>
+                                <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-3 sm:p-6">
+                                    <div className="flex flex-col gap-0.5 sm:gap-1">
+                                        <p className="text-white font-bold text-xs sm:text-lg line-clamp-1">{group.product.name}</p>
+                                        <p className="text-white/60 text-[10px] sm:text-xs font-mono tracking-wider">{group.product.sku}</p>
                                     </div>
                                 </div>
                             </div>
@@ -911,231 +975,167 @@ function GalleryContent() {
         {mounted && createPortal(
             <AnimatePresence>
                 {selectedImage && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
-                        className="fixed inset-0 z-9999 bg-black overflow-hidden touch-none pointer-events-auto flex flex-col"
-                        onWheel={handleWheel}
-                        onPointerUp={handlePointerUp}
-                        onPointerLeave={handlePointerUp}
-                    >
-                        {/* Layer 0: Ambient Background */}
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={`blur-${selectedImage.id}`}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 0.3 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.8 }}
-                                className="absolute inset-0 -z-20 pointer-events-none"
-                            >
-                                <Image 
-                                    src={selectedImage.url} 
-                                    alt="" 
-                                    fill
-                                    className="object-cover blur-[120px] scale-125"
-                                />
-                                <div className="absolute inset-0 bg-black/40" />
-                            </motion.div>
-                        </AnimatePresence>
-
-                        {/* Background Overlay - Click to Close */}
-                        <div 
-                            className="absolute inset-0 -z-10" 
-                            onClick={() => setSelectedImage(null)} 
-                        />
-
-                        {/* Top Bar Overlay (Minimalist Float) */}
                         <motion.div 
-                            style={{ 
-                                opacity: uiOpacity, 
-                                y: uiYOffset,
-                                pointerEvents: isZoomed ? 'none' : 'auto'
-                            }}
-                            className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55 pointer-events-none"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            className="fixed inset-0 z-9999 bg-black overflow-hidden touch-none pointer-events-auto flex flex-col"
                         >
-                            <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 pointer-events-auto">
-                                <button
-                                    onClick={() => setShowInfo(!showInfo)}
-                                    className={cn(
-                                        "h-11 w-11 flex items-center justify-center rounded-xl transition-all border backdrop-blur-2xl shadow-xl group",
-                                        showInfo 
-                                            ? "bg-white text-black border-white" 
-                                            : "bg-black/60 text-white border-white/10 hover:bg-white hover:text-black"
-                                    )}
-                                    title="显示商品详情"
+                            {/* Layer 0: Ambient Background */}
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={`blur-${selectedImage.id}`}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 0.3 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.8 }}
+                                    className="absolute inset-0 -z-20 pointer-events-none"
                                 >
-                                    {showInfo ? <X size={22} /> : <Info size={22} className="group-hover:scale-110 transition-transform" />}
-                                </button>
-                            </div>
-
-                            {/* Info Card Popover */}
-                            <AnimatePresence>
-                                {showInfo && (
-                                    <>
-                                        {/* Click Outside Backdrop */}
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            className="fixed inset-0 z-40 bg-transparent pointer-events-auto"
-                                            onClick={() => setShowInfo(false)}
-                                        />
-                                        
-                                        {/* Card */}
-                                        <motion.div
-                                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="absolute top-16 md:top-20 left-4 md:left-6 z-50 bg-black/80 backdrop-blur-xl px-4 py-3 md:px-5 md:py-4 rounded-xl border border-white/10 shadow-2xl flex flex-col gap-2 max-w-[80vw] md:max-w-md pointer-events-auto"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">商品信息</span>
-                                            <h3 className="text-white font-bold text-base md:text-lg leading-snug">
-                                                {selectedImage.product?.name}
-                                            </h3>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-white/60 font-mono text-[10px] md:text-xs bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
-                                                    {selectedImage.product?.sku}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        
-                                        {isAdmin && selectedImage.product?.stock !== undefined && (
-                                            <>
-                                                <div className="h-px w-full bg-white/10 my-1" />
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">当前库存</span>
-                                                    <span className="text-white font-bold text-sm">
-                                                        {selectedImage.product?.stock} <span className="text-[10px] opacity-40">件</span>
-                                                    </span>
-                                                </div>
-                                            </>
-                                        )}
-                                    </motion.div>
-                                    </>
-                                )}
+                                    <Image 
+                                        src={selectedImage.url} 
+                                        alt="" 
+                                        fill
+                                        className="object-cover blur-[120px] scale-125"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40" />
+                                </motion.div>
                             </AnimatePresence>
 
-                            <div className="flex items-center gap-2 md:gap-3 pointer-events-auto">
-                                <button 
-                                    onClick={() => {
-                                        const product = selectedImage.product;
-                                        const timestamp = new Date().getTime();
-                                        const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
-                                        const ext = isVideo ? 'mp4' : 'jpg';
-                                        const fileName = `${product?.sku || 'MEDIA'}_${timestamp}.${ext}`;
-                                        handleDownload(selectedImage.url, fileName);
-                                    }}
-                                    className="flex h-11 w-11 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
-                                    title="下载原始文件"
-                                >
-                                    <Download size={20} className="group-hover:translate-y-0.5 transition-transform" />
-                                </button>
-                                <button 
-                                    onClick={() => setSelectedImage(null)}
-                                    className="h-11 w-11 rounded-xl flex items-center justify-center bg-black/60 text-white hover:bg-destructive hover:text-white transition-all border border-white/20 backdrop-blur-2xl group shadow-xl"
-                                >
-                                    <X size={22} className="group-hover:rotate-90 transition-transform duration-300" />
-                                </button>
-                            </div>
-                        </motion.div>
+                            {/* Background Overlay - Click to Close */}
+                            <div 
+                                className="absolute inset-0 -z-10" 
+                                onClick={() => setSelectedImage(null)} 
+                            />
 
-                        {/* Main Interaction Area (Full Screen) */}
-                        <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
-                            
-                            {/* Side Navigation Buttons */}
-                            {relatedImages.length > 1 && (
-                                <motion.div
-                                    style={{ 
-                                        opacity: uiOpacity,
-                                        pointerEvents: isZoomed ? 'none' : 'auto'
-                                    }}
-                                    className="contents"
-                                >
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); handlePrev(); }}
-                                        className="hidden md:flex absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden"
-                                    >
-                                        <ChevronRight size={32} className="rotate-180 group-hover/btn:-translate-x-1 transition-transform" />
-                                    </button>
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); handleNext(); }}
-                                        className="hidden md:flex absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden"
-                                    >
-                                        <ChevronRight size={32} className="group-hover/btn:translate-x-1 transition-transform" />
-                                    </button>
-                                </motion.div>
-                            )}
-
-                            {/* Media Content Switcher */}
-                            <AnimatePresence initial={false} custom={previewDirection} mode="popLayout">
-                                <motion.div
-                                    key={selectedImage.id}
-                                    custom={previewDirection}
-                                    variants={{
-                                        enter: (dir: number) => ({
-                                            x: dir === 0 ? 0 : (dir > 0 ? 300 : -300),
-                                            opacity: 0,
-                                            scale: 0.95
-                                        }),
-                                        center: { x: 0, opacity: 1, scale: 1 },
-                                        exit: (dir: number) => ({
-                                            x: dir === 0 ? 0 : (dir < 0 ? 300 : -300),
-                                            opacity: 0,
-                                            scale: 0.95
-                                        })
-                                    }}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ 
-                                        x: { type: "spring", stiffness: 500, damping: 35 },
-                                        opacity: { duration: 0.15 },
-                                        scale: { duration: 0.15 }
-                                    }}
-                                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                                >
-                                    <motion.div 
+                            {/* Top Bar Overlay */}
+                            <motion.div 
+                                style={{ 
+                                    opacity: uiOpacity, 
+                                    y: uiYOffset,
+                                    pointerEvents: isZoomed ? 'none' : 'auto'
+                                }}
+                                className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55 pointer-events-none"
+                            >
+                                <div className="flex items-center gap-2 pointer-events-auto">
+                                    <button
+                                        onClick={() => setShowInfo(!showInfo)}
                                         className={cn(
-                                            "relative drop-shadow-2xl pointer-events-auto flex items-center justify-center",
-                                            isZoomed && !(selectedImage.type === 'video') ? "cursor-grab active:cursor-grabbing" : ""
+                                            "h-10 w-10 flex items-center justify-center rounded-xl transition-all border backdrop-blur-2xl shadow-xl group",
+                                            showInfo 
+                                                ? "bg-white text-black border-white" 
+                                                : "bg-black/60 text-white border-white/10 hover:bg-white hover:text-black"
                                         )}
-                                        style={{
-                                            x: smoothX,
-                                            y: smoothY,
-                                            scale: smoothScale,
-                                            width: '100vw',
-                                            height: '100vh',
-                                            willChange: "transform"
-                                        }}
-                                        onPointerDown={handlePointerDown}
-                                        onPointerMove={handlePointerMove}
+                                        title="显示商品详情"
                                     >
-                                        {selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url) ? (
-                                            <video 
-                                                src={selectedImage.url} 
-                                                className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
-                                                controls
-                                                autoPlay
+                                        {showInfo ? <X size={20} /> : <Info size={20} className="group-hover:scale-110 transition-transform" />}
+                                    </button>
+                                </div>
+
+                                <AnimatePresence>
+                                    {showInfo && (
+                                        <>
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                className="fixed inset-0 z-40 bg-transparent pointer-events-auto"
+                                                onClick={() => setShowInfo(false)}
                                             />
-                                        ) : (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img 
-                                                src={selectedImage.url} 
-                                                alt="Gallery View" 
-                                                className="max-w-[90%] max-h-[75%] object-contain rounded-2xl shadow-2xl mx-auto border border-white/5"
-                                                draggable={false}
-                                            />
-                                        )}
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="absolute top-16 left-4 right-4 md:left-6 md:right-auto z-50 bg-black/80 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/10 shadow-2xl flex flex-col gap-2 max-w-full md:max-w-md pointer-events-auto"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">商品信息</span>
+                                                    <h3 className="text-white font-bold text-sm md:text-lg leading-snug">
+                                                        {selectedImage.product?.name}
+                                                    </h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-white/60 font-mono text-[10px] md:text-xs bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
+                                                            {selectedImage.product?.sku}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {isAdmin && selectedImage.product?.stock !== undefined && (
+                                                    <>
+                                                        <div className="h-px w-full bg-white/10 my-1" />
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">当前库存</span>
+                                                            <span className="text-white font-bold text-sm">
+                                                                {selectedImage.product?.stock} <span className="text-[10px] opacity-40">件</span>
+                                                            </span>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </motion.div>
+                                        </>
+                                    )}
+                                </AnimatePresence>
+
+                                <div className="flex items-center gap-2 pointer-events-auto">
+                                    <button 
+                                        onClick={() => {
+                                            const product = selectedImage.product;
+                                            const timestamp = new Date().getTime();
+                                            const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
+                                            const ext = isVideo ? 'mp4' : 'jpg';
+                                            const fileName = `${product?.sku || 'MEDIA'}_${timestamp}.${ext}`;
+                                            handleDownload(selectedImage.url, fileName);
+                                        }}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
+                                        title="下载原始文件"
+                                    >
+                                        <Download size={18} className="group-hover:translate-y-0.5 transition-transform" />
+                                    </button>
+                                    <button 
+                                        onClick={() => setSelectedImage(null)}
+                                        className="h-10 w-10 rounded-xl flex items-center justify-center bg-black/60 text-white hover:bg-destructive hover:text-white transition-all border border-white/20 backdrop-blur-2xl group shadow-xl"
+                                    >
+                                        <X size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+                                    </button>
+                                </div>
+                            </motion.div>
+
+                            {/* Main Interaction Area */}
+                            <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
+                                {relatedImages.length > 1 && (
+                                    <motion.div
+                                        style={{ 
+                                            opacity: uiOpacity,
+                                            pointerEvents: isZoomed ? 'none' : 'auto'
+                                        }}
+                                        className="contents"
+                                    >
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); navigate(-1); }}
+                                            className="hidden md:flex absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden"
+                                        >
+                                            <ChevronRight size={32} className="rotate-180 group-hover/btn:-translate-x-1 transition-transform" />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); navigate(1); }}
+                                            className="hidden md:flex absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden"
+                                        >
+                                            <ChevronRight size={32} className="group-hover/btn:translate-x-1 transition-transform" />
+                                        </button>
                                     </motion.div>
-                                </motion.div>
-                            </AnimatePresence>
-                        </div>
+                                )}
+
+                                <AnimatePresence initial={false} custom={previewDirection} mode="popLayout">
+                                    <LightboxMediaItem 
+                                        key={selectedImage.id}
+                                        item={selectedImage}
+                                        direction={previewDirection}
+                                        onNavigate={navigate}
+                                        onScaleChange={(v) => activeScale.set(v)}
+                                    />
+                                </AnimatePresence>
+                            </div>
 
                         {/* Bottom Bar Overlay (Minimalist Float) */}
                         <div className="absolute bottom-4 left-0 right-0 flex justify-center z-55 pointer-events-none px-4">
@@ -1236,6 +1236,22 @@ function GalleryContent() {
         />
       </>
     )}
+
+    {/* Back to Top Button */}
+    <AnimatePresence>
+      {showBackToTop && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.5, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.5, y: 20 }}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 sm:bottom-10 sm:right-10 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-2xl shadow-primary/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+          title="返回顶部"
+        >
+          <ArrowUp size={24} strokeWidth={3} />
+        </motion.button>
+      )}
+    </AnimatePresence>
       </div>
   );
 }

@@ -92,28 +92,25 @@ export default function OutboundPage() {
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-7xl animate-in fade-in duration-500">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-10">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-black tracking-tight text-foreground">出库管理</h1>
-          </div>
-          <p className="text-muted-foreground font-medium px-1">处理销售、样本或损耗，精准抵扣账面余值。</p>
+          <h1 className="text-2xl md:text-4xl font-black tracking-tight text-foreground">出库管理</h1>
+          <p className="hidden md:block text-muted-foreground font-medium px-1 mt-2">处理销售、样本或损耗，精准抵扣账面余值。</p>
         </div>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="group relative h-12 md:h-11 flex items-center justify-center gap-2 px-8 bg-primary text-primary-foreground rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-xl shadow-primary/20 overflow-hidden"
+          className="group relative h-10 md:h-11 flex items-center justify-center gap-2 px-5 md:px-8 bg-primary text-primary-foreground rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 overflow-hidden shrink-0"
         >
           <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-          <Plus size={20} className="relative" />
-          <span className="relative">新增出库申请</span>
+          <Plus size={18} className="relative md:size-[20px]" />
+          <span className="relative text-sm md:text-base">新增出库</span>
         </button>
       </div>
 
       {/* Filter & Search Bar */}
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-8">
-        <div className="flex-1 h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+      <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
+        <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:w-96 shrink-0">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -124,8 +121,8 @@ export default function OutboundPage() {
           />
         </div>
         
-        <div className="flex gap-3 h-12">
-            <div className="w-36 sm:w-40 h-full">
+        <div className="flex gap-2 sm:gap-3 h-10 w-full">
+            <div className="flex-1 lg:w-40 h-full">
                 <CustomSelect
                     value={dateFilter}
                     onChange={setDateFilter}
@@ -136,10 +133,10 @@ export default function OutboundPage() {
                         { value: "month", label: "最近30天" }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 font-medium"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm font-medium"
                 />
             </div>
-            <div className="w-36 sm:w-40 h-full">
+            <div className="flex-1 lg:w-40 h-full">
                 <CustomSelect
                     value={typeFilter}
                     onChange={setTypeFilter}
@@ -151,7 +148,7 @@ export default function OutboundPage() {
                         { value: "Return", label: "退货出库" }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 font-medium"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm font-medium"
                 />
             </div>
         </div>

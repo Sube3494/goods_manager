@@ -29,7 +29,7 @@ export async function DELETE(request: Request) {
       try {
         const storage = await getStorageStrategy();
         await Promise.allSettled(
-          items.map(item => storage.delete(item.url))
+          items.map((item: { url: string }) => storage.delete(item.url))
         );
       } catch (storageError) {
         console.error("Batch physical deletion failed:", storageError);

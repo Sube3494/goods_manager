@@ -251,7 +251,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-2rem)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">
@@ -750,91 +750,61 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                         </div>
 
                         {!readOnly && (
-                            <div className="flex items-center gap-2">
-                            {/* Actions for Draft state */}
-                            {!readOnly && formData.status === "Draft" && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleAction("Draft")}
-                                        disabled={formData.items.length === 0}
-                                        className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-secondary px-4 sm:px-5 py-3 sm:py-2.5 text-xs sm:text-sm font-bold text-foreground border border-border/50 transition-all hover:bg-secondary/80 active:scale-[0.98] disabled:opacity-50"
-                                    >
-                                        暂存草稿
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={formData.items.length === 0}
-                                        className="flex-2 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 sm:px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap"
-                                    >
-                                        <CheckCircle size={18} />
-                                        <span>确认下单</span>
-                                    </button>
-                                </>
-                            )}
+                            <div className="flex flex-1 sm:flex-initial items-center gap-2 sm:gap-3">
+                                {/* Actions for Draft state */}
+                                {formData.status === "Draft" && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAction("Draft")}
+                                            disabled={formData.items.length === 0}
+                                            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-secondary px-4 sm:px-5 py-3.5 text-xs sm:text-sm font-bold text-foreground border border-border/50 transition-all hover:bg-secondary/80 active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            暂存草稿
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={formData.items.length === 0}
+                                            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 sm:px-8 py-3.5 text-xs sm:text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+                                        >
+                                            <CheckCircle size={18} className="hidden sm:block" />
+                                            <span>确认下单</span>
+                                        </button>
+                                    </>
+                                )}
 
-                            {/* Actions for Confirmed (Ordered) state */}
-                            {(formData.status === "Confirmed" || (formData.status as string) === "Ordered") ? (
-                                <div className="flex items-center gap-3">
-                                     <button
-                                        type="button"
-                                        onClick={onClose}
-                                        className="rounded-2xl bg-secondary px-8 py-3.5 text-sm font-bold text-foreground transition-all hover:bg-secondary/80"
-                                    >
-                                        取消
-                                    </button>
-                                     <button
+                                {/* Actions for Confirmed (Ordered) state */}
+                                {(formData.status === "Confirmed" || (formData.status as string) === "Ordered") && (
+                                    <button
                                         type="button"
                                         onClick={() => {
-                                            // Handle saving tracking info from within modal
-                                            // If tracking info exists, it transitions to Shipped
                                             const hasTracking = formData.trackingData && formData.trackingData.length > 0;
                                             handleAction(hasTracking ? "Shipped" : "Confirmed");
                                         }}
-                                        className="rounded-2xl bg-primary px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90"
+                                        className="flex-1 sm:flex-initial flex items-center justify-center rounded-2xl bg-primary px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 whitespace-nowrap"
                                     >
                                         保存物流资料
                                     </button>
-                                </div>
-                            ) : null}
+                                )}
 
-                            {/* Actions for Shipped state */}
-                            {formData.status === "Shipped" && (
-                                <div className="flex items-center gap-3">
-                                    {!isShippedAndReady && (
-                                        <p className="text-[10px] text-orange-500 font-bold max-w-[200px] text-right">请补全物流面单照片后即可入库</p>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => handleAction("Received")}
-                                        disabled={!isShippedAndReady}
-                                        className={`flex items-center justify-center gap-2 rounded-2xl px-8 py-3.5 text-sm font-black transition-all shadow-lg whitespace-nowrap ${isShippedAndReady ? 'bg-emerald-500 text-white shadow-emerald-500/25 hover:bg-emerald-600' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
-                                    >
-                                        <CheckCircle size={18} />
-                                        确认入库完成
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                        )}
-
-                        {!readOnly && (
-                        <div className="flex items-center gap-3">
-                             <button
-                                type="button"
-                                onClick={onClose}
-                                className="rounded-2xl border border-border px-8 py-3.5 text-sm font-black transition-all hover:bg-muted"
-                            >
-                                取消
-                            </button>
-                            
-                            <button
-                                type="submit"
-                                className="rounded-2xl bg-primary px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90"
-                            >
-                                {formData.status === "Draft" ? "创建采购单" : "保存修改"}
-                            </button>
-                        </div>
+                                {/* Actions for Shipped state */}
+                                {formData.status === "Shipped" && (
+                                    <div className="flex flex-1 sm:flex-initial items-center gap-3">
+                                        {!isShippedAndReady && (
+                                            <p className="hidden md:block text-[10px] text-orange-500 font-bold max-w-[200px] text-right">请补全物流面单照片后即可入库</p>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAction("Received")}
+                                            disabled={!isShippedAndReady}
+                                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl px-8 py-3.5 text-sm font-black transition-all shadow-lg whitespace-nowrap ${isShippedAndReady ? 'bg-emerald-500 text-white shadow-emerald-500/25 hover:bg-emerald-600' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
+                                        >
+                                            <CheckCircle size={18} />
+                                            确认入库
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>

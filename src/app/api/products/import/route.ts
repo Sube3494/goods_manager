@@ -11,9 +11,14 @@ export async function POST(request: Request) {
 
     const { products } = await request.json();
 
+    // Check system setting for data import
+    const settings = await prisma.systemSetting.findUnique({
+        where: { id: "system" }
+    });
 
-
-    if (!Array.isArray(products) || products.length === 0) {
+    if (settings && !settings.allowDataImport) {
+        return NextResponse.json({ error: "系统已关闭数据导入功能" }, { status: 403 });
+    }    if (!Array.isArray(products) || products.length === 0) {
         return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 

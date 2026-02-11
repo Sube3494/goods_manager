@@ -24,6 +24,8 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const { showToast } = useToast();
 
+  const [mobileView, setMobileView] = useState<"selection" | "review">("selection");
+
   useEffect(() => {
     if (isOpen) {
       fetchProducts();
@@ -33,6 +35,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         setSearchQuery("");
         setNote("");
         setType("Sale");
+        setMobileView("selection");
     }
   }, [isOpen]);
 
@@ -51,8 +54,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   };
 
   const addItem = (product: Product) => {
-    if (selectedItems.find(item => item.productId === product.id)) {
-      showToast("商品已在大项中", "warning");
+    const existing = selectedItems.find(item => item.productId === product.id);
+    if (existing) {
+      // If already exists, just show a hint or remove it to toggle? 
+      // User said "above it should be selection", usually toggle is better for selection list
+      removeItem(product.id);
       return;
     }
     
@@ -68,7 +74,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         name: product.name,
         sku: product.sku || "",
         quantity: 1,
-        price: 0, // Outbound price can be 0 (e.g. for sample/loss)
+        price: 0,
         image: product.image || "",
         stock: product.stock
       }
@@ -106,6 +112,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       return;
     }
     
+    if (mobileView === "selection" && window.innerWidth < 768) {
+        setMobileView("review");
+        return;
+    }
+
     const invalidItem = selectedItems.find(item => item.quantity <= 0);
     if (invalidItem) {
         showToast(`请检查 ${invalidItem.name} 的出库数量`, "error");
@@ -144,27 +155,39 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-white/10 shadow-2xl flex flex-col"
+          className="relative w-[calc(100%-32px)] sm:w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-white/10 shadow-2xl flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/5 p-6">
+          <div className="flex items-center justify-between border-b border-white/5 p-4 sm:p-6 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary hidden sm:block">
                 <Plus size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">新增出库登记</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">记录销售、领用或库存损耗，并自动从账目中扣减余值。</p>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground">
+                    {mobileView === "review" ? "确认出库清单" : "选择出库商品"}
+                </h2>
+                <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">记录销售、领用或库存损耗，并自动从账目中扣减余值。</p>
               </div>
             </div>
-            <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-white/5 transition-colors">
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+                {mobileView === "review" && (
+                    <button 
+                        onClick={() => setMobileView("selection")}
+                        className="text-xs font-bold text-primary px-3 py-1.5 rounded-lg bg-primary/10 md:hidden"
+                    >
+                        继续选择
+                    </button>
+                )}
+                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-white/5 transition-colors">
+                  <X size={20} />
+                </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-            {/* Left: Product Selection */}
-            <div className="w-full md:w-80 border-r border-white/5 flex flex-col bg-muted/20">
+            {/* Left/Selection: Product Selection */}
+            <div className={`w-full md:w-80 border-r border-white/5 flex flex-col bg-muted/20 ${mobileView === "review" ? "hidden md:flex" : "flex"}`}>
               <div className="p-4 bg-muted/30">
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -181,24 +204,34 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                 {isLoadingProducts ? (
                     <div className="py-10 text-center text-xs text-muted-foreground">加载中...</div>
                 ) : filteredProducts.length > 0 ? (
-                  filteredProducts.map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => addItem(p)}
-                      className="w-full text-left p-2 rounded-xl hover:bg-white dark:hover:bg-white/5 group transition-all"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-10 w-10 rounded-lg overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
-                           {p.image ? <Image src={p.image} alt={p.name} fill className="object-cover" /> : <Package className="w-full h-full p-2 text-muted-foreground/40" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-foreground truncate">{p.name}</p>
-                          <p className="text-[10px] text-muted-foreground truncate font-mono uppercase tracking-tighter">{p.sku}</p>
-                        </div>
-                        <div className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-secondary text-secondary-foreground">库存 {p.stock}</div>
-                      </div>
-                    </button>
-                  ))
+                  filteredProducts.map(p => {
+                    const isSelected = selectedItems.some(item => item.productId === p.id);
+                    return (
+                        <button
+                          key={p.id}
+                          onClick={() => addItem(p)}
+                          className={`w-full text-left p-2 rounded-xl transition-all ${isSelected ? 'bg-primary/10 border-primary/20 ring-1 ring-primary/20 shadow-inner' : 'hover:bg-white dark:hover:bg-white/5 group'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="relative h-10 w-10 rounded-lg overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
+                               {p.image ? <Image src={p.image} alt={p.name} fill className="object-cover" /> : <Package className="w-full h-full p-2 text-muted-foreground/40" />}
+                               {isSelected && (
+                                   <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                       <CheckCircle size={16} className="text-primary fill-white" />
+                                   </div>
+                               )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-xs font-bold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{p.name}</p>
+                              <p className="text-[10px] text-muted-foreground truncate font-mono uppercase tracking-tighter">{p.sku}</p>
+                            </div>
+                            <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}>
+                                {isSelected ? "已选" : `库存 ${p.stock}`}
+                            </div>
+                          </div>
+                        </button>
+                    );
+                  })
                 ) : (
                     <div className="py-10 text-center text-xs text-muted-foreground italic">未找到匹配商品</div>
                 )}
@@ -206,9 +239,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
             </div>
 
             {/* Right: Selected List & Meta */}
-            <div className="flex-1 flex flex-col h-full bg-white dark:bg-gray-900">
-                <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                    <div className="p-4 border-b border-white/5 grid grid-cols-2 gap-4">
+            <div className={`flex-1 flex flex-col h-full bg-white dark:bg-gray-900 ${mobileView === "selection" ? "hidden md:flex" : "flex"}`}>
+                <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+                    <div className="p-4 border-b border-white/5 grid grid-cols-2 gap-4 shrink-0">
                         <div className="space-y-1.5">
                             <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground px-1">出库类型</label>
                             <CustomSelect 
@@ -235,11 +268,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto p-4 bg-muted/5">
                         <div className="space-y-3">
                             {selectedItems.length > 0 ? (
                                 selectedItems.map(item => (
-                                    <div key={item.productId} className="flex items-center gap-4 p-3 rounded-2xl border border-white/5 bg-muted/10 group animate-in slide-in-from-right-4">
+                                    <div key={item.productId} className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl border border-white/5 bg-white dark:bg-gray-800/40 group shadow-sm">
                                         <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
                                             {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
                                         </div>
@@ -247,11 +280,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                             <p className="text-sm font-bold text-foreground truncate">{item.name}</p>
                                             <p className="text-[10px] text-muted-foreground font-mono truncate">{item.sku}</p>
                                         </div>
-                                        <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-full border border-white/10 p-1">
+                                        <div className="flex items-center gap-1 bg-muted/50 rounded-full border border-white/10 p-1">
                                             <button 
                                                 type="button"
                                                 onClick={() => updateQuantity(item.productId, -1)}
-                                                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                                className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
                                             >
                                                 <Minus size={14} />
                                             </button>
@@ -259,12 +292,12 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                                 type="number"
                                                 value={item.quantity}
                                                 onChange={(e) => handleManualQuantityChange(item.productId, e.target.value)}
-                                                className="w-12 text-center text-xs font-bold bg-transparent no-spinner outline-none"
+                                                className="w-10 text-center text-xs font-bold bg-transparent no-spinner outline-none"
                                             />
                                             <button 
                                                 type="button"
                                                 onClick={() => updateQuantity(item.productId, 1)}
-                                                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                                className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
                                             >
                                                 <Plus size={14} />
                                             </button>
@@ -283,18 +316,28 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                     <div className="p-4 rounded-full bg-muted/20 text-muted-foreground/30 mb-4 border border-dashed border-border dark:border-white/10">
                                         <Package size={32} />
                                     </div>
-                                    <p className="text-sm text-muted-foreground max-w-[200px]">请从左侧列表选择需要出库的商品</p>
+                                    <p className="text-sm text-muted-foreground max-w-[200px]">
+                                        {window.innerWidth < 768 && mobileView === "review" ? "清单为空，请返回选择商品" : "请从商品列表选择需要出库的商品"}
+                                    </p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="p-6 border-t border-white/5 bg-muted/10 shrink-0">
-                        <div className="flex items-center justify-between mb-6">
-                            <span className="text-sm text-muted-foreground">共选择 {selectedItems.length} 本项</span>
+                    <div className="p-4 sm:p-6 border-t border-white/5 bg-muted/10 shrink-0">
+                        <div className="flex items-center justify-between mb-4 sm:mb-6">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs sm:text-sm text-muted-foreground">共选择 {selectedItems.length} 本项</span>
+                                {selectedItems.length > 0 && (
+                                    <span className="text-[10px] text-primary font-bold hidden sm:inline">计费逻辑已确认</span>
+                                )}
+                            </div>
                             <div className="text-right">
                                 <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">出库估算</p>
-                                <p className="text-2xl font-black text-foreground">先进先出 <span className="text-muted-foreground text-xs font-normal">自动核算账面余值</span></p>
+                                <div className="flex flex-col sm:block">
+                                    <span className="text-lg sm:text-2xl font-black text-foreground">先进先出</span>
+                                    <span className="text-[10px] sm:text-xs text-muted-foreground sm:ml-2 block sm:inline">自动核算账面余值</span>
+                                </div>
                             </div>
                         </div>
                         <button
@@ -302,8 +345,17 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                             disabled={selectedItems.length === 0}
                             className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
                         >
-                            <CheckCircle size={20} />
-                            确认并减扣库存
+                            {mobileView === "selection" && window.innerWidth < 768 ? (
+                                <>
+                                    <span>以此为基础并下一步</span>
+                                    <CheckCircle size={20} className="ml-1" />
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle size={20} />
+                                    <span>确认并减扣库存</span>
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>

@@ -13,7 +13,6 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 
 
 import { useUser } from "@/hooks/useUser";
-import { useSearchParams } from "next/navigation";
 import { pinyinMatch } from "@/lib/pinyin";
 
 export default function GoodsPage() {
@@ -238,27 +237,29 @@ export default function GoodsPage() {
   return (
     <div className="space-y-8">
       {/* Header Section */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between relative z-10">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">商品库</h1>
-          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-lg">
+      <div className="flex items-center justify-between gap-4 relative z-10">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
+          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-lg truncate">
             {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU。"}
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
            {user && (
-             <div className="glass p-1 rounded-full flex gap-1 items-center h-10">
+             <div className="glass p-1 rounded-full flex gap-1 items-center h-10 shadow-sm border border-white/10">
                <button 
                   onClick={() => setIsImportOpen(true)}
-                  className="flex items-center gap-2 rounded-full px-3 sm:px-4 h-8 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  className="flex items-center justify-center rounded-full w-8 h-8 sm:w-auto sm:px-4 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  title="Excel 导入"
                 >
                   <Download size={18} />
-                  <span className="hidden sm:inline">Excel 导入</span>
+                  <span className="hidden sm:inline ml-2">导入</span>
                 </button>
+                <div className="w-px h-4 bg-white/20 mx-1 hidden sm:block"></div>
                 <button 
                   onClick={handleCreate}
-                  className="flex items-center gap-2 rounded-full bg-primary px-4 sm:px-6 h-8 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+                  className="flex items-center gap-2 rounded-full bg-primary px-3 sm:px-6 h-8 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all whitespace-nowrap"
                 >
                   <Plus size={18} />
                   <span className="hidden sm:inline">新建商品</span>
@@ -271,19 +272,19 @@ export default function GoodsPage() {
 
       {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+          <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
               type="text"
-              placeholder="搜索商品名称、SKU..."
+              placeholder="搜索商品..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
             />
           </div>
           
-          <div className="flex gap-3 h-12">
-             <div className="w-36 sm:w-40 h-full">
+          <div className="grid grid-cols-2 sm:flex gap-3 h-10 w-full sm:w-auto">
+             <div className="w-full sm:w-40 h-full"> 
                 <CustomSelect 
                     value={selectedStatus}
                     onChange={setSelectedStatus}
@@ -292,10 +293,10 @@ export default function GoodsPage() {
                         { value: 'low_stock', label: '库存预警' }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm"
                 />
              </div>
-             <div className="w-36 sm:w-40 h-full">
+             <div className="w-full sm:w-40 h-full">
                 <CustomSelect 
                     value={selectedCategory}
                     onChange={setSelectedCategory}
@@ -304,7 +305,7 @@ export default function GoodsPage() {
                         ...categories.map(c => ({ value: c.name, label: c.name }))
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm"
                 />
              </div>
           </div>

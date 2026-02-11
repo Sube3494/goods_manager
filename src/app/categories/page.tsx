@@ -132,14 +132,14 @@ export default function CategoriesPage() {
         
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Search */}
-            <div className="h-9 sm:h-10 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64">
-                <Search size={16} className="text-muted-foreground shrink-0" />
+            <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
+                <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
                     type="text"
                     placeholder="搜索分类..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-xs sm:text-sm"
+                    className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
                 />
             </div>
             {user && (

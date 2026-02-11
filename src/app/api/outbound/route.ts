@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { OutboundOrderItem } from "@/lib/types";
+import { OutboundOrderItem, Prisma } from '../../../../prisma/generated-client';
 
 export async function GET() {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     }
 
     // Use a transaction to ensure data consistency
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Create the OutboundOrder
       const order = await tx.outboundOrder.create({
         data: {

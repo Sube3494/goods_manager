@@ -18,8 +18,7 @@ interface CategoryModalProps {
 export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: CategoryModalProps) {
   const [mounted, setMounted] = useState(false);
   const [formData, setFormData] = useState<Partial<Category>>(initialData || {
-    name: "",
-    description: ""
+    name: ""
   });
 
   useEffect(() => {
@@ -33,7 +32,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
         if (initialData) {
           setFormData(initialData);
         } else {
-          setFormData({ name: "", description: "" });
+          setFormData({ name: "" });
         }
       });
     }
@@ -62,7 +61,7 @@ export function CategoryModal({ isOpen, onClose, onSubmit, initialData }: Catego
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">

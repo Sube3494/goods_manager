@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Info } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Upload, Info } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
+import { ImportModal } from "@/components/Goods/ImportModal";
 
 interface SystemInfo {
   version: string;
@@ -29,10 +30,12 @@ interface DocumentWithViewTransition extends Document {
 export default function SettingsPage() {
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
+  const [allowDataImport, setAllowDataImport] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Storage settings
   const [storageType, setStorageType] = useState<"local" | "minio">("local");
@@ -43,7 +46,7 @@ export default function SettingsPage() {
   const [minioBucket, setMinioBucket] = useState("");
   const [minioUseSSL, setMinioUseSSL] = useState(true);
   const [minioPublicUrl, setMinioPublicUrl] = useState("");
-  const [uploadConflictStrategy, setUploadConflictStrategy] = useState<"overwrite" | "rename" | "skip" | "uuid" | "hash">("uuid");
+  const [uploadConflictStrategy, setUploadConflictStrategy] = useState<"overwrite" | "rename" | "skip">("rename");
   // Use refs to track last saved values to prevent initial auto-save and loops
   const lastSavedSettings = useRef<Record<string, unknown>>({});
   // Add a ref to track if we should verify changes, only true after initial load
@@ -93,6 +96,7 @@ export default function SettingsPage() {
                 const data = await settingsRes.json();
                 setLowStockThreshold(data.lowStockThreshold);
                 setAllowGalleryUpload(data.allowGalleryUpload ?? true);
+                setAllowDataImport(data.allowDataImport ?? true);
                 
                 // Storage settings
                 setStorageType(data.storageType || "local");
@@ -132,6 +136,7 @@ export default function SettingsPage() {
     const payload = {
         lowStockThreshold,
         allowGalleryUpload,
+        allowDataImport,
         storageType,
         minioEndpoint,
         minioPort,
@@ -167,6 +172,7 @@ export default function SettingsPage() {
   }, [
     lowStockThreshold, 
     allowGalleryUpload, 
+    allowDataImport,
     storageType, 
     minioEndpoint, 
     minioPort, 
@@ -197,8 +203,64 @@ export default function SettingsPage() {
   const toggleGalleryUpload = () => {
     const newValue = !allowGalleryUpload;
     setAllowGalleryUpload(newValue);
-    // Directly call save to avoid waiting for useEffect
     saveSettings({ allowGalleryUpload: newValue });
+  };
+
+  const toggleDataImport = () => {
+    const newValue = !allowDataImport;
+    setAllowDataImport(newValue);
+    saveSettings({ allowDataImport: newValue });
+  };
+
+  const handleExportData = async () => {
+    try {
+      showToast("正在生成备份文件...", "info");
+      const res = await fetch("/api/system/export");
+      if (!res.ok) throw new Error("Export failed");
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `GoodsManager_Backup_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showToast("数据导出成功", "success");
+    } catch (error) {
+      console.error("Export error:", error);
+      showToast("导出失败，请检查网络", "error");
+    }
+  };
+
+  const handleImportData = async (data: any) => {
+    try {
+      showToast("正在处理并同步全量数据...", "info");
+      const res = await fetch("/api/system/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        if (result.failCount > 0) {
+            showToast(`导入完成：成功 ${result.successCount} 项，${result.failCount} 项失败。`, "warning");
+        } else {
+            showToast(`成功恢复并同步 ${result.successCount} 项数据`, "success");
+        }
+        // Force reload info to update any stats or times
+        const infoRes = await fetch("/api/system/info");
+        if (infoRes.ok) setSystemInfo(await infoRes.json());
+      } else {
+        const err = await res.json();
+        showToast(err.error || "导入失败", "error");
+      }
+    } catch (error) {
+      console.error("Import error:", error);
+      showToast("网络请求失败", "error");
+    }
   };
 
   if (isLoading) {
@@ -385,29 +447,64 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            <div className="p-8 flex items-center justify-between">
-                <div>
-                    <h4 className="font-bold text-foreground">允许实物照片上传</h4>
-                    <p className="text-sm text-muted-foreground mt-1">开启后，允许用户在实物相册中上传新照片。</p>
+            <div className="p-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h4 className="font-bold text-foreground">允许实物照片上传</h4>
+                        <p className="text-sm text-muted-foreground mt-1">开启后，允许用户在实物相册中上传新照片。</p>
+                    </div>
+                    <div className="shrink-0">
+                      <Switch
+                          checked={allowGalleryUpload}
+                          onChange={toggleGalleryUpload}
+                      />
+                    </div>
                 </div>
-                <Switch
-                    checked={allowGalleryUpload}
-                    onChange={toggleGalleryUpload}
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-border/50">
+                    <div>
+                        <h4 className="font-bold text-foreground">允许 Excel 批量中转导入</h4>
+                        <p className="text-sm text-muted-foreground mt-1">开启后，允许在入库管理中使用批量录入功能。</p>
+                    </div>
+                    <div className="shrink-0">
+                      <Switch
+                          checked={allowDataImport}
+                          onChange={toggleDataImport}
+                      />
+                    </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-border/50">
+                    <div className="flex-1">
+                        <h4 className="font-bold text-foreground">备份与恢复</h4>
+                        <p className="text-sm text-muted-foreground mt-1">将所有商品、订单及供应商数据导出为 Excel，或通过备份文件恢复系统。</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button 
+                            onClick={() => setShowImportModal(true)}
+                            className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-full bg-white dark:bg-white/5 border border-border hover:bg-muted font-bold transition-all hover:-translate-y-0.5 whitespace-nowrap"
+                        >
+                            <Upload size={18} className="text-emerald-500" />
+                            导入备份
+                        </button>
+                        <button 
+                            onClick={handleExportData}
+                            className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-90 font-bold transition-all hover:-translate-y-0.5 whitespace-nowrap"
+                        >
+                            <Download size={18} />
+                            立即导出
+                        </button>
+                    </div>
+                </div>
+
+                <ImportModal 
+                   isOpen={showImportModal}
+                   onClose={() => setShowImportModal(false)}
+                   onImport={handleImportData}
+                   title="导入全站备份"
+                   description="请选择之前导出的 GoodsManager 备份文件 (.xlsx)"
+                   multiSheet={true}
                 />
-            </div>
-            
-            <div className="p-8 border-t border-border/50 flex items-center justify-between">
-                <div>
-                    <h4 className="font-bold text-foreground">导出全站数据</h4>
-                    <p className="text-sm text-muted-foreground mt-1">将所有商品、订单及供应商数据导出为 Excel 备份。</p>
-                </div>
-                <button 
-                  onClick={() => showToast("正在准备数据导出...", "info")}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-muted transition-colors text-sm font-medium"
-                >
-                    <Download size={16} />
-                    立即导出
-                </button>
             </div>
         </motion.div>
         
@@ -418,7 +515,7 @@ export default function SettingsPage() {
             transition={{ delay: 0.3 }}
             className="glass-panel rounded-3xl border border-border overflow-hidden"
         >
-            <div className="p-8 border-b border-border/50 bg-white/5 flex items-center justify-between">
+            <div className="p-8 border-b border-border/50 bg-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
                         <Database size={20} />
@@ -428,14 +525,15 @@ export default function SettingsPage() {
                 <button
                     onClick={testConnection}
                     disabled={isTesting}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-colors text-sm font-bold disabled:opacity-50"
+                    className="group relative flex items-center justify-center gap-2 h-10 px-6 rounded-full bg-primary text-primary-foreground font-bold transition-all hover:opacity-90 hover:shadow-lg hover:shadow-primary/20 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0 whitespace-nowrap overflow-hidden"
                 >
+                    <div className="absolute inset-0 bg-linear-to-tr from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                     {isTesting ? (
-                        <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
                     ) : (
-                        <Zap size={16} />
+                        <Zap size={16} className="transition-transform group-hover:scale-125 group-hover:rotate-12" />
                     )}
-                    测试连接
+                    <span className="relative z-10">测试连接</span>
                 </button>
             </div>
 
@@ -487,15 +585,13 @@ export default function SettingsPage() {
                                 value={uploadConflictStrategy}
                                 triggerClassName="h-[46px]"
                                 onChange={(val) => {
-                                    setUploadConflictStrategy(val as "overwrite" | "rename" | "skip" | "uuid" | "hash");
+                                    setUploadConflictStrategy(val as "overwrite" | "rename" | "skip");
                                     saveSettings({ uploadConflictStrategy: val });
                                 }}
                                 options={[
                                     { value: "overwrite", label: "直接覆盖 (覆盖现有文件)" },
                                     { value: "rename", label: "自动重命名 (加数字序号)" },
-                                    { value: "skip", label: "跳过上传 (保持现有文件)" },
-                                    { value: "uuid", label: "随机重命名 (UUID)" },
-                                    { value: "hash", label: "内容哈希 (MD5 去重)" }
+                                    { value: "skip", label: "跳过上传 (保持现有文件)" }
                                 ]}
                             />
                         </div>

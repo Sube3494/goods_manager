@@ -172,7 +172,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
                 <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 p-6">
                     <h2 className="text-xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>

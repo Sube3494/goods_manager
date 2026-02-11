@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id              String              @id @default(cuid())
+  sku             String?             @unique
+  name            String
+  costPrice       Float               @default(0)
+  hideCost        Boolean             @default(false)
+  stock           Int                 @default(0)
+  image           String?
+  isPublic        Boolean             @default(true)
+  categoryId      String
+  supplierId      String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  brushOrderItems BrushOrderItem[]
+  gallery         GalleryItem[]
+  outboundItems   OutboundOrderItem[]
+  category        Category            @relation(fields: [categoryId], references: [id])
+  supplier        Supplier?           @relation(fields: [supplierId], references: [id])
+  orderItems      PurchaseOrderItem[]
+
+  @@index([categoryId])
+  @@index([supplierId])
+}
+
+model Supplier {
+  id                 String              @id @default(cuid())
+  code               String?             @unique
+  name               String
+  contact            String?
+  phone              String?
+  email              String?
+  address            String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  products           Product[]
+  purchaseOrderItems PurchaseOrderItem[]
+}
+
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  type            String              @default("Purchase")
+  status          String              @default("Draft")
+  totalAmount     Float               @default(0)
+  date            DateTime            @default(now())
+  shippingFees    Float               @default(0)
+  extraFees       Float               @default(0)
+  paymentVoucher  String?
+  paymentVouchers Json?               @default("[]")
+  trackingData    Json?               @default("[]")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  items           PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id                String        @id @default(cuid())
+  purchaseOrderId   String
+  productId         String
+  supplierId        String?
+  quantity          Int
+  remainingQuantity Int? // 新增：剩余可用数量 (用于 FIFO 成本计算)
+  costPrice         Float
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  product           Product       @relation(fields: [productId], references: [id])
+  purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  supplier          Supplier?     @relation(fields: [supplierId], references: [id])
+}
+
+model OutboundOrder {
+  id          String              @id @default(cuid())
+  type        String              @default("Sale") // Sale, Sample, Loss, Return
+  date        DateTime            @default(now())
+  note        String?
+  totalAmount Float               @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  items       OutboundOrderItem[]
+}
+
+model OutboundOrderItem {
+  id              String        @id @default(cuid())
+  outboundOrderId String
+  productId       String
+  quantity        Int
+  price           Float         @default(0)
+  product         Product       @relation(fields: [productId], references: [id])
+  outboundOrder   OutboundOrder @relation(fields: [outboundOrderId], references: [id], onDelete: Cascade)
+}
+
+model GalleryItem {
+  id        String   @id @default(cuid())
+  url       String
+  productId String
+  tags      String[] @default([])
+  isPublic  Boolean  @default(true)
+  type      String   @default("image")
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, code])
+}
+
+model SystemSetting {
+  id                 String  @id @default("system")
+  lowStockThreshold  Int     @default(10)
+  allowDataImport    Boolean @default(true)
+  allowGalleryUpload Boolean @default(true)
+
+  // Storage settings
+  storageType    String  @default("local") // "local" or "minio"
+  minioEndpoint  String?
+  minioPort      Int?
+  minioAccessKey String?
+  minioSecretKey String?
+  minioBucket    String?
+  minioUseSSL    Boolean @default(true)
+  minioPublicUrl String? // Custom public URL for access
+
+  // Upload settings
+  uploadConflictStrategy String @default("uuid") // "overwrite", "rename", "skip", "uuid"
+
+  updatedAt DateTime @updatedAt
+}
+
+model BrushOrder {
+  id              String           @id @default(cuid())
+  date            DateTime         @default(now())
+  type            String
+  status          String           @default("Draft")
+  principalAmount Float            @default(0)
+  paymentAmount   Float            @default(0)
+  receivedAmount  Float            @default(0)
+  commission      Float            @default(0)
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  items           BrushOrderItem[]
+}
+
+model BrushOrderItem {
+  id           String     @id @default(cuid())
+  brushOrderId String
+  productId    String
+  quantity     Int        @default(1)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  brushOrder   BrushOrder @relation(fields: [brushOrderId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id])
+}

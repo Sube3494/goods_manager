@@ -425,5 +425,5 @@ export async function getStorageStrategy(): Promise<StorageStrategy> {
   }
 
   // 否则一律回退到本地存储，并确保使用正确的冲突策略
-  return new LocalStorageStrategy(settings?.uploadConflictStrategy || "uuid");
+  return new LocalStorageStrategy(settings?.uploadConflictStrategy || "rename");
 }

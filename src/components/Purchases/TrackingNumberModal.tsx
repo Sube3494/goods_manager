@@ -272,7 +272,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-4xl sm:rounded-[2.5rem] bg-white/95 dark:bg-gray-900/60 backdrop-blur-3xl border border-border/40 dark:border-white/10 shadow-2xl flex flex-col min-h-[400px] sm:min-h-[500px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden"
+            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-4xl sm:rounded-[2.5rem] bg-white/95 dark:bg-gray-900/60 backdrop-blur-3xl border border-border/40 dark:border-white/10 shadow-2xl flex flex-col min-h-[400px] sm:min-h-[500px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden"
           >
             <div className="relative p-6 sm:p-10 border-b border-border/40 shrink-0 flex items-center gap-4 sm:gap-6">
               <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">

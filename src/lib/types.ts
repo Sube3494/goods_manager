@@ -56,6 +56,7 @@ export interface PurchaseOrderItem {
   purchaseOrderId?: string;
   productId: string;
   product?: Product;
+  image?: string;
   supplierId?: string;
   supplier?: Supplier;
   quantity: number;

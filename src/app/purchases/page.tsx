@@ -347,14 +347,14 @@ export default function PurchasesPage() {
       </div>
 
       {/* Search Box */}
-      <div className="h-12 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
         <Search size={18} className="text-muted-foreground shrink-0" />
         <input
           type="text"
           placeholder="搜索采购记录..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm"
+          className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
         />
       </div>
 
@@ -365,7 +365,7 @@ export default function PurchasesPage() {
                 key={status}
                 onClick={() => handleStatusFilterChange(status)}
                 className={`
-                    px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap
+                    px-4 h-9 rounded-full text-sm font-bold transition-all whitespace-nowrap
                     ${statusFilter === status 
                         ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' 
                         : 'bg-white dark:bg-white/5 border border-border text-muted-foreground hover:bg-muted'
