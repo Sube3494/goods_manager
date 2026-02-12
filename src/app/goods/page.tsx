@@ -5,7 +5,8 @@ import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { Search, Plus, Download } from "lucide-react";
-import { Product, Category } from "@/lib/types";
+import { Product, Category, Supplier } from "@/lib/types";
+import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { ActionBar } from "@/components/ui/ActionBar";
@@ -42,24 +43,29 @@ export default function GoodsPage() {
 
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
 
   const { showToast } = useToast();
 
   const fetchGoods = async () => {
     try {
       setIsLoading(true);
-      const [productsRes, categoriesRes] = await Promise.all([
+      const [productsRes, categoriesRes, suppliersRes] = await Promise.all([
         fetch("/api/products"),
-        fetch("/api/categories")
+        fetch("/api/categories"),
+        fetch("/api/suppliers")
       ]);
 
-      if (productsRes.ok && categoriesRes.ok) {
+      if (productsRes.ok && categoriesRes.ok && suppliersRes.ok) {
         const productsData = await productsRes.json();
         const categoriesData = await categoriesRes.json();
+        const suppliersData = await suppliersRes.json();
         setGoods(productsData);
         setCategories(categoriesData);
+        setSuppliers(suppliersData);
       }
     } catch (error) {
       console.error("Failed to fetch data", error);
@@ -126,16 +132,42 @@ export default function GoodsPage() {
   };
 
 
+  const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string }) => {
+    const count = selectedIds.length;
+    try {
+      const res = await fetch("/api/products/batch", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: selectedIds,
+          ...updateData
+        })
+      });
+
+      if (res.ok) {
+        showToast(`成功更新 ${count} 个商品`, "success");
+        setSelectedIds([]);
+        fetchGoods();
+      } else {
+        showToast("批量更新失败", "error");
+      }
+    } catch {
+      showToast("批量更新请求失败", "error");
+    }
+  };
+
   const handleBatchDelete = () => {
     const count = selectedIds.length;
     setConfirmConfig({
       isOpen: true,
       title: "批量删除商品",
-      message: `确定要删除选中的 ${count} 个商品吗?此操作不可恢复。`,
+      message: `确定要删除选中的 ${count} 个商品吗？此操作不可恢复。`,
       onConfirm: async () => {
         try {
           const res = await fetch("/api/products/batch", {
             method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: selectedIds }),
           });
           if (res.ok) {
             showToast(`成功删除 ${count} 个商品`, "success");
@@ -143,10 +175,10 @@ export default function GoodsPage() {
             fetchGoods();
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           } else {
-            showToast("批量删除失败", "error");
+            showToast("删除失败", "error");
           }
         } catch {
-          showToast("批量删除请求失败", "error");
+          showToast("请求失败", "error");
         }
       },
     });
@@ -177,7 +209,8 @@ export default function GoodsPage() {
     }
   };
 
-  const handleImport = async (data: Record<string, unknown>[]) => {
+  const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
+    if (!Array.isArray(data)) return;
     try {
       const res = await fetch("/api/products/import", {
         method: "POST",
@@ -374,6 +407,15 @@ export default function GoodsPage() {
         initialData={editingProduct}
       />
 
+      <BatchEditModal 
+        isOpen={isBatchEditOpen}
+        onClose={() => setIsBatchEditOpen(false)}
+        onConfirm={handleBatchUpdate}
+        categories={categories}
+        suppliers={suppliers}
+        selectedCount={selectedIds.length}
+      />
+
       <ConfirmModal 
         isOpen={confirmConfig.isOpen}
         onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
@@ -397,6 +439,7 @@ export default function GoodsPage() {
         onClear={() => setSelectedIds([])}
         label="个商品"
         onDelete={handleBatchDelete}
+        onEdit={() => setIsBatchEditOpen(true)}
       />
     </div>
   );

@@ -7,16 +7,18 @@ import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import Image from "next/image";
-import { format } from "date-fns";
+import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
+import { DatePicker } from "@/components/ui/DatePicker";
 
 export default function OutboundPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const { showToast } = useToast();
 
@@ -70,20 +72,11 @@ export default function OutboundPage() {
     
     // Date filter
     let matchesDate = true;
-    if (dateFilter !== "all") {
+    if (startDate || endDate) {
       const orderDate = new Date(order.date);
-      const now = new Date();
-      if (dateFilter === "today") {
-        matchesDate = orderDate.toDateString() === now.toDateString();
-      } else if (dateFilter === "week") {
-        const weekAgo = new Date();
-        weekAgo.setDate(now.getDate() - 7);
-        matchesDate = orderDate >= weekAgo;
-      } else if (dateFilter === "month") {
-        const monthAgo = new Date();
-        monthAgo.setDate(now.getDate() - 30);
-        matchesDate = orderDate >= monthAgo;
-      }
+      const start = startDate ? startOfDay(parseISO(startDate)) : new Date(0);
+      const end = endDate ? endOfDay(parseISO(endDate)) : new Date(8640000000000000);
+      matchesDate = isWithinInterval(orderDate, { start, end });
     }
     
     return matchesSearch && matchesType && matchesDate;
@@ -110,7 +103,7 @@ export default function OutboundPage() {
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
-        <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:w-96 shrink-0">
+        <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -121,22 +114,32 @@ export default function OutboundPage() {
           />
         </div>
         
-        <div className="flex gap-2 sm:gap-3 h-10 w-full">
-            <div className="flex-1 lg:w-40 h-full">
-                <CustomSelect
-                    value={dateFilter}
-                    onChange={setDateFilter}
-                    options={[
-                        { value: "all", label: "所有时间" },
-                        { value: "today", label: "今日出库" },
-                        { value: "week", label: "最近7天" },
-                        { value: "month", label: "最近30天" }
-                    ]}
-                    className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm font-medium"
+        <div className="flex flex-col sm:flex-row gap-3 h-auto sm:h-10 w-full lg:w-auto">
+            {/* Date Range Pickers */}
+            <div className="flex items-center gap-2 h-10 shrink-0">
+                <DatePicker 
+                    value={startDate} 
+                    onChange={setStartDate} 
+                    maxDate={endDate}
+                    placeholder="起始日期" 
+                    className="h-full w-28 md:w-36"
+                    triggerClassName="rounded-full shadow-sm"
+                    isCompact
+                />
+                <span className="text-muted-foreground text-xs shrink-0 font-medium hidden sm:block">至</span>
+                <DatePicker 
+                    value={endDate} 
+                    onChange={setEndDate} 
+                    minDate={startDate}
+                    placeholder="截至日期" 
+                    className="h-full w-28 md:w-36"
+                    triggerClassName="rounded-full shadow-sm"
+                    isCompact
+                    align="right"
                 />
             </div>
-            <div className="flex-1 lg:w-40 h-full">
+
+            <div className="w-full sm:w-40 h-10 shrink-0">
                 <CustomSelect
                     value={typeFilter}
                     onChange={setTypeFilter}

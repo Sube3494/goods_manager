@@ -158,7 +158,7 @@ model SystemSetting {
   minioPublicUrl     String?  // Custom public URL for access
 
   // Upload settings
-  uploadConflictStrategy String   @default("rename") // "overwrite", "rename", "skip"
+  uploadConflictStrategy String   @default("hash") // "overwrite", "rename", "skip", "hash"
 
   updatedAt          DateTime @updatedAt
 }

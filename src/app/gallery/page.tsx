@@ -332,17 +332,25 @@ function GalleryContent() {
 
     try {
       const uploadPromises = Array.from(files).map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
+        // Use streaming upload for reliability (especially for videos)
+        const arrayBuffer = await file.arrayBuffer();
         
         const res = await fetch("/api/upload", {
             method: "POST",
-            body: formData,
+            headers: {
+              "Content-Type": file.type,
+              "X-File-Name": encodeURIComponent(file.name),
+              "X-File-Type": file.type
+            },
+            body: arrayBuffer,
         });
 
         if (res.ok) {
-            const { url } = await res.json();
-            return url;
+            const data = await res.json();
+            return {
+                url: data.url,
+                type: data.type
+            };
         }
         return null;
       });
@@ -574,7 +582,12 @@ function GalleryContent() {
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                {(isUploadAllowed || isAdmin) && (
                  <button 
-                   onClick={() => setIsUploadModalOpen(true)}
+                   onClick={() => {
+                     setIsUploadModalOpen(true);
+                     if (productIdFilter && productIdFilter !== 'undefined') {
+                       setUploadForm(prev => ({ ...prev, productId: productIdFilter }));
+                     }
+                   }}
                    className="h-10 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
                  >
                    <Plus size={18} /> <span className="hidden xs:inline">上传实拍</span><span className="xs:hidden">上传</span>
@@ -592,51 +605,55 @@ function GalleryContent() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
-              <Search size={18} className="text-muted-foreground shrink-0" />
-              <input 
-                  type="text" 
-                  placeholder="搜索商品名或 SKU..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
-              />
+          {!productIdFilter && (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
+                <Search size={18} className="text-muted-foreground shrink-0" />
+                <input 
+                    type="text" 
+                    placeholder="搜索商品名或 SKU..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Filters */}
-        <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
-            <div className="flex items-center gap-2 pb-2">
-                <button
-                    onClick={() => setSelectedCategory("All")}
-                    className={cn(
-                        "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
-                        selectedCategory === "All" 
-                        ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
-                        : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
-                    )}
-                >
-                    全部展示
-                </button>
+        {!productIdFilter && (
+          <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+              <div className="flex items-center gap-2 pb-2">
+                  <button
+                      onClick={() => setSelectedCategory("All")}
+                      className={cn(
+                          "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
+                          selectedCategory === "All" 
+                          ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
+                          : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
+                      )}
+                  >
+                      全部展示
+                  </button>
 
-                {categories.map(cat => (
-                    <button
-                        key={cat.id}
-                        onClick={() => setSelectedCategory(cat.name)}
-                        className={cn(
-                            "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
-                            selectedCategory === cat.name
-                            ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
-                            : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
-                        )}
-                    >
-                        {cat.name}
-                    </button>
-                ))}
-            </div>
-        </div>
+                  {categories.map(cat => (
+                      <button
+                          key={cat.id}
+                          onClick={() => setSelectedCategory(cat.name)}
+                          className={cn(
+                              "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
+                              selectedCategory === cat.name
+                              ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
+                              : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
+                          )}
+                      >
+                          {cat.name}
+                      </button>
+                  ))}
+              </div>
+          </div>
+        )}
 
 
 
@@ -755,7 +772,7 @@ function GalleryContent() {
                                 {/* Image Count Badge */}
                                 <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
                                     <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-black/60 backdrop-blur-md rounded-full text-[9px] sm:text-[10px] font-black text-white border border-white/10 tracking-widest">
-                                        {group.items.length} 张
+                                        {group.items.length} 个
                                     </span>
                                 </div>
 
@@ -774,8 +791,8 @@ function GalleryContent() {
             {filteredItems.length === 0 && productIdFilter && (
                 <div className="col-span-full py-24 text-center glass border-dashed border-2 border-border/50 rounded-3xl">
                 <Camera size={48} className="mx-auto text-black/30 dark:text-white/30 mb-4" />
-                <h3 className="text-xl font-bold text-foreground">该商品暂无实拍图</h3>
-                <p className="text-muted-foreground mt-1">您可以尝试上传第一张实拍照片</p>
+                <h3 className="text-xl font-bold text-foreground">该商品暂无实拍内容</h3>
+                <p className="text-muted-foreground mt-1">您可以尝试上传第一个实拍内容</p>
                 </div>
             )}
            </AnimatePresence>
@@ -788,7 +805,7 @@ function GalleryContent() {
                     <Camera size={48} />
                 </div>
                 <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-foreground">暂无符合条件的图片</h3>
+                    <h3 className="text-2xl font-bold text-foreground">暂无符合条件的媒体内容</h3>
                     <p className="text-muted-foreground">尝试更换搜索词或选择其他分类</p>
                 </div>
             </div>
@@ -1147,7 +1164,7 @@ function GalleryContent() {
                                 }}
                                 className="bg-black/40 hover:bg-black/80 transition-colors backdrop-blur-xl px-4 py-3 rounded-2xl border border-white/10 shadow-2xl flex flex-col gap-2 pointer-events-auto items-center max-w-[95vw]"
                             >
-                                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-full">
+                                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-full py-2 px-4">
                                 {relatedImages.map((img, idx) => {
                                     const isSelected = img.id === selectedImage.id;
                                     return (

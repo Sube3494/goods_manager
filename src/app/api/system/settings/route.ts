@@ -15,7 +15,8 @@ export async function GET() {
         lowStockThreshold: 10,
         allowDataImport: true,
         allowGalleryUpload: true,
-        storageType: "local"
+        storageType: "local",
+        uploadConflictStrategy: "hash"
       }
     });
     
@@ -65,11 +66,18 @@ export async function POST(request: Request) {
       update: updateData,
       create: {
         id: "system",
-        lowStockThreshold: lowStockThreshold ?? 10,
-        allowDataImport: allowDataImport ?? true,
-        allowGalleryUpload: allowGalleryUpload ?? true,
+        lowStockThreshold: (typeof lowStockThreshold === 'number') ? lowStockThreshold : 10,
+        allowDataImport: (typeof allowDataImport === 'boolean') ? allowDataImport : true,
+        allowGalleryUpload: (typeof allowGalleryUpload === 'boolean') ? allowGalleryUpload : true,
         storageType: storageType || "local",
-        ...(updateData as any)
+        uploadConflictStrategy: "hash",
+        minioEndpoint: minioEndpoint || null,
+        minioPort: (minioPort === "" || Number(minioPort) === 0) ? null : Number(minioPort),
+        minioAccessKey: minioAccessKey || null,
+        minioSecretKey: minioSecretKey || null,
+        minioBucket: minioBucket || null,
+        minioUseSSL: Boolean(minioUseSSL),
+        minioPublicUrl: minioPublicUrl || null,
       }
     });
 

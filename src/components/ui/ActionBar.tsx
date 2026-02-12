@@ -9,6 +9,7 @@ interface ActionBarProps {
   onToggleSelectAll: () => void;
   onClear: () => void;
   onDelete: () => void;
+  onEdit?: () => void;
   label?: string;
 }
 
@@ -18,6 +19,7 @@ export function ActionBar({
   onToggleSelectAll,
   onClear, 
   onDelete, 
+  onEdit,
   label = "项" 
 }: ActionBarProps) {
   const [mounted, setMounted] = useState(false);
@@ -62,6 +64,15 @@ export function ActionBar({
 
             {/* Actions */}
             <div className="flex items-center gap-3">
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="h-8 px-6 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-black shadow-lg shadow-black/10 active:scale-[0.98] transition-all"
+                >
+                  批量修改
+                </button>
+              )}
+
               <button
                 onClick={onDelete}
                 className="h-8 px-6 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-black shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all"
