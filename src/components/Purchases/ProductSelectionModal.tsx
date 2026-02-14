@@ -153,9 +153,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-10001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white/90 dark:bg-gray-900/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-10001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-             <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 p-8 shrink-0">
+             <div className="flex items-center justify-between border-b border-border/50 p-8 shrink-0">
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-medium text-foreground">选择商品</h2>
                 <button
@@ -216,12 +216,12 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                          <div 
                           key={product.id}
                           onClick={() => toggleProduct(product.id)}
-                          className={cn(
-                            "group relative flex items-center gap-5 p-4 rounded-2xl border transition-all cursor-pointer",
-                            isSelected 
-                              ? "bg-primary/5 border-primary/30" 
-                              : "bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 hover:border-primary/20 hover:bg-black/10 dark:hover:bg-white/10"
-                          )}
+                            className={cn(
+                             "group relative flex items-center gap-5 p-4 rounded-2xl border transition-all cursor-pointer",
+                             isSelected 
+                               ? "bg-white dark:bg-white/5 border-primary shadow-md" 
+                               : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
+                           )}
                         >
                           {/* Circular Checkbox/Radio Top-Right - enlarged for usability */}
                           <div className={cn(
@@ -281,7 +281,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </div>
             </div>
 
-             <div className="flex items-center justify-between border-t border-black/5 dark:border-white/5 p-8 shrink-0">
+             <div className="flex items-center justify-between border-t border-border/50 p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5">
               <div className="text-sm font-medium text-muted-foreground">
                 已选择 <span className="text-primary font-medium">{tempSelectedIds.length}</span> 项
               </div>

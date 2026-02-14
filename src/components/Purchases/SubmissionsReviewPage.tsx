@@ -196,7 +196,7 @@ export function SubmissionsReviewPage() {
             ) : (
                 <div className="space-y-3">
                     {/* List Header - Perfect alignment with Card Row */}
-                    <div className="hidden md:grid grid-cols-6 gap-4 px-3 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/90 border-b border-border mb-2 bg-muted/5 rounded-t-2xl">
+                    <div className="hidden md:grid grid-cols-6 gap-4 px-3 py-3 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border mb-2 bg-muted/5 rounded-t-2xl">
                         <div className="col-span-3 flex gap-4 pl-3">素材与商品信息</div>
                         <div className="text-center">审核状态</div>
                         <div className="text-center">提交时间</div>

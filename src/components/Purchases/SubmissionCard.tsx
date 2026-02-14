@@ -25,12 +25,12 @@ export function SubmissionCard({ submission, onClick }: SubmissionCardProps) {
         <motion.div
             layout
             onClick={() => onClick(submission)}
-            className="group relative md:grid md:grid-cols-6 flex flex-col gap-4 p-3 rounded-2xl transition-all duration-300 bg-white/40 dark:bg-white/5 border border-border/50 hover:border-primary/30 hover:bg-white dark:hover:bg-white/10 hover:shadow-lg hover:shadow-primary/5 cursor-pointer items-center"
+            className="group relative flex flex-col md:grid md:grid-cols-6 gap-3 md:gap-4 p-3 rounded-2xl transition-all duration-300 bg-white dark:bg-white/5 border border-border/50 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 cursor-pointer md:items-center"
         >
             {/* Media + Info (Column 1-3) */}
-            <div className="md:col-span-3 flex items-center gap-4 w-full">
+            <div className="md:col-span-3 flex items-center gap-3 md:gap-4 min-w-0">
                 {/* Thumbnail Preview */}
-                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-secondary/30 border border-border/50 shadow-inner">
+                <div className="relative h-14 w-14 md:h-16 md:w-16 shrink-0 overflow-hidden rounded-xl bg-secondary/30 border border-border/50 shadow-inner">
                     {isVideo ? (
                         <div className="w-full h-full relative">
                             <video 
@@ -59,8 +59,8 @@ export function SubmissionCard({ submission, onClick }: SubmissionCardProps) {
                 </div>
 
                 {/* Product Info */}
-                <div className="min-w-0 flex-1 flex flex-col justify-center">
-                    <h3 className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors pr-4">
+                <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-sm md:text-base text-foreground truncate group-hover:text-primary transition-colors pr-2">
                         {submission.productName || "未填写商品名称"}
                     </h3>
                     <div className="flex items-center gap-2 mt-1">
@@ -71,38 +71,54 @@ export function SubmissionCard({ submission, onClick }: SubmissionCardProps) {
                 </div>
             </div>
 
-            {/* Status Column (Column 4) */}
-            <div className="md:col-span-1 flex items-center justify-between md:justify-center text-xs w-full">
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border shadow-sm shrink-0 uppercase tracking-tighter ${
-                    submission.status === 'approved' 
-                        ? 'bg-green-500/10 text-green-600 border-green-500/20'
-                        : submission.status === 'rejected' 
-                        ? 'bg-red-500/10 text-red-600 border-red-500/20'
-                        : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
-                }`}>
-                    {submission.status === 'approved' ? '已批准' : submission.status === 'rejected' ? '已拒绝' : '待审核'}
-                </span>
-                
-                {/* Mobile Only Meta */}
-                <div className="md:hidden flex items-center gap-1.5 text-muted-foreground/60">
-                    <Clock size={12} />
-                    <span className="font-mono text-[10px]">{new Date(submission.createdAt).toLocaleDateString()}</span>
-                    <Plus size={16} className="ml-2 text-primary/30" />
-                </div>
+            {/* Desktop Only Columns */}
+            {/* Status (Column 4) */}
+            <div className="hidden md:flex md:col-span-1 items-center justify-center">
+                <StatusBadge status={submission.status} />
             </div>
 
-            {/* Time Column (Column 5) */}
-            <div className="md:col-span-1 hidden md:flex items-center justify-center gap-1.5 text-muted-foreground/60 w-full">
-                <Clock size={12} className="text-muted-foreground/40" />
+            {/* Time (Column 5) */}
+            <div className="hidden md:flex md:col-span-1 items-center justify-center gap-1.5 text-muted-foreground">
+                <Clock size={12} className="opacity-70" />
                 <span className="font-mono text-[10px] tracking-tight">{new Date(submission.createdAt).toLocaleDateString()}</span>
             </div>
 
-            {/* Action Indicator (Column 6) */}
-            <div className="md:col-span-1 hidden md:flex justify-center w-full">
+            {/* Action (Column 6) */}
+            <div className="hidden md:flex md:col-span-1 justify-center">
                 <div className="h-9 w-9 rounded-full bg-muted/50 border border-border/50 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary group-hover:scale-110 transition-all shadow-sm">
                     <Plus size={18} />
                 </div>
             </div>
+
+            {/* Mobile Only Footer Row */}
+            <div className="md:hidden flex items-center justify-between pt-2 border-t border-border/40 mt-1">
+                <div className="flex items-center gap-2">
+                    <StatusBadge status={submission.status} />
+                    <div className="flex items-center gap-1.5 text-muted-foreground pl-2 border-l border-border/50">
+                        <Clock size={12} className="opacity-70" />
+                        <span className="font-mono text-[10px]">{new Date(submission.createdAt).toLocaleDateString()}</span>
+                    </div>
+                </div>
+                <div className="flex items-center text-primary/40">
+                    <span className="text-[10px] font-medium mr-1">查看详情</span>
+                    <Plus size={14} />
+                </div>
+            </div>
         </motion.div>
+    );
+}
+
+// Helper component for cleaner code
+function StatusBadge({ status }: { status: string }) {
+    return (
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border shadow-sm shrink-0 uppercase tracking-tight ${
+            status === 'approved' 
+                ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                : status === 'rejected' 
+                ? 'bg-red-500/10 text-red-600 border-red-500/20'
+                : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+        }`}>
+            {status === 'approved' ? '已批准' : status === 'rejected' ? '已拒绝' : '待审核'}
+        </span>
     );
 }
