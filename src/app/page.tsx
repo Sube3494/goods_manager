@@ -44,12 +44,13 @@ export default function Home() {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      {/* Header section with unified style */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/60">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
             库存概览
           </h1>
-          <p className="text-muted-foreground mt-2 text-lg">
+          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">
             实时监控仓库状态与资产总值。
           </p>
         </div>

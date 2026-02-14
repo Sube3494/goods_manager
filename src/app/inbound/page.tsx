@@ -121,12 +121,12 @@ export default function InboundPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto w-full space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      {/* Header */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+      {/* Header section with unified style */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">入库管理</h1>
-          <p className="text-muted-foreground mt-2">查看入库历史、凭证明细，并进行批量或手动入库登记。</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">入库管理</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">查看入库历史、凭证明细，并进行批量或手动入库登记。</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2">

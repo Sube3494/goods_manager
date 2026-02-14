@@ -83,12 +83,12 @@ export default function OutboundPage() {
   });
 
   return (
-    <div className="container mx-auto p-4 md:p-8 max-w-7xl animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-10">
+    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
+      {/* Header section with unified style */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black tracking-tight text-foreground">出库管理</h1>
-          <p className="hidden md:block text-muted-foreground font-medium px-1 mt-2">处理销售、样本或损耗，精准抵扣账面余值。</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">出库管理</h1>
+          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">处理销售、样本或损耗，精准抵扣账面余值。</p>
         </div>
 
         <button

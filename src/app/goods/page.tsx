@@ -269,11 +269,11 @@ export default function GoodsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
-      <div className="flex items-center justify-between gap-4 relative z-10">
+      {/* Header section with unified style */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all relative z-10">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
-          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-lg truncate">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-lg truncate">
             {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU。"}
           </p>
         </div>

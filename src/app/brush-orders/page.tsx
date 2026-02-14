@@ -299,12 +299,12 @@ export default function BrushOrdersPage() {
   if (!mounted) return null;
 
   return (
-    <div className="max-w-7xl mx-auto w-full space-y-8 animate-in fade-in zoom-in-95 duration-500 p-6 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+      {/* Header section with unified style */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">刷单管理</h1>
-          <p className="text-muted-foreground mt-2">管理刷单记录及佣金统计。</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">刷单管理</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">管理刷单记录及佣金统计。</p>
         </div>
         
         <div className="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-3 w-full md:w-auto">

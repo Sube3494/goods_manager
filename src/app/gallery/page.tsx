@@ -552,32 +552,31 @@ function GalleryContent() {
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header */}
-        {/* Header - Refactored for Stability */}
-        <div className="flex flex-col gap-6 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground flex items-center gap-2">
-                {productIdFilter ? (
-                  <div className="flex items-start gap-2 min-w-0 max-w-full">
-                    <span className="shrink-0 mt-0.5 sm:mt-1">实物相册</span>
-                    <span className="text-muted-foreground/30 font-light mt-0.5 sm:mt-1">/</span>
-                    <span 
-                      className="text-base sm:text-2xl font-bold text-muted-foreground/60 wrap-break-word line-clamp-2 sm:line-clamp-none"
-                      title={filteredProduct?.name}
-                    >
-                      {filteredProduct?.name || "加载中..."}
-                    </span>
-                  </div>
-                ) : (
-                  <>实物<span className="text-primary">相册</span></>
-                )}
-              </h1>
-              {!productIdFilter && (
-                <p className="text-muted-foreground/60 text-xs sm:text-sm font-medium mt-1">
-                  {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
-                </p>
+        {/* Header section with unified style */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              {productIdFilter ? (
+                <div className="flex items-start gap-2 min-w-0 max-w-full">
+                  <span className="shrink-0 mt-0.5 sm:mt-1">实物相册</span>
+                  <span className="text-muted-foreground/30 font-light mt-0.5 sm:mt-1">/</span>
+                  <span 
+                    className="text-base sm:text-2xl font-bold text-muted-foreground/60 wrap-break-word line-clamp-2 sm:line-clamp-none"
+                    title={filteredProduct?.name}
+                  >
+                    {filteredProduct?.name || "加载中..."}
+                  </span>
+                </div>
+              ) : (
+                <span>实物<span className="text-primary">相册</span></span>
               )}
-            </div>
+            </h1>
+            {!productIdFilter && (
+              <p className="text-muted-foreground mt-2 text-sm sm:text-lg">
+                {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
+              </p>
+            )}
+          </div>
 
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                {(isUploadAllowed || isAdmin) && (
@@ -619,7 +618,6 @@ function GalleryContent() {
               </div>
             </div>
           )}
-        </div>
 
         {/* Filters */}
         {!productIdFilter && (
@@ -914,7 +912,7 @@ function GalleryContent() {
                                                 if (!p) return null;
                                                 return (
                                                     <div className="h-10 w-10 rounded-lg overflow-hidden bg-background border border-border/50 shrink-0 flex items-center justify-center">
-                                                        {p.image ? (
+                                                        {p?.image ? (
                                                             /* eslint-disable-next-line @next/next/no-img-element */
                                                             <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
                                                         ) : (
@@ -1002,19 +1000,21 @@ function GalleryContent() {
                             {/* Layer 0: Ambient Background */}
                             <AnimatePresence mode="wait">
                                 <motion.div
-                                    key={`blur-${selectedImage.id}`}
+                                    key={`blur-${selectedImage?.id || 'none'}`}
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 0.3 }}
                                     exit={{ opacity: 0 }}
                                     transition={{ duration: 0.8 }}
                                     className="absolute inset-0 -z-20 pointer-events-none"
                                 >
-                                    <Image 
-                                        src={selectedImage.url} 
-                                        alt="" 
-                                        fill
-                                        className="object-cover blur-[120px] scale-125"
-                                    />
+                                    {selectedImage && (
+                                        <Image 
+                                            src={selectedImage.url} 
+                                            alt="" 
+                                            fill
+                                            className="object-cover blur-[120px] scale-125"
+                                        />
+                                    )}
                                     <div className="absolute inset-0 bg-black/40" />
                                 </motion.div>
                             </AnimatePresence>
@@ -1269,7 +1269,7 @@ function GalleryContent() {
         </motion.button>
       )}
     </AnimatePresence>
-      </div>
+    </div>
   );
 }
 
