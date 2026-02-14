@@ -71,7 +71,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
           triggerClassName
         )}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
             {!isCompact && <CalendarIcon size={14} className={cn("shrink-0", selectedDate ? "text-primary" : "text-muted-foreground")} />}
             <span className={cn("truncate", selectedDate ? "text-foreground font-medium" : "text-muted-foreground")}>
             {selectedDate ? format(selectedDate, "yyyy-MM-dd", { locale: zhCN }) : placeholder}

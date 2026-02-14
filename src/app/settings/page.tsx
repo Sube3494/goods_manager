@@ -234,7 +234,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleImportData = async (data: any) => {
+  const handleImportData = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
     try {
       showToast("正在处理并同步全量数据...", "info");
       const res = await fetch("/api/system/import", {

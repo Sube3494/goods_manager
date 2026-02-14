@@ -257,7 +257,8 @@ export default function BrushOrdersPage() {
     }, 0);
   }, [filteredOrders, showToast]);
 
-  const handleImport = async (data: Record<string, unknown>[]) => {
+  const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
+    if (!Array.isArray(data)) return;
     setIsLoading(true);
     try {
       const res = await fetch("/api/brush-orders/import", {
@@ -350,7 +351,7 @@ export default function BrushOrdersPage() {
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3">
-        <div className="h-12 md:h-11 px-5 w-full md:flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm">
+        <div className="h-10 px-5 w-full md:flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -368,7 +369,7 @@ export default function BrushOrdersPage() {
             </button>
           )}
         </div>
-        <div className="w-full sm:w-32 md:w-40 shrink-0 h-12 md:h-11">
+        <div className="w-full sm:w-32 md:w-40 shrink-0 h-10">
             <CustomSelect
                 value={selectedType}
                 onChange={setSelectedType}
@@ -386,7 +387,7 @@ export default function BrushOrdersPage() {
                 triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 shadow-sm"
             />
         </div>
-        <div className="flex flex-nowrap items-center gap-2 h-12 md:h-11">
+        <div className="flex flex-nowrap items-center gap-2 h-10">
             <DatePicker 
                 value={startDate} 
                 onChange={handleStartDateChange} 

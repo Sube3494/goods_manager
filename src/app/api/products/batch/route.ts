@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, string | number> = {};
     if (categoryId) updateData.categoryId = categoryId;
     if (supplierId) updateData.supplierId = supplierId;
 

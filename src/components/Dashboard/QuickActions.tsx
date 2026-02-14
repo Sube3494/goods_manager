@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, ArrowDownRight, ShoppingBag, PackagePlus, PackageMinus, Image as ImageIcon, Settings, Database } from "lucide-react";
+import { ArrowDownRight, ShoppingBag, PackagePlus, PackageMinus, Image as ImageIcon, Settings, Database } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 

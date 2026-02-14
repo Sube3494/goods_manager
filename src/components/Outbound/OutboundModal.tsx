@@ -222,7 +222,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={`text-xs font-bold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{p.name}</p>
+                              <p className={`text-xs truncate ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`} title={p.name}>{p.name}</p>
                               <p className="text-[10px] text-muted-foreground truncate font-mono uppercase tracking-tighter">{p.sku}</p>
                             </div>
                             <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}>
@@ -243,7 +243,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                 <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
                     <div className="p-4 border-b border-white/5 grid grid-cols-2 gap-4 shrink-0">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground px-1">出库类型</label>
+                            <label className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground px-1">出库类型</label>
                             <CustomSelect 
                                 value={type}
                                 onChange={(val) => setType(val)}
@@ -253,11 +253,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                     { value: "Loss", label: "库存损耗" },
                                     { value: "Return", label: "退货出库" }
                                 ]}
-                                triggerClassName="bg-muted/50 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm font-bold"
+                                triggerClassName="bg-muted/50 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-muted-foreground px-1">备注</label>
+                            <label className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground px-1">备注</label>
                             <input 
                                 type="text"
                                 value={note}
@@ -277,7 +277,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                             {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-bold text-foreground truncate">{item.name}</p>
+                                            <p className="text-sm text-foreground truncate" title={item.name}>{item.name}</p>
                                             <p className="text-[10px] text-muted-foreground font-mono truncate">{item.sku}</p>
                                         </div>
                                         <div className="flex items-center gap-1 bg-muted/50 rounded-full border border-white/10 p-1">
@@ -327,17 +327,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                     <div className="p-4 sm:p-6 border-t border-white/5 bg-muted/10 shrink-0">
                         <div className="flex items-center justify-between mb-4 sm:mb-6">
                             <div className="flex flex-col gap-1">
-                                <span className="text-xs sm:text-sm text-muted-foreground">共选择 {selectedItems.length} 本项</span>
-                                {selectedItems.length > 0 && (
-                                    <span className="text-[10px] text-primary font-bold hidden sm:inline">计费逻辑已确认</span>
-                                )}
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">出库估算</p>
-                                <div className="flex flex-col sm:block">
-                                    <span className="text-lg sm:text-2xl font-black text-foreground">先进先出</span>
-                                    <span className="text-[10px] sm:text-xs text-muted-foreground sm:ml-2 block sm:inline">自动核算账面余值</span>
-                                </div>
+                                <span className="text-xs sm:text-sm text-muted-foreground">共选择 {selectedItems.length} 项商品</span>
                             </div>
                         </div>
                         <button

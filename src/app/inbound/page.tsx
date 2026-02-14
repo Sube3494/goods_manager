@@ -79,7 +79,7 @@ export default function InboundPage() {
     }
   };
 
-  const handleImport = async (data: Record<string, unknown>[]) => {
+  const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
     try {
       const res = await fetch("/api/products/import", {
         method: "POST",
