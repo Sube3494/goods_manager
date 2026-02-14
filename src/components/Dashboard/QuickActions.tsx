@@ -44,7 +44,7 @@ export function QuickActions() {
               <motion.button 
                  onClick={() => router.push("/inbound?action=import")}
                  variants={itemAnim} 
-                 className="group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-primary px-4 py-6 text-center text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:shadow-primary/40"
+                 className="group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-primary px-4 py-6 text-center text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:shadow-primary/40"
               >
                 <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
                   <PackagePlus size={24} />
@@ -56,7 +56,7 @@ export function QuickActions() {
               <motion.button 
                  onClick={() => router.push("/outbound")}
                  variants={itemAnim} 
-                 className="group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-secondary px-4 py-6 text-center text-sm font-bold text-secondary-foreground border border-border/50 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-secondary/80"
+                 className="group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-secondary px-4 py-6 text-center text-sm font-medium text-secondary-foreground border border-border/50 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-secondary/80"
               >
                 <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-gray-800 shadow-sm transition-transform group-hover:scale-110">
                   <PackageMinus size={24} className="text-primary" />
@@ -76,7 +76,7 @@ export function QuickActions() {
                 key={action.path + i}
                 onClick={() => router.push(action.path)}
                 variants={itemAnim} 
-                className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-4 py-3 text-left text-sm font-semibold text-foreground backdrop-blur-md transition-all hover:bg-card hover:border-primary/20"
+                className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card/40 px-4 py-3 text-left text-sm font-medium text-foreground backdrop-blur-md transition-all hover:bg-card hover:border-primary/20"
               >
                 <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:${action.color} transition-colors`}>
                   <action.icon size={18} />
@@ -89,7 +89,7 @@ export function QuickActions() {
           <motion.button 
             onClick={() => router.push("/settings")}
             variants={itemAnim} 
-            className="flex w-full items-center justify-center gap-2 py-2 text-[10px] font-bold text-muted-foreground/30 hover:text-primary transition-colors uppercase tracking-widest pt-2"
+            className="flex w-full items-center justify-center gap-2 py-2 text-[10px] font-medium text-muted-foreground/30 hover:text-primary transition-colors uppercase tracking-widest pt-2"
           >
             <Settings size={12} />
             高级系统设置

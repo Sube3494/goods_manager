@@ -5,7 +5,7 @@ import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { Search, Plus, Download } from "lucide-react";
-import { Product, Category, Supplier } from "@/lib/types";
+import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
@@ -184,7 +184,7 @@ export default function GoodsPage() {
     });
   };
 
-  const handleSaveItem = async (data: Partial<Product>) => {
+  const handleSaveItem = async (data: Partial<Product>, galleryItems?: GalleryItem[]) => {
     try {
       const method = editingProduct ? "PUT" : "POST";
       const url = "/api/products";
@@ -198,6 +198,24 @@ export default function GoodsPage() {
       });
 
       if (res.ok) {
+        const product = await res.json();
+        
+        // Handle gallery items persistence, especially for new products
+        if (galleryItems && galleryItems.length > 0) {
+          const tempItems = galleryItems.filter(item => item.id.startsWith('temp-'));
+          if (tempItems.length > 0) {
+            await fetch("/api/gallery", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                productId: product.id,
+                urls: tempItems.map(item => ({ url: item.url, type: item.type })),
+                isPublic: product.isPublic // Match product visibility
+              })
+            });
+          }
+        }
+
         showToast(editingProduct ? "商品更新成功" : "商品创建成功", "success");
         setIsNewProductOpen(false);
         fetchGoods();
@@ -270,31 +288,31 @@ export default function GoodsPage() {
   return (
     <div className="space-y-8">
       {/* Header section with unified style */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all relative z-10">
+      <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg truncate">
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
+          <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
             {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU。"}
           </p>
         </div>
         
         <div className="flex items-center gap-2 shrink-0">
            {user && (
-             <div className="glass p-1 rounded-full flex gap-1 items-center h-10 shadow-sm border border-white/10">
+             <div className="glass p-1 rounded-full flex gap-1 items-center h-9 sm:h-10 shadow-sm border border-white/10">
                <button 
                   onClick={() => setIsImportOpen(true)}
-                  className="flex items-center justify-center rounded-full w-8 h-8 sm:w-auto sm:px-4 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  className="flex items-center justify-center rounded-full w-7 h-7 sm:w-auto sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                   title="Excel 导入"
                 >
-                  <Download size={18} />
+                  <Download size={16} className="sm:size-[18px]" />
                   <span className="hidden sm:inline ml-2">导入</span>
                 </button>
-                <div className="w-px h-4 bg-white/20 mx-1 hidden sm:block"></div>
+                <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
                 <button 
                   onClick={handleCreate}
-                  className="flex items-center gap-2 rounded-full bg-primary px-3 sm:px-6 h-8 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all whitespace-nowrap"
+                  className="flex items-center gap-2 rounded-full bg-primary px-3 sm:px-6 h-7 sm:h-8 text-[11px] sm:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all whitespace-nowrap"
                 >
-                  <Plus size={18} />
+                  <Plus size={16} className="sm:size-[18px]" />
                   <span className="hidden sm:inline">新建商品</span>
                   <span className="inline sm:hidden">新建</span>
                 </button>
@@ -305,7 +323,7 @@ export default function GoodsPage() {
 
       {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
-          <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1">
+          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:flex-1 shrink-0">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -316,7 +334,7 @@ export default function GoodsPage() {
             />
           </div>
           
-          <div className="grid grid-cols-2 sm:flex gap-3 h-10 w-full sm:w-auto">
+          <div className="grid grid-cols-2 sm:flex gap-3 h-10 sm:h-11 w-full sm:w-auto">
              <div className="w-full sm:w-40 h-full"> 
                 <CustomSelect 
                     value={selectedStatus}
@@ -326,7 +344,7 @@ export default function GoodsPage() {
                         { value: 'low_stock', label: '库存预警' }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm py-0"
                 />
              </div>
              <div className="w-full sm:w-40 h-full">
@@ -338,7 +356,7 @@ export default function GoodsPage() {
                         ...categories.map(c => ({ value: c.name, label: c.name }))
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm py-0"
                 />
              </div>
           </div>
@@ -346,13 +364,13 @@ export default function GoodsPage() {
 
       {/* Grid */}
       {isLoading ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-64 rounded-2xl bg-muted/20 animate-pulse border border-border" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredGoods.map((product, index) => (
             <GoodsCard 
               key={product.id} 

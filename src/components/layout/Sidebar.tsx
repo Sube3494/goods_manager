@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, LogOut, LogIn, X, CreditCard, ArrowUpRight } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, LogOut, LogIn, X, CreditCard, ArrowUpRight, CheckCircle } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -25,6 +25,7 @@ const navItems = [
   { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true },
   { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true },
   { name: "实物相册", href: "/gallery", icon: Camera },
+  { name: "实拍审核", href: "/gallery/submissions", icon: CheckCircle, adminOnly: true },
   { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true },
 ];
 

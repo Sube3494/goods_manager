@@ -24,7 +24,7 @@ function cn(...inputs: ClassValue[]) {
 interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<Product, "id"> & { id?: string }) => void;
+  onSubmit: (data: Omit<Product, "id"> & { id?: string }, galleryItems?: GalleryItem[]) => void;
   initialData?: Product | null;
 }
 
@@ -39,7 +39,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     image: initialData?.image || "",
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
-    isPublic: initialData?.isPublic ?? true
+    isPublic: initialData?.isPublic ?? true,
+    hideCost: initialData?.hideCost ?? false
   });
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -131,41 +132,52 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
       }
     };
 
+    const fetchGallery = async (productId: string) => {
+      try {
+        const res = await fetch(`/api/gallery?productId=${productId}`);
+        if (res.ok) {
+          setGalleryImages(await res.json());
+        } else {
+          console.error("Failed to fetch gallery images");
+          setGalleryImages([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch gallery images:", error);
+        setGalleryImages([]);
+      }
+    };
+
     if (isOpen) {
       fetchData();
       
-      // 强制同步 initialData 到本地 formData 状态
+      // Clear gallery images first to prevent stale data from showing
+      setGalleryImages([]);
+      
       if (initialData) {
         setFormData({
-            name: initialData.name || "",
-            categoryId: initialData.categoryId || "",
-            costPrice: initialData.costPrice?.toString() || "",
-            stock: initialData.stock?.toString() || "",
-            image: initialData.image || "",
-            supplierId: initialData.supplierId || "",
-            sku: initialData.sku || "",
-            isPublic: initialData.isPublic ?? true
+          sku: initialData.sku || "",
+          name: initialData.name,
+          costPrice: String(initialData.costPrice || ""),
+          stock: String(initialData.stock || ""),
+          categoryId: initialData.categoryId || "",
+          supplierId: initialData.supplierId || "",
+          image: initialData.image || "",
+          isPublic: initialData.isPublic ?? true,
+          hideCost: initialData.hideCost ?? false,
         });
+        fetchGallery(initialData.id);
       } else {
-        // 新增模式，重置为空
         setFormData({
-            name: "",
-            categoryId: "",
-            costPrice: "",
-            stock: "",
-            image: "",
-            supplierId: "",
-            sku: "",
-            isPublic: true
+          sku: "",
+          name: "",
+          costPrice: "",
+          stock: "",
+          categoryId: "",
+          supplierId: "",
+          image: "",
+          isPublic: true,
+          hideCost: false,
         });
-      }
-
-      if (initialData?.id) {
-        fetch(`/api/gallery?productId=${initialData.id}`)
-          .then(res => res.json())
-          .then(data => setGalleryImages(data));
-      } else {
-        setGalleryImages([]);
       }
     }
   }, [isOpen, initialData]);
@@ -482,7 +494,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         costPrice: Number(formData.costPrice),
         stock: Number(formData.stock),
         id: initialData?.id
-    });
+    }, galleryImages);
     onClose();
   };
 
@@ -558,14 +570,14 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-9999 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-20000 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-20000 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">{initialData ? "编辑商品" : "新增商品"}</h2>

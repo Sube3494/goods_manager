@@ -115,11 +115,25 @@ model GalleryItem {
   isPublic  Boolean  @default(true)
   type      String   @default("image")
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
+}
+
+model GallerySubmission {
+  id          String   @id @default(cuid())
+  urls        Json              // Array of {url: string, type: 'image'|'video'}
+  sku         String?           // User provided SKU
+  productName String?           // User provided Product Name
+  status      String   @default("pending") // pending, approved, rejected
+  notes       String?           // Admin notes or rejection reason
+  productId       String?           // Associated product ID (filled by admin during approval)
+  selectedIndices Json?             // Array of indices that were approved
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
 }
 
 model User {

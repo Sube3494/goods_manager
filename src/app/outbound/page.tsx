@@ -85,15 +85,15 @@ export default function OutboundPage() {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
       {/* Header section with unified style */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
+      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">出库管理</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">出库管理</h1>
           <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">处理销售、样本或损耗，精准抵扣账面余值。</p>
         </div>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="group relative h-10 md:h-11 flex items-center justify-center gap-2 px-5 md:px-8 bg-primary text-primary-foreground rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 overflow-hidden shrink-0"
+          className="group relative h-9 md:h-11 flex items-center justify-center gap-2 px-4 md:px-8 bg-primary text-primary-foreground rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 overflow-hidden shrink-0"
         >
           <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
           <Plus size={18} className="relative md:size-[20px]" />
@@ -116,13 +116,13 @@ export default function OutboundPage() {
         
         <div className="flex flex-col sm:flex-row gap-3 h-auto sm:h-10 w-full lg:w-auto">
             {/* Date Range Pickers */}
-            <div className="flex items-center gap-2 h-10 shrink-0">
+            <div className="flex items-center gap-2 h-10 shrink-0 w-full sm:w-auto">
                 <DatePicker 
                     value={startDate} 
                     onChange={setStartDate} 
                     maxDate={endDate}
                     placeholder="起始日期" 
-                    className="h-full w-28 md:w-36"
+                    className="h-full flex-1 md:w-36"
                     triggerClassName="rounded-full shadow-sm"
                     isCompact
                 />
@@ -132,7 +132,7 @@ export default function OutboundPage() {
                     onChange={setEndDate} 
                     minDate={startDate}
                     placeholder="截至日期" 
-                    className="h-full w-28 md:w-36"
+                    className="h-full flex-1 md:w-36"
                     triggerClassName="rounded-full shadow-sm"
                     isCompact
                     align="right"

@@ -20,9 +20,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
   const showSidebar = !isLoginPage && !!user;
 
-  return (
+    return (
     <ToastProvider>
-        <div className="min-h-screen bg-transparent text-foreground relative flex font-sans overflow-hidden">
+        <div className="w-full min-h-screen bg-transparent text-foreground relative flex font-sans overflow-hidden">
         {/* Ambient Background Mesh - Animated Blobs */}
         <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
             {/* Subtle Ambient Light - Clean & Professional */}
@@ -38,8 +38,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         )}
         
         <div className={cn(
-            "flex-1 flex flex-col min-h-screen transition-all duration-500 ease-in-out relative z-10",
-            showSidebar ? "lg:ml-72" : "ml-0"
+            "flex-1 flex flex-col min-h-screen transition-all duration-500 ease-in-out relative z-10 w-full",
+            showSidebar ? "lg:pl-72" : "pl-0"
         )}>
             {!isLoginPage && (
               <MobileHeader 
@@ -53,7 +53,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     {!user && !isLoading && (
                         <Link 
                             href="/login"
-                            className="flex items-center gap-2 px-5 h-10 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-bold hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm active:scale-95"
+                            className="flex items-center gap-2 px-5 h-10 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm active:scale-95"
                         >
                             <LogIn size={18} />
                             管理员登录
@@ -63,12 +63,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 </header>
             )}            
             <main className={cn(
-                "flex-1",
-                !isLoginPage && "px-4 sm:px-6 lg:px-10 pb-10 pt-16 lg:pt-0"
+                "flex-1 w-full",
+                !isLoginPage && (pathname.includes("/gallery") ? "pb-10 pt-16 lg:pt-0" : "px-4 sm:px-6 lg:px-10 pb-10 pt-16 lg:pt-0")
             )}>
                 <div className={cn(
                     "h-full animate-fade-in",
-                    !isLoginPage && "mx-auto max-w-7xl"
+                    !isLoginPage && (pathname.includes("/gallery") ? "w-full max-w-none px-4 sm:px-6 lg:px-10" : "mx-auto max-w-7xl")
                 )}>
                     {children}
                 </div>

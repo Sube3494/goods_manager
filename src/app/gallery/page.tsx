@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
-import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle, Info, ArrowUp } from "lucide-react";
+import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle, Info, ArrowUp, Trash2 } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -260,13 +260,14 @@ function GalleryContent() {
     productId: string;
     isPublic: boolean;
     urls: { url: string; type: 'image' | 'video' }[],
-    tags: ""
+    tags: string
   }>({
     productId: "",
     isPublic: true,
     urls: [],
     tags: ""
   });
+  const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<number[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -324,44 +325,86 @@ function GalleryContent() {
     };
   }, [selectedImage, isUploadModalOpen]);
 
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    // 1. Check current count
+    const currentCount = uploadForm.urls.length;
+    const remainingSlots = 9 - currentCount;
+
+    if (remainingSlots <= 0) {
+      showToast("最多只能上传 9 个文件", "error");
+      e.target.value = ''; // Reset input
+      return;
+    }
+
+    // 2. Slice files to fit limit
+    const filesArray = Array.from(files);
+    let filesToUpload = filesArray;
+    
+    if (filesArray.length > remainingSlots) {
+      showToast(`最多只能上传 9 个文件，已为您保留前 ${remainingSlots} 个`, "error");
+      filesToUpload = filesArray.slice(0, remainingSlots);
+    }
+
     setIsUploading(true);
 
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        // Use streaming upload for reliability (especially for videos)
-        const arrayBuffer = await file.arrayBuffer();
-        
-        const res = await fetch("/api/upload", {
-            method: "POST",
-            headers: {
-              "Content-Type": file.type,
-              "X-File-Name": encodeURIComponent(file.name),
-              "X-File-Type": file.type
-            },
-            body: arrayBuffer,
-        });
+      const uploadPromises = filesToUpload.map(async (file) => {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          
+          const res = await fetch("/api/upload", {
+              method: "POST",
+              headers: {
+                "Content-Type": file.type,
+                "X-File-Name": encodeURIComponent(file.name),
+                "X-File-Type": file.type
+              },
+              body: arrayBuffer,
+          });
 
-        if (res.ok) {
-            const data = await res.json();
-            return {
-                url: data.url,
-                type: data.type
-            };
+          if (res.ok) {
+              const data = await res.json();
+              return {
+                  url: data.url,
+                  type: data.type
+              };
+          } else {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.error || "服务器上传失败");
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error(`File ${file.name} upload failed:`, errorMessage);
+          throw err;
         }
-        return null;
       });
 
       const results = await Promise.all(uploadPromises);
       const successfulFiles = results.filter((res): res is { url: string; type: 'image' | 'video' } => res !== null);
       
-      setUploadForm(prev => ({ ...prev, urls: [...prev.urls, ...successfulFiles] }));
+      // 3. De-duplicate based on URL
+      setUploadForm(prev => {
+        const existingUrls = new Set(prev.urls.map(u => u.url));
+        const uniqueNewFiles = successfulFiles.filter(f => !existingUrls.has(f.url));
+        
+        if (uniqueNewFiles.length < successfulFiles.length) {
+             showToast("部分文件已存在，已自动过滤重复项", "success");
+        }
+        
+        return { 
+          ...prev, 
+          urls: [...prev.urls, ...uniqueNewFiles] 
+        };
+      });
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "上传失败，请检查网络或文件大小";
       console.error("Upload failed:", error);
+      showToast(errorMessage, "error");
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -370,25 +413,61 @@ function GalleryContent() {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (uploadForm.urls.length === 0 || !uploadForm.productId) return;
+    if (uploadForm.urls.length === 0) return;
+
+    // Admin direct upload logic
+    if (isAdmin && uploadForm.productId) {
+      try {
+        const res = await fetch("/api/gallery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...uploadForm,
+            tags: uploadForm.tags.split(",").map(t => t.trim()).filter(Boolean)
+          })
+        });
+
+        if (res.ok) {
+          setIsUploadModalOpen(false);
+          setUploadForm({ productId: "", isPublic: true, urls: [], tags: "" });
+          showToast("发布成功", "success");
+          fetchData();
+        }
+      } catch (error) {
+        console.error("Gallery submit failed:", error);
+        showToast("发布失败", "error");
+      }
+      return;
+    }
+
+    // Non-admin or missing product ID (Submission logic)
+    if (!uploadForm.productId && !uploadForm.tags && !isAdmin) { // Using tags field as a temporary storage or just relying on SKU/Name
+        // Validation check for SKU or Product Name is handled by the API and UI
+    }
 
     try {
-      const res = await fetch("/api/gallery", {
+      const res = await fetch("/api/gallery/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...uploadForm,
-          tags: uploadForm.tags.split(",").map(t => t.trim()).filter(Boolean)
+          urls: uploadForm.urls,
+          sku: uploadForm.tags.split(",")[0]?.trim() || "", // Temporary use of tags field or new state
+          productName: uploadForm.tags.split(",")[1]?.trim() || "",
+          productId: uploadForm.productId // Send productId if available
         })
       });
 
       if (res.ok) {
         setIsUploadModalOpen(false);
         setUploadForm({ productId: "", isPublic: true, urls: [], tags: "" });
-        fetchData();
+        showToast("已提交审核，请耐心等待管理员处理", "success");
+      } else {
+        const data = await res.json();
+        showToast(data.error || "提交失败", "error");
       }
     } catch (error) {
-      console.error("Gallery submit failed:", error);
+      console.error("Submission failed:", error);
+      showToast("提交失败", "error");
     }
   };
 
@@ -550,10 +629,10 @@ function GalleryContent() {
   };
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+    <div className="w-full space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header */}
         {/* Header section with unified style */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
+        <div className="flex flex-row items-center justify-between gap-4 mb-8 transition-all">
           <div className="flex-1 min-w-0">
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-2">
               {productIdFilter ? (
@@ -579,13 +658,24 @@ function GalleryContent() {
           </div>
 
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                {/* Removed redundant Review Submissions button */}
+                
+
                {(isUploadAllowed || isAdmin) && (
                  <button 
                    onClick={() => {
                      setIsUploadModalOpen(true);
                      if (productIdFilter && productIdFilter !== 'undefined') {
                        setUploadForm(prev => ({ ...prev, productId: productIdFilter }));
-                     }
+                       // Pre-fill tags for guests so they don't have to type it manually if product is known
+                       const p = products.find(prod => prod.id === productIdFilter);
+                       if (p && !isAdmin) {
+                          setUploadForm(prev => ({ ...prev, tags: `${p.sku || ''},${p.name || ''}` }));
+                       }
+                     } else {
+                        // Reset form if on main gallery page to avoid stale state from previous navigations
+                         setUploadForm({ productId: "", isPublic: true, urls: [], tags: "" });
+                      }
                    }}
                    className="h-10 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
                  >
@@ -595,10 +685,10 @@ function GalleryContent() {
                
                {productIdFilter && (
                    <button 
-                      onClick={() => router.push("/gallery")}
+                      onClick={() => router.back()}
                       className="h-10 px-4 sm:px-6 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-foreground flex items-center justify-center gap-2 transition-all font-bold whitespace-nowrap shadow-sm hover:bg-muted"
                    >
-                      <ArrowLeft size={18} /> <span className="hidden sm:inline">返回全集</span><span className="sm:hidden">返回</span>
+                      <ArrowLeft size={18} /> <span>返回</span>
                    </button>
                )}
             </div>
@@ -606,7 +696,7 @@ function GalleryContent() {
 
           {!productIdFilter && (
             <div className="flex flex-col sm:flex-row gap-3">
-              <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
+              <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full shrink-0">
                 <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
                     type="text" 
@@ -655,8 +745,13 @@ function GalleryContent() {
 
 
 
-        {/* Responsive Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-6">
+        {/* Responsive Grid / Waterfall */}
+        <div className={cn(
+            "w-full grid gap-3 sm:gap-6",
+            productIdFilter && productIdFilter !== 'undefined'
+                ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8"
+                : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+        )}>
            <AnimatePresence mode="popLayout">
             {productIdFilter && productIdFilter !== 'undefined' ? (
                 filteredItems.map((item, index) => {
@@ -668,8 +763,9 @@ function GalleryContent() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9 }}
                             transition={{ duration: 0.4, delay: index * 0.05 }}
+                            className="break-inside-avoid mb-3 sm:mb-6"
                         >
-                            <div className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
+                            <div className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 cursor-pointer"
                                  onClick={() => {
                                      if (selectedIds.length > 0) {
                                          toggleSelect(item.id);
@@ -678,28 +774,26 @@ function GalleryContent() {
                                      }
                                  }}
                             >
-                                {/* Image Container */}
-                                <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
+                                {/* Media Container */}
+                                <div className="relative overflow-hidden bg-muted">
                                     {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
-                                        <div className="relative w-full h-full bg-black flex items-center justify-center">
+                                        <div className="relative w-full bg-black flex items-center justify-center">
                                             <video 
                                                 src={item.url} 
-                                                className="w-full h-full object-cover pointer-events-none"
+                                                className="w-full h-auto object-contain pointer-events-none"
                                                 muted
                                                 preload="metadata"
                                             />
                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                <PlayCircle size={48} className="text-white/80 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
+                                                <PlayCircle size={40} className="text-white/80 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
                                             </div>
                                         </div>
                                     ) : (
-                                        <Image 
+                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                        <img 
                                             src={item.url} 
                                             alt={item.product?.name || "Product image"} 
-                                            fill 
-                                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                            priority={index < 4}
-                                            className="object-cover transition-transform duration-700 group-hover:scale-105" 
+                                            className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105" 
                                         />
                                     )}
                                     
@@ -746,7 +840,12 @@ function GalleryContent() {
                     );
                 })
             ) : (
-                groupedProducts.map((group, index) => (
+                groupedProducts.map((group, index) => {
+                    // Find first image for cover, or fallback to first item
+                    const coverItem = group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) || group.items[0];
+                    const isVideoCover = coverItem.type === 'video' || /\.(mp4|mov|webm)$/i.test(coverItem.url);
+
+                    return (
                     <motion.div
                         key={group.product.id}
                         initial={{ opacity: 0, y: 20 }}
@@ -759,13 +858,29 @@ function GalleryContent() {
                             onClick={() => router.push(`/gallery?productId=${group.product.id}`)}
                         >
                             <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
-                                <Image 
-                                    src={group.items[0].url} 
-                                    alt={group.product.name} 
-                                    fill 
-                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                    className="object-cover transition-transform duration-700 group-hover:scale-105" 
-                                />
+                                {isVideoCover ? (
+                                    <video 
+                                        src={coverItem.url} 
+                                        className="w-full h-full object-cover pointer-events-none"
+                                        muted
+                                        loop
+                                        playsInline
+                                        // Optional: autoPlay if you want motion on hover, but static is safer for perf
+                                        onMouseOver={e => e.currentTarget.play()}
+                                        onMouseOut={e => {
+                                            e.currentTarget.pause();
+                                            e.currentTarget.currentTime = 0;
+                                        }}
+                                    />
+                                ) : (
+                                    <Image 
+                                        src={coverItem.url} 
+                                        alt={group.product.name} 
+                                        fill 
+                                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                        className="object-cover transition-transform duration-700 group-hover:scale-105" 
+                                    />
+                                )}
                                 
                                 {/* Image Count Badge */}
                                 <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
@@ -783,7 +898,7 @@ function GalleryContent() {
                             </div>
                         </div>
                     </motion.div>
-                ))
+                )})
             )}
 
             {filteredItems.length === 0 && productIdFilter && (
@@ -834,30 +949,87 @@ function GalleryContent() {
                                 </button>
                             </div>
 
+
+
                             <form onSubmit={handleUploadSubmit} className="p-6 space-y-5 flex-1 overflow-y-auto">
                                 {/* Upload Box */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                        <Camera size={16} className="text-black dark:text-white" /> 选择文件 ({uploadForm.urls.length})
-                                    </label>
-                                    {uploadForm.urls.length > 0 && (
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setUploadForm(prev => ({ ...prev, urls: [] }))}
-                                            className="text-xs text-destructive hover:underline"
-                                        >
-                                            清空所有
-                                        </button>
-                                    )}
+                                    <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                            <Camera size={16} className="text-black dark:text-white" /> 选择文件 ({uploadForm.urls.length})
+                                        </label>
+                                        
+                                        {uploadForm.urls.length > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                {/* Select All / Deselect All */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (selectedDeleteIndices.length === uploadForm.urls.length) {
+                                                            setSelectedDeleteIndices([]); // Deselect All
+                                                        } else {
+                                                            setSelectedDeleteIndices(uploadForm.urls.map((_, i) => i)); // Select All
+                                                        }
+                                                    }}
+                                                    className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                                                >
+                                                    {selectedDeleteIndices.length === uploadForm.urls.length ? "取消全选" : "全选"}
+                                                </button>
+                                                
+                                                <div className="w-px h-3 bg-border" />
+
+                                                {selectedDeleteIndices.length > 0 ? (
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => {
+                                                            setUploadForm(prev => ({
+                                                                ...prev,
+                                                                urls: prev.urls.filter((_, i) => !selectedDeleteIndices.includes(i))
+                                                            }));
+                                                            setSelectedDeleteIndices([]);
+                                                        }}
+                                                        className="text-xs font-medium text-destructive hover:text-destructive/80 transition-colors flex items-center gap-1"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                        删除已选 ({selectedDeleteIndices.length})
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => setUploadForm(prev => ({ ...prev, urls: [] }))}
+                                                        className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                        清空
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                     
                                     <div className="grid grid-cols-3 gap-3">
                                         {/* Existing Images */}
-                                        {uploadForm.urls.map((file, idx) => (
-                                            <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group border border-border">
+                                        {uploadForm.urls.map((file, idx) => {
+                                            const isSelected = selectedDeleteIndices.includes(idx);
+                                            return (
+                                            <div 
+                                                key={idx} 
+                                                onClick={() => {
+                                                    setSelectedDeleteIndices(prev => 
+                                                        prev.includes(idx) 
+                                                            ? prev.filter(i => i !== idx)
+                                                            : [...prev, idx]
+                                                    );
+                                                }}
+                                                className={cn(
+                                                    "relative aspect-square rounded-2xl overflow-hidden border transition-all cursor-pointer",
+                                                    isSelected ? "ring-4 ring-primary ring-offset-2 dark:ring-offset-gray-900 border-primary scale-[0.98]" : "border-border hover:border-primary/50"
+                                                )}
+                                            >
                                                 {file.type === 'video' ? (
                                                      <video 
                                                         src={file.url} 
-                                                        className="w-full h-full object-cover"
+                                                        className="w-full h-full object-cover pointer-events-none"
                                                         muted
                                                     />
                                                 ) : (
@@ -866,22 +1038,30 @@ function GalleryContent() {
                                                       alt="Upload preview"
                                                       fill 
                                                       sizes="(max-width: 640px) 33vw, 150px"
-                                                      className="object-cover" 
+                                                      className="object-cover pointer-events-none" 
                                                     />
                                                 )}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setUploadForm(prev => ({ ...prev, urls: prev.urls.filter((_, i) => i !== idx) }))}
-                                                    className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-destructive transition-colors opacity-0 group-hover:opacity-100"
-                                                >
-                                                    <X size={12} />
-                                                </button>
+                                                
+                                                {/* Selection Checkbox */}
+                                                <div className={cn(
+                                                    "absolute top-2 right-2 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shadow-xl",
+                                                    isSelected 
+                                                        ? "bg-primary border-primary text-white" 
+                                                        : "bg-black/30 border-white/50 backdrop-blur-sm hover:border-white"
+                                                )}>
+                                                    {isSelected && <CheckCircle size={14} strokeWidth={3} className="drop-shadow-sm" />}
+                                                </div>
+
+                                                <div className={cn(
+                                                    "absolute inset-0 bg-black/0 transition-colors z-10",
+                                                    isSelected ? "bg-black/20" : "group-hover:bg-black/10"
+                                                )} />
                                             </div>
-                                        ))}
+                                        )})}
 
                                         {/* Add Button */}
                                         <label className="relative aspect-square rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer overflow-hidden group">
-                                            <input type="file" className="hidden" accept="image/*" multiple onChange={handleFileUpload} />
+                                            <input type="file" className="hidden" accept="image/*,video/*" multiple onChange={handleFileUpload} />
                                             <div className="p-2 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
                                                 {isUploading ? (
                                                     <div className="h-6 w-6 animate-spin border-2 border-primary border-t-transparent rounded-full" />
@@ -897,68 +1077,137 @@ function GalleryContent() {
                                     <p className="text-xs text-muted-foreground mt-2">支持多选，每次最多上传 9 个文件。</p>
                                 </div>
 
-                                {/* Product Select */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                        <Package size={16} /> 关联商品
-                                    </label>
-                                    <div 
-                                        onClick={() => setIsProductSelectOpen(true)}
-                                        className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border hover:bg-muted transition-colors cursor-pointer flex items-center justify-between group"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            {uploadForm.productId ? (() => {
-                                                const p = products.find(p => p.id === uploadForm.productId);
-                                                if (!p) return null;
-                                                return (
-                                                    <div className="h-10 w-10 rounded-lg overflow-hidden bg-background border border-border/50 shrink-0 flex items-center justify-center">
-                                                        {p?.image ? (
-                                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                                            <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
-                                                        ) : (
-                                                            <Package size={18} className="text-muted-foreground/50" />
-                                                        )}
-                                                    </div>
-                                                );
-                                            })() : (
-                                                <div className="h-10 w-10 rounded-lg bg-background/50 border border-border/50 shrink-0 flex items-center justify-center border-dashed">
-                                                    <Package size={18} className="text-muted-foreground/30" />
-                                                </div>
-                                            )}
-                                            
-                                            <div className="flex flex-col truncate">
-                                                <span className={cn("text-sm font-medium truncate", !uploadForm.productId ? "text-muted-foreground" : "text-foreground")}>
-                                                    {uploadForm.productId 
-                                                        ? (() => {
+                                {/* Product Select / Submission Info */}
+                                <div className="space-y-4">
+                                    {isAdmin ? (
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                                <Package size={16} /> 关联商品
+                                            </label>
+                                            <div 
+                                                onClick={() => setIsProductSelectOpen(true)}
+                                                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border transition-colors flex items-center justify-between group cursor-pointer hover:bg-muted mb-2"
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    {uploadForm.productId ? (() => {
+                                                        const p = products.find(p => p.id === uploadForm.productId);
+                                                        if (!p) return null;
+                                                        return (
+                                                            <div className="h-10 w-10 rounded-lg overflow-hidden bg-background border border-border/50 shrink-0 flex items-center justify-center">
+                                                                {p?.image ? (
+                                                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                                                    <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                                                                ) : (
+                                                                    <Package size={18} className="text-muted-foreground/50" />
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })() : (
+                                                        <div className="h-10 w-10 rounded-lg bg-background/50 border border-border/50 shrink-0 flex items-center justify-center border-dashed">
+                                                            <Package size={18} className="text-muted-foreground/30" />
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <div className="flex flex-col">
+                                                        <span className={cn("text-sm", !uploadForm.productId ? "text-muted-foreground" : "text-foreground")}>
+                                                            {uploadForm.productId 
+                                                                ? products.find(p => p.id === uploadForm.productId)?.name || "未知商品"
+                                                                : "点击选择关联商品..."
+                                                            }
+                                                        </span>
+                                                        {uploadForm.productId && (() => {
                                                             const p = products.find(p => p.id === uploadForm.productId);
-                                                            return p ? p.name : "未知商品";
-                                                        })()
-                                                        : "点击选择关联商品..."
-                                                    }
-                                                </span>
-                                                {uploadForm.productId && (() => {
-                                                     const p = products.find(p => p.id === uploadForm.productId);
-                                                     return p && (
-                                                         <span className="text-xs text-muted-foreground font-mono truncate opacity-70">
-                                                             {p.sku}
-                                                         </span>
-                                                     );
-                                                })()}
+                                                            return p && (
+                                                                <span className="text-xs text-muted-foreground font-mono opacity-70">
+                                                                    {p.sku}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                                <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
                                             </div>
                                         </div>
-                                        <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
-                                    </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {uploadForm.productId ? (
+                                                <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3 mb-4">
+                                                    <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 border border-black/10">
+                                                        {products.find(p => p.id === uploadForm.productId)?.image ? (
+                                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                                            <img 
+                                                                src={products.find(p => p.id === uploadForm.productId)?.image || ''} 
+                                                                alt="Product" 
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full bg-white flex items-center justify-center">
+                                                                <Package size={20} className="text-black/20" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-primary uppercase tracking-wider mb-0.5">关联商品</p>
+                                                        <p className="text-foreground text-sm">
+                                                            {products.find(p => p.id === uploadForm.productId)?.name}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                            <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-start gap-3">
+                                                <Info size={18} className="text-primary shrink-0 mt-0.5" />
+                                                <div className="space-y-1">
+                                                    <p className="text-sm text-primary">实拍审核说明</p>
+                                                    <p className="text-xs text-muted-foreground leading-relaxed">请提供商品货号或名称，管理员将在审核后将照片关联至对应商品。实拍内容不会立即显示在相册中。</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">货号 (SKU)</label>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="例如: B03"
+                                                        value={uploadForm.tags.split(",")[0] || ""}
+                                                        onChange={(e) => {
+                                                            const parts = uploadForm.tags.split(",");
+                                                            parts[0] = e.target.value;
+                                                            setUploadForm(prev => ({ ...prev, tags: parts.join(",") }));
+                                                        }}
+                                                        className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">商品名称</label>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="例如: 赛车游戏机"
+                                                        value={uploadForm.tags.split(",")[1] || ""}
+                                                        onChange={(e) => {
+                                                            const parts = uploadForm.tags.split(",");
+                                                            parts[1] = e.target.value;
+                                                            setUploadForm(prev => ({ ...prev, tags: parts.join(",") }));
+                                                        }}
+                                                        className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                                 </div>
 
                                 <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
                                     <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">取消</button>
                                     <button 
                                         type="submit" 
-                                        disabled={uploadForm.urls.length === 0 || !uploadForm.productId || isUploading}
+                                        disabled={uploadForm.urls.length === 0 || (isAdmin && !uploadForm.productId) || (!isAdmin && !uploadForm.productId && !uploadForm.tags.split(",")[0] && !uploadForm.tags.split(",")[1]) || isUploading}
                                         className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all"
                                     >
                                         <CheckCircle size={18} />
-                                        确认发布 ({uploadForm.urls.length})
+                                        {isAdmin ? "确认发布" : "提交审核"} ({uploadForm.urls.length})
                                     </button>
                                 </div>
                             </form>
@@ -1007,7 +1256,7 @@ function GalleryContent() {
                                     transition={{ duration: 0.8 }}
                                     className="absolute inset-0 -z-20 pointer-events-none"
                                 >
-                                    {selectedImage && (
+                                    {selectedImage && (selectedImage.type !== 'video' && !/\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url)) && (
                                         <Image 
                                             src={selectedImage.url} 
                                             alt="" 
@@ -1193,8 +1442,13 @@ function GalleryContent() {
                                                         <PlayCircle size={20} className="absolute text-white/80" />
                                                     </div>
                                                 ) : (
-                                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                                    <img src={img.url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                                    <Image 
+                                                        src={img.url} 
+                                                        alt="Thumbnail" 
+                                                        fill
+                                                        sizes="60px"
+                                                        className="object-cover" 
+                                                    />
                                                 )}
                                             </motion.div>
                                             
@@ -1269,6 +1523,7 @@ function GalleryContent() {
         </motion.button>
       )}
     </AnimatePresence>
+
     </div>
   );
 }

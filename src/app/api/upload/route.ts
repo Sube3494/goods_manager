@@ -5,19 +5,21 @@ import { getSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    // Check permissions
+    // Check auth or system setting for guest upload
     const session = await getSession();
+    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
     
-    // If not admin (no session), check system settings
-    if (!session) {
-      const settings = await prisma.systemSetting.findUnique({
-        where: { id: "system" }
-      });
+    // Default to allowed if settings missing
+    const isGalleryUploadAllowed = settings ? settings.allowGalleryUpload : true;
 
-      if (settings && settings.allowGalleryUpload === false) {
-        return NextResponse.json({ error: "系统已关闭实物照片上传功能" }, { status: 403 });
-      }
+    // Allow if admin (session) or if gallery upload is allowed for guests
+    if (!session && !isGalleryUploadAllowed) {
+      return NextResponse.json({ error: "实物上传功能已关闭" }, { status: 401 });
     }
+
+    // Logic: 
+    // 1. If user is logged in (session exists), we consider them an admin/authorized user. 
+    // 2. If no session but allowGalleryUpload is true, they are a guest contributor.
 
     const contentType = request.headers.get("content-type") || "";
     const contentLength = Number(request.headers.get("content-length") || "0");

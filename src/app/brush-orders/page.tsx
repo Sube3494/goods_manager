@@ -301,33 +301,39 @@ export default function BrushOrdersPage() {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header section with unified style */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">刷单管理</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">管理刷单记录及佣金统计。</p>
+      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">刷单管理</h1>
+          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理刷单记录及佣金统计。</p>
         </div>
         
-        <div className="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-3 w-full md:w-auto">
-          <button 
-            onClick={() => setIsImportModalOpen(true)}
-            className="h-11 flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-border bg-white dark:bg-white/5 px-4 text-sm font-bold text-foreground hover:bg-muted transition-all"
-          >
-            <Upload size={18} />
-            <span className="hidden xs:inline">导入</span>
-          </button>
-          <button 
-            onClick={handleExport}
-            className="h-11 flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl border border-border bg-white dark:bg-white/5 px-4 text-sm font-bold text-foreground hover:bg-muted transition-all"
-          >
-            <Download size={18} />
-            <span className="hidden xs:inline">导出</span>
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+           <div className="flex items-center gap-1 sm:gap-2">
+            <button 
+                onClick={() => setIsImportModalOpen(true)}
+                className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full border border-border bg-white dark:bg-white/5 sm:px-4 text-xs font-bold text-foreground hover:bg-muted transition-all"
+                title="导入"
+            >
+                <Upload size={16} className="sm:size-[18px]" />
+                <span className="hidden sm:inline">导入</span>
+            </button>
+            <button 
+                onClick={handleExport}
+                className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full border border-border bg-white dark:bg-white/5 sm:px-4 text-xs font-bold text-foreground hover:bg-muted transition-all"
+                title="导出"
+            >
+                <Download size={16} className="sm:size-[18px]" />
+                <span className="hidden sm:inline">导出</span>
+            </button>
+           </div>
+           
           <button 
             onClick={handleCreate}
-            className="h-12 md:h-11 col-span-2 sm:flex-none flex items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+            className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
           >
-            <Plus size={18} />
-            新建刷单
+            <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+             <span className="hidden sm:inline">新建刷单</span>
+             <span className="inline sm:hidden">新建</span>
           </button>
         </div>
       </div>

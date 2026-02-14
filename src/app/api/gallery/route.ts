@@ -13,6 +13,7 @@ export async function GET(request: Request) {
       where: {
         ...(productId ? { productId } : {}),
         ...(session ? {} : { 
+          isPublic: true,
           product: { isPublic: true }
         }),
       },

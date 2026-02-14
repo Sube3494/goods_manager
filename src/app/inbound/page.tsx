@@ -123,26 +123,28 @@ export default function InboundPage() {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header section with unified style */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">入库管理</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">查看入库历史、凭证明细，并进行批量或手动入库登记。</p>
+      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">入库管理</h1>
+          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">查看入库历史、凭证明细，并进行批量或手动入库登记。</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
             <button 
                 onClick={() => setShowImportModal(true)}
-                className="h-10 flex items-center gap-2 rounded-full bg-emerald-500/10 px-6 text-sm font-bold text-emerald-600 hover:bg-emerald-500/20 transition-all border border-emerald-500/10 shadow-lg shadow-emerald-500/5 hover:-translate-y-0.5"
+                className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full bg-emerald-500/10 sm:px-4 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 transition-all border border-emerald-500/10 shadow-lg shadow-emerald-500/5 hover:-translate-y-0.5"
+                title="Excel 批量导入"
             >
-                <FileSpreadsheet size={18} />
-                Excel 批量导入
+                <FileSpreadsheet size={16} className="sm:size-[18px]" />
+                <span className="hidden sm:inline">批量导入</span>
             </button>
             <button 
                 onClick={() => setShowManualModal(true)}
-                className="h-10 flex items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+                className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full bg-primary sm:px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+                title="手动录入"
             >
-                <Plus size={18} />
-                手动录入
+                <Plus size={16} className="sm:size-[18px]" />
+                <span className="hidden sm:inline">手动录入</span>
             </button>
         </div>
       </div>

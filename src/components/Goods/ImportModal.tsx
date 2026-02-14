@@ -138,7 +138,7 @@ export function ImportModal({
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border/50 p-6 md:p-8 shrink-0">
-              <h2 className="text-xl md:text-2xl font-black text-foreground">{title}</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-foreground">{title}</h2>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={20} className="md:size-6" />
               </button>
@@ -172,7 +172,7 @@ export function ImportModal({
                         <Upload size={32} />
                     </div>
                   </div>
-                  <p className="text-lg font-bold text-foreground">{description}</p>
+                  <p className="text-lg font-medium text-foreground">{description}</p>
                   <p className="mt-2 text-sm text-muted-foreground">支持 .xlsx, .xls, .csv 格式</p>
                   
                   {templateData && (
@@ -182,7 +182,7 @@ export function ImportModal({
                         e.stopPropagation();
                         handleDownloadTemplate();
                       }}
-                      className="mt-8 flex items-center gap-2 px-6 h-10 rounded-full bg-white dark:bg-white/5 border border-border hover:bg-muted font-bold text-sm transition-all hover:-translate-y-0.5"
+                      className="mt-8 flex items-center gap-2 px-6 h-10 rounded-full bg-white dark:bg-white/5 border border-border hover:bg-muted font-medium text-sm transition-all hover:-translate-y-0.5"
                     >
                       <FileSpreadsheet size={16} className="text-green-500" />
                       下载模板文件
@@ -202,12 +202,12 @@ export function ImportModal({
                       <FileSpreadsheet size={24} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-foreground truncate">{file?.name}</p>
+                      <p className="font-medium text-foreground truncate">{file?.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">文件解析完成，准备导入系统</p>
                     </div>
                     <button 
                         onClick={() => { setFile(null); setPreviewData([]); }}
-                        className="h-9 px-4 rounded-full text-xs font-bold text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                        className="h-9 px-4 rounded-full text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors shrink-0"
                     >
                         移除文件
                     </button>
@@ -256,7 +256,7 @@ export function ImportModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-11 px-6 rounded-full text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
+                className="h-11 px-6 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
               >
                 取消
               </button>
@@ -264,7 +264,7 @@ export function ImportModal({
                 type="button"
                 disabled={!file}
                 onClick={handleConfirm}
-                className="flex items-center gap-2 h-11 px-8 rounded-full bg-primary text-sm font-black text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0"
+                className="flex items-center gap-2 h-11 px-8 rounded-full bg-primary text-sm font-medium text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0"
               >
                 <CheckCircle size={18} />
                 确认导入

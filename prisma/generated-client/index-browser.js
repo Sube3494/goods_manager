@@ -213,6 +213,19 @@ exports.Prisma.GalleryItemScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.GallerySubmissionScalarFieldEnum = {
+  id: 'id',
+  urls: 'urls',
+  sku: 'sku',
+  productName: 'productName',
+  status: 'status',
+  notes: 'notes',
+  productId: 'productId',
+  selectedIndices: 'selectedIndices',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.UserScalarFieldEnum = {
   id: 'id',
   email: 'email',
@@ -280,6 +293,10 @@ exports.Prisma.NullableJsonNullValueInput = {
   JsonNull: Prisma.JsonNull
 };
 
+exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
+};
+
 exports.Prisma.QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -306,6 +323,7 @@ exports.Prisma.ModelName = {
   OutboundOrder: 'OutboundOrder',
   OutboundOrderItem: 'OutboundOrderItem',
   GalleryItem: 'GalleryItem',
+  GallerySubmission: 'GallerySubmission',
   User: 'User',
   VerificationCode: 'VerificationCode',
   SystemSetting: 'SystemSetting',

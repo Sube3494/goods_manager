@@ -9,10 +9,24 @@ export async function GET() {
   try {
     const products = await prisma.product.findMany({
       where: session ? {} : { isPublic: true },
-      include: {
-        category: true,
-        supplier: true,
-      },
+      ...(session ? {
+        include: {
+          category: true,
+          supplier: true,
+        }
+      } : {
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          image: true,
+          stock: true,
+          isPublic: true,
+          createdAt: true,
+          categoryId: true,
+          category: true,
+        }
+      }),
       orderBy: {
         createdAt: 'desc'
       }

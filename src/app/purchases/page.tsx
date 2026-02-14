@@ -331,17 +331,17 @@ export default function PurchasesPage() {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header section with unified style */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
+      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">采购管理</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">管理与供应商的采购订单，跟踪入库进度。</p>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">采购管理</h1>
+          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理与供应商的采购订单，跟踪入库进度。</p>
         </div>
         
         <button 
           onClick={handleCreate}
-          className="h-10 flex items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+          className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
         >
-          <Plus size={18} />
+          <Plus size={16} className="md:w-[18px] md:h-[18px]" />
           新建采购单
         </button>
       </div>

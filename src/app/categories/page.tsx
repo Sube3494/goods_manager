@@ -124,34 +124,32 @@ export default function CategoriesPage() {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header section with unified style */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
+      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">分类管理</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">管理商品类别与属性。</p>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">分类管理</h1>
+          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理商品类别与属性。</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Search */}
-            <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
-                <Search size={18} className="text-muted-foreground shrink-0" />
-                <input 
-                    type="text"
-                    placeholder="搜索分类..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
-                />
-            </div>
-            {user && (
-              <button 
-                  onClick={handleOpenCreate}
-                  className="h-9 sm:h-10 flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-full bg-primary px-5 sm:px-6 text-xs sm:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all whitespace-nowrap"
-              >
-                  <Plus size={16} />
-                  新建分类
-              </button>
-            )}
-        </div>
+        {user && (
+            <button 
+                onClick={handleOpenCreate}
+                className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
+            >
+                <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+                新建分类
+            </button>
+        )}
+      </div>
+
+      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-auto sm:max-w-md shrink-0">
+          <Search size={18} className="text-muted-foreground shrink-0" />
+          <input 
+              type="text"
+              placeholder="搜索分类..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+          />
       </div>
 
       {/* Grid */}

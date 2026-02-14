@@ -54,6 +54,11 @@ export type OutboundOrderItem = $Result.DefaultSelection<Prisma.$OutboundOrderIt
  */
 export type GalleryItem = $Result.DefaultSelection<Prisma.$GalleryItemPayload>
 /**
+ * Model GallerySubmission
+ * 
+ */
+export type GallerySubmission = $Result.DefaultSelection<Prisma.$GallerySubmissionPayload>
+/**
  * Model User
  * 
  */
@@ -281,6 +286,16 @@ export class PrismaClient<
     * ```
     */
   get galleryItem(): Prisma.GalleryItemDelegate<ExtArgs>;
+
+  /**
+   * `prisma.gallerySubmission`: Exposes CRUD operations for the **GallerySubmission** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more GallerySubmissions
+    * const gallerySubmissions = await prisma.gallerySubmission.findMany()
+    * ```
+    */
+  get gallerySubmission(): Prisma.GallerySubmissionDelegate<ExtArgs>;
 
   /**
    * `prisma.user`: Exposes CRUD operations for the **User** model.
@@ -780,6 +795,7 @@ export namespace Prisma {
     OutboundOrder: 'OutboundOrder',
     OutboundOrderItem: 'OutboundOrderItem',
     GalleryItem: 'GalleryItem',
+    GallerySubmission: 'GallerySubmission',
     User: 'User',
     VerificationCode: 'VerificationCode',
     SystemSetting: 'SystemSetting',
@@ -800,7 +816,7 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "category" | "product" | "supplier" | "purchaseOrder" | "purchaseOrderItem" | "outboundOrder" | "outboundOrderItem" | "galleryItem" | "user" | "verificationCode" | "systemSetting" | "brushOrder" | "brushOrderItem"
+      modelProps: "category" | "product" | "supplier" | "purchaseOrder" | "purchaseOrderItem" | "outboundOrder" | "outboundOrderItem" | "galleryItem" | "gallerySubmission" | "user" | "verificationCode" | "systemSetting" | "brushOrder" | "brushOrderItem"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1361,6 +1377,76 @@ export namespace Prisma {
           count: {
             args: Prisma.GalleryItemCountArgs<ExtArgs>
             result: $Utils.Optional<GalleryItemCountAggregateOutputType> | number
+          }
+        }
+      }
+      GallerySubmission: {
+        payload: Prisma.$GallerySubmissionPayload<ExtArgs>
+        fields: Prisma.GallerySubmissionFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.GallerySubmissionFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.GallerySubmissionFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>
+          }
+          findFirst: {
+            args: Prisma.GallerySubmissionFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.GallerySubmissionFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>
+          }
+          findMany: {
+            args: Prisma.GallerySubmissionFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>[]
+          }
+          create: {
+            args: Prisma.GallerySubmissionCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>
+          }
+          createMany: {
+            args: Prisma.GallerySubmissionCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.GallerySubmissionCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>[]
+          }
+          delete: {
+            args: Prisma.GallerySubmissionDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>
+          }
+          update: {
+            args: Prisma.GallerySubmissionUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>
+          }
+          deleteMany: {
+            args: Prisma.GallerySubmissionDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.GallerySubmissionUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.GallerySubmissionUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GallerySubmissionPayload>
+          }
+          aggregate: {
+            args: Prisma.GallerySubmissionAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateGallerySubmission>
+          }
+          groupBy: {
+            args: Prisma.GallerySubmissionGroupByArgs<ExtArgs>
+            result: $Utils.Optional<GallerySubmissionGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.GallerySubmissionCountArgs<ExtArgs>
+            result: $Utils.Optional<GallerySubmissionCountAggregateOutputType> | number
           }
         }
       }
@@ -10303,6 +10389,936 @@ export namespace Prisma {
 
 
   /**
+   * Model GallerySubmission
+   */
+
+  export type AggregateGallerySubmission = {
+    _count: GallerySubmissionCountAggregateOutputType | null
+    _min: GallerySubmissionMinAggregateOutputType | null
+    _max: GallerySubmissionMaxAggregateOutputType | null
+  }
+
+  export type GallerySubmissionMinAggregateOutputType = {
+    id: string | null
+    sku: string | null
+    productName: string | null
+    status: string | null
+    notes: string | null
+    productId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type GallerySubmissionMaxAggregateOutputType = {
+    id: string | null
+    sku: string | null
+    productName: string | null
+    status: string | null
+    notes: string | null
+    productId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type GallerySubmissionCountAggregateOutputType = {
+    id: number
+    urls: number
+    sku: number
+    productName: number
+    status: number
+    notes: number
+    productId: number
+    selectedIndices: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type GallerySubmissionMinAggregateInputType = {
+    id?: true
+    sku?: true
+    productName?: true
+    status?: true
+    notes?: true
+    productId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type GallerySubmissionMaxAggregateInputType = {
+    id?: true
+    sku?: true
+    productName?: true
+    status?: true
+    notes?: true
+    productId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type GallerySubmissionCountAggregateInputType = {
+    id?: true
+    urls?: true
+    sku?: true
+    productName?: true
+    status?: true
+    notes?: true
+    productId?: true
+    selectedIndices?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type GallerySubmissionAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which GallerySubmission to aggregate.
+     */
+    where?: GallerySubmissionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GallerySubmissions to fetch.
+     */
+    orderBy?: GallerySubmissionOrderByWithRelationInput | GallerySubmissionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: GallerySubmissionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GallerySubmissions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GallerySubmissions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned GallerySubmissions
+    **/
+    _count?: true | GallerySubmissionCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: GallerySubmissionMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: GallerySubmissionMaxAggregateInputType
+  }
+
+  export type GetGallerySubmissionAggregateType<T extends GallerySubmissionAggregateArgs> = {
+        [P in keyof T & keyof AggregateGallerySubmission]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateGallerySubmission[P]>
+      : GetScalarType<T[P], AggregateGallerySubmission[P]>
+  }
+
+
+
+
+  export type GallerySubmissionGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GallerySubmissionWhereInput
+    orderBy?: GallerySubmissionOrderByWithAggregationInput | GallerySubmissionOrderByWithAggregationInput[]
+    by: GallerySubmissionScalarFieldEnum[] | GallerySubmissionScalarFieldEnum
+    having?: GallerySubmissionScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: GallerySubmissionCountAggregateInputType | true
+    _min?: GallerySubmissionMinAggregateInputType
+    _max?: GallerySubmissionMaxAggregateInputType
+  }
+
+  export type GallerySubmissionGroupByOutputType = {
+    id: string
+    urls: JsonValue
+    sku: string | null
+    productName: string | null
+    status: string
+    notes: string | null
+    productId: string | null
+    selectedIndices: JsonValue | null
+    createdAt: Date
+    updatedAt: Date
+    _count: GallerySubmissionCountAggregateOutputType | null
+    _min: GallerySubmissionMinAggregateOutputType | null
+    _max: GallerySubmissionMaxAggregateOutputType | null
+  }
+
+  type GetGallerySubmissionGroupByPayload<T extends GallerySubmissionGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<GallerySubmissionGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof GallerySubmissionGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], GallerySubmissionGroupByOutputType[P]>
+            : GetScalarType<T[P], GallerySubmissionGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type GallerySubmissionSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    urls?: boolean
+    sku?: boolean
+    productName?: boolean
+    status?: boolean
+    notes?: boolean
+    productId?: boolean
+    selectedIndices?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["gallerySubmission"]>
+
+  export type GallerySubmissionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    urls?: boolean
+    sku?: boolean
+    productName?: boolean
+    status?: boolean
+    notes?: boolean
+    productId?: boolean
+    selectedIndices?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["gallerySubmission"]>
+
+  export type GallerySubmissionSelectScalar = {
+    id?: boolean
+    urls?: boolean
+    sku?: boolean
+    productName?: boolean
+    status?: boolean
+    notes?: boolean
+    productId?: boolean
+    selectedIndices?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+
+  export type $GallerySubmissionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "GallerySubmission"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      urls: Prisma.JsonValue
+      sku: string | null
+      productName: string | null
+      status: string
+      notes: string | null
+      productId: string | null
+      selectedIndices: Prisma.JsonValue | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["gallerySubmission"]>
+    composites: {}
+  }
+
+  type GallerySubmissionGetPayload<S extends boolean | null | undefined | GallerySubmissionDefaultArgs> = $Result.GetResult<Prisma.$GallerySubmissionPayload, S>
+
+  type GallerySubmissionCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<GallerySubmissionFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: GallerySubmissionCountAggregateInputType | true
+    }
+
+  export interface GallerySubmissionDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['GallerySubmission'], meta: { name: 'GallerySubmission' } }
+    /**
+     * Find zero or one GallerySubmission that matches the filter.
+     * @param {GallerySubmissionFindUniqueArgs} args - Arguments to find a GallerySubmission
+     * @example
+     * // Get one GallerySubmission
+     * const gallerySubmission = await prisma.gallerySubmission.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends GallerySubmissionFindUniqueArgs>(args: SelectSubset<T, GallerySubmissionFindUniqueArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one GallerySubmission that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {GallerySubmissionFindUniqueOrThrowArgs} args - Arguments to find a GallerySubmission
+     * @example
+     * // Get one GallerySubmission
+     * const gallerySubmission = await prisma.gallerySubmission.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends GallerySubmissionFindUniqueOrThrowArgs>(args: SelectSubset<T, GallerySubmissionFindUniqueOrThrowArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first GallerySubmission that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GallerySubmissionFindFirstArgs} args - Arguments to find a GallerySubmission
+     * @example
+     * // Get one GallerySubmission
+     * const gallerySubmission = await prisma.gallerySubmission.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends GallerySubmissionFindFirstArgs>(args?: SelectSubset<T, GallerySubmissionFindFirstArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first GallerySubmission that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GallerySubmissionFindFirstOrThrowArgs} args - Arguments to find a GallerySubmission
+     * @example
+     * // Get one GallerySubmission
+     * const gallerySubmission = await prisma.gallerySubmission.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends GallerySubmissionFindFirstOrThrowArgs>(args?: SelectSubset<T, GallerySubmissionFindFirstOrThrowArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more GallerySubmissions that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GallerySubmissionFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all GallerySubmissions
+     * const gallerySubmissions = await prisma.gallerySubmission.findMany()
+     * 
+     * // Get first 10 GallerySubmissions
+     * const gallerySubmissions = await prisma.gallerySubmission.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const gallerySubmissionWithIdOnly = await prisma.gallerySubmission.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends GallerySubmissionFindManyArgs>(args?: SelectSubset<T, GallerySubmissionFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a GallerySubmission.
+     * @param {GallerySubmissionCreateArgs} args - Arguments to create a GallerySubmission.
+     * @example
+     * // Create one GallerySubmission
+     * const GallerySubmission = await prisma.gallerySubmission.create({
+     *   data: {
+     *     // ... data to create a GallerySubmission
+     *   }
+     * })
+     * 
+     */
+    create<T extends GallerySubmissionCreateArgs>(args: SelectSubset<T, GallerySubmissionCreateArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many GallerySubmissions.
+     * @param {GallerySubmissionCreateManyArgs} args - Arguments to create many GallerySubmissions.
+     * @example
+     * // Create many GallerySubmissions
+     * const gallerySubmission = await prisma.gallerySubmission.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends GallerySubmissionCreateManyArgs>(args?: SelectSubset<T, GallerySubmissionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many GallerySubmissions and returns the data saved in the database.
+     * @param {GallerySubmissionCreateManyAndReturnArgs} args - Arguments to create many GallerySubmissions.
+     * @example
+     * // Create many GallerySubmissions
+     * const gallerySubmission = await prisma.gallerySubmission.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many GallerySubmissions and only return the `id`
+     * const gallerySubmissionWithIdOnly = await prisma.gallerySubmission.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends GallerySubmissionCreateManyAndReturnArgs>(args?: SelectSubset<T, GallerySubmissionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a GallerySubmission.
+     * @param {GallerySubmissionDeleteArgs} args - Arguments to delete one GallerySubmission.
+     * @example
+     * // Delete one GallerySubmission
+     * const GallerySubmission = await prisma.gallerySubmission.delete({
+     *   where: {
+     *     // ... filter to delete one GallerySubmission
+     *   }
+     * })
+     * 
+     */
+    delete<T extends GallerySubmissionDeleteArgs>(args: SelectSubset<T, GallerySubmissionDeleteArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one GallerySubmission.
+     * @param {GallerySubmissionUpdateArgs} args - Arguments to update one GallerySubmission.
+     * @example
+     * // Update one GallerySubmission
+     * const gallerySubmission = await prisma.gallerySubmission.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends GallerySubmissionUpdateArgs>(args: SelectSubset<T, GallerySubmissionUpdateArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more GallerySubmissions.
+     * @param {GallerySubmissionDeleteManyArgs} args - Arguments to filter GallerySubmissions to delete.
+     * @example
+     * // Delete a few GallerySubmissions
+     * const { count } = await prisma.gallerySubmission.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends GallerySubmissionDeleteManyArgs>(args?: SelectSubset<T, GallerySubmissionDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more GallerySubmissions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GallerySubmissionUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many GallerySubmissions
+     * const gallerySubmission = await prisma.gallerySubmission.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends GallerySubmissionUpdateManyArgs>(args: SelectSubset<T, GallerySubmissionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one GallerySubmission.
+     * @param {GallerySubmissionUpsertArgs} args - Arguments to update or create a GallerySubmission.
+     * @example
+     * // Update or create a GallerySubmission
+     * const gallerySubmission = await prisma.gallerySubmission.upsert({
+     *   create: {
+     *     // ... data to create a GallerySubmission
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the GallerySubmission we want to update
+     *   }
+     * })
+     */
+    upsert<T extends GallerySubmissionUpsertArgs>(args: SelectSubset<T, GallerySubmissionUpsertArgs<ExtArgs>>): Prisma__GallerySubmissionClient<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of GallerySubmissions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GallerySubmissionCountArgs} args - Arguments to filter GallerySubmissions to count.
+     * @example
+     * // Count the number of GallerySubmissions
+     * const count = await prisma.gallerySubmission.count({
+     *   where: {
+     *     // ... the filter for the GallerySubmissions we want to count
+     *   }
+     * })
+    **/
+    count<T extends GallerySubmissionCountArgs>(
+      args?: Subset<T, GallerySubmissionCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], GallerySubmissionCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a GallerySubmission.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GallerySubmissionAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends GallerySubmissionAggregateArgs>(args: Subset<T, GallerySubmissionAggregateArgs>): Prisma.PrismaPromise<GetGallerySubmissionAggregateType<T>>
+
+    /**
+     * Group by GallerySubmission.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GallerySubmissionGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends GallerySubmissionGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: GallerySubmissionGroupByArgs['orderBy'] }
+        : { orderBy?: GallerySubmissionGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, GallerySubmissionGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetGallerySubmissionGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the GallerySubmission model
+   */
+  readonly fields: GallerySubmissionFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for GallerySubmission.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__GallerySubmissionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the GallerySubmission model
+   */ 
+  interface GallerySubmissionFieldRefs {
+    readonly id: FieldRef<"GallerySubmission", 'String'>
+    readonly urls: FieldRef<"GallerySubmission", 'Json'>
+    readonly sku: FieldRef<"GallerySubmission", 'String'>
+    readonly productName: FieldRef<"GallerySubmission", 'String'>
+    readonly status: FieldRef<"GallerySubmission", 'String'>
+    readonly notes: FieldRef<"GallerySubmission", 'String'>
+    readonly productId: FieldRef<"GallerySubmission", 'String'>
+    readonly selectedIndices: FieldRef<"GallerySubmission", 'Json'>
+    readonly createdAt: FieldRef<"GallerySubmission", 'DateTime'>
+    readonly updatedAt: FieldRef<"GallerySubmission", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * GallerySubmission findUnique
+   */
+  export type GallerySubmissionFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Filter, which GallerySubmission to fetch.
+     */
+    where: GallerySubmissionWhereUniqueInput
+  }
+
+  /**
+   * GallerySubmission findUniqueOrThrow
+   */
+  export type GallerySubmissionFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Filter, which GallerySubmission to fetch.
+     */
+    where: GallerySubmissionWhereUniqueInput
+  }
+
+  /**
+   * GallerySubmission findFirst
+   */
+  export type GallerySubmissionFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Filter, which GallerySubmission to fetch.
+     */
+    where?: GallerySubmissionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GallerySubmissions to fetch.
+     */
+    orderBy?: GallerySubmissionOrderByWithRelationInput | GallerySubmissionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for GallerySubmissions.
+     */
+    cursor?: GallerySubmissionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GallerySubmissions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GallerySubmissions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of GallerySubmissions.
+     */
+    distinct?: GallerySubmissionScalarFieldEnum | GallerySubmissionScalarFieldEnum[]
+  }
+
+  /**
+   * GallerySubmission findFirstOrThrow
+   */
+  export type GallerySubmissionFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Filter, which GallerySubmission to fetch.
+     */
+    where?: GallerySubmissionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GallerySubmissions to fetch.
+     */
+    orderBy?: GallerySubmissionOrderByWithRelationInput | GallerySubmissionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for GallerySubmissions.
+     */
+    cursor?: GallerySubmissionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GallerySubmissions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GallerySubmissions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of GallerySubmissions.
+     */
+    distinct?: GallerySubmissionScalarFieldEnum | GallerySubmissionScalarFieldEnum[]
+  }
+
+  /**
+   * GallerySubmission findMany
+   */
+  export type GallerySubmissionFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Filter, which GallerySubmissions to fetch.
+     */
+    where?: GallerySubmissionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GallerySubmissions to fetch.
+     */
+    orderBy?: GallerySubmissionOrderByWithRelationInput | GallerySubmissionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing GallerySubmissions.
+     */
+    cursor?: GallerySubmissionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GallerySubmissions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GallerySubmissions.
+     */
+    skip?: number
+    distinct?: GallerySubmissionScalarFieldEnum | GallerySubmissionScalarFieldEnum[]
+  }
+
+  /**
+   * GallerySubmission create
+   */
+  export type GallerySubmissionCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * The data needed to create a GallerySubmission.
+     */
+    data: XOR<GallerySubmissionCreateInput, GallerySubmissionUncheckedCreateInput>
+  }
+
+  /**
+   * GallerySubmission createMany
+   */
+  export type GallerySubmissionCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many GallerySubmissions.
+     */
+    data: GallerySubmissionCreateManyInput | GallerySubmissionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * GallerySubmission createManyAndReturn
+   */
+  export type GallerySubmissionCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many GallerySubmissions.
+     */
+    data: GallerySubmissionCreateManyInput | GallerySubmissionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * GallerySubmission update
+   */
+  export type GallerySubmissionUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * The data needed to update a GallerySubmission.
+     */
+    data: XOR<GallerySubmissionUpdateInput, GallerySubmissionUncheckedUpdateInput>
+    /**
+     * Choose, which GallerySubmission to update.
+     */
+    where: GallerySubmissionWhereUniqueInput
+  }
+
+  /**
+   * GallerySubmission updateMany
+   */
+  export type GallerySubmissionUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update GallerySubmissions.
+     */
+    data: XOR<GallerySubmissionUpdateManyMutationInput, GallerySubmissionUncheckedUpdateManyInput>
+    /**
+     * Filter which GallerySubmissions to update
+     */
+    where?: GallerySubmissionWhereInput
+  }
+
+  /**
+   * GallerySubmission upsert
+   */
+  export type GallerySubmissionUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * The filter to search for the GallerySubmission to update in case it exists.
+     */
+    where: GallerySubmissionWhereUniqueInput
+    /**
+     * In case the GallerySubmission found by the `where` argument doesn't exist, create a new GallerySubmission with this data.
+     */
+    create: XOR<GallerySubmissionCreateInput, GallerySubmissionUncheckedCreateInput>
+    /**
+     * In case the GallerySubmission was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<GallerySubmissionUpdateInput, GallerySubmissionUncheckedUpdateInput>
+  }
+
+  /**
+   * GallerySubmission delete
+   */
+  export type GallerySubmissionDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Filter which GallerySubmission to delete.
+     */
+    where: GallerySubmissionWhereUniqueInput
+  }
+
+  /**
+   * GallerySubmission deleteMany
+   */
+  export type GallerySubmissionDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which GallerySubmissions to delete
+     */
+    where?: GallerySubmissionWhereInput
+  }
+
+  /**
+   * GallerySubmission without action
+   */
+  export type GallerySubmissionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+  }
+
+
+  /**
    * Model User
    */
 
@@ -15274,6 +16290,22 @@ export namespace Prisma {
   export type GalleryItemScalarFieldEnum = (typeof GalleryItemScalarFieldEnum)[keyof typeof GalleryItemScalarFieldEnum]
 
 
+  export const GallerySubmissionScalarFieldEnum: {
+    id: 'id',
+    urls: 'urls',
+    sku: 'sku',
+    productName: 'productName',
+    status: 'status',
+    notes: 'notes',
+    productId: 'productId',
+    selectedIndices: 'selectedIndices',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type GallerySubmissionScalarFieldEnum = (typeof GallerySubmissionScalarFieldEnum)[keyof typeof GallerySubmissionScalarFieldEnum]
+
+
   export const UserScalarFieldEnum: {
     id: 'id',
     email: 'email',
@@ -15360,6 +16392,13 @@ export namespace Prisma {
   };
 
   export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+  export const JsonNullValueInput: {
+    JsonNull: typeof JsonNull
+  };
+
+  export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
   export const QueryMode: {
@@ -16075,6 +17114,83 @@ export namespace Prisma {
     type?: StringWithAggregatesFilter<"GalleryItem"> | string
     createdAt?: DateTimeWithAggregatesFilter<"GalleryItem"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"GalleryItem"> | Date | string
+  }
+
+  export type GallerySubmissionWhereInput = {
+    AND?: GallerySubmissionWhereInput | GallerySubmissionWhereInput[]
+    OR?: GallerySubmissionWhereInput[]
+    NOT?: GallerySubmissionWhereInput | GallerySubmissionWhereInput[]
+    id?: StringFilter<"GallerySubmission"> | string
+    urls?: JsonFilter<"GallerySubmission">
+    sku?: StringNullableFilter<"GallerySubmission"> | string | null
+    productName?: StringNullableFilter<"GallerySubmission"> | string | null
+    status?: StringFilter<"GallerySubmission"> | string
+    notes?: StringNullableFilter<"GallerySubmission"> | string | null
+    productId?: StringNullableFilter<"GallerySubmission"> | string | null
+    selectedIndices?: JsonNullableFilter<"GallerySubmission">
+    createdAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+    updatedAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+  }
+
+  export type GallerySubmissionOrderByWithRelationInput = {
+    id?: SortOrder
+    urls?: SortOrder
+    sku?: SortOrderInput | SortOrder
+    productName?: SortOrderInput | SortOrder
+    status?: SortOrder
+    notes?: SortOrderInput | SortOrder
+    productId?: SortOrderInput | SortOrder
+    selectedIndices?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type GallerySubmissionWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: GallerySubmissionWhereInput | GallerySubmissionWhereInput[]
+    OR?: GallerySubmissionWhereInput[]
+    NOT?: GallerySubmissionWhereInput | GallerySubmissionWhereInput[]
+    urls?: JsonFilter<"GallerySubmission">
+    sku?: StringNullableFilter<"GallerySubmission"> | string | null
+    productName?: StringNullableFilter<"GallerySubmission"> | string | null
+    status?: StringFilter<"GallerySubmission"> | string
+    notes?: StringNullableFilter<"GallerySubmission"> | string | null
+    productId?: StringNullableFilter<"GallerySubmission"> | string | null
+    selectedIndices?: JsonNullableFilter<"GallerySubmission">
+    createdAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+    updatedAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+  }, "id">
+
+  export type GallerySubmissionOrderByWithAggregationInput = {
+    id?: SortOrder
+    urls?: SortOrder
+    sku?: SortOrderInput | SortOrder
+    productName?: SortOrderInput | SortOrder
+    status?: SortOrder
+    notes?: SortOrderInput | SortOrder
+    productId?: SortOrderInput | SortOrder
+    selectedIndices?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: GallerySubmissionCountOrderByAggregateInput
+    _max?: GallerySubmissionMaxOrderByAggregateInput
+    _min?: GallerySubmissionMinOrderByAggregateInput
+  }
+
+  export type GallerySubmissionScalarWhereWithAggregatesInput = {
+    AND?: GallerySubmissionScalarWhereWithAggregatesInput | GallerySubmissionScalarWhereWithAggregatesInput[]
+    OR?: GallerySubmissionScalarWhereWithAggregatesInput[]
+    NOT?: GallerySubmissionScalarWhereWithAggregatesInput | GallerySubmissionScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"GallerySubmission"> | string
+    urls?: JsonWithAggregatesFilter<"GallerySubmission">
+    sku?: StringNullableWithAggregatesFilter<"GallerySubmission"> | string | null
+    productName?: StringNullableWithAggregatesFilter<"GallerySubmission"> | string | null
+    status?: StringWithAggregatesFilter<"GallerySubmission"> | string
+    notes?: StringNullableWithAggregatesFilter<"GallerySubmission"> | string | null
+    productId?: StringNullableWithAggregatesFilter<"GallerySubmission"> | string | null
+    selectedIndices?: JsonNullableWithAggregatesFilter<"GallerySubmission">
+    createdAt?: DateTimeWithAggregatesFilter<"GallerySubmission"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"GallerySubmission"> | Date | string
   }
 
   export type UserWhereInput = {
@@ -17099,6 +18215,97 @@ export namespace Prisma {
     tags?: GalleryItemUpdatetagsInput | string[]
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     type?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GallerySubmissionCreateInput = {
+    id?: string
+    urls: JsonNullValueInput | InputJsonValue
+    sku?: string | null
+    productName?: string | null
+    status?: string
+    notes?: string | null
+    productId?: string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GallerySubmissionUncheckedCreateInput = {
+    id?: string
+    urls: JsonNullValueInput | InputJsonValue
+    sku?: string | null
+    productName?: string | null
+    status?: string
+    notes?: string | null
+    productId?: string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GallerySubmissionUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    urls?: JsonNullValueInput | InputJsonValue
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    productName?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    productId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GallerySubmissionUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    urls?: JsonNullValueInput | InputJsonValue
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    productName?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    productId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GallerySubmissionCreateManyInput = {
+    id?: string
+    urls: JsonNullValueInput | InputJsonValue
+    sku?: string | null
+    productName?: string | null
+    status?: string
+    notes?: string | null
+    productId?: string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GallerySubmissionUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    urls?: JsonNullValueInput | InputJsonValue
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    productName?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    productId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GallerySubmissionUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    urls?: JsonNullValueInput | InputJsonValue
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    productName?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    productId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18142,6 +19349,88 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
+  export type JsonFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type GallerySubmissionCountOrderByAggregateInput = {
+    id?: SortOrder
+    urls?: SortOrder
+    sku?: SortOrder
+    productName?: SortOrder
+    status?: SortOrder
+    notes?: SortOrder
+    productId?: SortOrder
+    selectedIndices?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type GallerySubmissionMaxOrderByAggregateInput = {
+    id?: SortOrder
+    sku?: SortOrder
+    productName?: SortOrder
+    status?: SortOrder
+    notes?: SortOrder
+    productId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type GallerySubmissionMinOrderByAggregateInput = {
+    id?: SortOrder
+    sku?: SortOrder
+    productName?: SortOrder
+    status?: SortOrder
+    notes?: SortOrder
+    productId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+  export type JsonWithAggregatesFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedJsonFilter<$PrismaModel>
+    _max?: NestedJsonFilter<$PrismaModel>
+  }
 
   export type UserCountOrderByAggregateInput = {
     id?: SortOrder
@@ -19181,6 +20470,28 @@ export namespace Prisma {
     gt?: number | FloatFieldRefInput<$PrismaModel>
     gte?: number | FloatFieldRefInput<$PrismaModel>
     not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+  export type NestedJsonFilter<$PrismaModel = never> = 
+    | PatchUndefined<
+        Either<Required<NestedJsonFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
   export type ProductCreateWithoutCategoryInput = {
@@ -20952,6 +22263,10 @@ export namespace Prisma {
      * @deprecated Use GalleryItemDefaultArgs instead
      */
     export type GalleryItemArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = GalleryItemDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use GallerySubmissionDefaultArgs instead
+     */
+    export type GallerySubmissionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = GallerySubmissionDefaultArgs<ExtArgs>
     /**
      * @deprecated Use UserDefaultArgs instead
      */

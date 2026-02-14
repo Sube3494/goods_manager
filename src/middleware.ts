@@ -29,12 +29,16 @@ export async function middleware(request: NextRequest) {
   const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info"];
   const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
 
+  // Check for public POST APIs (Guest uploads/submissions)
+  const publicPostApis = ["/api/upload", "/api/gallery/submissions"];
+  const isPublicPostApi = request.method === "POST" && publicPostApis.some(p => path === p || path.startsWith(p + "/"));
+
   // Get session from cookies
   const session = request.cookies.get("session")?.value;
 
   // Protect private routes
-  // If pass is NOT public AND NOT a public GET API AND no session
-  if (!isPublicPath && !isPublicGetApi && !session) {
+  // If pass is NOT public AND NOT a public GET API AND NOT a public POST API AND no session
+  if (!isPublicPath && !isPublicGetApi && !isPublicPostApi && !session) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -78,13 +78,13 @@ export function GoodsCard({
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col p-5">
+      <div className="flex flex-1 flex-col p-3 sm:p-5">
         <div className="flex-1">
-          <h3 className="font-bold text-lg leading-tight text-foreground mb-4 group-hover:text-primary transition-colors">
+          <h3 className="font-bold text-sm sm:text-lg leading-tight text-foreground mb-2 sm:mb-4 group-hover:text-primary transition-colors">
             {product.name}
           </h3>
           
-          <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-4">
               <span className="text-[10px] bg-secondary border border-border/50 px-2 py-0.5 rounded text-muted-foreground font-mono shrink-0">
                 {product.sku ? product.sku : `REF__${product.id.slice(0, 6)}`}
               </span>
@@ -115,16 +115,50 @@ export function GoodsCard({
              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">进货单价</p>
              <p className="font-bold text-foreground">
                 {product.costPrice > 0 
-                  ? <span className="text-lg">¥{product.costPrice.toLocaleString()}</span> 
-                  : <span className="text-base opacity-90">以实际为准</span>
+                  ? <span className="text-base sm:text-lg">¥{product.costPrice.toLocaleString()}</span> 
+                  : <span className="text-xs sm:text-base opacity-90">以实际为准</span>
                 }
              </p>
           </div>
         </div>
+
+        {/* Mobile Actions Bar */}
+        <div className="mt-4 flex sm:hidden items-center justify-between pt-3 border-t border-border/50">
+            <Link
+              href={`/gallery?productId=${product.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-[10px] font-bold text-primary hover:opacity-80 transition-opacity"
+            >
+              <Camera size={14} />
+              <span>实拍图库</span>
+            </Link>
+            <div className="flex gap-3">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(product);
+                }}
+                className="text-muted-foreground hover:text-primary transition-colors"
+                title="编辑"
+              >
+                <Edit size={16} />
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(product.id, product.name);
+                }}
+                className="text-destructive hover:opacity-80 transition-opacity"
+                title="删除"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+        </div>
       </div>
       
-      {/* Quick Actions Overlay (Always hoverable, not hidden by mode) */}
-      <div className="absolute top-3 right-3 flex flex-col gap-2 translate-x-0 opacity-100 lg:translate-x-10 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100 transition-all duration-300">
+      {/* Quick Actions Overlay (PC only) */}
+      <div className="hidden sm:flex absolute top-3 right-3 flex-col gap-2 translate-x-0 opacity-100 lg:translate-x-10 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100 transition-all duration-300">
            <Link
               href={`/gallery?productId=${product.id}`}
               onClick={(e) => e.stopPropagation()}

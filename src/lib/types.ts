@@ -23,6 +23,7 @@ export interface Product {
   supplierId?: string;
   supplier?: Supplier;
   isPublic?: boolean;
+  hideCost?: boolean;
 }
 
 export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered"; // 暂时保留 Ordered 以防万一，但主推前四个
