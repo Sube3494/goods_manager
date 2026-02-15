@@ -2,21 +2,30 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    if (!hasPermission(session, "gallery:delete")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const { id } = await params;
 
     // 先查找记录以获取 URL
-    const item = await prisma.galleryItem.findUnique({
-      where: { id }
+    const item = await prisma.galleryItem.findFirst({
+      where: { 
+        id,
+        workspaceId: session.workspaceId
+      }
     });
 
     if (item) {

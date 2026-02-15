@@ -133,26 +133,30 @@ export function GoodsCard({
               <span>实拍图库</span>
             </Link>
             <div className="flex gap-3">
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit?.(product);
-                }}
-                className="text-muted-foreground hover:text-primary transition-colors"
-                title="编辑"
-              >
-                <Edit size={16} />
-              </button>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete?.(product.id, product.name);
-                }}
-                className="text-destructive hover:opacity-80 transition-opacity"
-                title="删除"
-              >
-                <Trash2 size={16} />
-              </button>
+              {onEdit && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit?.(product);
+                  }}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  title="编辑"
+                >
+                  <Edit size={16} />
+                </button>
+              )}
+              {onDelete && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete?.(product.id, product.name);
+                  }}
+                  className="text-destructive hover:opacity-80 transition-opacity"
+                  title="删除"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
         </div>
       </div>
@@ -167,24 +171,28 @@ export function GoodsCard({
            >
              <Camera size={16} className="group-hover/btn:scale-110 transition-transform" />
            </Link>
-           <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.(product);
-              }}
-              className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-primary p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
-           >
-             <Edit size={16} className="group-hover/btn:scale-110 transition-transform" />
-           </button>
-           <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.(product.id, product.name);
-              }}
-              className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-destructive hover:bg-destructive hover:text-white p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
-           >
-             <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
-           </button>
+           {onEdit && (
+             <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(product);
+                }}
+                className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-primary p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
+             >
+               <Edit size={16} className="group-hover/btn:scale-110 transition-transform" />
+             </button>
+           )}
+           {onDelete && (
+             <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(product.id, product.name);
+                }}
+                className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-destructive hover:bg-destructive hover:text-white p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
+             >
+               <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+             </button>
+           )}
         </div>
 
     </motion.div>

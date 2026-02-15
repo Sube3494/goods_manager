@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, LogOut, LogIn, X, CreditCard, ArrowUpRight, CheckCircle } from "lucide-react";
+import { LogOut, LogIn, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -11,23 +11,12 @@ import { motion } from "framer-motion";
 import { useUser } from "@/hooks/useUser";
 import md5 from "blueimp-md5";
 
+import { navItems, NavItem } from "@/lib/navigation";
+import { hasPermission, SessionUser } from "@/lib/permissions";
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-const navItems = [
-  { name: "概览", href: "/", icon: LayoutDashboard, adminOnly: true },
-  { name: "商品管理", href: "/goods", icon: Package, adminOnly: true },
-  { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true },
-  { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true },
-  { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true },
-  { name: "刷单管理", href: "/brush-orders", icon: CreditCard, adminOnly: true },
-  { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true },
-  { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true },
-  { name: "实物相册", href: "/gallery", icon: Camera },
-  { name: "实拍审核", href: "/gallery/submissions", icon: CheckCircle, adminOnly: true },
-  { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true },
-];
 
 interface SidebarProps {
   onClose?: () => void;
@@ -43,7 +32,6 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
       await fetch("/api/auth/logout", { method: "POST" });
       showToast("已退出登录", "success");
       // Force hard refresh to clear state and re-run middleware/hooks
@@ -117,9 +105,18 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
             </div>
           </div>
           
+
           <div className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar scroll-smooth">
-            {navItems.map((item) => {
-              if (item.adminOnly && !user) return null;
+            {navItems.map((item: NavItem) => {
+              // 1. Super Admin Only Check
+              if (item.superAdminOnly && user?.role !== "SUPER_ADMIN") return null;
+              
+              // 2. Permission Check
+              if (item.permission && !hasPermission(user as SessionUser | null, item.permission)) return null;
+
+              // 3. Admin Only Check (fallback)
+              if (item.adminOnly && !item.permission && user?.role !== "SUPER_ADMIN" && user?.role !== "USER") return null;
+
               
               const isActive = pathname === item.href;
               return (
@@ -169,7 +166,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                 {user ? (
                 <>
                     <div className={cn(
-                        "flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group relative",
+                        "flex items-center gap-2 p-1.5 rounded-xl hover:bg-white/5 transition-colors group relative",
                         isCollapsed ? "justify-center p-0 h-10 w-10" : "mx-1"
                     )}>
                         <div className="relative h-8 w-8 rounded-full overflow-hidden border-2 border-white/20 shadow-sm shrink-0">
@@ -187,8 +184,8 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                             animate={{ opacity: 1 }}
                             className="flex-1 flex flex-col overflow-hidden"
                         >
-                            <p className="text-sm font-bold text-foreground truncate">{user.name || "管理员"}</p>
-                            <p className="text-xs text-muted-foreground">超级权限</p>
+                            <p className="text-sm font-medium text-foreground truncate">{user.email}</p>
+                            <p className="text-[10px] text-muted-foreground/60">{user.role === 'SUPER_ADMIN' ? '超级管理员' : (user.role === 'ADMIN' ? '工作区管理员' : '普通成员')}</p>
                         </motion.div>
                         )}
                     </div>

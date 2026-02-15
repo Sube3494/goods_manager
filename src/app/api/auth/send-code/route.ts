@@ -10,22 +10,46 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Check if user exists and is admin
+    // Check if user exists
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
-        // Option: Auto-create first user as admin if no users exist?
-        // For now, let's stick to secure default: only allow existing users
-        // OR for the sake of this demo/setup, allow creating the *first* user as admin.
+        // Safe setup: allow the first user to be created as SUPER_ADMIN
         const userCount = await prisma.user.count();
         if (userCount === 0) {
-            await prisma.user.create({
-                data: { email, role: 'admin' }
+            await prisma.$transaction(async (tx) => {
+                const newUser = await tx.user.create({
+                    data: { 
+                      email, 
+                      role: 'SUPER_ADMIN',
+                      permissions: { all: true }
+                    }
+                });
+
+                const workspace = await tx.workspace.create({
+                    data: {
+                        name: `${newUser.email}'s Workspace`,
+                        ownerId: newUser.id,
+                    }
+                });
+
+                await tx.user.update({
+                    where: { id: newUser.id },
+                    data: { workspaceId: workspace.id }
+                });
             });
         } else {
-             return NextResponse.json({ error: "User unauthorized" }, { status: 401 });
+            // Check whitelist for new users
+            const whitelisted = await prisma.emailWhitelist.findUnique({
+                where: { email }
+            });
+
+            if (!whitelisted) {
+                return NextResponse.json({ error: "Email not in whitelist" }, { status: 401 });
+            }
+            // User doesn't exist yet but is whitelisted, we'll create it during login/verification
         }
     }
 

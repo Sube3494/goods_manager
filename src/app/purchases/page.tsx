@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
@@ -9,6 +9,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
 import TrackingNumberModal from "@/components/Purchases/TrackingNumberModal";
+import { useUser } from "@/hooks/useUser";
+import { hasPermission } from "@/lib/permissions";
+import { SessionUser } from "@/lib/permissions";
 
 
 
@@ -37,8 +40,12 @@ const getTrackingUrl = (num: string, courierName?: string) => {
   return `https://www.kuaidi100.com/chaxun?com=${code}&nu=${num.trim()}`;
 };
 
-export default function PurchasesPage() {
+function PurchasesContent() {
   const { showToast } = useToast();
+  const { user } = useUser();
+  const canCreate = hasPermission(user as SessionUser | null, "purchase:create");
+  const canInbound = hasPermission(user as SessionUser | null, "inbound:create");
+  const canEdit = canCreate; // For now assuming create permission allows editing drafts
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -97,11 +104,9 @@ export default function PurchasesPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [pRes, sRes] = await Promise.all([
-        fetch("/api/purchases?type=Purchase"),
-        fetch("/api/suppliers")
-      ]);
-      if (pRes.ok && sRes.ok) {
+      const pRes = await fetch("/api/purchases?type=Purchase");
+      
+      if (pRes.ok) {
         setPurchases(await pRes.json());
       }
     } catch (error) {
@@ -337,17 +342,19 @@ export default function PurchasesPage() {
           <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理与供应商的采购订单，跟踪入库进度。</p>
         </div>
         
-        <button 
-          onClick={handleCreate}
-          className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
-        >
-          <Plus size={16} className="md:w-[18px] md:h-[18px]" />
-          新建采购单
-        </button>
+        {canCreate && (
+          <button 
+            onClick={handleCreate}
+            className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
+          >
+            <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+            新建采购单
+          </button>
+        )}
       </div>
 
       {/* Search Box */}
-      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:w-64 shrink-0">
+      <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full shrink-0 mb-4">
         <Search size={18} className="text-muted-foreground shrink-0" />
         <input
           type="text"
@@ -359,7 +366,7 @@ export default function PurchasesPage() {
       </div>
 
       {/* Status Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar mb-6 md:mb-8">
           {['All', 'Confirmed', 'Shipped', 'Received', 'Draft'].map(status => (
               <button
                 key={status}
@@ -367,8 +374,8 @@ export default function PurchasesPage() {
                 className={`
                     px-4 h-9 rounded-full text-sm font-bold transition-all whitespace-nowrap
                     ${statusFilter === status 
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' 
-                        : 'bg-white dark:bg-white/5 border border-border text-muted-foreground hover:bg-muted'
+                        ? 'bg-foreground text-background border-foreground shadow-sm' 
+                        : 'bg-white dark:bg-white/5 border border-border text-muted-foreground hover:bg-muted/80'
                     }
                 `}
               >
@@ -546,36 +553,42 @@ export default function PurchasesPage() {
                                    {/* Show Confirm button if it's Shipped (or legacy Ordered) AND all waybills are present */}
                                     {(po.status === "Shipped" || (po.status as string) === "Ordered") && 
                                      (po.trackingData || []).length > 0 && 
-                                     (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && (
-                                       <button 
-                                           onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
-                                           className="p-2 rounded-lg text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center gap-2 animate-in zoom-in-95 duration-300"
-                                           title="确认入库"
-                                       >
-                                           <CheckCircle2 size={16} />
-                                           <span className="text-[10px] font-bold ml-1">确认入库</span>
-                                       </button>
-                                   )}
+                                     (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && 
+                                     canInbound && (
+                                           <button 
+                                               onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
+                                               className="p-2 rounded-lg text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center gap-2 animate-in zoom-in-95 duration-300"
+                                               title="确认入库"
+                                           >
+                                               <CheckCircle2 size={16} />
+                                               <span className="text-[10px] font-bold ml-1">确认入库</span>
+                                           </button>
+                                      )
+                                   }
                                </div>
                              )}
 
                         {/* Actions: Only allow edit/delete for Drafts */}
                         {po.status === "Draft" ? (
                           <>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
-                                className="p-2 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors"
-                                title="编辑"
-                            >
-                               <Edit2 size={16} />
-                            </button>
-                             <button 
-                                 onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
-                                 className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                                 title="删除"
-                             >
-                               <Trash2 size={16} />
-                             </button>
+                            {canEdit && (
+                              <button 
+                                  onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
+                                  className="p-2 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors"
+                                  title="编辑"
+                              >
+                                 <Edit2 size={16} />
+                              </button>
+                            )}
+                            {canEdit && (
+                               <button 
+                                   onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
+                                   className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                                   title="删除"
+                               >
+                                 <Trash2 size={16} />
+                               </button>
+                            )}
                           </>
                         ) : null}
                       </div>
@@ -855,5 +868,17 @@ export default function PurchasesPage() {
         onClose={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
+  );
+}
+
+export default function PurchasesPage() {
+  return (
+    <Suspense fallback={
+        <div className="flex h-[50vh] items-center justify-center text-muted-foreground">
+            正在加载采购数据...
+        </div>
+    }>
+      <PurchasesContent />
+    </Suspense>
   );
 }

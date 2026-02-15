@@ -8,7 +8,7 @@ interface ActionBarProps {
   totalCount: number;
   onToggleSelectAll: () => void;
   onClear: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onEdit?: () => void;
   label?: string;
 }
@@ -73,12 +73,14 @@ export function ActionBar({
                 </button>
               )}
 
-              <button
-                onClick={onDelete}
-                className="h-8 px-6 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-black shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all"
-              >
-                删除
-              </button>
+              {onDelete && (
+                <button
+                  onClick={onDelete}
+                  className="h-8 px-6 rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-black shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all"
+                >
+                  删除
+                </button>
+              )}
               
               <div className="w-px h-8 bg-black/5 dark:bg-white/10 mx-2" />
 

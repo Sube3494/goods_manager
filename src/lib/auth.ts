@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import prisma from "./prisma";
 
 const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
 const key = new TextEncoder().encode(secretKey);
@@ -32,9 +33,47 @@ export async function getSession() {
   }
 }
 
-export async function login(userData: unknown) {
+/**
+ * Gets a session with fresh user data from the database
+ */
+export async function getFreshSession() {
+  const session = await getSession();
+  if (!session || !session.user) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: (session.user as any).id },
+    include: { workspace: true }
+  });
+
+  if (!user) return null;
+
+  return {
+    ...session,
+    // Flatten user fields for SessionUser compatibility
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    workspaceId: user.workspaceId || "",
+    permissions: user.permissions as any,
+    // Keep the user object for existing frontend code that might expect it
+    user: {
+      ...user,
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      workspaceId: user.workspaceId,
+      permissions: user.permissions
+    }
+  };
+}
+
+export async function login(userData: any) {
   const expires = new Date(Date.now() + SESSION_DURATION * 1000);
-  const session = await encrypt({ user: userData, expires });
+  const session = await encrypt({ 
+    ...userData,
+    user: userData, // Keep nested user for backward compatibility if any
+    expires 
+  });
   
   (await cookies()).set("session", session, { expires, httpOnly: true });
 }

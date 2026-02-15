@@ -10,6 +10,7 @@ import { useUser } from "@/hooks/useUser";
 import { LogIn } from "lucide-react";
 import { useState } from "react";
 import { MobileHeader } from "./MobileHeader";
+import { PageGuard } from "./PageGuard";
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -63,7 +64,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               />
             )}
             {!isLoginPage && (
-                <header className="hidden lg:flex sticky top-0 z-30 h-20 px-10 items-center justify-end gap-4">
+                <header className="hidden lg:flex sticky top-0 z-50 h-20 px-10 items-center justify-end gap-4">
                     {!user && !isLoading && (
                         <Link 
                             href="/login"
@@ -84,7 +85,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     "h-full animate-fade-in",
                     !isLoginPage && (pathname.includes("/gallery") ? "w-full max-w-none px-4 sm:px-6 lg:px-10" : "mx-auto max-w-7xl")
                 )}>
-                    {children}
+                    <PageGuard>
+                        {children}
+                    </PageGuard>
                 </div>
             </main>
         </div>

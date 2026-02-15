@@ -11,6 +11,9 @@ import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from "date-f
 import { zhCN } from "date-fns/locale";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { useUser } from "@/hooks/useUser";
+import { hasPermission } from "@/lib/permissions";
+import { SessionUser } from "@/lib/permissions";
 
 export default function OutboundPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([]);
@@ -21,6 +24,8 @@ export default function OutboundPage() {
   const [endDate, setEndDate] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const { showToast } = useToast();
+  const { user } = useUser();
+  const canCreate = hasPermission(user as SessionUser | null, "outbound:create");
 
   useEffect(() => {
     fetchOrders();
@@ -91,19 +96,21 @@ export default function OutboundPage() {
           <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">处理销售、样本或损耗，精准抵扣账面余值。</p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="group relative h-9 md:h-11 flex items-center justify-center gap-2 px-4 md:px-8 bg-primary text-primary-foreground rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 overflow-hidden shrink-0"
-        >
-          <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-          <Plus size={18} className="relative md:size-[20px]" />
-          <span className="relative text-sm md:text-base">新增出库</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="group relative h-9 md:h-11 flex items-center justify-center gap-2 px-4 md:px-8 bg-primary text-primary-foreground rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 overflow-hidden shrink-0"
+          >
+            <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+            <Plus size={18} className="relative md:size-[20px]" />
+            <span className="relative text-sm md:text-base">新增出库</span>
+          </button>
+        )}
       </div>
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
-        <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1">
+        <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"

@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
+  const session = await getFreshSession() as SessionUser | null;
   const searchParams = req.nextUrl.searchParams;
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '10');
   const skip = (page - 1) * limit;
 
+  if (!session || !session.workspaceId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!hasPermission(session, "brush:read")) {
+    return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+  }
+
   try {
     const [orders, total] = await Promise.all([
       prisma.brushOrder.findMany({
+        where: { workspaceId: session.workspaceId },
         skip,
         take: limit,
         orderBy: { date: 'desc' },
@@ -21,7 +33,9 @@ export async function GET(req: NextRequest) {
           },
         },
       }),
-      prisma.brushOrder.count(),
+      prisma.brushOrder.count({
+        where: { workspaceId: session.workspaceId }
+      }),
     ]);
 
     return NextResponse.json({
@@ -44,6 +58,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!hasPermission(session, "brush:create")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const body = await req.json();
     const {
       date,
@@ -61,6 +84,7 @@ export async function POST(req: NextRequest) {
       data: {
         date: new Date(date),
         type,
+        workspaceId: session.workspaceId,
         principalAmount: parseFloat(principalAmount || 0),
         paymentAmount: parseFloat(paymentAmount || 0),
         receivedAmount: parseFloat(receivedAmount || 0),

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { SessionUser } from "@/lib/permissions";
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getSession() as SessionUser | null;
+    const workspaceId = session?.workspaceId;
+    if (!session || !workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -33,9 +35,9 @@ export async function POST(request: Request) {
           const name = cat["分类名称"];
           if (name) {
             await tx.category.upsert({
-              where: { name },
+              where: { name_workspaceId: { name, workspaceId } },
               update: {},
-              create: { name }
+              create: { name, workspaceId }
             });
           }
         }
@@ -50,13 +52,15 @@ export async function POST(request: Request) {
             // Upsert by name if code is missing, otherwise by code
             if (code) {
               await tx.supplier.upsert({
-                where: { code },
+                where: { code_workspaceId: { code, workspaceId } },
                 update: { name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null },
-                create: { code, name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null }
+                create: { code, name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null, workspaceId }
               });
             } else {
               // Fallback to name-based logic (simplified for this context)
-              const existingS = await tx.supplier.findFirst({ where: { name } });
+              const existingS = await tx.supplier.findFirst({ 
+                  where: { name, workspaceId } 
+              });
               if (existingS) {
                   await tx.supplier.update({
                       where: { id: existingS.id },
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
                   });
               } else {
                   await tx.supplier.create({
-                      data: { name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null }
+                      data: { name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null, workspaceId }
                   });
               }
             }
@@ -90,19 +94,23 @@ export async function POST(request: Request) {
             // Find or create category
             let categoryId = "";
             if (catName) {
-              const cat = await tx.category.findUnique({ where: { name: catName } });
+              const cat = await tx.category.findUnique({ 
+                  where: { name_workspaceId: { name: catName, workspaceId } } 
+              });
               if (cat) {
                 categoryId = cat.id;
               } else {
-                const newCat = await tx.category.create({ data: { name: catName } });
+                const newCat = await tx.category.create({ 
+                    data: { name: catName, workspaceId } 
+                });
                 categoryId = newCat.id;
               }
             } else {
                 // Find or create 'Mixed' category
                 const cat = await tx.category.upsert({
-                    where: { name: "未分类" },
+                    where: { name_workspaceId: { name: "未分类", workspaceId } },
                     update: {},
-                    create: { name: "未分类" }
+                    create: { name: "未分类", workspaceId }
                 });
                 categoryId = cat.id;
             }
@@ -110,14 +118,16 @@ export async function POST(request: Request) {
             // Find supplier
             let supplierId = null;
             if (supName && supName !== "无") {
-              const sup = await tx.supplier.findFirst({ where: { name: supName } });
+              const sup = await tx.supplier.findFirst({ 
+                  where: { name: supName, workspaceId } 
+              });
               if (sup) {
                 supplierId = sup.id;
               }
             }
 
             await tx.product.upsert({
-              where: { sku },
+              where: { sku_workspaceId: { sku, workspaceId } },
               update: {
                 name,
                 categoryId,
@@ -133,7 +143,8 @@ export async function POST(request: Request) {
                 supplierId,
                 stock: Number(p["库存数量"] || 0),
                 costPrice: Number(p["成本价"] || 0),
-                isPublic: p["是否公开"] === "是"
+                isPublic: p["是否公开"] === "是",
+                workspaceId
               }
             });
 

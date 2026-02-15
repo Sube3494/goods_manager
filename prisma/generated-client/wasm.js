@@ -122,10 +122,19 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
+exports.Prisma.WorkspaceScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  ownerId: 'ownerId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.CategoryScalarFieldEnum = {
   id: 'id',
   name: 'name',
   description: 'description',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -141,6 +150,7 @@ exports.Prisma.ProductScalarFieldEnum = {
   isPublic: 'isPublic',
   categoryId: 'categoryId',
   supplierId: 'supplierId',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -153,6 +163,7 @@ exports.Prisma.SupplierScalarFieldEnum = {
   phone: 'phone',
   email: 'email',
   address: 'address',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -168,6 +179,7 @@ exports.Prisma.PurchaseOrderScalarFieldEnum = {
   paymentVoucher: 'paymentVoucher',
   paymentVouchers: 'paymentVouchers',
   trackingData: 'trackingData',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -190,6 +202,7 @@ exports.Prisma.OutboundOrderScalarFieldEnum = {
   date: 'date',
   note: 'note',
   totalAmount: 'totalAmount',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -209,6 +222,7 @@ exports.Prisma.GalleryItemScalarFieldEnum = {
   tags: 'tags',
   isPublic: 'isPublic',
   type: 'type',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -222,6 +236,7 @@ exports.Prisma.GallerySubmissionScalarFieldEnum = {
   notes: 'notes',
   productId: 'productId',
   selectedIndices: 'selectedIndices',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -231,6 +246,18 @@ exports.Prisma.UserScalarFieldEnum = {
   email: 'email',
   name: 'name',
   role: 'role',
+  status: 'status',
+  permissions: 'permissions',
+  workspaceId: 'workspaceId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.EmailWhitelistScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  role: 'role',
+  permissions: 'permissions',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -245,6 +272,7 @@ exports.Prisma.VerificationCodeScalarFieldEnum = {
 
 exports.Prisma.SystemSettingScalarFieldEnum = {
   id: 'id',
+  workspaceId: 'workspaceId',
   lowStockThreshold: 'lowStockThreshold',
   allowDataImport: 'allowDataImport',
   allowGalleryUpload: 'allowGalleryUpload',
@@ -270,6 +298,7 @@ exports.Prisma.BrushOrderScalarFieldEnum = {
   receivedAmount: 'receivedAmount',
   commission: 'commission',
   note: 'note',
+  workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -312,9 +341,13 @@ exports.Prisma.JsonNullValueFilter = {
   JsonNull: Prisma.JsonNull,
   AnyNull: Prisma.AnyNull
 };
-
+exports.Role = exports.$Enums.Role = {
+  USER: 'USER',
+  SUPER_ADMIN: 'SUPER_ADMIN'
+};
 
 exports.Prisma.ModelName = {
+  Workspace: 'Workspace',
   Category: 'Category',
   Product: 'Product',
   Supplier: 'Supplier',
@@ -325,6 +358,7 @@ exports.Prisma.ModelName = {
   GalleryItem: 'GalleryItem',
   GallerySubmission: 'GallerySubmission',
   User: 'User',
+  EmailWhitelist: 'EmailWhitelist',
   VerificationCode: 'VerificationCode',
   SystemSetting: 'SystemSetting',
   BrushOrder: 'BrushOrder',

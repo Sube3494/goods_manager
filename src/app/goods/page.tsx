@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
@@ -14,7 +14,9 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 
 
 import { useUser } from "@/hooks/useUser";
+import { hasPermission } from "@/lib/permissions";
 import { pinyinMatch } from "@/lib/pinyin";
+import { SessionUser } from "@/lib/permissions";
 
 export default function GoodsPage() {
   const { user } = useUser();
@@ -49,32 +51,48 @@ export default function GoodsPage() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
 
   const { showToast } = useToast();
+  const canCreate = hasPermission(user as SessionUser | null, "product:create");
+  const canUpdate = hasPermission(user as SessionUser | null, "product:update");
+  const canDelete = hasPermission(user as SessionUser | null, "product:delete");
 
-  const fetchGoods = async () => {
+  const fetchGoods = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [productsRes, categoriesRes, suppliersRes] = await Promise.all([
+      
+      const promises: Promise<Response>[] = [
         fetch("/api/products"),
-        fetch("/api/categories"),
-        fetch("/api/suppliers")
-      ]);
+        fetch("/api/categories")
+      ];
 
-      if (productsRes.ok && categoriesRes.ok && suppliersRes.ok) {
+      const canReadSuppliers = user?.role === "SUPER_ADMIN" || user?.permissions?.["supplier:read"];
+      if (canReadSuppliers) {
+        promises.push(fetch("/api/suppliers"));
+      }
+
+      const results = await Promise.all(promises);
+      const productsRes = results[0];
+      const categoriesRes = results[1];
+      const suppliersRes = canReadSuppliers ? results[2] : null;
+
+      if (productsRes.ok && categoriesRes.ok) {
         const productsData = await productsRes.json();
         const categoriesData = await categoriesRes.json();
-        const suppliersData = await suppliersRes.json();
         setGoods(productsData);
         setCategories(categoriesData);
-        setSuppliers(suppliersData);
+
+        if (suppliersRes && suppliersRes.ok) {
+           const suppliersData = await suppliersRes.json();
+           setSuppliers(suppliersData);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const res = await fetch("/api/system/settings");
       if (res.ok) {
@@ -83,12 +101,12 @@ export default function GoodsPage() {
     } catch (error) {
       console.error("Failed to fetch settings:", error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchGoods();
     fetchSettings();
-  }, []);
+  }, [fetchGoods, fetchSettings]);
 
   const handleCreate = () => {
     setEditingProduct(undefined);
@@ -297,7 +315,7 @@ export default function GoodsPage() {
         </div>
         
         <div className="flex items-center gap-2 shrink-0">
-           {user && (
+           {(canCreate) && (
              <div className="glass p-1 rounded-full flex gap-1 items-center h-9 sm:h-10 shadow-sm border border-white/10">
                <button 
                   onClick={() => setIsImportOpen(true)}
@@ -322,7 +340,7 @@ export default function GoodsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 md:mb-8">
           <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:flex-1 shrink-0">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
@@ -375,8 +393,8 @@ export default function GoodsPage() {
             <GoodsCard 
               key={product.id} 
               product={product} 
-              onEdit={user ? handleEdit : undefined} 
-              onDelete={user ? handleDelete : undefined} 
+              onEdit={canUpdate ? handleEdit : undefined} 
+              onDelete={canDelete ? handleDelete : undefined} 
               lowStockThreshold={settings.lowStockThreshold}
               isSelected={selectedIds.includes(product.id)}
               anySelected={selectedIds.length > 0}

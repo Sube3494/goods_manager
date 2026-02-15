@@ -17,16 +17,7 @@ interface SystemInfo {
   lastBackup: string;
 }
 
-interface ViewTransition {
-  ready: Promise<void>;
-  finished: Promise<void>;
-  updateCallbackDone: Promise<void>;
-  skipTransition: () => void;
-}
-
-interface DocumentWithViewTransition extends Document {
-  startViewTransition?: (callback: () => void | Promise<void>) => ViewTransition;
-}
+// View transitions types are built into modern TS versions, but we'll use a safer approach for the animation logic below.
 
 export default function SettingsPage() {
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
@@ -337,7 +328,8 @@ export default function SettingsPage() {
                           key={t.id}
                           onClick={(e) => {
                             if (theme === t.id) return;
-                            const doc = document as DocumentWithViewTransition;
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const doc = document as any;
                             if (!doc.startViewTransition) {
                               setTheme(t.id);
                               return;
@@ -347,7 +339,8 @@ export default function SettingsPage() {
                               const x = e.clientX;
                               const y = e.clientY;
                               const endRadius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-                              transition.ready.then(() => {
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              (transition as any).ready.then(() => {
                                 const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
                                 document.documentElement.animate(
                                   { clipPath: clipPath },

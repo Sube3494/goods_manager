@@ -14,6 +14,11 @@ export type PrismaPromise<T> = $Public.PrismaPromise<T>
 
 
 /**
+ * Model Workspace
+ * 
+ */
+export type Workspace = $Result.DefaultSelection<Prisma.$WorkspacePayload>
+/**
  * Model Category
  * 
  */
@@ -64,6 +69,11 @@ export type GallerySubmission = $Result.DefaultSelection<Prisma.$GallerySubmissi
  */
 export type User = $Result.DefaultSelection<Prisma.$UserPayload>
 /**
+ * Model EmailWhitelist
+ * 
+ */
+export type EmailWhitelist = $Result.DefaultSelection<Prisma.$EmailWhitelistPayload>
+/**
  * Model VerificationCode
  * 
  */
@@ -85,14 +95,31 @@ export type BrushOrder = $Result.DefaultSelection<Prisma.$BrushOrderPayload>
 export type BrushOrderItem = $Result.DefaultSelection<Prisma.$BrushOrderItemPayload>
 
 /**
+ * Enums
+ */
+export namespace $Enums {
+  export const Role: {
+  USER: 'USER',
+  SUPER_ADMIN: 'SUPER_ADMIN'
+};
+
+export type Role = (typeof Role)[keyof typeof Role]
+
+}
+
+export type Role = $Enums.Role
+
+export const Role: typeof $Enums.Role
+
+/**
  * ##  Prisma Client ʲˢ
  * 
  * Type-safe database client for TypeScript & Node.js
  * @example
  * ```
  * const prisma = new PrismaClient()
- * // Fetch zero or more Categories
- * const categories = await prisma.category.findMany()
+ * // Fetch zero or more Workspaces
+ * const workspaces = await prisma.workspace.findMany()
  * ```
  *
  * 
@@ -112,8 +139,8 @@ export class PrismaClient<
    * @example
    * ```
    * const prisma = new PrismaClient()
-   * // Fetch zero or more Categories
-   * const categories = await prisma.category.findMany()
+   * // Fetch zero or more Workspaces
+   * const workspaces = await prisma.workspace.findMany()
    * ```
    *
    * 
@@ -208,6 +235,16 @@ export class PrismaClient<
   $extends: $Extensions.ExtendsHook<"extends", Prisma.TypeMapCb, ExtArgs>
 
       /**
+   * `prisma.workspace`: Exposes CRUD operations for the **Workspace** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Workspaces
+    * const workspaces = await prisma.workspace.findMany()
+    * ```
+    */
+  get workspace(): Prisma.WorkspaceDelegate<ExtArgs>;
+
+  /**
    * `prisma.category`: Exposes CRUD operations for the **Category** model.
     * Example usage:
     * ```ts
@@ -306,6 +343,16 @@ export class PrismaClient<
     * ```
     */
   get user(): Prisma.UserDelegate<ExtArgs>;
+
+  /**
+   * `prisma.emailWhitelist`: Exposes CRUD operations for the **EmailWhitelist** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more EmailWhitelists
+    * const emailWhitelists = await prisma.emailWhitelist.findMany()
+    * ```
+    */
+  get emailWhitelist(): Prisma.EmailWhitelistDelegate<ExtArgs>;
 
   /**
    * `prisma.verificationCode`: Exposes CRUD operations for the **VerificationCode** model.
@@ -787,6 +834,7 @@ export namespace Prisma {
 
 
   export const ModelName: {
+    Workspace: 'Workspace',
     Category: 'Category',
     Product: 'Product',
     Supplier: 'Supplier',
@@ -797,6 +845,7 @@ export namespace Prisma {
     GalleryItem: 'GalleryItem',
     GallerySubmission: 'GallerySubmission',
     User: 'User',
+    EmailWhitelist: 'EmailWhitelist',
     VerificationCode: 'VerificationCode',
     SystemSetting: 'SystemSetting',
     BrushOrder: 'BrushOrder',
@@ -816,10 +865,80 @@ export namespace Prisma {
 
   export type TypeMap<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, ClientOptions = {}> = {
     meta: {
-      modelProps: "category" | "product" | "supplier" | "purchaseOrder" | "purchaseOrderItem" | "outboundOrder" | "outboundOrderItem" | "galleryItem" | "gallerySubmission" | "user" | "verificationCode" | "systemSetting" | "brushOrder" | "brushOrderItem"
+      modelProps: "workspace" | "category" | "product" | "supplier" | "purchaseOrder" | "purchaseOrderItem" | "outboundOrder" | "outboundOrderItem" | "galleryItem" | "gallerySubmission" | "user" | "emailWhitelist" | "verificationCode" | "systemSetting" | "brushOrder" | "brushOrderItem"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
+      Workspace: {
+        payload: Prisma.$WorkspacePayload<ExtArgs>
+        fields: Prisma.WorkspaceFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WorkspaceFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WorkspaceFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>
+          }
+          findFirst: {
+            args: Prisma.WorkspaceFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WorkspaceFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>
+          }
+          findMany: {
+            args: Prisma.WorkspaceFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>[]
+          }
+          create: {
+            args: Prisma.WorkspaceCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>
+          }
+          createMany: {
+            args: Prisma.WorkspaceCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WorkspaceCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>[]
+          }
+          delete: {
+            args: Prisma.WorkspaceDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>
+          }
+          update: {
+            args: Prisma.WorkspaceUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>
+          }
+          deleteMany: {
+            args: Prisma.WorkspaceDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WorkspaceUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.WorkspaceUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkspacePayload>
+          }
+          aggregate: {
+            args: Prisma.WorkspaceAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWorkspace>
+          }
+          groupBy: {
+            args: Prisma.WorkspaceGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WorkspaceGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WorkspaceCountArgs<ExtArgs>
+            result: $Utils.Optional<WorkspaceCountAggregateOutputType> | number
+          }
+        }
+      }
       Category: {
         payload: Prisma.$CategoryPayload<ExtArgs>
         fields: Prisma.CategoryFieldRefs
@@ -1520,6 +1639,76 @@ export namespace Prisma {
           }
         }
       }
+      EmailWhitelist: {
+        payload: Prisma.$EmailWhitelistPayload<ExtArgs>
+        fields: Prisma.EmailWhitelistFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.EmailWhitelistFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.EmailWhitelistFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>
+          }
+          findFirst: {
+            args: Prisma.EmailWhitelistFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.EmailWhitelistFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>
+          }
+          findMany: {
+            args: Prisma.EmailWhitelistFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>[]
+          }
+          create: {
+            args: Prisma.EmailWhitelistCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>
+          }
+          createMany: {
+            args: Prisma.EmailWhitelistCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.EmailWhitelistCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>[]
+          }
+          delete: {
+            args: Prisma.EmailWhitelistDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>
+          }
+          update: {
+            args: Prisma.EmailWhitelistUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>
+          }
+          deleteMany: {
+            args: Prisma.EmailWhitelistDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.EmailWhitelistUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.EmailWhitelistUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EmailWhitelistPayload>
+          }
+          aggregate: {
+            args: Prisma.EmailWhitelistAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateEmailWhitelist>
+          }
+          groupBy: {
+            args: Prisma.EmailWhitelistGroupByArgs<ExtArgs>
+            result: $Utils.Optional<EmailWhitelistGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.EmailWhitelistCountArgs<ExtArgs>
+            result: $Utils.Optional<EmailWhitelistCountAggregateOutputType> | number
+          }
+        }
+      }
       VerificationCode: {
         payload: Prisma.$VerificationCodePayload<ExtArgs>
         fields: Prisma.VerificationCodeFieldRefs
@@ -1957,6 +2146,118 @@ export namespace Prisma {
 
 
   /**
+   * Count Type WorkspaceCountOutputType
+   */
+
+  export type WorkspaceCountOutputType = {
+    brushOrders: number
+    categories: number
+    galleryItems: number
+    gallerySubmissions: number
+    outboundOrders: number
+    products: number
+    purchaseOrders: number
+    suppliers: number
+    systemSettings: number
+    users: number
+  }
+
+  export type WorkspaceCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    brushOrders?: boolean | WorkspaceCountOutputTypeCountBrushOrdersArgs
+    categories?: boolean | WorkspaceCountOutputTypeCountCategoriesArgs
+    galleryItems?: boolean | WorkspaceCountOutputTypeCountGalleryItemsArgs
+    gallerySubmissions?: boolean | WorkspaceCountOutputTypeCountGallerySubmissionsArgs
+    outboundOrders?: boolean | WorkspaceCountOutputTypeCountOutboundOrdersArgs
+    products?: boolean | WorkspaceCountOutputTypeCountProductsArgs
+    purchaseOrders?: boolean | WorkspaceCountOutputTypeCountPurchaseOrdersArgs
+    suppliers?: boolean | WorkspaceCountOutputTypeCountSuppliersArgs
+    systemSettings?: boolean | WorkspaceCountOutputTypeCountSystemSettingsArgs
+    users?: boolean | WorkspaceCountOutputTypeCountUsersArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkspaceCountOutputType
+     */
+    select?: WorkspaceCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountBrushOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BrushOrderWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountCategoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CategoryWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountGalleryItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GalleryItemWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountGallerySubmissionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GallerySubmissionWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountOutboundOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: OutboundOrderWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountProductsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProductWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountPurchaseOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PurchaseOrderWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountSuppliersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SupplierWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountSystemSettingsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SystemSettingWhereInput
+  }
+
+  /**
+   * WorkspaceCountOutputType without action
+   */
+  export type WorkspaceCountOutputTypeCountUsersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: UserWhereInput
+  }
+
+
+  /**
    * Count Type CategoryCountOutputType
    */
 
@@ -2183,6 +2484,1181 @@ export namespace Prisma {
    */
 
   /**
+   * Model Workspace
+   */
+
+  export type AggregateWorkspace = {
+    _count: WorkspaceCountAggregateOutputType | null
+    _min: WorkspaceMinAggregateOutputType | null
+    _max: WorkspaceMaxAggregateOutputType | null
+  }
+
+  export type WorkspaceMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+    ownerId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkspaceMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+    ownerId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkspaceCountAggregateOutputType = {
+    id: number
+    name: number
+    ownerId: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type WorkspaceMinAggregateInputType = {
+    id?: true
+    name?: true
+    ownerId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkspaceMaxAggregateInputType = {
+    id?: true
+    name?: true
+    ownerId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkspaceCountAggregateInputType = {
+    id?: true
+    name?: true
+    ownerId?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type WorkspaceAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Workspace to aggregate.
+     */
+    where?: WorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Workspaces to fetch.
+     */
+    orderBy?: WorkspaceOrderByWithRelationInput | WorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Workspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Workspaces.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Workspaces
+    **/
+    _count?: true | WorkspaceCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WorkspaceMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WorkspaceMaxAggregateInputType
+  }
+
+  export type GetWorkspaceAggregateType<T extends WorkspaceAggregateArgs> = {
+        [P in keyof T & keyof AggregateWorkspace]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWorkspace[P]>
+      : GetScalarType<T[P], AggregateWorkspace[P]>
+  }
+
+
+
+
+  export type WorkspaceGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkspaceWhereInput
+    orderBy?: WorkspaceOrderByWithAggregationInput | WorkspaceOrderByWithAggregationInput[]
+    by: WorkspaceScalarFieldEnum[] | WorkspaceScalarFieldEnum
+    having?: WorkspaceScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WorkspaceCountAggregateInputType | true
+    _min?: WorkspaceMinAggregateInputType
+    _max?: WorkspaceMaxAggregateInputType
+  }
+
+  export type WorkspaceGroupByOutputType = {
+    id: string
+    name: string
+    ownerId: string
+    createdAt: Date
+    updatedAt: Date
+    _count: WorkspaceCountAggregateOutputType | null
+    _min: WorkspaceMinAggregateOutputType | null
+    _max: WorkspaceMaxAggregateOutputType | null
+  }
+
+  type GetWorkspaceGroupByPayload<T extends WorkspaceGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WorkspaceGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WorkspaceGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WorkspaceGroupByOutputType[P]>
+            : GetScalarType<T[P], WorkspaceGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WorkspaceSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    ownerId?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    brushOrders?: boolean | Workspace$brushOrdersArgs<ExtArgs>
+    categories?: boolean | Workspace$categoriesArgs<ExtArgs>
+    galleryItems?: boolean | Workspace$galleryItemsArgs<ExtArgs>
+    gallerySubmissions?: boolean | Workspace$gallerySubmissionsArgs<ExtArgs>
+    outboundOrders?: boolean | Workspace$outboundOrdersArgs<ExtArgs>
+    products?: boolean | Workspace$productsArgs<ExtArgs>
+    purchaseOrders?: boolean | Workspace$purchaseOrdersArgs<ExtArgs>
+    suppliers?: boolean | Workspace$suppliersArgs<ExtArgs>
+    systemSettings?: boolean | Workspace$systemSettingsArgs<ExtArgs>
+    users?: boolean | Workspace$usersArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workspace"]>
+
+  export type WorkspaceSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    ownerId?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workspace"]>
+
+  export type WorkspaceSelectScalar = {
+    id?: boolean
+    name?: boolean
+    ownerId?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type WorkspaceInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    brushOrders?: boolean | Workspace$brushOrdersArgs<ExtArgs>
+    categories?: boolean | Workspace$categoriesArgs<ExtArgs>
+    galleryItems?: boolean | Workspace$galleryItemsArgs<ExtArgs>
+    gallerySubmissions?: boolean | Workspace$gallerySubmissionsArgs<ExtArgs>
+    outboundOrders?: boolean | Workspace$outboundOrdersArgs<ExtArgs>
+    products?: boolean | Workspace$productsArgs<ExtArgs>
+    purchaseOrders?: boolean | Workspace$purchaseOrdersArgs<ExtArgs>
+    suppliers?: boolean | Workspace$suppliersArgs<ExtArgs>
+    systemSettings?: boolean | Workspace$systemSettingsArgs<ExtArgs>
+    users?: boolean | Workspace$usersArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type WorkspaceIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $WorkspacePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Workspace"
+    objects: {
+      brushOrders: Prisma.$BrushOrderPayload<ExtArgs>[]
+      categories: Prisma.$CategoryPayload<ExtArgs>[]
+      galleryItems: Prisma.$GalleryItemPayload<ExtArgs>[]
+      gallerySubmissions: Prisma.$GallerySubmissionPayload<ExtArgs>[]
+      outboundOrders: Prisma.$OutboundOrderPayload<ExtArgs>[]
+      products: Prisma.$ProductPayload<ExtArgs>[]
+      purchaseOrders: Prisma.$PurchaseOrderPayload<ExtArgs>[]
+      suppliers: Prisma.$SupplierPayload<ExtArgs>[]
+      systemSettings: Prisma.$SystemSettingPayload<ExtArgs>[]
+      users: Prisma.$UserPayload<ExtArgs>[]
+      owner: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+      ownerId: string
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["workspace"]>
+    composites: {}
+  }
+
+  type WorkspaceGetPayload<S extends boolean | null | undefined | WorkspaceDefaultArgs> = $Result.GetResult<Prisma.$WorkspacePayload, S>
+
+  type WorkspaceCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<WorkspaceFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: WorkspaceCountAggregateInputType | true
+    }
+
+  export interface WorkspaceDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Workspace'], meta: { name: 'Workspace' } }
+    /**
+     * Find zero or one Workspace that matches the filter.
+     * @param {WorkspaceFindUniqueArgs} args - Arguments to find a Workspace
+     * @example
+     * // Get one Workspace
+     * const workspace = await prisma.workspace.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WorkspaceFindUniqueArgs>(args: SelectSubset<T, WorkspaceFindUniqueArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one Workspace that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {WorkspaceFindUniqueOrThrowArgs} args - Arguments to find a Workspace
+     * @example
+     * // Get one Workspace
+     * const workspace = await prisma.workspace.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WorkspaceFindUniqueOrThrowArgs>(args: SelectSubset<T, WorkspaceFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first Workspace that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkspaceFindFirstArgs} args - Arguments to find a Workspace
+     * @example
+     * // Get one Workspace
+     * const workspace = await prisma.workspace.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WorkspaceFindFirstArgs>(args?: SelectSubset<T, WorkspaceFindFirstArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first Workspace that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkspaceFindFirstOrThrowArgs} args - Arguments to find a Workspace
+     * @example
+     * // Get one Workspace
+     * const workspace = await prisma.workspace.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WorkspaceFindFirstOrThrowArgs>(args?: SelectSubset<T, WorkspaceFindFirstOrThrowArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more Workspaces that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkspaceFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Workspaces
+     * const workspaces = await prisma.workspace.findMany()
+     * 
+     * // Get first 10 Workspaces
+     * const workspaces = await prisma.workspace.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const workspaceWithIdOnly = await prisma.workspace.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends WorkspaceFindManyArgs>(args?: SelectSubset<T, WorkspaceFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a Workspace.
+     * @param {WorkspaceCreateArgs} args - Arguments to create a Workspace.
+     * @example
+     * // Create one Workspace
+     * const Workspace = await prisma.workspace.create({
+     *   data: {
+     *     // ... data to create a Workspace
+     *   }
+     * })
+     * 
+     */
+    create<T extends WorkspaceCreateArgs>(args: SelectSubset<T, WorkspaceCreateArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many Workspaces.
+     * @param {WorkspaceCreateManyArgs} args - Arguments to create many Workspaces.
+     * @example
+     * // Create many Workspaces
+     * const workspace = await prisma.workspace.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WorkspaceCreateManyArgs>(args?: SelectSubset<T, WorkspaceCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Workspaces and returns the data saved in the database.
+     * @param {WorkspaceCreateManyAndReturnArgs} args - Arguments to create many Workspaces.
+     * @example
+     * // Create many Workspaces
+     * const workspace = await prisma.workspace.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Workspaces and only return the `id`
+     * const workspaceWithIdOnly = await prisma.workspace.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WorkspaceCreateManyAndReturnArgs>(args?: SelectSubset<T, WorkspaceCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a Workspace.
+     * @param {WorkspaceDeleteArgs} args - Arguments to delete one Workspace.
+     * @example
+     * // Delete one Workspace
+     * const Workspace = await prisma.workspace.delete({
+     *   where: {
+     *     // ... filter to delete one Workspace
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WorkspaceDeleteArgs>(args: SelectSubset<T, WorkspaceDeleteArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one Workspace.
+     * @param {WorkspaceUpdateArgs} args - Arguments to update one Workspace.
+     * @example
+     * // Update one Workspace
+     * const workspace = await prisma.workspace.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WorkspaceUpdateArgs>(args: SelectSubset<T, WorkspaceUpdateArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more Workspaces.
+     * @param {WorkspaceDeleteManyArgs} args - Arguments to filter Workspaces to delete.
+     * @example
+     * // Delete a few Workspaces
+     * const { count } = await prisma.workspace.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WorkspaceDeleteManyArgs>(args?: SelectSubset<T, WorkspaceDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Workspaces.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkspaceUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Workspaces
+     * const workspace = await prisma.workspace.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WorkspaceUpdateManyArgs>(args: SelectSubset<T, WorkspaceUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one Workspace.
+     * @param {WorkspaceUpsertArgs} args - Arguments to update or create a Workspace.
+     * @example
+     * // Update or create a Workspace
+     * const workspace = await prisma.workspace.upsert({
+     *   create: {
+     *     // ... data to create a Workspace
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Workspace we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WorkspaceUpsertArgs>(args: SelectSubset<T, WorkspaceUpsertArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of Workspaces.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkspaceCountArgs} args - Arguments to filter Workspaces to count.
+     * @example
+     * // Count the number of Workspaces
+     * const count = await prisma.workspace.count({
+     *   where: {
+     *     // ... the filter for the Workspaces we want to count
+     *   }
+     * })
+    **/
+    count<T extends WorkspaceCountArgs>(
+      args?: Subset<T, WorkspaceCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WorkspaceCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Workspace.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkspaceAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WorkspaceAggregateArgs>(args: Subset<T, WorkspaceAggregateArgs>): Prisma.PrismaPromise<GetWorkspaceAggregateType<T>>
+
+    /**
+     * Group by Workspace.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkspaceGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WorkspaceGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WorkspaceGroupByArgs['orderBy'] }
+        : { orderBy?: WorkspaceGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WorkspaceGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWorkspaceGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Workspace model
+   */
+  readonly fields: WorkspaceFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Workspace.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WorkspaceClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    brushOrders<T extends Workspace$brushOrdersArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$brushOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BrushOrderPayload<ExtArgs>, T, "findMany"> | Null>
+    categories<T extends Workspace$categoriesArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$categoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CategoryPayload<ExtArgs>, T, "findMany"> | Null>
+    galleryItems<T extends Workspace$galleryItemsArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$galleryItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GalleryItemPayload<ExtArgs>, T, "findMany"> | Null>
+    gallerySubmissions<T extends Workspace$gallerySubmissionsArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$gallerySubmissionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GallerySubmissionPayload<ExtArgs>, T, "findMany"> | Null>
+    outboundOrders<T extends Workspace$outboundOrdersArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$outboundOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OutboundOrderPayload<ExtArgs>, T, "findMany"> | Null>
+    products<T extends Workspace$productsArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$productsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findMany"> | Null>
+    purchaseOrders<T extends Workspace$purchaseOrdersArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$purchaseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "findMany"> | Null>
+    suppliers<T extends Workspace$suppliersArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$suppliersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SupplierPayload<ExtArgs>, T, "findMany"> | Null>
+    systemSettings<T extends Workspace$systemSettingsArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$systemSettingsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SystemSettingPayload<ExtArgs>, T, "findMany"> | Null>
+    users<T extends Workspace$usersArgs<ExtArgs> = {}>(args?: Subset<T, Workspace$usersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany"> | Null>
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Workspace model
+   */ 
+  interface WorkspaceFieldRefs {
+    readonly id: FieldRef<"Workspace", 'String'>
+    readonly name: FieldRef<"Workspace", 'String'>
+    readonly ownerId: FieldRef<"Workspace", 'String'>
+    readonly createdAt: FieldRef<"Workspace", 'DateTime'>
+    readonly updatedAt: FieldRef<"Workspace", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Workspace findUnique
+   */
+  export type WorkspaceFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which Workspace to fetch.
+     */
+    where: WorkspaceWhereUniqueInput
+  }
+
+  /**
+   * Workspace findUniqueOrThrow
+   */
+  export type WorkspaceFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which Workspace to fetch.
+     */
+    where: WorkspaceWhereUniqueInput
+  }
+
+  /**
+   * Workspace findFirst
+   */
+  export type WorkspaceFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which Workspace to fetch.
+     */
+    where?: WorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Workspaces to fetch.
+     */
+    orderBy?: WorkspaceOrderByWithRelationInput | WorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Workspaces.
+     */
+    cursor?: WorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Workspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Workspaces.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Workspaces.
+     */
+    distinct?: WorkspaceScalarFieldEnum | WorkspaceScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace findFirstOrThrow
+   */
+  export type WorkspaceFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which Workspace to fetch.
+     */
+    where?: WorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Workspaces to fetch.
+     */
+    orderBy?: WorkspaceOrderByWithRelationInput | WorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Workspaces.
+     */
+    cursor?: WorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Workspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Workspaces.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Workspaces.
+     */
+    distinct?: WorkspaceScalarFieldEnum | WorkspaceScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace findMany
+   */
+  export type WorkspaceFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which Workspaces to fetch.
+     */
+    where?: WorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Workspaces to fetch.
+     */
+    orderBy?: WorkspaceOrderByWithRelationInput | WorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Workspaces.
+     */
+    cursor?: WorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Workspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Workspaces.
+     */
+    skip?: number
+    distinct?: WorkspaceScalarFieldEnum | WorkspaceScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace create
+   */
+  export type WorkspaceCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Workspace.
+     */
+    data: XOR<WorkspaceCreateInput, WorkspaceUncheckedCreateInput>
+  }
+
+  /**
+   * Workspace createMany
+   */
+  export type WorkspaceCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Workspaces.
+     */
+    data: WorkspaceCreateManyInput | WorkspaceCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Workspace createManyAndReturn
+   */
+  export type WorkspaceCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many Workspaces.
+     */
+    data: WorkspaceCreateManyInput | WorkspaceCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Workspace update
+   */
+  export type WorkspaceUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Workspace.
+     */
+    data: XOR<WorkspaceUpdateInput, WorkspaceUncheckedUpdateInput>
+    /**
+     * Choose, which Workspace to update.
+     */
+    where: WorkspaceWhereUniqueInput
+  }
+
+  /**
+   * Workspace updateMany
+   */
+  export type WorkspaceUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Workspaces.
+     */
+    data: XOR<WorkspaceUpdateManyMutationInput, WorkspaceUncheckedUpdateManyInput>
+    /**
+     * Filter which Workspaces to update
+     */
+    where?: WorkspaceWhereInput
+  }
+
+  /**
+   * Workspace upsert
+   */
+  export type WorkspaceUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Workspace to update in case it exists.
+     */
+    where: WorkspaceWhereUniqueInput
+    /**
+     * In case the Workspace found by the `where` argument doesn't exist, create a new Workspace with this data.
+     */
+    create: XOR<WorkspaceCreateInput, WorkspaceUncheckedCreateInput>
+    /**
+     * In case the Workspace was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WorkspaceUpdateInput, WorkspaceUncheckedUpdateInput>
+  }
+
+  /**
+   * Workspace delete
+   */
+  export type WorkspaceDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter which Workspace to delete.
+     */
+    where: WorkspaceWhereUniqueInput
+  }
+
+  /**
+   * Workspace deleteMany
+   */
+  export type WorkspaceDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Workspaces to delete
+     */
+    where?: WorkspaceWhereInput
+  }
+
+  /**
+   * Workspace.brushOrders
+   */
+  export type Workspace$brushOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BrushOrder
+     */
+    select?: BrushOrderSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BrushOrderInclude<ExtArgs> | null
+    where?: BrushOrderWhereInput
+    orderBy?: BrushOrderOrderByWithRelationInput | BrushOrderOrderByWithRelationInput[]
+    cursor?: BrushOrderWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: BrushOrderScalarFieldEnum | BrushOrderScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.categories
+   */
+  export type Workspace$categoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Category
+     */
+    select?: CategorySelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CategoryInclude<ExtArgs> | null
+    where?: CategoryWhereInput
+    orderBy?: CategoryOrderByWithRelationInput | CategoryOrderByWithRelationInput[]
+    cursor?: CategoryWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CategoryScalarFieldEnum | CategoryScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.galleryItems
+   */
+  export type Workspace$galleryItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GalleryItem
+     */
+    select?: GalleryItemSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GalleryItemInclude<ExtArgs> | null
+    where?: GalleryItemWhereInput
+    orderBy?: GalleryItemOrderByWithRelationInput | GalleryItemOrderByWithRelationInput[]
+    cursor?: GalleryItemWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: GalleryItemScalarFieldEnum | GalleryItemScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.gallerySubmissions
+   */
+  export type Workspace$gallerySubmissionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GallerySubmission
+     */
+    select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    where?: GallerySubmissionWhereInput
+    orderBy?: GallerySubmissionOrderByWithRelationInput | GallerySubmissionOrderByWithRelationInput[]
+    cursor?: GallerySubmissionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: GallerySubmissionScalarFieldEnum | GallerySubmissionScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.outboundOrders
+   */
+  export type Workspace$outboundOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the OutboundOrder
+     */
+    select?: OutboundOrderSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: OutboundOrderInclude<ExtArgs> | null
+    where?: OutboundOrderWhereInput
+    orderBy?: OutboundOrderOrderByWithRelationInput | OutboundOrderOrderByWithRelationInput[]
+    cursor?: OutboundOrderWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: OutboundOrderScalarFieldEnum | OutboundOrderScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.products
+   */
+  export type Workspace$productsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Product
+     */
+    select?: ProductSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProductInclude<ExtArgs> | null
+    where?: ProductWhereInput
+    orderBy?: ProductOrderByWithRelationInput | ProductOrderByWithRelationInput[]
+    cursor?: ProductWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ProductScalarFieldEnum | ProductScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.purchaseOrders
+   */
+  export type Workspace$purchaseOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PurchaseOrder
+     */
+    select?: PurchaseOrderSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PurchaseOrderInclude<ExtArgs> | null
+    where?: PurchaseOrderWhereInput
+    orderBy?: PurchaseOrderOrderByWithRelationInput | PurchaseOrderOrderByWithRelationInput[]
+    cursor?: PurchaseOrderWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: PurchaseOrderScalarFieldEnum | PurchaseOrderScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.suppliers
+   */
+  export type Workspace$suppliersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Supplier
+     */
+    select?: SupplierSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SupplierInclude<ExtArgs> | null
+    where?: SupplierWhereInput
+    orderBy?: SupplierOrderByWithRelationInput | SupplierOrderByWithRelationInput[]
+    cursor?: SupplierWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SupplierScalarFieldEnum | SupplierScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.systemSettings
+   */
+  export type Workspace$systemSettingsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SystemSetting
+     */
+    select?: SystemSettingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    where?: SystemSettingWhereInput
+    orderBy?: SystemSettingOrderByWithRelationInput | SystemSettingOrderByWithRelationInput[]
+    cursor?: SystemSettingWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SystemSettingScalarFieldEnum | SystemSettingScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace.users
+   */
+  export type Workspace$usersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    cursor?: UserWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
+  }
+
+  /**
+   * Workspace without action
+   */
+  export type WorkspaceDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model Category
    */
 
@@ -2196,6 +3672,7 @@ export namespace Prisma {
     id: string | null
     name: string | null
     description: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -2204,6 +3681,7 @@ export namespace Prisma {
     id: string | null
     name: string | null
     description: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -2212,6 +3690,7 @@ export namespace Prisma {
     id: number
     name: number
     description: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -2222,6 +3701,7 @@ export namespace Prisma {
     id?: true
     name?: true
     description?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -2230,6 +3710,7 @@ export namespace Prisma {
     id?: true
     name?: true
     description?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -2238,6 +3719,7 @@ export namespace Prisma {
     id?: true
     name?: true
     description?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -2319,6 +3801,7 @@ export namespace Prisma {
     id: string
     name: string
     description: string | null
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: CategoryCountAggregateOutputType | null
@@ -2344,8 +3827,10 @@ export namespace Prisma {
     id?: boolean
     name?: boolean
     description?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | Category$workspaceArgs<ExtArgs>
     products?: boolean | Category$productsArgs<ExtArgs>
     _count?: boolean | CategoryCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["category"]>
@@ -2354,33 +3839,41 @@ export namespace Prisma {
     id?: boolean
     name?: boolean
     description?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | Category$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["category"]>
 
   export type CategorySelectScalar = {
     id?: boolean
     name?: boolean
     description?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
   export type CategoryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | Category$workspaceArgs<ExtArgs>
     products?: boolean | Category$productsArgs<ExtArgs>
     _count?: boolean | CategoryCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type CategoryIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type CategoryIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | Category$workspaceArgs<ExtArgs>
+  }
 
   export type $CategoryPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Category"
     objects: {
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
       products: Prisma.$ProductPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       name: string
       description: string | null
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["category"]>
@@ -2747,6 +4240,7 @@ export namespace Prisma {
    */
   export interface Prisma__CategoryClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends Category$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, Category$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     products<T extends Category$productsArgs<ExtArgs> = {}>(args?: Subset<T, Category$productsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -2780,6 +4274,7 @@ export namespace Prisma {
     readonly id: FieldRef<"Category", 'String'>
     readonly name: FieldRef<"Category", 'String'>
     readonly description: FieldRef<"Category", 'String'>
+    readonly workspaceId: FieldRef<"Category", 'String'>
     readonly createdAt: FieldRef<"Category", 'DateTime'>
     readonly updatedAt: FieldRef<"Category", 'DateTime'>
   }
@@ -3003,6 +4498,10 @@ export namespace Prisma {
      */
     data: CategoryCreateManyInput | CategoryCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CategoryIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -3096,6 +4595,21 @@ export namespace Prisma {
   }
 
   /**
+   * Category.workspace
+   */
+  export type Category$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
    * Category.products
    */
   export type Category$productsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -3163,6 +4677,7 @@ export namespace Prisma {
     isPublic: boolean | null
     categoryId: string | null
     supplierId: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -3178,6 +4693,7 @@ export namespace Prisma {
     isPublic: boolean | null
     categoryId: string | null
     supplierId: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -3193,6 +4709,7 @@ export namespace Prisma {
     isPublic: number
     categoryId: number
     supplierId: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -3220,6 +4737,7 @@ export namespace Prisma {
     isPublic?: true
     categoryId?: true
     supplierId?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -3235,6 +4753,7 @@ export namespace Prisma {
     isPublic?: true
     categoryId?: true
     supplierId?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -3250,6 +4769,7 @@ export namespace Prisma {
     isPublic?: true
     categoryId?: true
     supplierId?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -3352,6 +4872,7 @@ export namespace Prisma {
     isPublic: boolean
     categoryId: string
     supplierId: string | null
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: ProductCountAggregateOutputType | null
@@ -3386,6 +4907,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId?: boolean
     supplierId?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     brushOrderItems?: boolean | Product$brushOrderItemsArgs<ExtArgs>
@@ -3393,6 +4915,7 @@ export namespace Prisma {
     outboundItems?: boolean | Product$outboundItemsArgs<ExtArgs>
     category?: boolean | CategoryDefaultArgs<ExtArgs>
     supplier?: boolean | Product$supplierArgs<ExtArgs>
+    workspace?: boolean | Product$workspaceArgs<ExtArgs>
     orderItems?: boolean | Product$orderItemsArgs<ExtArgs>
     _count?: boolean | ProductCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["product"]>
@@ -3408,10 +4931,12 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId?: boolean
     supplierId?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     category?: boolean | CategoryDefaultArgs<ExtArgs>
     supplier?: boolean | Product$supplierArgs<ExtArgs>
+    workspace?: boolean | Product$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["product"]>
 
   export type ProductSelectScalar = {
@@ -3425,6 +4950,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId?: boolean
     supplierId?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
@@ -3435,12 +4961,14 @@ export namespace Prisma {
     outboundItems?: boolean | Product$outboundItemsArgs<ExtArgs>
     category?: boolean | CategoryDefaultArgs<ExtArgs>
     supplier?: boolean | Product$supplierArgs<ExtArgs>
+    workspace?: boolean | Product$workspaceArgs<ExtArgs>
     orderItems?: boolean | Product$orderItemsArgs<ExtArgs>
     _count?: boolean | ProductCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ProductIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     category?: boolean | CategoryDefaultArgs<ExtArgs>
     supplier?: boolean | Product$supplierArgs<ExtArgs>
+    workspace?: boolean | Product$workspaceArgs<ExtArgs>
   }
 
   export type $ProductPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -3451,6 +4979,7 @@ export namespace Prisma {
       outboundItems: Prisma.$OutboundOrderItemPayload<ExtArgs>[]
       category: Prisma.$CategoryPayload<ExtArgs>
       supplier: Prisma.$SupplierPayload<ExtArgs> | null
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
       orderItems: Prisma.$PurchaseOrderItemPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -3464,6 +4993,7 @@ export namespace Prisma {
       isPublic: boolean
       categoryId: string
       supplierId: string | null
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["product"]>
@@ -3835,6 +5365,7 @@ export namespace Prisma {
     outboundItems<T extends Product$outboundItemsArgs<ExtArgs> = {}>(args?: Subset<T, Product$outboundItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OutboundOrderItemPayload<ExtArgs>, T, "findMany"> | Null>
     category<T extends CategoryDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CategoryDefaultArgs<ExtArgs>>): Prisma__CategoryClient<$Result.GetResult<Prisma.$CategoryPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
     supplier<T extends Product$supplierArgs<ExtArgs> = {}>(args?: Subset<T, Product$supplierArgs<ExtArgs>>): Prisma__SupplierClient<$Result.GetResult<Prisma.$SupplierPayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
+    workspace<T extends Product$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, Product$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     orderItems<T extends Product$orderItemsArgs<ExtArgs> = {}>(args?: Subset<T, Product$orderItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderItemPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -3875,6 +5406,7 @@ export namespace Prisma {
     readonly isPublic: FieldRef<"Product", 'Boolean'>
     readonly categoryId: FieldRef<"Product", 'String'>
     readonly supplierId: FieldRef<"Product", 'String'>
+    readonly workspaceId: FieldRef<"Product", 'String'>
     readonly createdAt: FieldRef<"Product", 'DateTime'>
     readonly updatedAt: FieldRef<"Product", 'DateTime'>
   }
@@ -4270,6 +5802,21 @@ export namespace Prisma {
   }
 
   /**
+   * Product.workspace
+   */
+  export type Product$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
    * Product.orderItems
    */
   export type Product$orderItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4322,6 +5869,7 @@ export namespace Prisma {
     phone: string | null
     email: string | null
     address: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -4334,6 +5882,7 @@ export namespace Prisma {
     phone: string | null
     email: string | null
     address: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -4346,6 +5895,7 @@ export namespace Prisma {
     phone: number
     email: number
     address: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -4360,6 +5910,7 @@ export namespace Prisma {
     phone?: true
     email?: true
     address?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -4372,6 +5923,7 @@ export namespace Prisma {
     phone?: true
     email?: true
     address?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -4384,6 +5936,7 @@ export namespace Prisma {
     phone?: true
     email?: true
     address?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -4469,6 +6022,7 @@ export namespace Prisma {
     phone: string | null
     email: string | null
     address: string | null
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: SupplierCountAggregateOutputType | null
@@ -4498,10 +6052,12 @@ export namespace Prisma {
     phone?: boolean
     email?: boolean
     address?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     products?: boolean | Supplier$productsArgs<ExtArgs>
     purchaseOrderItems?: boolean | Supplier$purchaseOrderItemsArgs<ExtArgs>
+    workspace?: boolean | Supplier$workspaceArgs<ExtArgs>
     _count?: boolean | SupplierCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["supplier"]>
 
@@ -4513,8 +6069,10 @@ export namespace Prisma {
     phone?: boolean
     email?: boolean
     address?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | Supplier$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["supplier"]>
 
   export type SupplierSelectScalar = {
@@ -4525,6 +6083,7 @@ export namespace Prisma {
     phone?: boolean
     email?: boolean
     address?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
@@ -4532,15 +6091,19 @@ export namespace Prisma {
   export type SupplierInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     products?: boolean | Supplier$productsArgs<ExtArgs>
     purchaseOrderItems?: boolean | Supplier$purchaseOrderItemsArgs<ExtArgs>
+    workspace?: boolean | Supplier$workspaceArgs<ExtArgs>
     _count?: boolean | SupplierCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type SupplierIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type SupplierIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | Supplier$workspaceArgs<ExtArgs>
+  }
 
   export type $SupplierPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Supplier"
     objects: {
       products: Prisma.$ProductPayload<ExtArgs>[]
       purchaseOrderItems: Prisma.$PurchaseOrderItemPayload<ExtArgs>[]
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -4550,6 +6113,7 @@ export namespace Prisma {
       phone: string | null
       email: string | null
       address: string | null
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["supplier"]>
@@ -4918,6 +6482,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     products<T extends Supplier$productsArgs<ExtArgs> = {}>(args?: Subset<T, Supplier$productsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findMany"> | Null>
     purchaseOrderItems<T extends Supplier$purchaseOrderItemsArgs<ExtArgs> = {}>(args?: Subset<T, Supplier$purchaseOrderItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderItemPayload<ExtArgs>, T, "findMany"> | Null>
+    workspace<T extends Supplier$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, Supplier$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -4954,6 +6519,7 @@ export namespace Prisma {
     readonly phone: FieldRef<"Supplier", 'String'>
     readonly email: FieldRef<"Supplier", 'String'>
     readonly address: FieldRef<"Supplier", 'String'>
+    readonly workspaceId: FieldRef<"Supplier", 'String'>
     readonly createdAt: FieldRef<"Supplier", 'DateTime'>
     readonly updatedAt: FieldRef<"Supplier", 'DateTime'>
   }
@@ -5177,6 +6743,10 @@ export namespace Prisma {
      */
     data: SupplierCreateManyInput | SupplierCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SupplierIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -5310,6 +6880,21 @@ export namespace Prisma {
   }
 
   /**
+   * Supplier.workspace
+   */
+  export type Supplier$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
    * Supplier without action
    */
   export type SupplierDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -5357,6 +6942,7 @@ export namespace Prisma {
     shippingFees: number | null
     extraFees: number | null
     paymentVoucher: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -5370,6 +6956,7 @@ export namespace Prisma {
     shippingFees: number | null
     extraFees: number | null
     paymentVoucher: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -5385,6 +6972,7 @@ export namespace Prisma {
     paymentVoucher: number
     paymentVouchers: number
     trackingData: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -5412,6 +7000,7 @@ export namespace Prisma {
     shippingFees?: true
     extraFees?: true
     paymentVoucher?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -5425,6 +7014,7 @@ export namespace Prisma {
     shippingFees?: true
     extraFees?: true
     paymentVoucher?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -5440,6 +7030,7 @@ export namespace Prisma {
     paymentVoucher?: true
     paymentVouchers?: true
     trackingData?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -5542,6 +7133,7 @@ export namespace Prisma {
     paymentVoucher: string | null
     paymentVouchers: JsonValue | null
     trackingData: JsonValue | null
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: PurchaseOrderCountAggregateOutputType | null
@@ -5576,8 +7168,10 @@ export namespace Prisma {
     paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | PurchaseOrder$workspaceArgs<ExtArgs>
     items?: boolean | PurchaseOrder$itemsArgs<ExtArgs>
     _count?: boolean | PurchaseOrderCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["purchaseOrder"]>
@@ -5593,8 +7187,10 @@ export namespace Prisma {
     paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | PurchaseOrder$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["purchaseOrder"]>
 
   export type PurchaseOrderSelectScalar = {
@@ -5608,19 +7204,24 @@ export namespace Prisma {
     paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
   export type PurchaseOrderInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | PurchaseOrder$workspaceArgs<ExtArgs>
     items?: boolean | PurchaseOrder$itemsArgs<ExtArgs>
     _count?: boolean | PurchaseOrderCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type PurchaseOrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type PurchaseOrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | PurchaseOrder$workspaceArgs<ExtArgs>
+  }
 
   export type $PurchaseOrderPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "PurchaseOrder"
     objects: {
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
       items: Prisma.$PurchaseOrderItemPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -5634,6 +7235,7 @@ export namespace Prisma {
       paymentVoucher: string | null
       paymentVouchers: Prisma.JsonValue | null
       trackingData: Prisma.JsonValue | null
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["purchaseOrder"]>
@@ -6000,6 +7602,7 @@ export namespace Prisma {
    */
   export interface Prisma__PurchaseOrderClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends PurchaseOrder$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, PurchaseOrder$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     items<T extends PurchaseOrder$itemsArgs<ExtArgs> = {}>(args?: Subset<T, PurchaseOrder$itemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PurchaseOrderItemPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -6040,6 +7643,7 @@ export namespace Prisma {
     readonly paymentVoucher: FieldRef<"PurchaseOrder", 'String'>
     readonly paymentVouchers: FieldRef<"PurchaseOrder", 'Json'>
     readonly trackingData: FieldRef<"PurchaseOrder", 'Json'>
+    readonly workspaceId: FieldRef<"PurchaseOrder", 'String'>
     readonly createdAt: FieldRef<"PurchaseOrder", 'DateTime'>
     readonly updatedAt: FieldRef<"PurchaseOrder", 'DateTime'>
   }
@@ -6263,6 +7867,10 @@ export namespace Prisma {
      */
     data: PurchaseOrderCreateManyInput | PurchaseOrderCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PurchaseOrderIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -6353,6 +7961,21 @@ export namespace Prisma {
      * Filter which PurchaseOrders to delete
      */
     where?: PurchaseOrderWhereInput
+  }
+
+  /**
+   * PurchaseOrder.workspace
+   */
+  export type PurchaseOrder$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
   }
 
   /**
@@ -7466,6 +9089,7 @@ export namespace Prisma {
     date: Date | null
     note: string | null
     totalAmount: number | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -7476,6 +9100,7 @@ export namespace Prisma {
     date: Date | null
     note: string | null
     totalAmount: number | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -7486,6 +9111,7 @@ export namespace Prisma {
     date: number
     note: number
     totalAmount: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -7506,6 +9132,7 @@ export namespace Prisma {
     date?: true
     note?: true
     totalAmount?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -7516,6 +9143,7 @@ export namespace Prisma {
     date?: true
     note?: true
     totalAmount?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -7526,6 +9154,7 @@ export namespace Prisma {
     date?: true
     note?: true
     totalAmount?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -7623,6 +9252,7 @@ export namespace Prisma {
     date: Date
     note: string | null
     totalAmount: number
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: OutboundOrderCountAggregateOutputType | null
@@ -7652,8 +9282,10 @@ export namespace Prisma {
     date?: boolean
     note?: boolean
     totalAmount?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | OutboundOrder$workspaceArgs<ExtArgs>
     items?: boolean | OutboundOrder$itemsArgs<ExtArgs>
     _count?: boolean | OutboundOrderCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["outboundOrder"]>
@@ -7664,8 +9296,10 @@ export namespace Prisma {
     date?: boolean
     note?: boolean
     totalAmount?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | OutboundOrder$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["outboundOrder"]>
 
   export type OutboundOrderSelectScalar = {
@@ -7674,19 +9308,24 @@ export namespace Prisma {
     date?: boolean
     note?: boolean
     totalAmount?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
   export type OutboundOrderInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | OutboundOrder$workspaceArgs<ExtArgs>
     items?: boolean | OutboundOrder$itemsArgs<ExtArgs>
     _count?: boolean | OutboundOrderCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type OutboundOrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type OutboundOrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | OutboundOrder$workspaceArgs<ExtArgs>
+  }
 
   export type $OutboundOrderPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "OutboundOrder"
     objects: {
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
       items: Prisma.$OutboundOrderItemPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -7695,6 +9334,7 @@ export namespace Prisma {
       date: Date
       note: string | null
       totalAmount: number
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["outboundOrder"]>
@@ -8061,6 +9701,7 @@ export namespace Prisma {
    */
   export interface Prisma__OutboundOrderClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends OutboundOrder$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, OutboundOrder$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     items<T extends OutboundOrder$itemsArgs<ExtArgs> = {}>(args?: Subset<T, OutboundOrder$itemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OutboundOrderItemPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -8096,6 +9737,7 @@ export namespace Prisma {
     readonly date: FieldRef<"OutboundOrder", 'DateTime'>
     readonly note: FieldRef<"OutboundOrder", 'String'>
     readonly totalAmount: FieldRef<"OutboundOrder", 'Float'>
+    readonly workspaceId: FieldRef<"OutboundOrder", 'String'>
     readonly createdAt: FieldRef<"OutboundOrder", 'DateTime'>
     readonly updatedAt: FieldRef<"OutboundOrder", 'DateTime'>
   }
@@ -8319,6 +9961,10 @@ export namespace Prisma {
      */
     data: OutboundOrderCreateManyInput | OutboundOrderCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: OutboundOrderIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -8409,6 +10055,21 @@ export namespace Prisma {
      * Filter which OutboundOrders to delete
      */
     where?: OutboundOrderWhereInput
+  }
+
+  /**
+   * OutboundOrder.workspace
+   */
+  export type OutboundOrder$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
   }
 
   /**
@@ -8648,8 +10309,8 @@ export namespace Prisma {
     productId?: boolean
     quantity?: boolean
     price?: boolean
-    product?: boolean | ProductDefaultArgs<ExtArgs>
     outboundOrder?: boolean | OutboundOrderDefaultArgs<ExtArgs>
+    product?: boolean | ProductDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["outboundOrderItem"]>
 
   export type OutboundOrderItemSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -8658,8 +10319,8 @@ export namespace Prisma {
     productId?: boolean
     quantity?: boolean
     price?: boolean
-    product?: boolean | ProductDefaultArgs<ExtArgs>
     outboundOrder?: boolean | OutboundOrderDefaultArgs<ExtArgs>
+    product?: boolean | ProductDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["outboundOrderItem"]>
 
   export type OutboundOrderItemSelectScalar = {
@@ -8671,19 +10332,19 @@ export namespace Prisma {
   }
 
   export type OutboundOrderItemInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    product?: boolean | ProductDefaultArgs<ExtArgs>
     outboundOrder?: boolean | OutboundOrderDefaultArgs<ExtArgs>
+    product?: boolean | ProductDefaultArgs<ExtArgs>
   }
   export type OutboundOrderItemIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    product?: boolean | ProductDefaultArgs<ExtArgs>
     outboundOrder?: boolean | OutboundOrderDefaultArgs<ExtArgs>
+    product?: boolean | ProductDefaultArgs<ExtArgs>
   }
 
   export type $OutboundOrderItemPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "OutboundOrderItem"
     objects: {
-      product: Prisma.$ProductPayload<ExtArgs>
       outboundOrder: Prisma.$OutboundOrderPayload<ExtArgs>
+      product: Prisma.$ProductPayload<ExtArgs>
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -9055,8 +10716,8 @@ export namespace Prisma {
    */
   export interface Prisma__OutboundOrderItemClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-    product<T extends ProductDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ProductDefaultArgs<ExtArgs>>): Prisma__ProductClient<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
     outboundOrder<T extends OutboundOrderDefaultArgs<ExtArgs> = {}>(args?: Subset<T, OutboundOrderDefaultArgs<ExtArgs>>): Prisma__OutboundOrderClient<$Result.GetResult<Prisma.$OutboundOrderPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    product<T extends ProductDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ProductDefaultArgs<ExtArgs>>): Prisma__ProductClient<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -9439,6 +11100,7 @@ export namespace Prisma {
     productId: string | null
     isPublic: boolean | null
     type: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -9449,6 +11111,7 @@ export namespace Prisma {
     productId: string | null
     isPublic: boolean | null
     type: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -9460,6 +11123,7 @@ export namespace Prisma {
     tags: number
     isPublic: number
     type: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -9472,6 +11136,7 @@ export namespace Prisma {
     productId?: true
     isPublic?: true
     type?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -9482,6 +11147,7 @@ export namespace Prisma {
     productId?: true
     isPublic?: true
     type?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -9493,6 +11159,7 @@ export namespace Prisma {
     tags?: true
     isPublic?: true
     type?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -9577,6 +11244,7 @@ export namespace Prisma {
     tags: string[]
     isPublic: boolean
     type: string
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: GalleryItemCountAggregateOutputType | null
@@ -9605,9 +11273,11 @@ export namespace Prisma {
     tags?: boolean
     isPublic?: boolean
     type?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     product?: boolean | ProductDefaultArgs<ExtArgs>
+    workspace?: boolean | GalleryItem$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["galleryItem"]>
 
   export type GalleryItemSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -9617,9 +11287,11 @@ export namespace Prisma {
     tags?: boolean
     isPublic?: boolean
     type?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     product?: boolean | ProductDefaultArgs<ExtArgs>
+    workspace?: boolean | GalleryItem$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["galleryItem"]>
 
   export type GalleryItemSelectScalar = {
@@ -9629,21 +11301,25 @@ export namespace Prisma {
     tags?: boolean
     isPublic?: boolean
     type?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
   export type GalleryItemInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     product?: boolean | ProductDefaultArgs<ExtArgs>
+    workspace?: boolean | GalleryItem$workspaceArgs<ExtArgs>
   }
   export type GalleryItemIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     product?: boolean | ProductDefaultArgs<ExtArgs>
+    workspace?: boolean | GalleryItem$workspaceArgs<ExtArgs>
   }
 
   export type $GalleryItemPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "GalleryItem"
     objects: {
       product: Prisma.$ProductPayload<ExtArgs>
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -9652,6 +11328,7 @@ export namespace Prisma {
       tags: string[]
       isPublic: boolean
       type: string
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["galleryItem"]>
@@ -10019,6 +11696,7 @@ export namespace Prisma {
   export interface Prisma__GalleryItemClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     product<T extends ProductDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ProductDefaultArgs<ExtArgs>>): Prisma__ProductClient<$Result.GetResult<Prisma.$ProductPayload<ExtArgs>, T, "findUniqueOrThrow"> | Null, Null, ExtArgs>
+    workspace<T extends GalleryItem$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, GalleryItem$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -10054,6 +11732,7 @@ export namespace Prisma {
     readonly tags: FieldRef<"GalleryItem", 'String[]'>
     readonly isPublic: FieldRef<"GalleryItem", 'Boolean'>
     readonly type: FieldRef<"GalleryItem", 'String'>
+    readonly workspaceId: FieldRef<"GalleryItem", 'String'>
     readonly createdAt: FieldRef<"GalleryItem", 'DateTime'>
     readonly updatedAt: FieldRef<"GalleryItem", 'DateTime'>
   }
@@ -10374,6 +12053,21 @@ export namespace Prisma {
   }
 
   /**
+   * GalleryItem.workspace
+   */
+  export type GalleryItem$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
    * GalleryItem without action
    */
   export type GalleryItemDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -10405,6 +12099,7 @@ export namespace Prisma {
     status: string | null
     notes: string | null
     productId: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -10416,6 +12111,7 @@ export namespace Prisma {
     status: string | null
     notes: string | null
     productId: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -10429,6 +12125,7 @@ export namespace Prisma {
     notes: number
     productId: number
     selectedIndices: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -10442,6 +12139,7 @@ export namespace Prisma {
     status?: true
     notes?: true
     productId?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -10453,6 +12151,7 @@ export namespace Prisma {
     status?: true
     notes?: true
     productId?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -10466,6 +12165,7 @@ export namespace Prisma {
     notes?: true
     productId?: true
     selectedIndices?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -10552,6 +12252,7 @@ export namespace Prisma {
     notes: string | null
     productId: string | null
     selectedIndices: JsonValue | null
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: GallerySubmissionCountAggregateOutputType | null
@@ -10582,8 +12283,10 @@ export namespace Prisma {
     notes?: boolean
     productId?: boolean
     selectedIndices?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | GallerySubmission$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["gallerySubmission"]>
 
   export type GallerySubmissionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -10595,8 +12298,10 @@ export namespace Prisma {
     notes?: boolean
     productId?: boolean
     selectedIndices?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | GallerySubmission$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["gallerySubmission"]>
 
   export type GallerySubmissionSelectScalar = {
@@ -10608,14 +12313,23 @@ export namespace Prisma {
     notes?: boolean
     productId?: boolean
     selectedIndices?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
+  export type GallerySubmissionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | GallerySubmission$workspaceArgs<ExtArgs>
+  }
+  export type GallerySubmissionIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | GallerySubmission$workspaceArgs<ExtArgs>
+  }
 
   export type $GallerySubmissionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "GallerySubmission"
-    objects: {}
+    objects: {
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       urls: Prisma.JsonValue
@@ -10625,6 +12339,7 @@ export namespace Prisma {
       notes: string | null
       productId: string | null
       selectedIndices: Prisma.JsonValue | null
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["gallerySubmission"]>
@@ -10991,6 +12706,7 @@ export namespace Prisma {
    */
   export interface Prisma__GallerySubmissionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends GallerySubmission$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, GallerySubmission$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -11028,6 +12744,7 @@ export namespace Prisma {
     readonly notes: FieldRef<"GallerySubmission", 'String'>
     readonly productId: FieldRef<"GallerySubmission", 'String'>
     readonly selectedIndices: FieldRef<"GallerySubmission", 'Json'>
+    readonly workspaceId: FieldRef<"GallerySubmission", 'String'>
     readonly createdAt: FieldRef<"GallerySubmission", 'DateTime'>
     readonly updatedAt: FieldRef<"GallerySubmission", 'DateTime'>
   }
@@ -11043,6 +12760,10 @@ export namespace Prisma {
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    /**
      * Filter, which GallerySubmission to fetch.
      */
     where: GallerySubmissionWhereUniqueInput
@@ -11057,6 +12778,10 @@ export namespace Prisma {
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    /**
      * Filter, which GallerySubmission to fetch.
      */
     where: GallerySubmissionWhereUniqueInput
@@ -11070,6 +12795,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the GallerySubmission
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
     /**
      * Filter, which GallerySubmission to fetch.
      */
@@ -11115,6 +12844,10 @@ export namespace Prisma {
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    /**
      * Filter, which GallerySubmission to fetch.
      */
     where?: GallerySubmissionWhereInput
@@ -11159,6 +12892,10 @@ export namespace Prisma {
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    /**
      * Filter, which GallerySubmissions to fetch.
      */
     where?: GallerySubmissionWhereInput
@@ -11198,6 +12935,10 @@ export namespace Prisma {
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    /**
      * The data needed to create a GallerySubmission.
      */
     data: XOR<GallerySubmissionCreateInput, GallerySubmissionUncheckedCreateInput>
@@ -11227,6 +12968,10 @@ export namespace Prisma {
      */
     data: GallerySubmissionCreateManyInput | GallerySubmissionCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -11237,6 +12982,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the GallerySubmission
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
     /**
      * The data needed to update a GallerySubmission.
      */
@@ -11270,6 +13019,10 @@ export namespace Prisma {
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    /**
      * The filter to search for the GallerySubmission to update in case it exists.
      */
     where: GallerySubmissionWhereUniqueInput
@@ -11292,6 +13045,10 @@ export namespace Prisma {
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
+    /**
      * Filter which GallerySubmission to delete.
      */
     where: GallerySubmissionWhereUniqueInput
@@ -11308,6 +13065,21 @@ export namespace Prisma {
   }
 
   /**
+   * GallerySubmission.workspace
+   */
+  export type GallerySubmission$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
    * GallerySubmission without action
    */
   export type GallerySubmissionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -11315,6 +13087,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the GallerySubmission
      */
     select?: GallerySubmissionSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GallerySubmissionInclude<ExtArgs> | null
   }
 
 
@@ -11332,7 +13108,9 @@ export namespace Prisma {
     id: string | null
     email: string | null
     name: string | null
-    role: string | null
+    role: $Enums.Role | null
+    status: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -11341,7 +13119,9 @@ export namespace Prisma {
     id: string | null
     email: string | null
     name: string | null
-    role: string | null
+    role: $Enums.Role | null
+    status: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -11351,6 +13131,9 @@ export namespace Prisma {
     email: number
     name: number
     role: number
+    status: number
+    permissions: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -11362,6 +13145,8 @@ export namespace Prisma {
     email?: true
     name?: true
     role?: true
+    status?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -11371,6 +13156,8 @@ export namespace Prisma {
     email?: true
     name?: true
     role?: true
+    status?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -11380,6 +13167,9 @@ export namespace Prisma {
     email?: true
     name?: true
     role?: true
+    status?: true
+    permissions?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -11461,7 +13251,10 @@ export namespace Prisma {
     id: string
     email: string
     name: string | null
-    role: string
+    role: $Enums.Role
+    status: string
+    permissions: JsonValue | null
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: UserCountAggregateOutputType | null
@@ -11488,8 +13281,13 @@ export namespace Prisma {
     email?: boolean
     name?: boolean
     role?: boolean
+    status?: boolean
+    permissions?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | User$workspaceArgs<ExtArgs>
+    ownedWorkspace?: boolean | User$ownedWorkspaceArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
   export type UserSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -11497,8 +13295,12 @@ export namespace Prisma {
     email?: boolean
     name?: boolean
     role?: boolean
+    status?: boolean
+    permissions?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | User$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
   export type UserSelectScalar = {
@@ -11506,19 +13308,35 @@ export namespace Prisma {
     email?: boolean
     name?: boolean
     role?: boolean
+    status?: boolean
+    permissions?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
+  export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | User$workspaceArgs<ExtArgs>
+    ownedWorkspace?: boolean | User$ownedWorkspaceArgs<ExtArgs>
+  }
+  export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | User$workspaceArgs<ExtArgs>
+  }
 
   export type $UserPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "User"
-    objects: {}
+    objects: {
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
+      ownedWorkspace: Prisma.$WorkspacePayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       email: string
       name: string | null
-      role: string
+      role: $Enums.Role
+      status: string
+      permissions: Prisma.JsonValue | null
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["user"]>
@@ -11885,6 +13703,8 @@ export namespace Prisma {
    */
   export interface Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends User$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, User$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
+    ownedWorkspace<T extends User$ownedWorkspaceArgs<ExtArgs> = {}>(args?: Subset<T, User$ownedWorkspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -11917,7 +13737,10 @@ export namespace Prisma {
     readonly id: FieldRef<"User", 'String'>
     readonly email: FieldRef<"User", 'String'>
     readonly name: FieldRef<"User", 'String'>
-    readonly role: FieldRef<"User", 'String'>
+    readonly role: FieldRef<"User", 'Role'>
+    readonly status: FieldRef<"User", 'String'>
+    readonly permissions: FieldRef<"User", 'Json'>
+    readonly workspaceId: FieldRef<"User", 'String'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
   }
@@ -11933,6 +13756,10 @@ export namespace Prisma {
      */
     select?: UserSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
      * Filter, which User to fetch.
      */
     where: UserWhereUniqueInput
@@ -11947,6 +13774,10 @@ export namespace Prisma {
      */
     select?: UserSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
      * Filter, which User to fetch.
      */
     where: UserWhereUniqueInput
@@ -11960,6 +13791,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the User
      */
     select?: UserSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
     /**
      * Filter, which User to fetch.
      */
@@ -12005,6 +13840,10 @@ export namespace Prisma {
      */
     select?: UserSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
      * Filter, which User to fetch.
      */
     where?: UserWhereInput
@@ -12049,6 +13888,10 @@ export namespace Prisma {
      */
     select?: UserSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
      * Filter, which Users to fetch.
      */
     where?: UserWhereInput
@@ -12088,6 +13931,10 @@ export namespace Prisma {
      */
     select?: UserSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
      * The data needed to create a User.
      */
     data: XOR<UserCreateInput, UserUncheckedCreateInput>
@@ -12117,6 +13964,10 @@ export namespace Prisma {
      */
     data: UserCreateManyInput | UserCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -12127,6 +13978,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the User
      */
     select?: UserSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
     /**
      * The data needed to update a User.
      */
@@ -12160,6 +14015,10 @@ export namespace Prisma {
      */
     select?: UserSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
      * The filter to search for the User to update in case it exists.
      */
     where: UserWhereUniqueInput
@@ -12182,6 +14041,10 @@ export namespace Prisma {
      */
     select?: UserSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
      * Filter which User to delete.
      */
     where: UserWhereUniqueInput
@@ -12198,6 +14061,36 @@ export namespace Prisma {
   }
 
   /**
+   * User.workspace
+   */
+  export type User$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
+   * User.ownedWorkspace
+   */
+  export type User$ownedWorkspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
    * User without action
    */
   export type UserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -12205,6 +14098,896 @@ export namespace Prisma {
      * Select specific fields to fetch from the User
      */
     select?: UserSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model EmailWhitelist
+   */
+
+  export type AggregateEmailWhitelist = {
+    _count: EmailWhitelistCountAggregateOutputType | null
+    _min: EmailWhitelistMinAggregateOutputType | null
+    _max: EmailWhitelistMaxAggregateOutputType | null
+  }
+
+  export type EmailWhitelistMinAggregateOutputType = {
+    id: string | null
+    email: string | null
+    role: $Enums.Role | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type EmailWhitelistMaxAggregateOutputType = {
+    id: string | null
+    email: string | null
+    role: $Enums.Role | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type EmailWhitelistCountAggregateOutputType = {
+    id: number
+    email: number
+    role: number
+    permissions: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type EmailWhitelistMinAggregateInputType = {
+    id?: true
+    email?: true
+    role?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type EmailWhitelistMaxAggregateInputType = {
+    id?: true
+    email?: true
+    role?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type EmailWhitelistCountAggregateInputType = {
+    id?: true
+    email?: true
+    role?: true
+    permissions?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type EmailWhitelistAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which EmailWhitelist to aggregate.
+     */
+    where?: EmailWhitelistWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of EmailWhitelists to fetch.
+     */
+    orderBy?: EmailWhitelistOrderByWithRelationInput | EmailWhitelistOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: EmailWhitelistWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` EmailWhitelists from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` EmailWhitelists.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned EmailWhitelists
+    **/
+    _count?: true | EmailWhitelistCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: EmailWhitelistMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: EmailWhitelistMaxAggregateInputType
+  }
+
+  export type GetEmailWhitelistAggregateType<T extends EmailWhitelistAggregateArgs> = {
+        [P in keyof T & keyof AggregateEmailWhitelist]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateEmailWhitelist[P]>
+      : GetScalarType<T[P], AggregateEmailWhitelist[P]>
+  }
+
+
+
+
+  export type EmailWhitelistGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: EmailWhitelistWhereInput
+    orderBy?: EmailWhitelistOrderByWithAggregationInput | EmailWhitelistOrderByWithAggregationInput[]
+    by: EmailWhitelistScalarFieldEnum[] | EmailWhitelistScalarFieldEnum
+    having?: EmailWhitelistScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: EmailWhitelistCountAggregateInputType | true
+    _min?: EmailWhitelistMinAggregateInputType
+    _max?: EmailWhitelistMaxAggregateInputType
+  }
+
+  export type EmailWhitelistGroupByOutputType = {
+    id: string
+    email: string
+    role: $Enums.Role
+    permissions: JsonValue | null
+    createdAt: Date
+    updatedAt: Date
+    _count: EmailWhitelistCountAggregateOutputType | null
+    _min: EmailWhitelistMinAggregateOutputType | null
+    _max: EmailWhitelistMaxAggregateOutputType | null
+  }
+
+  type GetEmailWhitelistGroupByPayload<T extends EmailWhitelistGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<EmailWhitelistGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof EmailWhitelistGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], EmailWhitelistGroupByOutputType[P]>
+            : GetScalarType<T[P], EmailWhitelistGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type EmailWhitelistSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    role?: boolean
+    permissions?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["emailWhitelist"]>
+
+  export type EmailWhitelistSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    role?: boolean
+    permissions?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["emailWhitelist"]>
+
+  export type EmailWhitelistSelectScalar = {
+    id?: boolean
+    email?: boolean
+    role?: boolean
+    permissions?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+
+  export type $EmailWhitelistPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "EmailWhitelist"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      email: string
+      role: $Enums.Role
+      permissions: Prisma.JsonValue | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["emailWhitelist"]>
+    composites: {}
+  }
+
+  type EmailWhitelistGetPayload<S extends boolean | null | undefined | EmailWhitelistDefaultArgs> = $Result.GetResult<Prisma.$EmailWhitelistPayload, S>
+
+  type EmailWhitelistCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = 
+    Omit<EmailWhitelistFindManyArgs, 'select' | 'include' | 'distinct'> & {
+      select?: EmailWhitelistCountAggregateInputType | true
+    }
+
+  export interface EmailWhitelistDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['EmailWhitelist'], meta: { name: 'EmailWhitelist' } }
+    /**
+     * Find zero or one EmailWhitelist that matches the filter.
+     * @param {EmailWhitelistFindUniqueArgs} args - Arguments to find a EmailWhitelist
+     * @example
+     * // Get one EmailWhitelist
+     * const emailWhitelist = await prisma.emailWhitelist.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends EmailWhitelistFindUniqueArgs>(args: SelectSubset<T, EmailWhitelistFindUniqueArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "findUnique"> | null, null, ExtArgs>
+
+    /**
+     * Find one EmailWhitelist that matches the filter or throw an error with `error.code='P2025'` 
+     * if no matches were found.
+     * @param {EmailWhitelistFindUniqueOrThrowArgs} args - Arguments to find a EmailWhitelist
+     * @example
+     * // Get one EmailWhitelist
+     * const emailWhitelist = await prisma.emailWhitelist.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends EmailWhitelistFindUniqueOrThrowArgs>(args: SelectSubset<T, EmailWhitelistFindUniqueOrThrowArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "findUniqueOrThrow">, never, ExtArgs>
+
+    /**
+     * Find the first EmailWhitelist that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EmailWhitelistFindFirstArgs} args - Arguments to find a EmailWhitelist
+     * @example
+     * // Get one EmailWhitelist
+     * const emailWhitelist = await prisma.emailWhitelist.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends EmailWhitelistFindFirstArgs>(args?: SelectSubset<T, EmailWhitelistFindFirstArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "findFirst"> | null, null, ExtArgs>
+
+    /**
+     * Find the first EmailWhitelist that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EmailWhitelistFindFirstOrThrowArgs} args - Arguments to find a EmailWhitelist
+     * @example
+     * // Get one EmailWhitelist
+     * const emailWhitelist = await prisma.emailWhitelist.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends EmailWhitelistFindFirstOrThrowArgs>(args?: SelectSubset<T, EmailWhitelistFindFirstOrThrowArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "findFirstOrThrow">, never, ExtArgs>
+
+    /**
+     * Find zero or more EmailWhitelists that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EmailWhitelistFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all EmailWhitelists
+     * const emailWhitelists = await prisma.emailWhitelist.findMany()
+     * 
+     * // Get first 10 EmailWhitelists
+     * const emailWhitelists = await prisma.emailWhitelist.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const emailWhitelistWithIdOnly = await prisma.emailWhitelist.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends EmailWhitelistFindManyArgs>(args?: SelectSubset<T, EmailWhitelistFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "findMany">>
+
+    /**
+     * Create a EmailWhitelist.
+     * @param {EmailWhitelistCreateArgs} args - Arguments to create a EmailWhitelist.
+     * @example
+     * // Create one EmailWhitelist
+     * const EmailWhitelist = await prisma.emailWhitelist.create({
+     *   data: {
+     *     // ... data to create a EmailWhitelist
+     *   }
+     * })
+     * 
+     */
+    create<T extends EmailWhitelistCreateArgs>(args: SelectSubset<T, EmailWhitelistCreateArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "create">, never, ExtArgs>
+
+    /**
+     * Create many EmailWhitelists.
+     * @param {EmailWhitelistCreateManyArgs} args - Arguments to create many EmailWhitelists.
+     * @example
+     * // Create many EmailWhitelists
+     * const emailWhitelist = await prisma.emailWhitelist.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends EmailWhitelistCreateManyArgs>(args?: SelectSubset<T, EmailWhitelistCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many EmailWhitelists and returns the data saved in the database.
+     * @param {EmailWhitelistCreateManyAndReturnArgs} args - Arguments to create many EmailWhitelists.
+     * @example
+     * // Create many EmailWhitelists
+     * const emailWhitelist = await prisma.emailWhitelist.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many EmailWhitelists and only return the `id`
+     * const emailWhitelistWithIdOnly = await prisma.emailWhitelist.createManyAndReturn({ 
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends EmailWhitelistCreateManyAndReturnArgs>(args?: SelectSubset<T, EmailWhitelistCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "createManyAndReturn">>
+
+    /**
+     * Delete a EmailWhitelist.
+     * @param {EmailWhitelistDeleteArgs} args - Arguments to delete one EmailWhitelist.
+     * @example
+     * // Delete one EmailWhitelist
+     * const EmailWhitelist = await prisma.emailWhitelist.delete({
+     *   where: {
+     *     // ... filter to delete one EmailWhitelist
+     *   }
+     * })
+     * 
+     */
+    delete<T extends EmailWhitelistDeleteArgs>(args: SelectSubset<T, EmailWhitelistDeleteArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "delete">, never, ExtArgs>
+
+    /**
+     * Update one EmailWhitelist.
+     * @param {EmailWhitelistUpdateArgs} args - Arguments to update one EmailWhitelist.
+     * @example
+     * // Update one EmailWhitelist
+     * const emailWhitelist = await prisma.emailWhitelist.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends EmailWhitelistUpdateArgs>(args: SelectSubset<T, EmailWhitelistUpdateArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "update">, never, ExtArgs>
+
+    /**
+     * Delete zero or more EmailWhitelists.
+     * @param {EmailWhitelistDeleteManyArgs} args - Arguments to filter EmailWhitelists to delete.
+     * @example
+     * // Delete a few EmailWhitelists
+     * const { count } = await prisma.emailWhitelist.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends EmailWhitelistDeleteManyArgs>(args?: SelectSubset<T, EmailWhitelistDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more EmailWhitelists.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EmailWhitelistUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many EmailWhitelists
+     * const emailWhitelist = await prisma.emailWhitelist.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends EmailWhitelistUpdateManyArgs>(args: SelectSubset<T, EmailWhitelistUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one EmailWhitelist.
+     * @param {EmailWhitelistUpsertArgs} args - Arguments to update or create a EmailWhitelist.
+     * @example
+     * // Update or create a EmailWhitelist
+     * const emailWhitelist = await prisma.emailWhitelist.upsert({
+     *   create: {
+     *     // ... data to create a EmailWhitelist
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the EmailWhitelist we want to update
+     *   }
+     * })
+     */
+    upsert<T extends EmailWhitelistUpsertArgs>(args: SelectSubset<T, EmailWhitelistUpsertArgs<ExtArgs>>): Prisma__EmailWhitelistClient<$Result.GetResult<Prisma.$EmailWhitelistPayload<ExtArgs>, T, "upsert">, never, ExtArgs>
+
+
+    /**
+     * Count the number of EmailWhitelists.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EmailWhitelistCountArgs} args - Arguments to filter EmailWhitelists to count.
+     * @example
+     * // Count the number of EmailWhitelists
+     * const count = await prisma.emailWhitelist.count({
+     *   where: {
+     *     // ... the filter for the EmailWhitelists we want to count
+     *   }
+     * })
+    **/
+    count<T extends EmailWhitelistCountArgs>(
+      args?: Subset<T, EmailWhitelistCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], EmailWhitelistCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a EmailWhitelist.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EmailWhitelistAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends EmailWhitelistAggregateArgs>(args: Subset<T, EmailWhitelistAggregateArgs>): Prisma.PrismaPromise<GetEmailWhitelistAggregateType<T>>
+
+    /**
+     * Group by EmailWhitelist.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EmailWhitelistGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends EmailWhitelistGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: EmailWhitelistGroupByArgs['orderBy'] }
+        : { orderBy?: EmailWhitelistGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, EmailWhitelistGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetEmailWhitelistGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the EmailWhitelist model
+   */
+  readonly fields: EmailWhitelistFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for EmailWhitelist.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__EmailWhitelistClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the EmailWhitelist model
+   */ 
+  interface EmailWhitelistFieldRefs {
+    readonly id: FieldRef<"EmailWhitelist", 'String'>
+    readonly email: FieldRef<"EmailWhitelist", 'String'>
+    readonly role: FieldRef<"EmailWhitelist", 'Role'>
+    readonly permissions: FieldRef<"EmailWhitelist", 'Json'>
+    readonly createdAt: FieldRef<"EmailWhitelist", 'DateTime'>
+    readonly updatedAt: FieldRef<"EmailWhitelist", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * EmailWhitelist findUnique
+   */
+  export type EmailWhitelistFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * Filter, which EmailWhitelist to fetch.
+     */
+    where: EmailWhitelistWhereUniqueInput
+  }
+
+  /**
+   * EmailWhitelist findUniqueOrThrow
+   */
+  export type EmailWhitelistFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * Filter, which EmailWhitelist to fetch.
+     */
+    where: EmailWhitelistWhereUniqueInput
+  }
+
+  /**
+   * EmailWhitelist findFirst
+   */
+  export type EmailWhitelistFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * Filter, which EmailWhitelist to fetch.
+     */
+    where?: EmailWhitelistWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of EmailWhitelists to fetch.
+     */
+    orderBy?: EmailWhitelistOrderByWithRelationInput | EmailWhitelistOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for EmailWhitelists.
+     */
+    cursor?: EmailWhitelistWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` EmailWhitelists from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` EmailWhitelists.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of EmailWhitelists.
+     */
+    distinct?: EmailWhitelistScalarFieldEnum | EmailWhitelistScalarFieldEnum[]
+  }
+
+  /**
+   * EmailWhitelist findFirstOrThrow
+   */
+  export type EmailWhitelistFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * Filter, which EmailWhitelist to fetch.
+     */
+    where?: EmailWhitelistWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of EmailWhitelists to fetch.
+     */
+    orderBy?: EmailWhitelistOrderByWithRelationInput | EmailWhitelistOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for EmailWhitelists.
+     */
+    cursor?: EmailWhitelistWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` EmailWhitelists from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` EmailWhitelists.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of EmailWhitelists.
+     */
+    distinct?: EmailWhitelistScalarFieldEnum | EmailWhitelistScalarFieldEnum[]
+  }
+
+  /**
+   * EmailWhitelist findMany
+   */
+  export type EmailWhitelistFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * Filter, which EmailWhitelists to fetch.
+     */
+    where?: EmailWhitelistWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of EmailWhitelists to fetch.
+     */
+    orderBy?: EmailWhitelistOrderByWithRelationInput | EmailWhitelistOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing EmailWhitelists.
+     */
+    cursor?: EmailWhitelistWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` EmailWhitelists from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` EmailWhitelists.
+     */
+    skip?: number
+    distinct?: EmailWhitelistScalarFieldEnum | EmailWhitelistScalarFieldEnum[]
+  }
+
+  /**
+   * EmailWhitelist create
+   */
+  export type EmailWhitelistCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * The data needed to create a EmailWhitelist.
+     */
+    data: XOR<EmailWhitelistCreateInput, EmailWhitelistUncheckedCreateInput>
+  }
+
+  /**
+   * EmailWhitelist createMany
+   */
+  export type EmailWhitelistCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many EmailWhitelists.
+     */
+    data: EmailWhitelistCreateManyInput | EmailWhitelistCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * EmailWhitelist createManyAndReturn
+   */
+  export type EmailWhitelistCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * The data used to create many EmailWhitelists.
+     */
+    data: EmailWhitelistCreateManyInput | EmailWhitelistCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * EmailWhitelist update
+   */
+  export type EmailWhitelistUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * The data needed to update a EmailWhitelist.
+     */
+    data: XOR<EmailWhitelistUpdateInput, EmailWhitelistUncheckedUpdateInput>
+    /**
+     * Choose, which EmailWhitelist to update.
+     */
+    where: EmailWhitelistWhereUniqueInput
+  }
+
+  /**
+   * EmailWhitelist updateMany
+   */
+  export type EmailWhitelistUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update EmailWhitelists.
+     */
+    data: XOR<EmailWhitelistUpdateManyMutationInput, EmailWhitelistUncheckedUpdateManyInput>
+    /**
+     * Filter which EmailWhitelists to update
+     */
+    where?: EmailWhitelistWhereInput
+  }
+
+  /**
+   * EmailWhitelist upsert
+   */
+  export type EmailWhitelistUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * The filter to search for the EmailWhitelist to update in case it exists.
+     */
+    where: EmailWhitelistWhereUniqueInput
+    /**
+     * In case the EmailWhitelist found by the `where` argument doesn't exist, create a new EmailWhitelist with this data.
+     */
+    create: XOR<EmailWhitelistCreateInput, EmailWhitelistUncheckedCreateInput>
+    /**
+     * In case the EmailWhitelist was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<EmailWhitelistUpdateInput, EmailWhitelistUncheckedUpdateInput>
+  }
+
+  /**
+   * EmailWhitelist delete
+   */
+  export type EmailWhitelistDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
+    /**
+     * Filter which EmailWhitelist to delete.
+     */
+    where: EmailWhitelistWhereUniqueInput
+  }
+
+  /**
+   * EmailWhitelist deleteMany
+   */
+  export type EmailWhitelistDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which EmailWhitelists to delete
+     */
+    where?: EmailWhitelistWhereInput
+  }
+
+  /**
+   * EmailWhitelist without action
+   */
+  export type EmailWhitelistDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the EmailWhitelist
+     */
+    select?: EmailWhitelistSelect<ExtArgs> | null
   }
 
 
@@ -13110,6 +15893,7 @@ export namespace Prisma {
 
   export type SystemSettingMinAggregateOutputType = {
     id: string | null
+    workspaceId: string | null
     lowStockThreshold: number | null
     allowDataImport: boolean | null
     allowGalleryUpload: boolean | null
@@ -13127,6 +15911,7 @@ export namespace Prisma {
 
   export type SystemSettingMaxAggregateOutputType = {
     id: string | null
+    workspaceId: string | null
     lowStockThreshold: number | null
     allowDataImport: boolean | null
     allowGalleryUpload: boolean | null
@@ -13144,6 +15929,7 @@ export namespace Prisma {
 
   export type SystemSettingCountAggregateOutputType = {
     id: number
+    workspaceId: number
     lowStockThreshold: number
     allowDataImport: number
     allowGalleryUpload: number
@@ -13173,6 +15959,7 @@ export namespace Prisma {
 
   export type SystemSettingMinAggregateInputType = {
     id?: true
+    workspaceId?: true
     lowStockThreshold?: true
     allowDataImport?: true
     allowGalleryUpload?: true
@@ -13190,6 +15977,7 @@ export namespace Prisma {
 
   export type SystemSettingMaxAggregateInputType = {
     id?: true
+    workspaceId?: true
     lowStockThreshold?: true
     allowDataImport?: true
     allowGalleryUpload?: true
@@ -13207,6 +15995,7 @@ export namespace Prisma {
 
   export type SystemSettingCountAggregateInputType = {
     id?: true
+    workspaceId?: true
     lowStockThreshold?: true
     allowDataImport?: true
     allowGalleryUpload?: true
@@ -13311,6 +16100,7 @@ export namespace Prisma {
 
   export type SystemSettingGroupByOutputType = {
     id: string
+    workspaceId: string | null
     lowStockThreshold: number
     allowDataImport: boolean
     allowGalleryUpload: boolean
@@ -13347,6 +16137,7 @@ export namespace Prisma {
 
   export type SystemSettingSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    workspaceId?: boolean
     lowStockThreshold?: boolean
     allowDataImport?: boolean
     allowGalleryUpload?: boolean
@@ -13360,10 +16151,12 @@ export namespace Prisma {
     minioPublicUrl?: boolean
     uploadConflictStrategy?: boolean
     updatedAt?: boolean
+    workspace?: boolean | SystemSetting$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["systemSetting"]>
 
   export type SystemSettingSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
+    workspaceId?: boolean
     lowStockThreshold?: boolean
     allowDataImport?: boolean
     allowGalleryUpload?: boolean
@@ -13377,10 +16170,12 @@ export namespace Prisma {
     minioPublicUrl?: boolean
     uploadConflictStrategy?: boolean
     updatedAt?: boolean
+    workspace?: boolean | SystemSetting$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["systemSetting"]>
 
   export type SystemSettingSelectScalar = {
     id?: boolean
+    workspaceId?: boolean
     lowStockThreshold?: boolean
     allowDataImport?: boolean
     allowGalleryUpload?: boolean
@@ -13396,12 +16191,21 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
+  export type SystemSettingInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | SystemSetting$workspaceArgs<ExtArgs>
+  }
+  export type SystemSettingIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | SystemSetting$workspaceArgs<ExtArgs>
+  }
 
   export type $SystemSettingPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "SystemSetting"
-    objects: {}
+    objects: {
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
+      workspaceId: string | null
       lowStockThreshold: number
       allowDataImport: boolean
       allowGalleryUpload: boolean
@@ -13779,6 +16583,7 @@ export namespace Prisma {
    */
   export interface Prisma__SystemSettingClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends SystemSetting$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, SystemSetting$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -13809,6 +16614,7 @@ export namespace Prisma {
    */ 
   interface SystemSettingFieldRefs {
     readonly id: FieldRef<"SystemSetting", 'String'>
+    readonly workspaceId: FieldRef<"SystemSetting", 'String'>
     readonly lowStockThreshold: FieldRef<"SystemSetting", 'Int'>
     readonly allowDataImport: FieldRef<"SystemSetting", 'Boolean'>
     readonly allowGalleryUpload: FieldRef<"SystemSetting", 'Boolean'>
@@ -13835,6 +16641,10 @@ export namespace Prisma {
      */
     select?: SystemSettingSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    /**
      * Filter, which SystemSetting to fetch.
      */
     where: SystemSettingWhereUniqueInput
@@ -13849,6 +16659,10 @@ export namespace Prisma {
      */
     select?: SystemSettingSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    /**
      * Filter, which SystemSetting to fetch.
      */
     where: SystemSettingWhereUniqueInput
@@ -13862,6 +16676,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the SystemSetting
      */
     select?: SystemSettingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
     /**
      * Filter, which SystemSetting to fetch.
      */
@@ -13907,6 +16725,10 @@ export namespace Prisma {
      */
     select?: SystemSettingSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    /**
      * Filter, which SystemSetting to fetch.
      */
     where?: SystemSettingWhereInput
@@ -13951,6 +16773,10 @@ export namespace Prisma {
      */
     select?: SystemSettingSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    /**
      * Filter, which SystemSettings to fetch.
      */
     where?: SystemSettingWhereInput
@@ -13990,6 +16816,10 @@ export namespace Prisma {
      */
     select?: SystemSettingSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    /**
      * The data needed to create a SystemSetting.
      */
     data: XOR<SystemSettingCreateInput, SystemSettingUncheckedCreateInput>
@@ -14019,6 +16849,10 @@ export namespace Prisma {
      */
     data: SystemSettingCreateManyInput | SystemSettingCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -14029,6 +16863,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the SystemSetting
      */
     select?: SystemSettingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
     /**
      * The data needed to update a SystemSetting.
      */
@@ -14062,6 +16900,10 @@ export namespace Prisma {
      */
     select?: SystemSettingSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    /**
      * The filter to search for the SystemSetting to update in case it exists.
      */
     where: SystemSettingWhereUniqueInput
@@ -14084,6 +16926,10 @@ export namespace Prisma {
      */
     select?: SystemSettingSelect<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
+    /**
      * Filter which SystemSetting to delete.
      */
     where: SystemSettingWhereUniqueInput
@@ -14100,6 +16946,21 @@ export namespace Prisma {
   }
 
   /**
+   * SystemSetting.workspace
+   */
+  export type SystemSetting$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
+  }
+
+  /**
    * SystemSetting without action
    */
   export type SystemSettingDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -14107,6 +16968,10 @@ export namespace Prisma {
      * Select specific fields to fetch from the SystemSetting
      */
     select?: SystemSettingSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SystemSettingInclude<ExtArgs> | null
   }
 
 
@@ -14146,6 +17011,7 @@ export namespace Prisma {
     receivedAmount: number | null
     commission: number | null
     note: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -14160,6 +17026,7 @@ export namespace Prisma {
     receivedAmount: number | null
     commission: number | null
     note: string | null
+    workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -14174,6 +17041,7 @@ export namespace Prisma {
     receivedAmount: number
     commission: number
     note: number
+    workspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -14204,6 +17072,7 @@ export namespace Prisma {
     receivedAmount?: true
     commission?: true
     note?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -14218,6 +17087,7 @@ export namespace Prisma {
     receivedAmount?: true
     commission?: true
     note?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -14232,6 +17102,7 @@ export namespace Prisma {
     receivedAmount?: true
     commission?: true
     note?: true
+    workspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -14333,6 +17204,7 @@ export namespace Prisma {
     receivedAmount: number
     commission: number
     note: string | null
+    workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: BrushOrderCountAggregateOutputType | null
@@ -14366,8 +17238,10 @@ export namespace Prisma {
     receivedAmount?: boolean
     commission?: boolean
     note?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | BrushOrder$workspaceArgs<ExtArgs>
     items?: boolean | BrushOrder$itemsArgs<ExtArgs>
     _count?: boolean | BrushOrderCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["brushOrder"]>
@@ -14382,8 +17256,10 @@ export namespace Prisma {
     receivedAmount?: boolean
     commission?: boolean
     note?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    workspace?: boolean | BrushOrder$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["brushOrder"]>
 
   export type BrushOrderSelectScalar = {
@@ -14396,19 +17272,24 @@ export namespace Prisma {
     receivedAmount?: boolean
     commission?: boolean
     note?: boolean
+    workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
   export type BrushOrderInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | BrushOrder$workspaceArgs<ExtArgs>
     items?: boolean | BrushOrder$itemsArgs<ExtArgs>
     _count?: boolean | BrushOrderCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type BrushOrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type BrushOrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | BrushOrder$workspaceArgs<ExtArgs>
+  }
 
   export type $BrushOrderPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "BrushOrder"
     objects: {
+      workspace: Prisma.$WorkspacePayload<ExtArgs> | null
       items: Prisma.$BrushOrderItemPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -14421,6 +17302,7 @@ export namespace Prisma {
       receivedAmount: number
       commission: number
       note: string | null
+      workspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["brushOrder"]>
@@ -14787,6 +17669,7 @@ export namespace Prisma {
    */
   export interface Prisma__BrushOrderClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends BrushOrder$workspaceArgs<ExtArgs> = {}>(args?: Subset<T, BrushOrder$workspaceArgs<ExtArgs>>): Prisma__WorkspaceClient<$Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow"> | null, null, ExtArgs>
     items<T extends BrushOrder$itemsArgs<ExtArgs> = {}>(args?: Subset<T, BrushOrder$itemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BrushOrderItemPayload<ExtArgs>, T, "findMany"> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -14826,6 +17709,7 @@ export namespace Prisma {
     readonly receivedAmount: FieldRef<"BrushOrder", 'Float'>
     readonly commission: FieldRef<"BrushOrder", 'Float'>
     readonly note: FieldRef<"BrushOrder", 'String'>
+    readonly workspaceId: FieldRef<"BrushOrder", 'String'>
     readonly createdAt: FieldRef<"BrushOrder", 'DateTime'>
     readonly updatedAt: FieldRef<"BrushOrder", 'DateTime'>
   }
@@ -15049,6 +17933,10 @@ export namespace Prisma {
      */
     data: BrushOrderCreateManyInput | BrushOrderCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BrushOrderIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -15139,6 +18027,21 @@ export namespace Prisma {
      * Filter which BrushOrders to delete
      */
     where?: BrushOrderWhereInput
+  }
+
+  /**
+   * BrushOrder.workspace
+   */
+  export type BrushOrder$workspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Workspace
+     */
+    select?: WorkspaceSelect<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkspaceInclude<ExtArgs> | null
+    where?: WorkspaceWhereInput
   }
 
   /**
@@ -16175,10 +19078,22 @@ export namespace Prisma {
   export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
+  export const WorkspaceScalarFieldEnum: {
+    id: 'id',
+    name: 'name',
+    ownerId: 'ownerId',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type WorkspaceScalarFieldEnum = (typeof WorkspaceScalarFieldEnum)[keyof typeof WorkspaceScalarFieldEnum]
+
+
   export const CategoryScalarFieldEnum: {
     id: 'id',
     name: 'name',
     description: 'description',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16197,6 +19112,7 @@ export namespace Prisma {
     isPublic: 'isPublic',
     categoryId: 'categoryId',
     supplierId: 'supplierId',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16212,6 +19128,7 @@ export namespace Prisma {
     phone: 'phone',
     email: 'email',
     address: 'address',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16230,6 +19147,7 @@ export namespace Prisma {
     paymentVoucher: 'paymentVoucher',
     paymentVouchers: 'paymentVouchers',
     trackingData: 'trackingData',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16258,6 +19176,7 @@ export namespace Prisma {
     date: 'date',
     note: 'note',
     totalAmount: 'totalAmount',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16283,6 +19202,7 @@ export namespace Prisma {
     tags: 'tags',
     isPublic: 'isPublic',
     type: 'type',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16299,6 +19219,7 @@ export namespace Prisma {
     notes: 'notes',
     productId: 'productId',
     selectedIndices: 'selectedIndices',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16311,11 +19232,26 @@ export namespace Prisma {
     email: 'email',
     name: 'name',
     role: 'role',
+    status: 'status',
+    permissions: 'permissions',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
 
   export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+  export const EmailWhitelistScalarFieldEnum: {
+    id: 'id',
+    email: 'email',
+    role: 'role',
+    permissions: 'permissions',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type EmailWhitelistScalarFieldEnum = (typeof EmailWhitelistScalarFieldEnum)[keyof typeof EmailWhitelistScalarFieldEnum]
 
 
   export const VerificationCodeScalarFieldEnum: {
@@ -16331,6 +19267,7 @@ export namespace Prisma {
 
   export const SystemSettingScalarFieldEnum: {
     id: 'id',
+    workspaceId: 'workspaceId',
     lowStockThreshold: 'lowStockThreshold',
     allowDataImport: 'allowDataImport',
     allowGalleryUpload: 'allowGalleryUpload',
@@ -16359,6 +19296,7 @@ export namespace Prisma {
     receivedAmount: 'receivedAmount',
     commission: 'commission',
     note: 'note',
+    workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16499,10 +19437,109 @@ export namespace Prisma {
    */
   export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
     
+
+
+  /**
+   * Reference to a field of type 'Role'
+   */
+  export type EnumRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Role'>
+    
+
+
+  /**
+   * Reference to a field of type 'Role[]'
+   */
+  export type ListEnumRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Role[]'>
+    
   /**
    * Deep Input Types
    */
 
+
+  export type WorkspaceWhereInput = {
+    AND?: WorkspaceWhereInput | WorkspaceWhereInput[]
+    OR?: WorkspaceWhereInput[]
+    NOT?: WorkspaceWhereInput | WorkspaceWhereInput[]
+    id?: StringFilter<"Workspace"> | string
+    name?: StringFilter<"Workspace"> | string
+    ownerId?: StringFilter<"Workspace"> | string
+    createdAt?: DateTimeFilter<"Workspace"> | Date | string
+    updatedAt?: DateTimeFilter<"Workspace"> | Date | string
+    brushOrders?: BrushOrderListRelationFilter
+    categories?: CategoryListRelationFilter
+    galleryItems?: GalleryItemListRelationFilter
+    gallerySubmissions?: GallerySubmissionListRelationFilter
+    outboundOrders?: OutboundOrderListRelationFilter
+    products?: ProductListRelationFilter
+    purchaseOrders?: PurchaseOrderListRelationFilter
+    suppliers?: SupplierListRelationFilter
+    systemSettings?: SystemSettingListRelationFilter
+    users?: UserListRelationFilter
+    owner?: XOR<UserRelationFilter, UserWhereInput>
+  }
+
+  export type WorkspaceOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    ownerId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    brushOrders?: BrushOrderOrderByRelationAggregateInput
+    categories?: CategoryOrderByRelationAggregateInput
+    galleryItems?: GalleryItemOrderByRelationAggregateInput
+    gallerySubmissions?: GallerySubmissionOrderByRelationAggregateInput
+    outboundOrders?: OutboundOrderOrderByRelationAggregateInput
+    products?: ProductOrderByRelationAggregateInput
+    purchaseOrders?: PurchaseOrderOrderByRelationAggregateInput
+    suppliers?: SupplierOrderByRelationAggregateInput
+    systemSettings?: SystemSettingOrderByRelationAggregateInput
+    users?: UserOrderByRelationAggregateInput
+    owner?: UserOrderByWithRelationInput
+  }
+
+  export type WorkspaceWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    ownerId?: string
+    AND?: WorkspaceWhereInput | WorkspaceWhereInput[]
+    OR?: WorkspaceWhereInput[]
+    NOT?: WorkspaceWhereInput | WorkspaceWhereInput[]
+    name?: StringFilter<"Workspace"> | string
+    createdAt?: DateTimeFilter<"Workspace"> | Date | string
+    updatedAt?: DateTimeFilter<"Workspace"> | Date | string
+    brushOrders?: BrushOrderListRelationFilter
+    categories?: CategoryListRelationFilter
+    galleryItems?: GalleryItemListRelationFilter
+    gallerySubmissions?: GallerySubmissionListRelationFilter
+    outboundOrders?: OutboundOrderListRelationFilter
+    products?: ProductListRelationFilter
+    purchaseOrders?: PurchaseOrderListRelationFilter
+    suppliers?: SupplierListRelationFilter
+    systemSettings?: SystemSettingListRelationFilter
+    users?: UserListRelationFilter
+    owner?: XOR<UserRelationFilter, UserWhereInput>
+  }, "id" | "ownerId">
+
+  export type WorkspaceOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    ownerId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: WorkspaceCountOrderByAggregateInput
+    _max?: WorkspaceMaxOrderByAggregateInput
+    _min?: WorkspaceMinOrderByAggregateInput
+  }
+
+  export type WorkspaceScalarWhereWithAggregatesInput = {
+    AND?: WorkspaceScalarWhereWithAggregatesInput | WorkspaceScalarWhereWithAggregatesInput[]
+    OR?: WorkspaceScalarWhereWithAggregatesInput[]
+    NOT?: WorkspaceScalarWhereWithAggregatesInput | WorkspaceScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Workspace"> | string
+    name?: StringWithAggregatesFilter<"Workspace"> | string
+    ownerId?: StringWithAggregatesFilter<"Workspace"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"Workspace"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Workspace"> | Date | string
+  }
 
   export type CategoryWhereInput = {
     AND?: CategoryWhereInput | CategoryWhereInput[]
@@ -16511,8 +19548,10 @@ export namespace Prisma {
     id?: StringFilter<"Category"> | string
     name?: StringFilter<"Category"> | string
     description?: StringNullableFilter<"Category"> | string | null
+    workspaceId?: StringNullableFilter<"Category"> | string | null
     createdAt?: DateTimeFilter<"Category"> | Date | string
     updatedAt?: DateTimeFilter<"Category"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     products?: ProductListRelationFilter
   }
 
@@ -16520,27 +19559,33 @@ export namespace Prisma {
     id?: SortOrder
     name?: SortOrder
     description?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    workspace?: WorkspaceOrderByWithRelationInput
     products?: ProductOrderByRelationAggregateInput
   }
 
   export type CategoryWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    name?: string
+    name_workspaceId?: CategoryNameWorkspaceIdCompoundUniqueInput
     AND?: CategoryWhereInput | CategoryWhereInput[]
     OR?: CategoryWhereInput[]
     NOT?: CategoryWhereInput | CategoryWhereInput[]
+    name?: StringFilter<"Category"> | string
     description?: StringNullableFilter<"Category"> | string | null
+    workspaceId?: StringNullableFilter<"Category"> | string | null
     createdAt?: DateTimeFilter<"Category"> | Date | string
     updatedAt?: DateTimeFilter<"Category"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     products?: ProductListRelationFilter
-  }, "id" | "name">
+  }, "id" | "name_workspaceId">
 
   export type CategoryOrderByWithAggregationInput = {
     id?: SortOrder
     name?: SortOrder
     description?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: CategoryCountOrderByAggregateInput
@@ -16555,6 +19600,7 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"Category"> | string
     name?: StringWithAggregatesFilter<"Category"> | string
     description?: StringNullableWithAggregatesFilter<"Category"> | string | null
+    workspaceId?: StringNullableWithAggregatesFilter<"Category"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Category"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Category"> | Date | string
   }
@@ -16573,6 +19619,7 @@ export namespace Prisma {
     isPublic?: BoolFilter<"Product"> | boolean
     categoryId?: StringFilter<"Product"> | string
     supplierId?: StringNullableFilter<"Product"> | string | null
+    workspaceId?: StringNullableFilter<"Product"> | string | null
     createdAt?: DateTimeFilter<"Product"> | Date | string
     updatedAt?: DateTimeFilter<"Product"> | Date | string
     brushOrderItems?: BrushOrderItemListRelationFilter
@@ -16580,6 +19627,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemListRelationFilter
     category?: XOR<CategoryRelationFilter, CategoryWhereInput>
     supplier?: XOR<SupplierNullableRelationFilter, SupplierWhereInput> | null
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     orderItems?: PurchaseOrderItemListRelationFilter
   }
 
@@ -16594,6 +19642,7 @@ export namespace Prisma {
     isPublic?: SortOrder
     categoryId?: SortOrder
     supplierId?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     brushOrderItems?: BrushOrderItemOrderByRelationAggregateInput
@@ -16601,15 +19650,17 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemOrderByRelationAggregateInput
     category?: CategoryOrderByWithRelationInput
     supplier?: SupplierOrderByWithRelationInput
+    workspace?: WorkspaceOrderByWithRelationInput
     orderItems?: PurchaseOrderItemOrderByRelationAggregateInput
   }
 
   export type ProductWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    sku?: string
+    sku_workspaceId?: ProductSkuWorkspaceIdCompoundUniqueInput
     AND?: ProductWhereInput | ProductWhereInput[]
     OR?: ProductWhereInput[]
     NOT?: ProductWhereInput | ProductWhereInput[]
+    sku?: StringNullableFilter<"Product"> | string | null
     name?: StringFilter<"Product"> | string
     costPrice?: FloatFilter<"Product"> | number
     hideCost?: BoolFilter<"Product"> | boolean
@@ -16618,6 +19669,7 @@ export namespace Prisma {
     isPublic?: BoolFilter<"Product"> | boolean
     categoryId?: StringFilter<"Product"> | string
     supplierId?: StringNullableFilter<"Product"> | string | null
+    workspaceId?: StringNullableFilter<"Product"> | string | null
     createdAt?: DateTimeFilter<"Product"> | Date | string
     updatedAt?: DateTimeFilter<"Product"> | Date | string
     brushOrderItems?: BrushOrderItemListRelationFilter
@@ -16625,8 +19677,9 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemListRelationFilter
     category?: XOR<CategoryRelationFilter, CategoryWhereInput>
     supplier?: XOR<SupplierNullableRelationFilter, SupplierWhereInput> | null
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     orderItems?: PurchaseOrderItemListRelationFilter
-  }, "id" | "sku">
+  }, "id" | "sku_workspaceId">
 
   export type ProductOrderByWithAggregationInput = {
     id?: SortOrder
@@ -16639,6 +19692,7 @@ export namespace Prisma {
     isPublic?: SortOrder
     categoryId?: SortOrder
     supplierId?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: ProductCountOrderByAggregateInput
@@ -16662,6 +19716,7 @@ export namespace Prisma {
     isPublic?: BoolWithAggregatesFilter<"Product"> | boolean
     categoryId?: StringWithAggregatesFilter<"Product"> | string
     supplierId?: StringNullableWithAggregatesFilter<"Product"> | string | null
+    workspaceId?: StringNullableWithAggregatesFilter<"Product"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Product"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Product"> | Date | string
   }
@@ -16677,10 +19732,12 @@ export namespace Prisma {
     phone?: StringNullableFilter<"Supplier"> | string | null
     email?: StringNullableFilter<"Supplier"> | string | null
     address?: StringNullableFilter<"Supplier"> | string | null
+    workspaceId?: StringNullableFilter<"Supplier"> | string | null
     createdAt?: DateTimeFilter<"Supplier"> | Date | string
     updatedAt?: DateTimeFilter<"Supplier"> | Date | string
     products?: ProductListRelationFilter
     purchaseOrderItems?: PurchaseOrderItemListRelationFilter
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }
 
   export type SupplierOrderByWithRelationInput = {
@@ -16691,28 +19748,33 @@ export namespace Prisma {
     phone?: SortOrderInput | SortOrder
     email?: SortOrderInput | SortOrder
     address?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     products?: ProductOrderByRelationAggregateInput
     purchaseOrderItems?: PurchaseOrderItemOrderByRelationAggregateInput
+    workspace?: WorkspaceOrderByWithRelationInput
   }
 
   export type SupplierWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    code?: string
+    code_workspaceId?: SupplierCodeWorkspaceIdCompoundUniqueInput
     AND?: SupplierWhereInput | SupplierWhereInput[]
     OR?: SupplierWhereInput[]
     NOT?: SupplierWhereInput | SupplierWhereInput[]
+    code?: StringNullableFilter<"Supplier"> | string | null
     name?: StringFilter<"Supplier"> | string
     contact?: StringNullableFilter<"Supplier"> | string | null
     phone?: StringNullableFilter<"Supplier"> | string | null
     email?: StringNullableFilter<"Supplier"> | string | null
     address?: StringNullableFilter<"Supplier"> | string | null
+    workspaceId?: StringNullableFilter<"Supplier"> | string | null
     createdAt?: DateTimeFilter<"Supplier"> | Date | string
     updatedAt?: DateTimeFilter<"Supplier"> | Date | string
     products?: ProductListRelationFilter
     purchaseOrderItems?: PurchaseOrderItemListRelationFilter
-  }, "id" | "code">
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
+  }, "id" | "code_workspaceId">
 
   export type SupplierOrderByWithAggregationInput = {
     id?: SortOrder
@@ -16722,6 +19784,7 @@ export namespace Prisma {
     phone?: SortOrderInput | SortOrder
     email?: SortOrderInput | SortOrder
     address?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: SupplierCountOrderByAggregateInput
@@ -16740,6 +19803,7 @@ export namespace Prisma {
     phone?: StringNullableWithAggregatesFilter<"Supplier"> | string | null
     email?: StringNullableWithAggregatesFilter<"Supplier"> | string | null
     address?: StringNullableWithAggregatesFilter<"Supplier"> | string | null
+    workspaceId?: StringNullableWithAggregatesFilter<"Supplier"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Supplier"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Supplier"> | Date | string
   }
@@ -16758,8 +19822,10 @@ export namespace Prisma {
     paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
+    workspaceId?: StringNullableFilter<"PurchaseOrder"> | string | null
     createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     items?: PurchaseOrderItemListRelationFilter
   }
 
@@ -16774,8 +19840,10 @@ export namespace Prisma {
     paymentVoucher?: SortOrderInput | SortOrder
     paymentVouchers?: SortOrderInput | SortOrder
     trackingData?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    workspace?: WorkspaceOrderByWithRelationInput
     items?: PurchaseOrderItemOrderByRelationAggregateInput
   }
 
@@ -16793,8 +19861,10 @@ export namespace Prisma {
     paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
+    workspaceId?: StringNullableFilter<"PurchaseOrder"> | string | null
     createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     items?: PurchaseOrderItemListRelationFilter
   }, "id">
 
@@ -16809,6 +19879,7 @@ export namespace Prisma {
     paymentVoucher?: SortOrderInput | SortOrder
     paymentVouchers?: SortOrderInput | SortOrder
     trackingData?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: PurchaseOrderCountOrderByAggregateInput
@@ -16832,6 +19903,7 @@ export namespace Prisma {
     paymentVoucher?: StringNullableWithAggregatesFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableWithAggregatesFilter<"PurchaseOrder">
     trackingData?: JsonNullableWithAggregatesFilter<"PurchaseOrder">
+    workspaceId?: StringNullableWithAggregatesFilter<"PurchaseOrder"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"PurchaseOrder"> | Date | string
   }
@@ -16928,8 +20000,10 @@ export namespace Prisma {
     date?: DateTimeFilter<"OutboundOrder"> | Date | string
     note?: StringNullableFilter<"OutboundOrder"> | string | null
     totalAmount?: FloatFilter<"OutboundOrder"> | number
+    workspaceId?: StringNullableFilter<"OutboundOrder"> | string | null
     createdAt?: DateTimeFilter<"OutboundOrder"> | Date | string
     updatedAt?: DateTimeFilter<"OutboundOrder"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     items?: OutboundOrderItemListRelationFilter
   }
 
@@ -16939,8 +20013,10 @@ export namespace Prisma {
     date?: SortOrder
     note?: SortOrderInput | SortOrder
     totalAmount?: SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    workspace?: WorkspaceOrderByWithRelationInput
     items?: OutboundOrderItemOrderByRelationAggregateInput
   }
 
@@ -16953,8 +20029,10 @@ export namespace Prisma {
     date?: DateTimeFilter<"OutboundOrder"> | Date | string
     note?: StringNullableFilter<"OutboundOrder"> | string | null
     totalAmount?: FloatFilter<"OutboundOrder"> | number
+    workspaceId?: StringNullableFilter<"OutboundOrder"> | string | null
     createdAt?: DateTimeFilter<"OutboundOrder"> | Date | string
     updatedAt?: DateTimeFilter<"OutboundOrder"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     items?: OutboundOrderItemListRelationFilter
   }, "id">
 
@@ -16964,6 +20042,7 @@ export namespace Prisma {
     date?: SortOrder
     note?: SortOrderInput | SortOrder
     totalAmount?: SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: OutboundOrderCountOrderByAggregateInput
@@ -16982,6 +20061,7 @@ export namespace Prisma {
     date?: DateTimeWithAggregatesFilter<"OutboundOrder"> | Date | string
     note?: StringNullableWithAggregatesFilter<"OutboundOrder"> | string | null
     totalAmount?: FloatWithAggregatesFilter<"OutboundOrder"> | number
+    workspaceId?: StringNullableWithAggregatesFilter<"OutboundOrder"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"OutboundOrder"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"OutboundOrder"> | Date | string
   }
@@ -16995,8 +20075,8 @@ export namespace Prisma {
     productId?: StringFilter<"OutboundOrderItem"> | string
     quantity?: IntFilter<"OutboundOrderItem"> | number
     price?: FloatFilter<"OutboundOrderItem"> | number
-    product?: XOR<ProductRelationFilter, ProductWhereInput>
     outboundOrder?: XOR<OutboundOrderRelationFilter, OutboundOrderWhereInput>
+    product?: XOR<ProductRelationFilter, ProductWhereInput>
   }
 
   export type OutboundOrderItemOrderByWithRelationInput = {
@@ -17005,8 +20085,8 @@ export namespace Prisma {
     productId?: SortOrder
     quantity?: SortOrder
     price?: SortOrder
-    product?: ProductOrderByWithRelationInput
     outboundOrder?: OutboundOrderOrderByWithRelationInput
+    product?: ProductOrderByWithRelationInput
   }
 
   export type OutboundOrderItemWhereUniqueInput = Prisma.AtLeast<{
@@ -17018,8 +20098,8 @@ export namespace Prisma {
     productId?: StringFilter<"OutboundOrderItem"> | string
     quantity?: IntFilter<"OutboundOrderItem"> | number
     price?: FloatFilter<"OutboundOrderItem"> | number
-    product?: XOR<ProductRelationFilter, ProductWhereInput>
     outboundOrder?: XOR<OutboundOrderRelationFilter, OutboundOrderWhereInput>
+    product?: XOR<ProductRelationFilter, ProductWhereInput>
   }, "id">
 
   export type OutboundOrderItemOrderByWithAggregationInput = {
@@ -17056,9 +20136,11 @@ export namespace Prisma {
     tags?: StringNullableListFilter<"GalleryItem">
     isPublic?: BoolFilter<"GalleryItem"> | boolean
     type?: StringFilter<"GalleryItem"> | string
+    workspaceId?: StringNullableFilter<"GalleryItem"> | string | null
     createdAt?: DateTimeFilter<"GalleryItem"> | Date | string
     updatedAt?: DateTimeFilter<"GalleryItem"> | Date | string
     product?: XOR<ProductRelationFilter, ProductWhereInput>
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }
 
   export type GalleryItemOrderByWithRelationInput = {
@@ -17068,9 +20150,11 @@ export namespace Prisma {
     tags?: SortOrder
     isPublic?: SortOrder
     type?: SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     product?: ProductOrderByWithRelationInput
+    workspace?: WorkspaceOrderByWithRelationInput
   }
 
   export type GalleryItemWhereUniqueInput = Prisma.AtLeast<{
@@ -17083,9 +20167,11 @@ export namespace Prisma {
     tags?: StringNullableListFilter<"GalleryItem">
     isPublic?: BoolFilter<"GalleryItem"> | boolean
     type?: StringFilter<"GalleryItem"> | string
+    workspaceId?: StringNullableFilter<"GalleryItem"> | string | null
     createdAt?: DateTimeFilter<"GalleryItem"> | Date | string
     updatedAt?: DateTimeFilter<"GalleryItem"> | Date | string
     product?: XOR<ProductRelationFilter, ProductWhereInput>
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }, "id">
 
   export type GalleryItemOrderByWithAggregationInput = {
@@ -17095,6 +20181,7 @@ export namespace Prisma {
     tags?: SortOrder
     isPublic?: SortOrder
     type?: SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: GalleryItemCountOrderByAggregateInput
@@ -17112,6 +20199,7 @@ export namespace Prisma {
     tags?: StringNullableListFilter<"GalleryItem">
     isPublic?: BoolWithAggregatesFilter<"GalleryItem"> | boolean
     type?: StringWithAggregatesFilter<"GalleryItem"> | string
+    workspaceId?: StringNullableWithAggregatesFilter<"GalleryItem"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"GalleryItem"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"GalleryItem"> | Date | string
   }
@@ -17128,8 +20216,10 @@ export namespace Prisma {
     notes?: StringNullableFilter<"GallerySubmission"> | string | null
     productId?: StringNullableFilter<"GallerySubmission"> | string | null
     selectedIndices?: JsonNullableFilter<"GallerySubmission">
+    workspaceId?: StringNullableFilter<"GallerySubmission"> | string | null
     createdAt?: DateTimeFilter<"GallerySubmission"> | Date | string
     updatedAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }
 
   export type GallerySubmissionOrderByWithRelationInput = {
@@ -17141,8 +20231,10 @@ export namespace Prisma {
     notes?: SortOrderInput | SortOrder
     productId?: SortOrderInput | SortOrder
     selectedIndices?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    workspace?: WorkspaceOrderByWithRelationInput
   }
 
   export type GallerySubmissionWhereUniqueInput = Prisma.AtLeast<{
@@ -17157,8 +20249,10 @@ export namespace Prisma {
     notes?: StringNullableFilter<"GallerySubmission"> | string | null
     productId?: StringNullableFilter<"GallerySubmission"> | string | null
     selectedIndices?: JsonNullableFilter<"GallerySubmission">
+    workspaceId?: StringNullableFilter<"GallerySubmission"> | string | null
     createdAt?: DateTimeFilter<"GallerySubmission"> | Date | string
     updatedAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }, "id">
 
   export type GallerySubmissionOrderByWithAggregationInput = {
@@ -17170,6 +20264,7 @@ export namespace Prisma {
     notes?: SortOrderInput | SortOrder
     productId?: SortOrderInput | SortOrder
     selectedIndices?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: GallerySubmissionCountOrderByAggregateInput
@@ -17189,6 +20284,7 @@ export namespace Prisma {
     notes?: StringNullableWithAggregatesFilter<"GallerySubmission"> | string | null
     productId?: StringNullableWithAggregatesFilter<"GallerySubmission"> | string | null
     selectedIndices?: JsonNullableWithAggregatesFilter<"GallerySubmission">
+    workspaceId?: StringNullableWithAggregatesFilter<"GallerySubmission"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"GallerySubmission"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"GallerySubmission"> | Date | string
   }
@@ -17200,9 +20296,14 @@ export namespace Prisma {
     id?: StringFilter<"User"> | string
     email?: StringFilter<"User"> | string
     name?: StringNullableFilter<"User"> | string | null
-    role?: StringFilter<"User"> | string
+    role?: EnumRoleFilter<"User"> | $Enums.Role
+    status?: StringFilter<"User"> | string
+    permissions?: JsonNullableFilter<"User">
+    workspaceId?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
+    ownedWorkspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }
 
   export type UserOrderByWithRelationInput = {
@@ -17210,8 +20311,13 @@ export namespace Prisma {
     email?: SortOrder
     name?: SortOrderInput | SortOrder
     role?: SortOrder
+    status?: SortOrder
+    permissions?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    workspace?: WorkspaceOrderByWithRelationInput
+    ownedWorkspace?: WorkspaceOrderByWithRelationInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -17221,9 +20327,14 @@ export namespace Prisma {
     OR?: UserWhereInput[]
     NOT?: UserWhereInput | UserWhereInput[]
     name?: StringNullableFilter<"User"> | string | null
-    role?: StringFilter<"User"> | string
+    role?: EnumRoleFilter<"User"> | $Enums.Role
+    status?: StringFilter<"User"> | string
+    permissions?: JsonNullableFilter<"User">
+    workspaceId?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
+    ownedWorkspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -17231,6 +20342,9 @@ export namespace Prisma {
     email?: SortOrder
     name?: SortOrderInput | SortOrder
     role?: SortOrder
+    status?: SortOrder
+    permissions?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: UserCountOrderByAggregateInput
@@ -17245,9 +20359,69 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"User"> | string
     email?: StringWithAggregatesFilter<"User"> | string
     name?: StringNullableWithAggregatesFilter<"User"> | string | null
-    role?: StringWithAggregatesFilter<"User"> | string
+    role?: EnumRoleWithAggregatesFilter<"User"> | $Enums.Role
+    status?: StringWithAggregatesFilter<"User"> | string
+    permissions?: JsonNullableWithAggregatesFilter<"User">
+    workspaceId?: StringNullableWithAggregatesFilter<"User"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
+  }
+
+  export type EmailWhitelistWhereInput = {
+    AND?: EmailWhitelistWhereInput | EmailWhitelistWhereInput[]
+    OR?: EmailWhitelistWhereInput[]
+    NOT?: EmailWhitelistWhereInput | EmailWhitelistWhereInput[]
+    id?: StringFilter<"EmailWhitelist"> | string
+    email?: StringFilter<"EmailWhitelist"> | string
+    role?: EnumRoleFilter<"EmailWhitelist"> | $Enums.Role
+    permissions?: JsonNullableFilter<"EmailWhitelist">
+    createdAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
+    updatedAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
+  }
+
+  export type EmailWhitelistOrderByWithRelationInput = {
+    id?: SortOrder
+    email?: SortOrder
+    role?: SortOrder
+    permissions?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EmailWhitelistWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    email?: string
+    AND?: EmailWhitelistWhereInput | EmailWhitelistWhereInput[]
+    OR?: EmailWhitelistWhereInput[]
+    NOT?: EmailWhitelistWhereInput | EmailWhitelistWhereInput[]
+    role?: EnumRoleFilter<"EmailWhitelist"> | $Enums.Role
+    permissions?: JsonNullableFilter<"EmailWhitelist">
+    createdAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
+    updatedAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
+  }, "id" | "email">
+
+  export type EmailWhitelistOrderByWithAggregationInput = {
+    id?: SortOrder
+    email?: SortOrder
+    role?: SortOrder
+    permissions?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: EmailWhitelistCountOrderByAggregateInput
+    _max?: EmailWhitelistMaxOrderByAggregateInput
+    _min?: EmailWhitelistMinOrderByAggregateInput
+  }
+
+  export type EmailWhitelistScalarWhereWithAggregatesInput = {
+    AND?: EmailWhitelistScalarWhereWithAggregatesInput | EmailWhitelistScalarWhereWithAggregatesInput[]
+    OR?: EmailWhitelistScalarWhereWithAggregatesInput[]
+    NOT?: EmailWhitelistScalarWhereWithAggregatesInput | EmailWhitelistScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"EmailWhitelist"> | string
+    email?: StringWithAggregatesFilter<"EmailWhitelist"> | string
+    role?: EnumRoleWithAggregatesFilter<"EmailWhitelist"> | $Enums.Role
+    permissions?: JsonNullableWithAggregatesFilter<"EmailWhitelist">
+    createdAt?: DateTimeWithAggregatesFilter<"EmailWhitelist"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"EmailWhitelist"> | Date | string
   }
 
   export type VerificationCodeWhereInput = {
@@ -17308,6 +20482,7 @@ export namespace Prisma {
     OR?: SystemSettingWhereInput[]
     NOT?: SystemSettingWhereInput | SystemSettingWhereInput[]
     id?: StringFilter<"SystemSetting"> | string
+    workspaceId?: StringNullableFilter<"SystemSetting"> | string | null
     lowStockThreshold?: IntFilter<"SystemSetting"> | number
     allowDataImport?: BoolFilter<"SystemSetting"> | boolean
     allowGalleryUpload?: BoolFilter<"SystemSetting"> | boolean
@@ -17321,10 +20496,12 @@ export namespace Prisma {
     minioPublicUrl?: StringNullableFilter<"SystemSetting"> | string | null
     uploadConflictStrategy?: StringFilter<"SystemSetting"> | string
     updatedAt?: DateTimeFilter<"SystemSetting"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }
 
   export type SystemSettingOrderByWithRelationInput = {
     id?: SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     lowStockThreshold?: SortOrder
     allowDataImport?: SortOrder
     allowGalleryUpload?: SortOrder
@@ -17338,6 +20515,7 @@ export namespace Prisma {
     minioPublicUrl?: SortOrderInput | SortOrder
     uploadConflictStrategy?: SortOrder
     updatedAt?: SortOrder
+    workspace?: WorkspaceOrderByWithRelationInput
   }
 
   export type SystemSettingWhereUniqueInput = Prisma.AtLeast<{
@@ -17345,6 +20523,7 @@ export namespace Prisma {
     AND?: SystemSettingWhereInput | SystemSettingWhereInput[]
     OR?: SystemSettingWhereInput[]
     NOT?: SystemSettingWhereInput | SystemSettingWhereInput[]
+    workspaceId?: StringNullableFilter<"SystemSetting"> | string | null
     lowStockThreshold?: IntFilter<"SystemSetting"> | number
     allowDataImport?: BoolFilter<"SystemSetting"> | boolean
     allowGalleryUpload?: BoolFilter<"SystemSetting"> | boolean
@@ -17358,10 +20537,12 @@ export namespace Prisma {
     minioPublicUrl?: StringNullableFilter<"SystemSetting"> | string | null
     uploadConflictStrategy?: StringFilter<"SystemSetting"> | string
     updatedAt?: DateTimeFilter<"SystemSetting"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }, "id">
 
   export type SystemSettingOrderByWithAggregationInput = {
     id?: SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     lowStockThreshold?: SortOrder
     allowDataImport?: SortOrder
     allowGalleryUpload?: SortOrder
@@ -17387,6 +20568,7 @@ export namespace Prisma {
     OR?: SystemSettingScalarWhereWithAggregatesInput[]
     NOT?: SystemSettingScalarWhereWithAggregatesInput | SystemSettingScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"SystemSetting"> | string
+    workspaceId?: StringNullableWithAggregatesFilter<"SystemSetting"> | string | null
     lowStockThreshold?: IntWithAggregatesFilter<"SystemSetting"> | number
     allowDataImport?: BoolWithAggregatesFilter<"SystemSetting"> | boolean
     allowGalleryUpload?: BoolWithAggregatesFilter<"SystemSetting"> | boolean
@@ -17415,8 +20597,10 @@ export namespace Prisma {
     receivedAmount?: FloatFilter<"BrushOrder"> | number
     commission?: FloatFilter<"BrushOrder"> | number
     note?: StringNullableFilter<"BrushOrder"> | string | null
+    workspaceId?: StringNullableFilter<"BrushOrder"> | string | null
     createdAt?: DateTimeFilter<"BrushOrder"> | Date | string
     updatedAt?: DateTimeFilter<"BrushOrder"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     items?: BrushOrderItemListRelationFilter
   }
 
@@ -17430,8 +20614,10 @@ export namespace Prisma {
     receivedAmount?: SortOrder
     commission?: SortOrder
     note?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    workspace?: WorkspaceOrderByWithRelationInput
     items?: BrushOrderItemOrderByRelationAggregateInput
   }
 
@@ -17448,8 +20634,10 @@ export namespace Prisma {
     receivedAmount?: FloatFilter<"BrushOrder"> | number
     commission?: FloatFilter<"BrushOrder"> | number
     note?: StringNullableFilter<"BrushOrder"> | string | null
+    workspaceId?: StringNullableFilter<"BrushOrder"> | string | null
     createdAt?: DateTimeFilter<"BrushOrder"> | Date | string
     updatedAt?: DateTimeFilter<"BrushOrder"> | Date | string
+    workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     items?: BrushOrderItemListRelationFilter
   }, "id">
 
@@ -17463,6 +20651,7 @@ export namespace Prisma {
     receivedAmount?: SortOrder
     commission?: SortOrder
     note?: SortOrderInput | SortOrder
+    workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: BrushOrderCountOrderByAggregateInput
@@ -17485,6 +20674,7 @@ export namespace Prisma {
     receivedAmount?: FloatWithAggregatesFilter<"BrushOrder"> | number
     commission?: FloatWithAggregatesFilter<"BrushOrder"> | number
     note?: StringNullableWithAggregatesFilter<"BrushOrder"> | string | null
+    workspaceId?: StringNullableWithAggregatesFilter<"BrushOrder"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"BrushOrder"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"BrushOrder"> | Date | string
   }
@@ -17554,12 +20744,108 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"BrushOrderItem"> | Date | string
   }
 
+  export type WorkspaceCreateInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceCreateManyInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkspaceUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkspaceUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CategoryCreateInput = {
     id?: string
     name: string
     description?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutCategoriesInput
     products?: ProductCreateNestedManyWithoutCategoryInput
   }
 
@@ -17567,6 +20853,7 @@ export namespace Prisma {
     id?: string
     name: string
     description?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     products?: ProductUncheckedCreateNestedManyWithoutCategoryInput
@@ -17578,6 +20865,7 @@ export namespace Prisma {
     description?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutCategoriesNestedInput
     products?: ProductUpdateManyWithoutCategoryNestedInput
   }
 
@@ -17585,6 +20873,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     products?: ProductUncheckedUpdateManyWithoutCategoryNestedInput
@@ -17594,6 +20883,7 @@ export namespace Prisma {
     id?: string
     name: string
     description?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -17610,6 +20900,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -17630,6 +20921,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemCreateNestedManyWithoutProductInput
     category: CategoryCreateNestedOneWithoutProductsInput
     supplier?: SupplierCreateNestedOneWithoutProductsInput
+    workspace?: WorkspaceCreateNestedOneWithoutProductsInput
     orderItems?: PurchaseOrderItemCreateNestedManyWithoutProductInput
   }
 
@@ -17644,6 +20936,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId: string
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     brushOrderItems?: BrushOrderItemUncheckedCreateNestedManyWithoutProductInput
@@ -17668,6 +20961,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemUpdateManyWithoutProductNestedInput
     category?: CategoryUpdateOneRequiredWithoutProductsNestedInput
     supplier?: SupplierUpdateOneWithoutProductsNestedInput
+    workspace?: WorkspaceUpdateOneWithoutProductsNestedInput
     orderItems?: PurchaseOrderItemUpdateManyWithoutProductNestedInput
   }
 
@@ -17682,6 +20976,7 @@ export namespace Prisma {
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     brushOrderItems?: BrushOrderItemUncheckedUpdateManyWithoutProductNestedInput
@@ -17701,6 +20996,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId: string
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -17729,6 +21025,7 @@ export namespace Prisma {
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -17745,6 +21042,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     products?: ProductCreateNestedManyWithoutSupplierInput
     purchaseOrderItems?: PurchaseOrderItemCreateNestedManyWithoutSupplierInput
+    workspace?: WorkspaceCreateNestedOneWithoutSuppliersInput
   }
 
   export type SupplierUncheckedCreateInput = {
@@ -17755,6 +21053,7 @@ export namespace Prisma {
     phone?: string | null
     email?: string | null
     address?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     products?: ProductUncheckedCreateNestedManyWithoutSupplierInput
@@ -17773,6 +21072,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     products?: ProductUpdateManyWithoutSupplierNestedInput
     purchaseOrderItems?: PurchaseOrderItemUpdateManyWithoutSupplierNestedInput
+    workspace?: WorkspaceUpdateOneWithoutSuppliersNestedInput
   }
 
   export type SupplierUncheckedUpdateInput = {
@@ -17783,6 +21083,7 @@ export namespace Prisma {
     phone?: NullableStringFieldUpdateOperationsInput | string | null
     email?: NullableStringFieldUpdateOperationsInput | string | null
     address?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     products?: ProductUncheckedUpdateManyWithoutSupplierNestedInput
@@ -17797,6 +21098,7 @@ export namespace Prisma {
     phone?: string | null
     email?: string | null
     address?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -17821,6 +21123,7 @@ export namespace Prisma {
     phone?: NullableStringFieldUpdateOperationsInput | string | null
     email?: NullableStringFieldUpdateOperationsInput | string | null
     address?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -17838,6 +21141,7 @@ export namespace Prisma {
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutPurchaseOrdersInput
     items?: PurchaseOrderItemCreateNestedManyWithoutPurchaseOrderInput
   }
 
@@ -17852,6 +21156,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: PurchaseOrderItemUncheckedCreateNestedManyWithoutPurchaseOrderInput
@@ -17870,6 +21175,7 @@ export namespace Prisma {
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutPurchaseOrdersNestedInput
     items?: PurchaseOrderItemUpdateManyWithoutPurchaseOrderNestedInput
   }
 
@@ -17884,6 +21190,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: PurchaseOrderItemUncheckedUpdateManyWithoutPurchaseOrderNestedInput
@@ -17900,6 +21207,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -17930,6 +21238,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18023,6 +21332,7 @@ export namespace Prisma {
     totalAmount?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutOutboundOrdersInput
     items?: OutboundOrderItemCreateNestedManyWithoutOutboundOrderInput
   }
 
@@ -18032,6 +21342,7 @@ export namespace Prisma {
     date?: Date | string
     note?: string | null
     totalAmount?: number
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: OutboundOrderItemUncheckedCreateNestedManyWithoutOutboundOrderInput
@@ -18045,6 +21356,7 @@ export namespace Prisma {
     totalAmount?: FloatFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutOutboundOrdersNestedInput
     items?: OutboundOrderItemUpdateManyWithoutOutboundOrderNestedInput
   }
 
@@ -18054,6 +21366,7 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
     totalAmount?: FloatFieldUpdateOperationsInput | number
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: OutboundOrderItemUncheckedUpdateManyWithoutOutboundOrderNestedInput
@@ -18065,6 +21378,7 @@ export namespace Prisma {
     date?: Date | string
     note?: string | null
     totalAmount?: number
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -18085,6 +21399,7 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
     totalAmount?: FloatFieldUpdateOperationsInput | number
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18093,8 +21408,8 @@ export namespace Prisma {
     id?: string
     quantity: number
     price?: number
-    product: ProductCreateNestedOneWithoutOutboundItemsInput
     outboundOrder: OutboundOrderCreateNestedOneWithoutItemsInput
+    product: ProductCreateNestedOneWithoutOutboundItemsInput
   }
 
   export type OutboundOrderItemUncheckedCreateInput = {
@@ -18109,8 +21424,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     quantity?: IntFieldUpdateOperationsInput | number
     price?: FloatFieldUpdateOperationsInput | number
-    product?: ProductUpdateOneRequiredWithoutOutboundItemsNestedInput
     outboundOrder?: OutboundOrderUpdateOneRequiredWithoutItemsNestedInput
+    product?: ProductUpdateOneRequiredWithoutOutboundItemsNestedInput
   }
 
   export type OutboundOrderItemUncheckedUpdateInput = {
@@ -18152,6 +21467,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     product: ProductCreateNestedOneWithoutGalleryInput
+    workspace?: WorkspaceCreateNestedOneWithoutGalleryItemsInput
   }
 
   export type GalleryItemUncheckedCreateInput = {
@@ -18161,6 +21477,7 @@ export namespace Prisma {
     tags?: GalleryItemCreatetagsInput | string[]
     isPublic?: boolean
     type?: string
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -18174,6 +21491,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     product?: ProductUpdateOneRequiredWithoutGalleryNestedInput
+    workspace?: WorkspaceUpdateOneWithoutGalleryItemsNestedInput
   }
 
   export type GalleryItemUncheckedUpdateInput = {
@@ -18183,6 +21501,7 @@ export namespace Prisma {
     tags?: GalleryItemUpdatetagsInput | string[]
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     type?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18194,6 +21513,7 @@ export namespace Prisma {
     tags?: GalleryItemCreatetagsInput | string[]
     isPublic?: boolean
     type?: string
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -18215,6 +21535,7 @@ export namespace Prisma {
     tags?: GalleryItemUpdatetagsInput | string[]
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     type?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18230,6 +21551,7 @@ export namespace Prisma {
     selectedIndices?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutGallerySubmissionsInput
   }
 
   export type GallerySubmissionUncheckedCreateInput = {
@@ -18241,6 +21563,7 @@ export namespace Prisma {
     notes?: string | null
     productId?: string | null
     selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -18256,6 +21579,7 @@ export namespace Prisma {
     selectedIndices?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutGallerySubmissionsNestedInput
   }
 
   export type GallerySubmissionUncheckedUpdateInput = {
@@ -18267,6 +21591,7 @@ export namespace Prisma {
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     productId?: NullableStringFieldUpdateOperationsInput | string | null
     selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18280,6 +21605,7 @@ export namespace Prisma {
     notes?: string | null
     productId?: string | null
     selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -18306,6 +21632,7 @@ export namespace Prisma {
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     productId?: NullableStringFieldUpdateOperationsInput | string | null
     selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18314,43 +21641,62 @@ export namespace Prisma {
     id?: string
     email: string
     name?: string | null
-    role?: string
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutUsersInput
+    ownedWorkspace?: WorkspaceCreateNestedOneWithoutOwnerInput
   }
 
   export type UserUncheckedCreateInput = {
     id?: string
     email: string
     name?: string | null
-    role?: string
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    ownedWorkspace?: WorkspaceUncheckedCreateNestedOneWithoutOwnerInput
   }
 
   export type UserUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutUsersNestedInput
+    ownedWorkspace?: WorkspaceUpdateOneWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    ownedWorkspace?: WorkspaceUncheckedUpdateOneWithoutOwnerNestedInput
   }
 
   export type UserCreateManyInput = {
     id?: string
     email: string
     name?: string | null
-    role?: string
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -18359,7 +21705,9 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18368,7 +21716,73 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EmailWhitelistCreateInput = {
+    id?: string
+    email: string
+    role?: $Enums.Role
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type EmailWhitelistUncheckedCreateInput = {
+    id?: string
+    email: string
+    role?: $Enums.Role
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type EmailWhitelistUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EmailWhitelistUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EmailWhitelistCreateManyInput = {
+    id?: string
+    email: string
+    role?: $Enums.Role
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type EmailWhitelistUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EmailWhitelistUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    permissions?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18444,10 +21858,12 @@ export namespace Prisma {
     minioPublicUrl?: string | null
     uploadConflictStrategy?: string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutSystemSettingsInput
   }
 
   export type SystemSettingUncheckedCreateInput = {
     id?: string
+    workspaceId?: string | null
     lowStockThreshold?: number
     allowDataImport?: boolean
     allowGalleryUpload?: boolean
@@ -18478,10 +21894,12 @@ export namespace Prisma {
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutSystemSettingsNestedInput
   }
 
   export type SystemSettingUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     lowStockThreshold?: IntFieldUpdateOperationsInput | number
     allowDataImport?: BoolFieldUpdateOperationsInput | boolean
     allowGalleryUpload?: BoolFieldUpdateOperationsInput | boolean
@@ -18499,6 +21917,7 @@ export namespace Prisma {
 
   export type SystemSettingCreateManyInput = {
     id?: string
+    workspaceId?: string | null
     lowStockThreshold?: number
     allowDataImport?: boolean
     allowGalleryUpload?: boolean
@@ -18533,6 +21952,7 @@ export namespace Prisma {
 
   export type SystemSettingUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     lowStockThreshold?: IntFieldUpdateOperationsInput | number
     allowDataImport?: BoolFieldUpdateOperationsInput | boolean
     allowGalleryUpload?: BoolFieldUpdateOperationsInput | boolean
@@ -18560,6 +21980,7 @@ export namespace Prisma {
     note?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutBrushOrdersInput
     items?: BrushOrderItemCreateNestedManyWithoutBrushOrderInput
   }
 
@@ -18573,6 +21994,7 @@ export namespace Prisma {
     receivedAmount?: number
     commission?: number
     note?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: BrushOrderItemUncheckedCreateNestedManyWithoutBrushOrderInput
@@ -18590,6 +22012,7 @@ export namespace Prisma {
     note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutBrushOrdersNestedInput
     items?: BrushOrderItemUpdateManyWithoutBrushOrderNestedInput
   }
 
@@ -18603,6 +22026,7 @@ export namespace Prisma {
     receivedAmount?: FloatFieldUpdateOperationsInput | number
     commission?: FloatFieldUpdateOperationsInput | number
     note?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: BrushOrderItemUncheckedUpdateManyWithoutBrushOrderNestedInput
@@ -18618,6 +22042,7 @@ export namespace Prisma {
     receivedAmount?: number
     commission?: number
     note?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -18646,6 +22071,7 @@ export namespace Prisma {
     receivedAmount?: FloatFieldUpdateOperationsInput | number
     commission?: FloatFieldUpdateOperationsInput | number
     note?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18726,21 +22152,6 @@ export namespace Prisma {
     not?: NestedStringFilter<$PrismaModel> | string
   }
 
-  export type StringNullableFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    mode?: QueryMode
-    not?: NestedStringNullableFilter<$PrismaModel> | string | null
-  }
-
   export type DateTimeFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -18752,41 +22163,131 @@ export namespace Prisma {
     not?: NestedDateTimeFilter<$PrismaModel> | Date | string
   }
 
+  export type BrushOrderListRelationFilter = {
+    every?: BrushOrderWhereInput
+    some?: BrushOrderWhereInput
+    none?: BrushOrderWhereInput
+  }
+
+  export type CategoryListRelationFilter = {
+    every?: CategoryWhereInput
+    some?: CategoryWhereInput
+    none?: CategoryWhereInput
+  }
+
+  export type GalleryItemListRelationFilter = {
+    every?: GalleryItemWhereInput
+    some?: GalleryItemWhereInput
+    none?: GalleryItemWhereInput
+  }
+
+  export type GallerySubmissionListRelationFilter = {
+    every?: GallerySubmissionWhereInput
+    some?: GallerySubmissionWhereInput
+    none?: GallerySubmissionWhereInput
+  }
+
+  export type OutboundOrderListRelationFilter = {
+    every?: OutboundOrderWhereInput
+    some?: OutboundOrderWhereInput
+    none?: OutboundOrderWhereInput
+  }
+
   export type ProductListRelationFilter = {
     every?: ProductWhereInput
     some?: ProductWhereInput
     none?: ProductWhereInput
   }
 
-  export type SortOrderInput = {
-    sort: SortOrder
-    nulls?: NullsOrder
+  export type PurchaseOrderListRelationFilter = {
+    every?: PurchaseOrderWhereInput
+    some?: PurchaseOrderWhereInput
+    none?: PurchaseOrderWhereInput
+  }
+
+  export type SupplierListRelationFilter = {
+    every?: SupplierWhereInput
+    some?: SupplierWhereInput
+    none?: SupplierWhereInput
+  }
+
+  export type SystemSettingListRelationFilter = {
+    every?: SystemSettingWhereInput
+    some?: SystemSettingWhereInput
+    none?: SystemSettingWhereInput
+  }
+
+  export type UserListRelationFilter = {
+    every?: UserWhereInput
+    some?: UserWhereInput
+    none?: UserWhereInput
+  }
+
+  export type UserRelationFilter = {
+    is?: UserWhereInput
+    isNot?: UserWhereInput
+  }
+
+  export type BrushOrderOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type CategoryOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type GalleryItemOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type GallerySubmissionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type OutboundOrderOrderByRelationAggregateInput = {
+    _count?: SortOrder
   }
 
   export type ProductOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
-  export type CategoryCountOrderByAggregateInput = {
+  export type PurchaseOrderOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SupplierOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SystemSettingOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type UserOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type WorkspaceCountOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
-    description?: SortOrder
+    ownerId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
-  export type CategoryMaxOrderByAggregateInput = {
+  export type WorkspaceMaxOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
-    description?: SortOrder
+    ownerId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
-  export type CategoryMinOrderByAggregateInput = {
+  export type WorkspaceMinOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
-    description?: SortOrder
+    ownerId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -18809,6 +22310,77 @@ export namespace Prisma {
     _max?: NestedStringFilter<$PrismaModel>
   }
 
+  export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedDateTimeFilter<$PrismaModel>
+    _max?: NestedDateTimeFilter<$PrismaModel>
+  }
+
+  export type StringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type WorkspaceNullableRelationFilter = {
+    is?: WorkspaceWhereInput | null
+    isNot?: WorkspaceWhereInput | null
+  }
+
+  export type SortOrderInput = {
+    sort: SortOrder
+    nulls?: NullsOrder
+  }
+
+  export type CategoryNameWorkspaceIdCompoundUniqueInput = {
+    name: string
+    workspaceId: string
+  }
+
+  export type CategoryCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrder
+    workspaceId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CategoryMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrder
+    workspaceId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CategoryMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrder
+    workspaceId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
   export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
@@ -18825,20 +22397,6 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedStringNullableFilter<$PrismaModel>
     _max?: NestedStringNullableFilter<$PrismaModel>
-  }
-
-  export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedDateTimeFilter<$PrismaModel>
-    _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
   export type FloatFilter<$PrismaModel = never> = {
@@ -18874,12 +22432,6 @@ export namespace Prisma {
     none?: BrushOrderItemWhereInput
   }
 
-  export type GalleryItemListRelationFilter = {
-    every?: GalleryItemWhereInput
-    some?: GalleryItemWhereInput
-    none?: GalleryItemWhereInput
-  }
-
   export type OutboundOrderItemListRelationFilter = {
     every?: OutboundOrderItemWhereInput
     some?: OutboundOrderItemWhereInput
@@ -18906,16 +22458,17 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
-  export type GalleryItemOrderByRelationAggregateInput = {
-    _count?: SortOrder
-  }
-
   export type OutboundOrderItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
   export type PurchaseOrderItemOrderByRelationAggregateInput = {
     _count?: SortOrder
+  }
+
+  export type ProductSkuWorkspaceIdCompoundUniqueInput = {
+    sku: string
+    workspaceId: string
   }
 
   export type ProductCountOrderByAggregateInput = {
@@ -18929,6 +22482,7 @@ export namespace Prisma {
     isPublic?: SortOrder
     categoryId?: SortOrder
     supplierId?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -18949,6 +22503,7 @@ export namespace Prisma {
     isPublic?: SortOrder
     categoryId?: SortOrder
     supplierId?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -18964,6 +22519,7 @@ export namespace Prisma {
     isPublic?: SortOrder
     categoryId?: SortOrder
     supplierId?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19013,6 +22569,11 @@ export namespace Prisma {
     _max?: NestedIntFilter<$PrismaModel>
   }
 
+  export type SupplierCodeWorkspaceIdCompoundUniqueInput = {
+    code: string
+    workspaceId: string
+  }
+
   export type SupplierCountOrderByAggregateInput = {
     id?: SortOrder
     code?: SortOrder
@@ -19021,6 +22582,7 @@ export namespace Prisma {
     phone?: SortOrder
     email?: SortOrder
     address?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19033,6 +22595,7 @@ export namespace Prisma {
     phone?: SortOrder
     email?: SortOrder
     address?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19045,6 +22608,7 @@ export namespace Prisma {
     phone?: SortOrder
     email?: SortOrder
     address?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19082,6 +22646,7 @@ export namespace Prisma {
     paymentVoucher?: SortOrder
     paymentVouchers?: SortOrder
     trackingData?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19101,6 +22666,7 @@ export namespace Prisma {
     shippingFees?: SortOrder
     extraFees?: SortOrder
     paymentVoucher?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19114,6 +22680,7 @@ export namespace Prisma {
     shippingFees?: SortOrder
     extraFees?: SortOrder
     paymentVoucher?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19240,6 +22807,7 @@ export namespace Prisma {
     date?: SortOrder
     note?: SortOrder
     totalAmount?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19254,6 +22822,7 @@ export namespace Prisma {
     date?: SortOrder
     note?: SortOrder
     totalAmount?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19264,6 +22833,7 @@ export namespace Prisma {
     date?: SortOrder
     note?: SortOrder
     totalAmount?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19326,6 +22896,7 @@ export namespace Prisma {
     tags?: SortOrder
     isPublic?: SortOrder
     type?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19336,6 +22907,7 @@ export namespace Prisma {
     productId?: SortOrder
     isPublic?: SortOrder
     type?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19346,6 +22918,7 @@ export namespace Prisma {
     productId?: SortOrder
     isPublic?: SortOrder
     type?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19381,6 +22954,7 @@ export namespace Prisma {
     notes?: SortOrder
     productId?: SortOrder
     selectedIndices?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19392,6 +22966,7 @@ export namespace Prisma {
     status?: SortOrder
     notes?: SortOrder
     productId?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19403,6 +22978,7 @@ export namespace Prisma {
     status?: SortOrder
     notes?: SortOrder
     productId?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19432,11 +23008,21 @@ export namespace Prisma {
     _max?: NestedJsonFilter<$PrismaModel>
   }
 
+  export type EnumRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleFilter<$PrismaModel> | $Enums.Role
+  }
+
   export type UserCountOrderByAggregateInput = {
     id?: SortOrder
     email?: SortOrder
     name?: SortOrder
     role?: SortOrder
+    status?: SortOrder
+    permissions?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19446,6 +23032,8 @@ export namespace Prisma {
     email?: SortOrder
     name?: SortOrder
     role?: SortOrder
+    status?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19454,6 +23042,43 @@ export namespace Prisma {
     id?: SortOrder
     email?: SortOrder
     name?: SortOrder
+    role?: SortOrder
+    status?: SortOrder
+    workspaceId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleWithAggregatesFilter<$PrismaModel> | $Enums.Role
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumRoleFilter<$PrismaModel>
+    _max?: NestedEnumRoleFilter<$PrismaModel>
+  }
+
+  export type EmailWhitelistCountOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    role?: SortOrder
+    permissions?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EmailWhitelistMaxOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    role?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EmailWhitelistMinOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
     role?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -19490,6 +23115,7 @@ export namespace Prisma {
 
   export type SystemSettingCountOrderByAggregateInput = {
     id?: SortOrder
+    workspaceId?: SortOrder
     lowStockThreshold?: SortOrder
     allowDataImport?: SortOrder
     allowGalleryUpload?: SortOrder
@@ -19512,6 +23138,7 @@ export namespace Prisma {
 
   export type SystemSettingMaxOrderByAggregateInput = {
     id?: SortOrder
+    workspaceId?: SortOrder
     lowStockThreshold?: SortOrder
     allowDataImport?: SortOrder
     allowGalleryUpload?: SortOrder
@@ -19529,6 +23156,7 @@ export namespace Prisma {
 
   export type SystemSettingMinOrderByAggregateInput = {
     id?: SortOrder
+    workspaceId?: SortOrder
     lowStockThreshold?: SortOrder
     allowDataImport?: SortOrder
     allowGalleryUpload?: SortOrder
@@ -19559,6 +23187,7 @@ export namespace Prisma {
     receivedAmount?: SortOrder
     commission?: SortOrder
     note?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19580,6 +23209,7 @@ export namespace Prisma {
     receivedAmount?: SortOrder
     commission?: SortOrder
     note?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19594,6 +23224,7 @@ export namespace Prisma {
     receivedAmount?: SortOrder
     commission?: SortOrder
     note?: SortOrder
+    workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -19645,6 +23276,454 @@ export namespace Prisma {
     quantity?: SortOrder
   }
 
+  export type BrushOrderCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<BrushOrderCreateWithoutWorkspaceInput, BrushOrderUncheckedCreateWithoutWorkspaceInput> | BrushOrderCreateWithoutWorkspaceInput[] | BrushOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: BrushOrderCreateOrConnectWithoutWorkspaceInput | BrushOrderCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: BrushOrderCreateManyWorkspaceInputEnvelope
+    connect?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+  }
+
+  export type CategoryCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<CategoryCreateWithoutWorkspaceInput, CategoryUncheckedCreateWithoutWorkspaceInput> | CategoryCreateWithoutWorkspaceInput[] | CategoryUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: CategoryCreateOrConnectWithoutWorkspaceInput | CategoryCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: CategoryCreateManyWorkspaceInputEnvelope
+    connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+  }
+
+  export type GalleryItemCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<GalleryItemCreateWithoutWorkspaceInput, GalleryItemUncheckedCreateWithoutWorkspaceInput> | GalleryItemCreateWithoutWorkspaceInput[] | GalleryItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GalleryItemCreateOrConnectWithoutWorkspaceInput | GalleryItemCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: GalleryItemCreateManyWorkspaceInputEnvelope
+    connect?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+  }
+
+  export type GallerySubmissionCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<GallerySubmissionCreateWithoutWorkspaceInput, GallerySubmissionUncheckedCreateWithoutWorkspaceInput> | GallerySubmissionCreateWithoutWorkspaceInput[] | GallerySubmissionUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GallerySubmissionCreateOrConnectWithoutWorkspaceInput | GallerySubmissionCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: GallerySubmissionCreateManyWorkspaceInputEnvelope
+    connect?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+  }
+
+  export type OutboundOrderCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<OutboundOrderCreateWithoutWorkspaceInput, OutboundOrderUncheckedCreateWithoutWorkspaceInput> | OutboundOrderCreateWithoutWorkspaceInput[] | OutboundOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: OutboundOrderCreateOrConnectWithoutWorkspaceInput | OutboundOrderCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: OutboundOrderCreateManyWorkspaceInputEnvelope
+    connect?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+  }
+
+  export type ProductCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<ProductCreateWithoutWorkspaceInput, ProductUncheckedCreateWithoutWorkspaceInput> | ProductCreateWithoutWorkspaceInput[] | ProductUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ProductCreateOrConnectWithoutWorkspaceInput | ProductCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: ProductCreateManyWorkspaceInputEnvelope
+    connect?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+  }
+
+  export type PurchaseOrderCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<PurchaseOrderCreateWithoutWorkspaceInput, PurchaseOrderUncheckedCreateWithoutWorkspaceInput> | PurchaseOrderCreateWithoutWorkspaceInput[] | PurchaseOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutWorkspaceInput | PurchaseOrderCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: PurchaseOrderCreateManyWorkspaceInputEnvelope
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+  }
+
+  export type SupplierCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<SupplierCreateWithoutWorkspaceInput, SupplierUncheckedCreateWithoutWorkspaceInput> | SupplierCreateWithoutWorkspaceInput[] | SupplierUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SupplierCreateOrConnectWithoutWorkspaceInput | SupplierCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: SupplierCreateManyWorkspaceInputEnvelope
+    connect?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+  }
+
+  export type SystemSettingCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<SystemSettingCreateWithoutWorkspaceInput, SystemSettingUncheckedCreateWithoutWorkspaceInput> | SystemSettingCreateWithoutWorkspaceInput[] | SystemSettingUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SystemSettingCreateOrConnectWithoutWorkspaceInput | SystemSettingCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: SystemSettingCreateManyWorkspaceInputEnvelope
+    connect?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+  }
+
+  export type UserCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<UserCreateWithoutWorkspaceInput, UserUncheckedCreateWithoutWorkspaceInput> | UserCreateWithoutWorkspaceInput[] | UserUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutWorkspaceInput | UserCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: UserCreateManyWorkspaceInputEnvelope
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+  }
+
+  export type UserCreateNestedOneWithoutOwnedWorkspaceInput = {
+    create?: XOR<UserCreateWithoutOwnedWorkspaceInput, UserUncheckedCreateWithoutOwnedWorkspaceInput>
+    connectOrCreate?: UserCreateOrConnectWithoutOwnedWorkspaceInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<BrushOrderCreateWithoutWorkspaceInput, BrushOrderUncheckedCreateWithoutWorkspaceInput> | BrushOrderCreateWithoutWorkspaceInput[] | BrushOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: BrushOrderCreateOrConnectWithoutWorkspaceInput | BrushOrderCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: BrushOrderCreateManyWorkspaceInputEnvelope
+    connect?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+  }
+
+  export type CategoryUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<CategoryCreateWithoutWorkspaceInput, CategoryUncheckedCreateWithoutWorkspaceInput> | CategoryCreateWithoutWorkspaceInput[] | CategoryUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: CategoryCreateOrConnectWithoutWorkspaceInput | CategoryCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: CategoryCreateManyWorkspaceInputEnvelope
+    connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+  }
+
+  export type GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<GalleryItemCreateWithoutWorkspaceInput, GalleryItemUncheckedCreateWithoutWorkspaceInput> | GalleryItemCreateWithoutWorkspaceInput[] | GalleryItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GalleryItemCreateOrConnectWithoutWorkspaceInput | GalleryItemCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: GalleryItemCreateManyWorkspaceInputEnvelope
+    connect?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+  }
+
+  export type GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<GallerySubmissionCreateWithoutWorkspaceInput, GallerySubmissionUncheckedCreateWithoutWorkspaceInput> | GallerySubmissionCreateWithoutWorkspaceInput[] | GallerySubmissionUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GallerySubmissionCreateOrConnectWithoutWorkspaceInput | GallerySubmissionCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: GallerySubmissionCreateManyWorkspaceInputEnvelope
+    connect?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+  }
+
+  export type OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<OutboundOrderCreateWithoutWorkspaceInput, OutboundOrderUncheckedCreateWithoutWorkspaceInput> | OutboundOrderCreateWithoutWorkspaceInput[] | OutboundOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: OutboundOrderCreateOrConnectWithoutWorkspaceInput | OutboundOrderCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: OutboundOrderCreateManyWorkspaceInputEnvelope
+    connect?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+  }
+
+  export type ProductUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<ProductCreateWithoutWorkspaceInput, ProductUncheckedCreateWithoutWorkspaceInput> | ProductCreateWithoutWorkspaceInput[] | ProductUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ProductCreateOrConnectWithoutWorkspaceInput | ProductCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: ProductCreateManyWorkspaceInputEnvelope
+    connect?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+  }
+
+  export type PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<PurchaseOrderCreateWithoutWorkspaceInput, PurchaseOrderUncheckedCreateWithoutWorkspaceInput> | PurchaseOrderCreateWithoutWorkspaceInput[] | PurchaseOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutWorkspaceInput | PurchaseOrderCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: PurchaseOrderCreateManyWorkspaceInputEnvelope
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+  }
+
+  export type SupplierUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<SupplierCreateWithoutWorkspaceInput, SupplierUncheckedCreateWithoutWorkspaceInput> | SupplierCreateWithoutWorkspaceInput[] | SupplierUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SupplierCreateOrConnectWithoutWorkspaceInput | SupplierCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: SupplierCreateManyWorkspaceInputEnvelope
+    connect?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+  }
+
+  export type SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<SystemSettingCreateWithoutWorkspaceInput, SystemSettingUncheckedCreateWithoutWorkspaceInput> | SystemSettingCreateWithoutWorkspaceInput[] | SystemSettingUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SystemSettingCreateOrConnectWithoutWorkspaceInput | SystemSettingCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: SystemSettingCreateManyWorkspaceInputEnvelope
+    connect?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+  }
+
+  export type UserUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<UserCreateWithoutWorkspaceInput, UserUncheckedCreateWithoutWorkspaceInput> | UserCreateWithoutWorkspaceInput[] | UserUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutWorkspaceInput | UserCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: UserCreateManyWorkspaceInputEnvelope
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+  }
+
+  export type StringFieldUpdateOperationsInput = {
+    set?: string
+  }
+
+  export type DateTimeFieldUpdateOperationsInput = {
+    set?: Date | string
+  }
+
+  export type BrushOrderUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<BrushOrderCreateWithoutWorkspaceInput, BrushOrderUncheckedCreateWithoutWorkspaceInput> | BrushOrderCreateWithoutWorkspaceInput[] | BrushOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: BrushOrderCreateOrConnectWithoutWorkspaceInput | BrushOrderCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: BrushOrderUpsertWithWhereUniqueWithoutWorkspaceInput | BrushOrderUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: BrushOrderCreateManyWorkspaceInputEnvelope
+    set?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    disconnect?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    delete?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    connect?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    update?: BrushOrderUpdateWithWhereUniqueWithoutWorkspaceInput | BrushOrderUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: BrushOrderUpdateManyWithWhereWithoutWorkspaceInput | BrushOrderUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: BrushOrderScalarWhereInput | BrushOrderScalarWhereInput[]
+  }
+
+  export type CategoryUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<CategoryCreateWithoutWorkspaceInput, CategoryUncheckedCreateWithoutWorkspaceInput> | CategoryCreateWithoutWorkspaceInput[] | CategoryUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: CategoryCreateOrConnectWithoutWorkspaceInput | CategoryCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: CategoryUpsertWithWhereUniqueWithoutWorkspaceInput | CategoryUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: CategoryCreateManyWorkspaceInputEnvelope
+    set?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    disconnect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    delete?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    update?: CategoryUpdateWithWhereUniqueWithoutWorkspaceInput | CategoryUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: CategoryUpdateManyWithWhereWithoutWorkspaceInput | CategoryUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
+  }
+
+  export type GalleryItemUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<GalleryItemCreateWithoutWorkspaceInput, GalleryItemUncheckedCreateWithoutWorkspaceInput> | GalleryItemCreateWithoutWorkspaceInput[] | GalleryItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GalleryItemCreateOrConnectWithoutWorkspaceInput | GalleryItemCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: GalleryItemUpsertWithWhereUniqueWithoutWorkspaceInput | GalleryItemUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: GalleryItemCreateManyWorkspaceInputEnvelope
+    set?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    disconnect?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    delete?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    connect?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    update?: GalleryItemUpdateWithWhereUniqueWithoutWorkspaceInput | GalleryItemUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: GalleryItemUpdateManyWithWhereWithoutWorkspaceInput | GalleryItemUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: GalleryItemScalarWhereInput | GalleryItemScalarWhereInput[]
+  }
+
+  export type GallerySubmissionUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<GallerySubmissionCreateWithoutWorkspaceInput, GallerySubmissionUncheckedCreateWithoutWorkspaceInput> | GallerySubmissionCreateWithoutWorkspaceInput[] | GallerySubmissionUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GallerySubmissionCreateOrConnectWithoutWorkspaceInput | GallerySubmissionCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: GallerySubmissionUpsertWithWhereUniqueWithoutWorkspaceInput | GallerySubmissionUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: GallerySubmissionCreateManyWorkspaceInputEnvelope
+    set?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    disconnect?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    delete?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    connect?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    update?: GallerySubmissionUpdateWithWhereUniqueWithoutWorkspaceInput | GallerySubmissionUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: GallerySubmissionUpdateManyWithWhereWithoutWorkspaceInput | GallerySubmissionUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: GallerySubmissionScalarWhereInput | GallerySubmissionScalarWhereInput[]
+  }
+
+  export type OutboundOrderUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<OutboundOrderCreateWithoutWorkspaceInput, OutboundOrderUncheckedCreateWithoutWorkspaceInput> | OutboundOrderCreateWithoutWorkspaceInput[] | OutboundOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: OutboundOrderCreateOrConnectWithoutWorkspaceInput | OutboundOrderCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: OutboundOrderUpsertWithWhereUniqueWithoutWorkspaceInput | OutboundOrderUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: OutboundOrderCreateManyWorkspaceInputEnvelope
+    set?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    disconnect?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    delete?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    connect?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    update?: OutboundOrderUpdateWithWhereUniqueWithoutWorkspaceInput | OutboundOrderUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: OutboundOrderUpdateManyWithWhereWithoutWorkspaceInput | OutboundOrderUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: OutboundOrderScalarWhereInput | OutboundOrderScalarWhereInput[]
+  }
+
+  export type ProductUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<ProductCreateWithoutWorkspaceInput, ProductUncheckedCreateWithoutWorkspaceInput> | ProductCreateWithoutWorkspaceInput[] | ProductUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ProductCreateOrConnectWithoutWorkspaceInput | ProductCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: ProductUpsertWithWhereUniqueWithoutWorkspaceInput | ProductUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: ProductCreateManyWorkspaceInputEnvelope
+    set?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    disconnect?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    delete?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    connect?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    update?: ProductUpdateWithWhereUniqueWithoutWorkspaceInput | ProductUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: ProductUpdateManyWithWhereWithoutWorkspaceInput | ProductUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: ProductScalarWhereInput | ProductScalarWhereInput[]
+  }
+
+  export type PurchaseOrderUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<PurchaseOrderCreateWithoutWorkspaceInput, PurchaseOrderUncheckedCreateWithoutWorkspaceInput> | PurchaseOrderCreateWithoutWorkspaceInput[] | PurchaseOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutWorkspaceInput | PurchaseOrderCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: PurchaseOrderUpsertWithWhereUniqueWithoutWorkspaceInput | PurchaseOrderUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: PurchaseOrderCreateManyWorkspaceInputEnvelope
+    set?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    disconnect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    delete?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    update?: PurchaseOrderUpdateWithWhereUniqueWithoutWorkspaceInput | PurchaseOrderUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: PurchaseOrderUpdateManyWithWhereWithoutWorkspaceInput | PurchaseOrderUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
+  }
+
+  export type SupplierUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<SupplierCreateWithoutWorkspaceInput, SupplierUncheckedCreateWithoutWorkspaceInput> | SupplierCreateWithoutWorkspaceInput[] | SupplierUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SupplierCreateOrConnectWithoutWorkspaceInput | SupplierCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: SupplierUpsertWithWhereUniqueWithoutWorkspaceInput | SupplierUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: SupplierCreateManyWorkspaceInputEnvelope
+    set?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    disconnect?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    delete?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    connect?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    update?: SupplierUpdateWithWhereUniqueWithoutWorkspaceInput | SupplierUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: SupplierUpdateManyWithWhereWithoutWorkspaceInput | SupplierUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: SupplierScalarWhereInput | SupplierScalarWhereInput[]
+  }
+
+  export type SystemSettingUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<SystemSettingCreateWithoutWorkspaceInput, SystemSettingUncheckedCreateWithoutWorkspaceInput> | SystemSettingCreateWithoutWorkspaceInput[] | SystemSettingUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SystemSettingCreateOrConnectWithoutWorkspaceInput | SystemSettingCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: SystemSettingUpsertWithWhereUniqueWithoutWorkspaceInput | SystemSettingUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: SystemSettingCreateManyWorkspaceInputEnvelope
+    set?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    disconnect?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    delete?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    connect?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    update?: SystemSettingUpdateWithWhereUniqueWithoutWorkspaceInput | SystemSettingUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: SystemSettingUpdateManyWithWhereWithoutWorkspaceInput | SystemSettingUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: SystemSettingScalarWhereInput | SystemSettingScalarWhereInput[]
+  }
+
+  export type UserUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<UserCreateWithoutWorkspaceInput, UserUncheckedCreateWithoutWorkspaceInput> | UserCreateWithoutWorkspaceInput[] | UserUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutWorkspaceInput | UserCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: UserUpsertWithWhereUniqueWithoutWorkspaceInput | UserUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: UserCreateManyWorkspaceInputEnvelope
+    set?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    disconnect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    delete?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    update?: UserUpdateWithWhereUniqueWithoutWorkspaceInput | UserUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: UserUpdateManyWithWhereWithoutWorkspaceInput | UserUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: UserScalarWhereInput | UserScalarWhereInput[]
+  }
+
+  export type UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput = {
+    create?: XOR<UserCreateWithoutOwnedWorkspaceInput, UserUncheckedCreateWithoutOwnedWorkspaceInput>
+    connectOrCreate?: UserCreateOrConnectWithoutOwnedWorkspaceInput
+    upsert?: UserUpsertWithoutOwnedWorkspaceInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutOwnedWorkspaceInput, UserUpdateWithoutOwnedWorkspaceInput>, UserUncheckedUpdateWithoutOwnedWorkspaceInput>
+  }
+
+  export type BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<BrushOrderCreateWithoutWorkspaceInput, BrushOrderUncheckedCreateWithoutWorkspaceInput> | BrushOrderCreateWithoutWorkspaceInput[] | BrushOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: BrushOrderCreateOrConnectWithoutWorkspaceInput | BrushOrderCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: BrushOrderUpsertWithWhereUniqueWithoutWorkspaceInput | BrushOrderUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: BrushOrderCreateManyWorkspaceInputEnvelope
+    set?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    disconnect?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    delete?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    connect?: BrushOrderWhereUniqueInput | BrushOrderWhereUniqueInput[]
+    update?: BrushOrderUpdateWithWhereUniqueWithoutWorkspaceInput | BrushOrderUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: BrushOrderUpdateManyWithWhereWithoutWorkspaceInput | BrushOrderUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: BrushOrderScalarWhereInput | BrushOrderScalarWhereInput[]
+  }
+
+  export type CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<CategoryCreateWithoutWorkspaceInput, CategoryUncheckedCreateWithoutWorkspaceInput> | CategoryCreateWithoutWorkspaceInput[] | CategoryUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: CategoryCreateOrConnectWithoutWorkspaceInput | CategoryCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: CategoryUpsertWithWhereUniqueWithoutWorkspaceInput | CategoryUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: CategoryCreateManyWorkspaceInputEnvelope
+    set?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    disconnect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    delete?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+    update?: CategoryUpdateWithWhereUniqueWithoutWorkspaceInput | CategoryUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: CategoryUpdateManyWithWhereWithoutWorkspaceInput | CategoryUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
+  }
+
+  export type GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<GalleryItemCreateWithoutWorkspaceInput, GalleryItemUncheckedCreateWithoutWorkspaceInput> | GalleryItemCreateWithoutWorkspaceInput[] | GalleryItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GalleryItemCreateOrConnectWithoutWorkspaceInput | GalleryItemCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: GalleryItemUpsertWithWhereUniqueWithoutWorkspaceInput | GalleryItemUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: GalleryItemCreateManyWorkspaceInputEnvelope
+    set?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    disconnect?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    delete?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    connect?: GalleryItemWhereUniqueInput | GalleryItemWhereUniqueInput[]
+    update?: GalleryItemUpdateWithWhereUniqueWithoutWorkspaceInput | GalleryItemUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: GalleryItemUpdateManyWithWhereWithoutWorkspaceInput | GalleryItemUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: GalleryItemScalarWhereInput | GalleryItemScalarWhereInput[]
+  }
+
+  export type GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<GallerySubmissionCreateWithoutWorkspaceInput, GallerySubmissionUncheckedCreateWithoutWorkspaceInput> | GallerySubmissionCreateWithoutWorkspaceInput[] | GallerySubmissionUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: GallerySubmissionCreateOrConnectWithoutWorkspaceInput | GallerySubmissionCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: GallerySubmissionUpsertWithWhereUniqueWithoutWorkspaceInput | GallerySubmissionUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: GallerySubmissionCreateManyWorkspaceInputEnvelope
+    set?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    disconnect?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    delete?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    connect?: GallerySubmissionWhereUniqueInput | GallerySubmissionWhereUniqueInput[]
+    update?: GallerySubmissionUpdateWithWhereUniqueWithoutWorkspaceInput | GallerySubmissionUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: GallerySubmissionUpdateManyWithWhereWithoutWorkspaceInput | GallerySubmissionUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: GallerySubmissionScalarWhereInput | GallerySubmissionScalarWhereInput[]
+  }
+
+  export type OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<OutboundOrderCreateWithoutWorkspaceInput, OutboundOrderUncheckedCreateWithoutWorkspaceInput> | OutboundOrderCreateWithoutWorkspaceInput[] | OutboundOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: OutboundOrderCreateOrConnectWithoutWorkspaceInput | OutboundOrderCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: OutboundOrderUpsertWithWhereUniqueWithoutWorkspaceInput | OutboundOrderUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: OutboundOrderCreateManyWorkspaceInputEnvelope
+    set?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    disconnect?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    delete?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    connect?: OutboundOrderWhereUniqueInput | OutboundOrderWhereUniqueInput[]
+    update?: OutboundOrderUpdateWithWhereUniqueWithoutWorkspaceInput | OutboundOrderUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: OutboundOrderUpdateManyWithWhereWithoutWorkspaceInput | OutboundOrderUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: OutboundOrderScalarWhereInput | OutboundOrderScalarWhereInput[]
+  }
+
+  export type ProductUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<ProductCreateWithoutWorkspaceInput, ProductUncheckedCreateWithoutWorkspaceInput> | ProductCreateWithoutWorkspaceInput[] | ProductUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ProductCreateOrConnectWithoutWorkspaceInput | ProductCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: ProductUpsertWithWhereUniqueWithoutWorkspaceInput | ProductUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: ProductCreateManyWorkspaceInputEnvelope
+    set?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    disconnect?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    delete?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    connect?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
+    update?: ProductUpdateWithWhereUniqueWithoutWorkspaceInput | ProductUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: ProductUpdateManyWithWhereWithoutWorkspaceInput | ProductUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: ProductScalarWhereInput | ProductScalarWhereInput[]
+  }
+
+  export type PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<PurchaseOrderCreateWithoutWorkspaceInput, PurchaseOrderUncheckedCreateWithoutWorkspaceInput> | PurchaseOrderCreateWithoutWorkspaceInput[] | PurchaseOrderUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: PurchaseOrderCreateOrConnectWithoutWorkspaceInput | PurchaseOrderCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: PurchaseOrderUpsertWithWhereUniqueWithoutWorkspaceInput | PurchaseOrderUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: PurchaseOrderCreateManyWorkspaceInputEnvelope
+    set?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    disconnect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    delete?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    connect?: PurchaseOrderWhereUniqueInput | PurchaseOrderWhereUniqueInput[]
+    update?: PurchaseOrderUpdateWithWhereUniqueWithoutWorkspaceInput | PurchaseOrderUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: PurchaseOrderUpdateManyWithWhereWithoutWorkspaceInput | PurchaseOrderUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
+  }
+
+  export type SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<SupplierCreateWithoutWorkspaceInput, SupplierUncheckedCreateWithoutWorkspaceInput> | SupplierCreateWithoutWorkspaceInput[] | SupplierUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SupplierCreateOrConnectWithoutWorkspaceInput | SupplierCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: SupplierUpsertWithWhereUniqueWithoutWorkspaceInput | SupplierUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: SupplierCreateManyWorkspaceInputEnvelope
+    set?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    disconnect?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    delete?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    connect?: SupplierWhereUniqueInput | SupplierWhereUniqueInput[]
+    update?: SupplierUpdateWithWhereUniqueWithoutWorkspaceInput | SupplierUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: SupplierUpdateManyWithWhereWithoutWorkspaceInput | SupplierUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: SupplierScalarWhereInput | SupplierScalarWhereInput[]
+  }
+
+  export type SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<SystemSettingCreateWithoutWorkspaceInput, SystemSettingUncheckedCreateWithoutWorkspaceInput> | SystemSettingCreateWithoutWorkspaceInput[] | SystemSettingUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: SystemSettingCreateOrConnectWithoutWorkspaceInput | SystemSettingCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: SystemSettingUpsertWithWhereUniqueWithoutWorkspaceInput | SystemSettingUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: SystemSettingCreateManyWorkspaceInputEnvelope
+    set?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    disconnect?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    delete?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    connect?: SystemSettingWhereUniqueInput | SystemSettingWhereUniqueInput[]
+    update?: SystemSettingUpdateWithWhereUniqueWithoutWorkspaceInput | SystemSettingUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: SystemSettingUpdateManyWithWhereWithoutWorkspaceInput | SystemSettingUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: SystemSettingScalarWhereInput | SystemSettingScalarWhereInput[]
+  }
+
+  export type UserUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<UserCreateWithoutWorkspaceInput, UserUncheckedCreateWithoutWorkspaceInput> | UserCreateWithoutWorkspaceInput[] | UserUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutWorkspaceInput | UserCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: UserUpsertWithWhereUniqueWithoutWorkspaceInput | UserUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: UserCreateManyWorkspaceInputEnvelope
+    set?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    disconnect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    delete?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    update?: UserUpdateWithWhereUniqueWithoutWorkspaceInput | UserUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: UserUpdateManyWithWhereWithoutWorkspaceInput | UserUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: UserScalarWhereInput | UserScalarWhereInput[]
+  }
+
+  export type WorkspaceCreateNestedOneWithoutCategoriesInput = {
+    create?: XOR<WorkspaceCreateWithoutCategoriesInput, WorkspaceUncheckedCreateWithoutCategoriesInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutCategoriesInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
   export type ProductCreateNestedManyWithoutCategoryInput = {
     create?: XOR<ProductCreateWithoutCategoryInput, ProductUncheckedCreateWithoutCategoryInput> | ProductCreateWithoutCategoryInput[] | ProductUncheckedCreateWithoutCategoryInput[]
     connectOrCreate?: ProductCreateOrConnectWithoutCategoryInput | ProductCreateOrConnectWithoutCategoryInput[]
@@ -19659,16 +23738,18 @@ export namespace Prisma {
     connect?: ProductWhereUniqueInput | ProductWhereUniqueInput[]
   }
 
-  export type StringFieldUpdateOperationsInput = {
-    set?: string
-  }
-
   export type NullableStringFieldUpdateOperationsInput = {
     set?: string | null
   }
 
-  export type DateTimeFieldUpdateOperationsInput = {
-    set?: Date | string
+  export type WorkspaceUpdateOneWithoutCategoriesNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutCategoriesInput, WorkspaceUncheckedCreateWithoutCategoriesInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutCategoriesInput
+    upsert?: WorkspaceUpsertWithoutCategoriesInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutCategoriesInput, WorkspaceUpdateWithoutCategoriesInput>, WorkspaceUncheckedUpdateWithoutCategoriesInput>
   }
 
   export type ProductUpdateManyWithoutCategoryNestedInput = {
@@ -19730,6 +23811,12 @@ export namespace Prisma {
     create?: XOR<SupplierCreateWithoutProductsInput, SupplierUncheckedCreateWithoutProductsInput>
     connectOrCreate?: SupplierCreateOrConnectWithoutProductsInput
     connect?: SupplierWhereUniqueInput
+  }
+
+  export type WorkspaceCreateNestedOneWithoutProductsInput = {
+    create?: XOR<WorkspaceCreateWithoutProductsInput, WorkspaceUncheckedCreateWithoutProductsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutProductsInput
+    connect?: WorkspaceWhereUniqueInput
   }
 
   export type PurchaseOrderItemCreateNestedManyWithoutProductInput = {
@@ -19847,6 +23934,16 @@ export namespace Prisma {
     update?: XOR<XOR<SupplierUpdateToOneWithWhereWithoutProductsInput, SupplierUpdateWithoutProductsInput>, SupplierUncheckedUpdateWithoutProductsInput>
   }
 
+  export type WorkspaceUpdateOneWithoutProductsNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutProductsInput, WorkspaceUncheckedCreateWithoutProductsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutProductsInput
+    upsert?: WorkspaceUpsertWithoutProductsInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutProductsInput, WorkspaceUpdateWithoutProductsInput>, WorkspaceUncheckedUpdateWithoutProductsInput>
+  }
+
   export type PurchaseOrderItemUpdateManyWithoutProductNestedInput = {
     create?: XOR<PurchaseOrderItemCreateWithoutProductInput, PurchaseOrderItemUncheckedCreateWithoutProductInput> | PurchaseOrderItemCreateWithoutProductInput[] | PurchaseOrderItemUncheckedCreateWithoutProductInput[]
     connectOrCreate?: PurchaseOrderItemCreateOrConnectWithoutProductInput | PurchaseOrderItemCreateOrConnectWithoutProductInput[]
@@ -19931,6 +24028,12 @@ export namespace Prisma {
     connect?: PurchaseOrderItemWhereUniqueInput | PurchaseOrderItemWhereUniqueInput[]
   }
 
+  export type WorkspaceCreateNestedOneWithoutSuppliersInput = {
+    create?: XOR<WorkspaceCreateWithoutSuppliersInput, WorkspaceUncheckedCreateWithoutSuppliersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutSuppliersInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
   export type ProductUncheckedCreateNestedManyWithoutSupplierInput = {
     create?: XOR<ProductCreateWithoutSupplierInput, ProductUncheckedCreateWithoutSupplierInput> | ProductCreateWithoutSupplierInput[] | ProductUncheckedCreateWithoutSupplierInput[]
     connectOrCreate?: ProductCreateOrConnectWithoutSupplierInput | ProductCreateOrConnectWithoutSupplierInput[]
@@ -19973,6 +24076,16 @@ export namespace Prisma {
     deleteMany?: PurchaseOrderItemScalarWhereInput | PurchaseOrderItemScalarWhereInput[]
   }
 
+  export type WorkspaceUpdateOneWithoutSuppliersNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutSuppliersInput, WorkspaceUncheckedCreateWithoutSuppliersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutSuppliersInput
+    upsert?: WorkspaceUpsertWithoutSuppliersInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutSuppliersInput, WorkspaceUpdateWithoutSuppliersInput>, WorkspaceUncheckedUpdateWithoutSuppliersInput>
+  }
+
   export type ProductUncheckedUpdateManyWithoutSupplierNestedInput = {
     create?: XOR<ProductCreateWithoutSupplierInput, ProductUncheckedCreateWithoutSupplierInput> | ProductCreateWithoutSupplierInput[] | ProductUncheckedCreateWithoutSupplierInput[]
     connectOrCreate?: ProductCreateOrConnectWithoutSupplierInput | ProductCreateOrConnectWithoutSupplierInput[]
@@ -20001,6 +24114,12 @@ export namespace Prisma {
     deleteMany?: PurchaseOrderItemScalarWhereInput | PurchaseOrderItemScalarWhereInput[]
   }
 
+  export type WorkspaceCreateNestedOneWithoutPurchaseOrdersInput = {
+    create?: XOR<WorkspaceCreateWithoutPurchaseOrdersInput, WorkspaceUncheckedCreateWithoutPurchaseOrdersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutPurchaseOrdersInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
   export type PurchaseOrderItemCreateNestedManyWithoutPurchaseOrderInput = {
     create?: XOR<PurchaseOrderItemCreateWithoutPurchaseOrderInput, PurchaseOrderItemUncheckedCreateWithoutPurchaseOrderInput> | PurchaseOrderItemCreateWithoutPurchaseOrderInput[] | PurchaseOrderItemUncheckedCreateWithoutPurchaseOrderInput[]
     connectOrCreate?: PurchaseOrderItemCreateOrConnectWithoutPurchaseOrderInput | PurchaseOrderItemCreateOrConnectWithoutPurchaseOrderInput[]
@@ -20013,6 +24132,16 @@ export namespace Prisma {
     connectOrCreate?: PurchaseOrderItemCreateOrConnectWithoutPurchaseOrderInput | PurchaseOrderItemCreateOrConnectWithoutPurchaseOrderInput[]
     createMany?: PurchaseOrderItemCreateManyPurchaseOrderInputEnvelope
     connect?: PurchaseOrderItemWhereUniqueInput | PurchaseOrderItemWhereUniqueInput[]
+  }
+
+  export type WorkspaceUpdateOneWithoutPurchaseOrdersNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutPurchaseOrdersInput, WorkspaceUncheckedCreateWithoutPurchaseOrdersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutPurchaseOrdersInput
+    upsert?: WorkspaceUpsertWithoutPurchaseOrdersInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutPurchaseOrdersInput, WorkspaceUpdateWithoutPurchaseOrdersInput>, WorkspaceUncheckedUpdateWithoutPurchaseOrdersInput>
   }
 
   export type PurchaseOrderItemUpdateManyWithoutPurchaseOrderNestedInput = {
@@ -20095,6 +24224,12 @@ export namespace Prisma {
     update?: XOR<XOR<SupplierUpdateToOneWithWhereWithoutPurchaseOrderItemsInput, SupplierUpdateWithoutPurchaseOrderItemsInput>, SupplierUncheckedUpdateWithoutPurchaseOrderItemsInput>
   }
 
+  export type WorkspaceCreateNestedOneWithoutOutboundOrdersInput = {
+    create?: XOR<WorkspaceCreateWithoutOutboundOrdersInput, WorkspaceUncheckedCreateWithoutOutboundOrdersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutOutboundOrdersInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
   export type OutboundOrderItemCreateNestedManyWithoutOutboundOrderInput = {
     create?: XOR<OutboundOrderItemCreateWithoutOutboundOrderInput, OutboundOrderItemUncheckedCreateWithoutOutboundOrderInput> | OutboundOrderItemCreateWithoutOutboundOrderInput[] | OutboundOrderItemUncheckedCreateWithoutOutboundOrderInput[]
     connectOrCreate?: OutboundOrderItemCreateOrConnectWithoutOutboundOrderInput | OutboundOrderItemCreateOrConnectWithoutOutboundOrderInput[]
@@ -20107,6 +24242,16 @@ export namespace Prisma {
     connectOrCreate?: OutboundOrderItemCreateOrConnectWithoutOutboundOrderInput | OutboundOrderItemCreateOrConnectWithoutOutboundOrderInput[]
     createMany?: OutboundOrderItemCreateManyOutboundOrderInputEnvelope
     connect?: OutboundOrderItemWhereUniqueInput | OutboundOrderItemWhereUniqueInput[]
+  }
+
+  export type WorkspaceUpdateOneWithoutOutboundOrdersNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutOutboundOrdersInput, WorkspaceUncheckedCreateWithoutOutboundOrdersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutOutboundOrdersInput
+    upsert?: WorkspaceUpsertWithoutOutboundOrdersInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutOutboundOrdersInput, WorkspaceUpdateWithoutOutboundOrdersInput>, WorkspaceUncheckedUpdateWithoutOutboundOrdersInput>
   }
 
   export type OutboundOrderItemUpdateManyWithoutOutboundOrderNestedInput = {
@@ -20137,24 +24282,16 @@ export namespace Prisma {
     deleteMany?: OutboundOrderItemScalarWhereInput | OutboundOrderItemScalarWhereInput[]
   }
 
-  export type ProductCreateNestedOneWithoutOutboundItemsInput = {
-    create?: XOR<ProductCreateWithoutOutboundItemsInput, ProductUncheckedCreateWithoutOutboundItemsInput>
-    connectOrCreate?: ProductCreateOrConnectWithoutOutboundItemsInput
-    connect?: ProductWhereUniqueInput
-  }
-
   export type OutboundOrderCreateNestedOneWithoutItemsInput = {
     create?: XOR<OutboundOrderCreateWithoutItemsInput, OutboundOrderUncheckedCreateWithoutItemsInput>
     connectOrCreate?: OutboundOrderCreateOrConnectWithoutItemsInput
     connect?: OutboundOrderWhereUniqueInput
   }
 
-  export type ProductUpdateOneRequiredWithoutOutboundItemsNestedInput = {
+  export type ProductCreateNestedOneWithoutOutboundItemsInput = {
     create?: XOR<ProductCreateWithoutOutboundItemsInput, ProductUncheckedCreateWithoutOutboundItemsInput>
     connectOrCreate?: ProductCreateOrConnectWithoutOutboundItemsInput
-    upsert?: ProductUpsertWithoutOutboundItemsInput
     connect?: ProductWhereUniqueInput
-    update?: XOR<XOR<ProductUpdateToOneWithWhereWithoutOutboundItemsInput, ProductUpdateWithoutOutboundItemsInput>, ProductUncheckedUpdateWithoutOutboundItemsInput>
   }
 
   export type OutboundOrderUpdateOneRequiredWithoutItemsNestedInput = {
@@ -20165,6 +24302,14 @@ export namespace Prisma {
     update?: XOR<XOR<OutboundOrderUpdateToOneWithWhereWithoutItemsInput, OutboundOrderUpdateWithoutItemsInput>, OutboundOrderUncheckedUpdateWithoutItemsInput>
   }
 
+  export type ProductUpdateOneRequiredWithoutOutboundItemsNestedInput = {
+    create?: XOR<ProductCreateWithoutOutboundItemsInput, ProductUncheckedCreateWithoutOutboundItemsInput>
+    connectOrCreate?: ProductCreateOrConnectWithoutOutboundItemsInput
+    upsert?: ProductUpsertWithoutOutboundItemsInput
+    connect?: ProductWhereUniqueInput
+    update?: XOR<XOR<ProductUpdateToOneWithWhereWithoutOutboundItemsInput, ProductUpdateWithoutOutboundItemsInput>, ProductUncheckedUpdateWithoutOutboundItemsInput>
+  }
+
   export type GalleryItemCreatetagsInput = {
     set: string[]
   }
@@ -20173,6 +24318,12 @@ export namespace Prisma {
     create?: XOR<ProductCreateWithoutGalleryInput, ProductUncheckedCreateWithoutGalleryInput>
     connectOrCreate?: ProductCreateOrConnectWithoutGalleryInput
     connect?: ProductWhereUniqueInput
+  }
+
+  export type WorkspaceCreateNestedOneWithoutGalleryItemsInput = {
+    create?: XOR<WorkspaceCreateWithoutGalleryItemsInput, WorkspaceUncheckedCreateWithoutGalleryItemsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutGalleryItemsInput
+    connect?: WorkspaceWhereUniqueInput
   }
 
   export type GalleryItemUpdatetagsInput = {
@@ -20188,6 +24339,106 @@ export namespace Prisma {
     update?: XOR<XOR<ProductUpdateToOneWithWhereWithoutGalleryInput, ProductUpdateWithoutGalleryInput>, ProductUncheckedUpdateWithoutGalleryInput>
   }
 
+  export type WorkspaceUpdateOneWithoutGalleryItemsNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutGalleryItemsInput, WorkspaceUncheckedCreateWithoutGalleryItemsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutGalleryItemsInput
+    upsert?: WorkspaceUpsertWithoutGalleryItemsInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutGalleryItemsInput, WorkspaceUpdateWithoutGalleryItemsInput>, WorkspaceUncheckedUpdateWithoutGalleryItemsInput>
+  }
+
+  export type WorkspaceCreateNestedOneWithoutGallerySubmissionsInput = {
+    create?: XOR<WorkspaceCreateWithoutGallerySubmissionsInput, WorkspaceUncheckedCreateWithoutGallerySubmissionsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutGallerySubmissionsInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
+  export type WorkspaceUpdateOneWithoutGallerySubmissionsNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutGallerySubmissionsInput, WorkspaceUncheckedCreateWithoutGallerySubmissionsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutGallerySubmissionsInput
+    upsert?: WorkspaceUpsertWithoutGallerySubmissionsInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutGallerySubmissionsInput, WorkspaceUpdateWithoutGallerySubmissionsInput>, WorkspaceUncheckedUpdateWithoutGallerySubmissionsInput>
+  }
+
+  export type WorkspaceCreateNestedOneWithoutUsersInput = {
+    create?: XOR<WorkspaceCreateWithoutUsersInput, WorkspaceUncheckedCreateWithoutUsersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutUsersInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
+  export type WorkspaceCreateNestedOneWithoutOwnerInput = {
+    create?: XOR<WorkspaceCreateWithoutOwnerInput, WorkspaceUncheckedCreateWithoutOwnerInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutOwnerInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
+  export type WorkspaceUncheckedCreateNestedOneWithoutOwnerInput = {
+    create?: XOR<WorkspaceCreateWithoutOwnerInput, WorkspaceUncheckedCreateWithoutOwnerInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutOwnerInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
+  export type EnumRoleFieldUpdateOperationsInput = {
+    set?: $Enums.Role
+  }
+
+  export type WorkspaceUpdateOneWithoutUsersNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutUsersInput, WorkspaceUncheckedCreateWithoutUsersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutUsersInput
+    upsert?: WorkspaceUpsertWithoutUsersInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutUsersInput, WorkspaceUpdateWithoutUsersInput>, WorkspaceUncheckedUpdateWithoutUsersInput>
+  }
+
+  export type WorkspaceUpdateOneWithoutOwnerNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutOwnerInput, WorkspaceUncheckedCreateWithoutOwnerInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutOwnerInput
+    upsert?: WorkspaceUpsertWithoutOwnerInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutOwnerInput, WorkspaceUpdateWithoutOwnerInput>, WorkspaceUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type WorkspaceUncheckedUpdateOneWithoutOwnerNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutOwnerInput, WorkspaceUncheckedCreateWithoutOwnerInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutOwnerInput
+    upsert?: WorkspaceUpsertWithoutOwnerInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutOwnerInput, WorkspaceUpdateWithoutOwnerInput>, WorkspaceUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type WorkspaceCreateNestedOneWithoutSystemSettingsInput = {
+    create?: XOR<WorkspaceCreateWithoutSystemSettingsInput, WorkspaceUncheckedCreateWithoutSystemSettingsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutSystemSettingsInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
+  export type WorkspaceUpdateOneWithoutSystemSettingsNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutSystemSettingsInput, WorkspaceUncheckedCreateWithoutSystemSettingsInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutSystemSettingsInput
+    upsert?: WorkspaceUpsertWithoutSystemSettingsInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutSystemSettingsInput, WorkspaceUpdateWithoutSystemSettingsInput>, WorkspaceUncheckedUpdateWithoutSystemSettingsInput>
+  }
+
+  export type WorkspaceCreateNestedOneWithoutBrushOrdersInput = {
+    create?: XOR<WorkspaceCreateWithoutBrushOrdersInput, WorkspaceUncheckedCreateWithoutBrushOrdersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutBrushOrdersInput
+    connect?: WorkspaceWhereUniqueInput
+  }
+
   export type BrushOrderItemCreateNestedManyWithoutBrushOrderInput = {
     create?: XOR<BrushOrderItemCreateWithoutBrushOrderInput, BrushOrderItemUncheckedCreateWithoutBrushOrderInput> | BrushOrderItemCreateWithoutBrushOrderInput[] | BrushOrderItemUncheckedCreateWithoutBrushOrderInput[]
     connectOrCreate?: BrushOrderItemCreateOrConnectWithoutBrushOrderInput | BrushOrderItemCreateOrConnectWithoutBrushOrderInput[]
@@ -20200,6 +24451,16 @@ export namespace Prisma {
     connectOrCreate?: BrushOrderItemCreateOrConnectWithoutBrushOrderInput | BrushOrderItemCreateOrConnectWithoutBrushOrderInput[]
     createMany?: BrushOrderItemCreateManyBrushOrderInputEnvelope
     connect?: BrushOrderItemWhereUniqueInput | BrushOrderItemWhereUniqueInput[]
+  }
+
+  export type WorkspaceUpdateOneWithoutBrushOrdersNestedInput = {
+    create?: XOR<WorkspaceCreateWithoutBrushOrdersInput, WorkspaceUncheckedCreateWithoutBrushOrdersInput>
+    connectOrCreate?: WorkspaceCreateOrConnectWithoutBrushOrdersInput
+    upsert?: WorkspaceUpsertWithoutBrushOrdersInput
+    disconnect?: WorkspaceWhereInput | boolean
+    delete?: WorkspaceWhereInput | boolean
+    connect?: WorkspaceWhereUniqueInput
+    update?: XOR<XOR<WorkspaceUpdateToOneWithWhereWithoutBrushOrdersInput, WorkspaceUpdateWithoutBrushOrdersInput>, WorkspaceUncheckedUpdateWithoutBrushOrdersInput>
   }
 
   export type BrushOrderItemUpdateManyWithoutBrushOrderNestedInput = {
@@ -20272,20 +24533,6 @@ export namespace Prisma {
     not?: NestedStringFilter<$PrismaModel> | string
   }
 
-  export type NestedStringNullableFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    not?: NestedStringNullableFilter<$PrismaModel> | string | null
-  }
-
   export type NestedDateTimeFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -20325,6 +24572,34 @@ export namespace Prisma {
     not?: NestedIntFilter<$PrismaModel> | number
   }
 
+  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedDateTimeFilter<$PrismaModel>
+    _max?: NestedDateTimeFilter<$PrismaModel>
+  }
+
+  export type NestedStringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
@@ -20351,20 +24626,6 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
-  }
-
-  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedDateTimeFilter<$PrismaModel>
-    _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
   export type NestedFloatFilter<$PrismaModel = never> = {
@@ -20494,6 +24755,826 @@ export namespace Prisma {
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
+  export type NestedEnumRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleFilter<$PrismaModel> | $Enums.Role
+  }
+
+  export type NestedEnumRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumRoleWithAggregatesFilter<$PrismaModel> | $Enums.Role
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumRoleFilter<$PrismaModel>
+    _max?: NestedEnumRoleFilter<$PrismaModel>
+  }
+
+  export type BrushOrderCreateWithoutWorkspaceInput = {
+    id?: string
+    date?: Date | string
+    type: string
+    status?: string
+    principalAmount?: number
+    paymentAmount?: number
+    receivedAmount?: number
+    commission?: number
+    note?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: BrushOrderItemCreateNestedManyWithoutBrushOrderInput
+  }
+
+  export type BrushOrderUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    date?: Date | string
+    type: string
+    status?: string
+    principalAmount?: number
+    paymentAmount?: number
+    receivedAmount?: number
+    commission?: number
+    note?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: BrushOrderItemUncheckedCreateNestedManyWithoutBrushOrderInput
+  }
+
+  export type BrushOrderCreateOrConnectWithoutWorkspaceInput = {
+    where: BrushOrderWhereUniqueInput
+    create: XOR<BrushOrderCreateWithoutWorkspaceInput, BrushOrderUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type BrushOrderCreateManyWorkspaceInputEnvelope = {
+    data: BrushOrderCreateManyWorkspaceInput | BrushOrderCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type CategoryCreateWithoutWorkspaceInput = {
+    id?: string
+    name: string
+    description?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    products?: ProductCreateNestedManyWithoutCategoryInput
+  }
+
+  export type CategoryUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    name: string
+    description?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    products?: ProductUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type CategoryCreateOrConnectWithoutWorkspaceInput = {
+    where: CategoryWhereUniqueInput
+    create: XOR<CategoryCreateWithoutWorkspaceInput, CategoryUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type CategoryCreateManyWorkspaceInputEnvelope = {
+    data: CategoryCreateManyWorkspaceInput | CategoryCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type GalleryItemCreateWithoutWorkspaceInput = {
+    id?: string
+    url: string
+    tags?: GalleryItemCreatetagsInput | string[]
+    isPublic?: boolean
+    type?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    product: ProductCreateNestedOneWithoutGalleryInput
+  }
+
+  export type GalleryItemUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    url: string
+    productId: string
+    tags?: GalleryItemCreatetagsInput | string[]
+    isPublic?: boolean
+    type?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GalleryItemCreateOrConnectWithoutWorkspaceInput = {
+    where: GalleryItemWhereUniqueInput
+    create: XOR<GalleryItemCreateWithoutWorkspaceInput, GalleryItemUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type GalleryItemCreateManyWorkspaceInputEnvelope = {
+    data: GalleryItemCreateManyWorkspaceInput | GalleryItemCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type GallerySubmissionCreateWithoutWorkspaceInput = {
+    id?: string
+    urls: JsonNullValueInput | InputJsonValue
+    sku?: string | null
+    productName?: string | null
+    status?: string
+    notes?: string | null
+    productId?: string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GallerySubmissionUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    urls: JsonNullValueInput | InputJsonValue
+    sku?: string | null
+    productName?: string | null
+    status?: string
+    notes?: string | null
+    productId?: string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GallerySubmissionCreateOrConnectWithoutWorkspaceInput = {
+    where: GallerySubmissionWhereUniqueInput
+    create: XOR<GallerySubmissionCreateWithoutWorkspaceInput, GallerySubmissionUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type GallerySubmissionCreateManyWorkspaceInputEnvelope = {
+    data: GallerySubmissionCreateManyWorkspaceInput | GallerySubmissionCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type OutboundOrderCreateWithoutWorkspaceInput = {
+    id?: string
+    type?: string
+    date?: Date | string
+    note?: string | null
+    totalAmount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: OutboundOrderItemCreateNestedManyWithoutOutboundOrderInput
+  }
+
+  export type OutboundOrderUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    type?: string
+    date?: Date | string
+    note?: string | null
+    totalAmount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: OutboundOrderItemUncheckedCreateNestedManyWithoutOutboundOrderInput
+  }
+
+  export type OutboundOrderCreateOrConnectWithoutWorkspaceInput = {
+    where: OutboundOrderWhereUniqueInput
+    create: XOR<OutboundOrderCreateWithoutWorkspaceInput, OutboundOrderUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type OutboundOrderCreateManyWorkspaceInputEnvelope = {
+    data: OutboundOrderCreateManyWorkspaceInput | OutboundOrderCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ProductCreateWithoutWorkspaceInput = {
+    id?: string
+    sku?: string | null
+    name: string
+    costPrice?: number
+    hideCost?: boolean
+    stock?: number
+    image?: string | null
+    isPublic?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrderItems?: BrushOrderItemCreateNestedManyWithoutProductInput
+    gallery?: GalleryItemCreateNestedManyWithoutProductInput
+    outboundItems?: OutboundOrderItemCreateNestedManyWithoutProductInput
+    category: CategoryCreateNestedOneWithoutProductsInput
+    supplier?: SupplierCreateNestedOneWithoutProductsInput
+    orderItems?: PurchaseOrderItemCreateNestedManyWithoutProductInput
+  }
+
+  export type ProductUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    sku?: string | null
+    name: string
+    costPrice?: number
+    hideCost?: boolean
+    stock?: number
+    image?: string | null
+    isPublic?: boolean
+    categoryId: string
+    supplierId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrderItems?: BrushOrderItemUncheckedCreateNestedManyWithoutProductInput
+    gallery?: GalleryItemUncheckedCreateNestedManyWithoutProductInput
+    outboundItems?: OutboundOrderItemUncheckedCreateNestedManyWithoutProductInput
+    orderItems?: PurchaseOrderItemUncheckedCreateNestedManyWithoutProductInput
+  }
+
+  export type ProductCreateOrConnectWithoutWorkspaceInput = {
+    where: ProductWhereUniqueInput
+    create: XOR<ProductCreateWithoutWorkspaceInput, ProductUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type ProductCreateManyWorkspaceInputEnvelope = {
+    data: ProductCreateManyWorkspaceInput | ProductCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type PurchaseOrderCreateWithoutWorkspaceInput = {
+    id?: string
+    type?: string
+    status?: string
+    totalAmount?: number
+    date?: Date | string
+    shippingFees?: number
+    extraFees?: number
+    paymentVoucher?: string | null
+    paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
+    trackingData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: PurchaseOrderItemCreateNestedManyWithoutPurchaseOrderInput
+  }
+
+  export type PurchaseOrderUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    type?: string
+    status?: string
+    totalAmount?: number
+    date?: Date | string
+    shippingFees?: number
+    extraFees?: number
+    paymentVoucher?: string | null
+    paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
+    trackingData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: PurchaseOrderItemUncheckedCreateNestedManyWithoutPurchaseOrderInput
+  }
+
+  export type PurchaseOrderCreateOrConnectWithoutWorkspaceInput = {
+    where: PurchaseOrderWhereUniqueInput
+    create: XOR<PurchaseOrderCreateWithoutWorkspaceInput, PurchaseOrderUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type PurchaseOrderCreateManyWorkspaceInputEnvelope = {
+    data: PurchaseOrderCreateManyWorkspaceInput | PurchaseOrderCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SupplierCreateWithoutWorkspaceInput = {
+    id?: string
+    code?: string | null
+    name: string
+    contact?: string | null
+    phone?: string | null
+    email?: string | null
+    address?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    products?: ProductCreateNestedManyWithoutSupplierInput
+    purchaseOrderItems?: PurchaseOrderItemCreateNestedManyWithoutSupplierInput
+  }
+
+  export type SupplierUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    code?: string | null
+    name: string
+    contact?: string | null
+    phone?: string | null
+    email?: string | null
+    address?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    products?: ProductUncheckedCreateNestedManyWithoutSupplierInput
+    purchaseOrderItems?: PurchaseOrderItemUncheckedCreateNestedManyWithoutSupplierInput
+  }
+
+  export type SupplierCreateOrConnectWithoutWorkspaceInput = {
+    where: SupplierWhereUniqueInput
+    create: XOR<SupplierCreateWithoutWorkspaceInput, SupplierUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type SupplierCreateManyWorkspaceInputEnvelope = {
+    data: SupplierCreateManyWorkspaceInput | SupplierCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SystemSettingCreateWithoutWorkspaceInput = {
+    id?: string
+    lowStockThreshold?: number
+    allowDataImport?: boolean
+    allowGalleryUpload?: boolean
+    storageType?: string
+    minioEndpoint?: string | null
+    minioPort?: number | null
+    minioAccessKey?: string | null
+    minioSecretKey?: string | null
+    minioBucket?: string | null
+    minioUseSSL?: boolean
+    minioPublicUrl?: string | null
+    uploadConflictStrategy?: string
+    updatedAt?: Date | string
+  }
+
+  export type SystemSettingUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    lowStockThreshold?: number
+    allowDataImport?: boolean
+    allowGalleryUpload?: boolean
+    storageType?: string
+    minioEndpoint?: string | null
+    minioPort?: number | null
+    minioAccessKey?: string | null
+    minioSecretKey?: string | null
+    minioBucket?: string | null
+    minioUseSSL?: boolean
+    minioPublicUrl?: string | null
+    uploadConflictStrategy?: string
+    updatedAt?: Date | string
+  }
+
+  export type SystemSettingCreateOrConnectWithoutWorkspaceInput = {
+    where: SystemSettingWhereUniqueInput
+    create: XOR<SystemSettingCreateWithoutWorkspaceInput, SystemSettingUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type SystemSettingCreateManyWorkspaceInputEnvelope = {
+    data: SystemSettingCreateManyWorkspaceInput | SystemSettingCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserCreateWithoutWorkspaceInput = {
+    id?: string
+    email: string
+    name?: string | null
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    ownedWorkspace?: WorkspaceCreateNestedOneWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    email: string
+    name?: string | null
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    ownedWorkspace?: WorkspaceUncheckedCreateNestedOneWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutWorkspaceInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutWorkspaceInput, UserUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type UserCreateManyWorkspaceInputEnvelope = {
+    data: UserCreateManyWorkspaceInput | UserCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserCreateWithoutOwnedWorkspaceInput = {
+    id?: string
+    email: string
+    name?: string | null
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutUsersInput
+  }
+
+  export type UserUncheckedCreateWithoutOwnedWorkspaceInput = {
+    id?: string
+    email: string
+    name?: string | null
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserCreateOrConnectWithoutOwnedWorkspaceInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutOwnedWorkspaceInput, UserUncheckedCreateWithoutOwnedWorkspaceInput>
+  }
+
+  export type BrushOrderUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: BrushOrderWhereUniqueInput
+    update: XOR<BrushOrderUpdateWithoutWorkspaceInput, BrushOrderUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<BrushOrderCreateWithoutWorkspaceInput, BrushOrderUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type BrushOrderUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: BrushOrderWhereUniqueInput
+    data: XOR<BrushOrderUpdateWithoutWorkspaceInput, BrushOrderUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type BrushOrderUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: BrushOrderScalarWhereInput
+    data: XOR<BrushOrderUpdateManyMutationInput, BrushOrderUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type BrushOrderScalarWhereInput = {
+    AND?: BrushOrderScalarWhereInput | BrushOrderScalarWhereInput[]
+    OR?: BrushOrderScalarWhereInput[]
+    NOT?: BrushOrderScalarWhereInput | BrushOrderScalarWhereInput[]
+    id?: StringFilter<"BrushOrder"> | string
+    date?: DateTimeFilter<"BrushOrder"> | Date | string
+    type?: StringFilter<"BrushOrder"> | string
+    status?: StringFilter<"BrushOrder"> | string
+    principalAmount?: FloatFilter<"BrushOrder"> | number
+    paymentAmount?: FloatFilter<"BrushOrder"> | number
+    receivedAmount?: FloatFilter<"BrushOrder"> | number
+    commission?: FloatFilter<"BrushOrder"> | number
+    note?: StringNullableFilter<"BrushOrder"> | string | null
+    workspaceId?: StringNullableFilter<"BrushOrder"> | string | null
+    createdAt?: DateTimeFilter<"BrushOrder"> | Date | string
+    updatedAt?: DateTimeFilter<"BrushOrder"> | Date | string
+  }
+
+  export type CategoryUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: CategoryWhereUniqueInput
+    update: XOR<CategoryUpdateWithoutWorkspaceInput, CategoryUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<CategoryCreateWithoutWorkspaceInput, CategoryUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type CategoryUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: CategoryWhereUniqueInput
+    data: XOR<CategoryUpdateWithoutWorkspaceInput, CategoryUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type CategoryUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: CategoryScalarWhereInput
+    data: XOR<CategoryUpdateManyMutationInput, CategoryUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type CategoryScalarWhereInput = {
+    AND?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
+    OR?: CategoryScalarWhereInput[]
+    NOT?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
+    id?: StringFilter<"Category"> | string
+    name?: StringFilter<"Category"> | string
+    description?: StringNullableFilter<"Category"> | string | null
+    workspaceId?: StringNullableFilter<"Category"> | string | null
+    createdAt?: DateTimeFilter<"Category"> | Date | string
+    updatedAt?: DateTimeFilter<"Category"> | Date | string
+  }
+
+  export type GalleryItemUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: GalleryItemWhereUniqueInput
+    update: XOR<GalleryItemUpdateWithoutWorkspaceInput, GalleryItemUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<GalleryItemCreateWithoutWorkspaceInput, GalleryItemUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type GalleryItemUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: GalleryItemWhereUniqueInput
+    data: XOR<GalleryItemUpdateWithoutWorkspaceInput, GalleryItemUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type GalleryItemUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: GalleryItemScalarWhereInput
+    data: XOR<GalleryItemUpdateManyMutationInput, GalleryItemUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type GalleryItemScalarWhereInput = {
+    AND?: GalleryItemScalarWhereInput | GalleryItemScalarWhereInput[]
+    OR?: GalleryItemScalarWhereInput[]
+    NOT?: GalleryItemScalarWhereInput | GalleryItemScalarWhereInput[]
+    id?: StringFilter<"GalleryItem"> | string
+    url?: StringFilter<"GalleryItem"> | string
+    productId?: StringFilter<"GalleryItem"> | string
+    tags?: StringNullableListFilter<"GalleryItem">
+    isPublic?: BoolFilter<"GalleryItem"> | boolean
+    type?: StringFilter<"GalleryItem"> | string
+    workspaceId?: StringNullableFilter<"GalleryItem"> | string | null
+    createdAt?: DateTimeFilter<"GalleryItem"> | Date | string
+    updatedAt?: DateTimeFilter<"GalleryItem"> | Date | string
+  }
+
+  export type GallerySubmissionUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: GallerySubmissionWhereUniqueInput
+    update: XOR<GallerySubmissionUpdateWithoutWorkspaceInput, GallerySubmissionUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<GallerySubmissionCreateWithoutWorkspaceInput, GallerySubmissionUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type GallerySubmissionUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: GallerySubmissionWhereUniqueInput
+    data: XOR<GallerySubmissionUpdateWithoutWorkspaceInput, GallerySubmissionUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type GallerySubmissionUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: GallerySubmissionScalarWhereInput
+    data: XOR<GallerySubmissionUpdateManyMutationInput, GallerySubmissionUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type GallerySubmissionScalarWhereInput = {
+    AND?: GallerySubmissionScalarWhereInput | GallerySubmissionScalarWhereInput[]
+    OR?: GallerySubmissionScalarWhereInput[]
+    NOT?: GallerySubmissionScalarWhereInput | GallerySubmissionScalarWhereInput[]
+    id?: StringFilter<"GallerySubmission"> | string
+    urls?: JsonFilter<"GallerySubmission">
+    sku?: StringNullableFilter<"GallerySubmission"> | string | null
+    productName?: StringNullableFilter<"GallerySubmission"> | string | null
+    status?: StringFilter<"GallerySubmission"> | string
+    notes?: StringNullableFilter<"GallerySubmission"> | string | null
+    productId?: StringNullableFilter<"GallerySubmission"> | string | null
+    selectedIndices?: JsonNullableFilter<"GallerySubmission">
+    workspaceId?: StringNullableFilter<"GallerySubmission"> | string | null
+    createdAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+    updatedAt?: DateTimeFilter<"GallerySubmission"> | Date | string
+  }
+
+  export type OutboundOrderUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: OutboundOrderWhereUniqueInput
+    update: XOR<OutboundOrderUpdateWithoutWorkspaceInput, OutboundOrderUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<OutboundOrderCreateWithoutWorkspaceInput, OutboundOrderUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type OutboundOrderUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: OutboundOrderWhereUniqueInput
+    data: XOR<OutboundOrderUpdateWithoutWorkspaceInput, OutboundOrderUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type OutboundOrderUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: OutboundOrderScalarWhereInput
+    data: XOR<OutboundOrderUpdateManyMutationInput, OutboundOrderUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type OutboundOrderScalarWhereInput = {
+    AND?: OutboundOrderScalarWhereInput | OutboundOrderScalarWhereInput[]
+    OR?: OutboundOrderScalarWhereInput[]
+    NOT?: OutboundOrderScalarWhereInput | OutboundOrderScalarWhereInput[]
+    id?: StringFilter<"OutboundOrder"> | string
+    type?: StringFilter<"OutboundOrder"> | string
+    date?: DateTimeFilter<"OutboundOrder"> | Date | string
+    note?: StringNullableFilter<"OutboundOrder"> | string | null
+    totalAmount?: FloatFilter<"OutboundOrder"> | number
+    workspaceId?: StringNullableFilter<"OutboundOrder"> | string | null
+    createdAt?: DateTimeFilter<"OutboundOrder"> | Date | string
+    updatedAt?: DateTimeFilter<"OutboundOrder"> | Date | string
+  }
+
+  export type ProductUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: ProductWhereUniqueInput
+    update: XOR<ProductUpdateWithoutWorkspaceInput, ProductUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<ProductCreateWithoutWorkspaceInput, ProductUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type ProductUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: ProductWhereUniqueInput
+    data: XOR<ProductUpdateWithoutWorkspaceInput, ProductUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type ProductUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: ProductScalarWhereInput
+    data: XOR<ProductUpdateManyMutationInput, ProductUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type ProductScalarWhereInput = {
+    AND?: ProductScalarWhereInput | ProductScalarWhereInput[]
+    OR?: ProductScalarWhereInput[]
+    NOT?: ProductScalarWhereInput | ProductScalarWhereInput[]
+    id?: StringFilter<"Product"> | string
+    sku?: StringNullableFilter<"Product"> | string | null
+    name?: StringFilter<"Product"> | string
+    costPrice?: FloatFilter<"Product"> | number
+    hideCost?: BoolFilter<"Product"> | boolean
+    stock?: IntFilter<"Product"> | number
+    image?: StringNullableFilter<"Product"> | string | null
+    isPublic?: BoolFilter<"Product"> | boolean
+    categoryId?: StringFilter<"Product"> | string
+    supplierId?: StringNullableFilter<"Product"> | string | null
+    workspaceId?: StringNullableFilter<"Product"> | string | null
+    createdAt?: DateTimeFilter<"Product"> | Date | string
+    updatedAt?: DateTimeFilter<"Product"> | Date | string
+  }
+
+  export type PurchaseOrderUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: PurchaseOrderWhereUniqueInput
+    update: XOR<PurchaseOrderUpdateWithoutWorkspaceInput, PurchaseOrderUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<PurchaseOrderCreateWithoutWorkspaceInput, PurchaseOrderUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type PurchaseOrderUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: PurchaseOrderWhereUniqueInput
+    data: XOR<PurchaseOrderUpdateWithoutWorkspaceInput, PurchaseOrderUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type PurchaseOrderUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: PurchaseOrderScalarWhereInput
+    data: XOR<PurchaseOrderUpdateManyMutationInput, PurchaseOrderUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type PurchaseOrderScalarWhereInput = {
+    AND?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
+    OR?: PurchaseOrderScalarWhereInput[]
+    NOT?: PurchaseOrderScalarWhereInput | PurchaseOrderScalarWhereInput[]
+    id?: StringFilter<"PurchaseOrder"> | string
+    type?: StringFilter<"PurchaseOrder"> | string
+    status?: StringFilter<"PurchaseOrder"> | string
+    totalAmount?: FloatFilter<"PurchaseOrder"> | number
+    date?: DateTimeFilter<"PurchaseOrder"> | Date | string
+    shippingFees?: FloatFilter<"PurchaseOrder"> | number
+    extraFees?: FloatFilter<"PurchaseOrder"> | number
+    paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
+    paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
+    trackingData?: JsonNullableFilter<"PurchaseOrder">
+    workspaceId?: StringNullableFilter<"PurchaseOrder"> | string | null
+    createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
+    updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
+  }
+
+  export type SupplierUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: SupplierWhereUniqueInput
+    update: XOR<SupplierUpdateWithoutWorkspaceInput, SupplierUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<SupplierCreateWithoutWorkspaceInput, SupplierUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type SupplierUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: SupplierWhereUniqueInput
+    data: XOR<SupplierUpdateWithoutWorkspaceInput, SupplierUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type SupplierUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: SupplierScalarWhereInput
+    data: XOR<SupplierUpdateManyMutationInput, SupplierUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type SupplierScalarWhereInput = {
+    AND?: SupplierScalarWhereInput | SupplierScalarWhereInput[]
+    OR?: SupplierScalarWhereInput[]
+    NOT?: SupplierScalarWhereInput | SupplierScalarWhereInput[]
+    id?: StringFilter<"Supplier"> | string
+    code?: StringNullableFilter<"Supplier"> | string | null
+    name?: StringFilter<"Supplier"> | string
+    contact?: StringNullableFilter<"Supplier"> | string | null
+    phone?: StringNullableFilter<"Supplier"> | string | null
+    email?: StringNullableFilter<"Supplier"> | string | null
+    address?: StringNullableFilter<"Supplier"> | string | null
+    workspaceId?: StringNullableFilter<"Supplier"> | string | null
+    createdAt?: DateTimeFilter<"Supplier"> | Date | string
+    updatedAt?: DateTimeFilter<"Supplier"> | Date | string
+  }
+
+  export type SystemSettingUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: SystemSettingWhereUniqueInput
+    update: XOR<SystemSettingUpdateWithoutWorkspaceInput, SystemSettingUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<SystemSettingCreateWithoutWorkspaceInput, SystemSettingUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type SystemSettingUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: SystemSettingWhereUniqueInput
+    data: XOR<SystemSettingUpdateWithoutWorkspaceInput, SystemSettingUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type SystemSettingUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: SystemSettingScalarWhereInput
+    data: XOR<SystemSettingUpdateManyMutationInput, SystemSettingUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type SystemSettingScalarWhereInput = {
+    AND?: SystemSettingScalarWhereInput | SystemSettingScalarWhereInput[]
+    OR?: SystemSettingScalarWhereInput[]
+    NOT?: SystemSettingScalarWhereInput | SystemSettingScalarWhereInput[]
+    id?: StringFilter<"SystemSetting"> | string
+    workspaceId?: StringNullableFilter<"SystemSetting"> | string | null
+    lowStockThreshold?: IntFilter<"SystemSetting"> | number
+    allowDataImport?: BoolFilter<"SystemSetting"> | boolean
+    allowGalleryUpload?: BoolFilter<"SystemSetting"> | boolean
+    storageType?: StringFilter<"SystemSetting"> | string
+    minioEndpoint?: StringNullableFilter<"SystemSetting"> | string | null
+    minioPort?: IntNullableFilter<"SystemSetting"> | number | null
+    minioAccessKey?: StringNullableFilter<"SystemSetting"> | string | null
+    minioSecretKey?: StringNullableFilter<"SystemSetting"> | string | null
+    minioBucket?: StringNullableFilter<"SystemSetting"> | string | null
+    minioUseSSL?: BoolFilter<"SystemSetting"> | boolean
+    minioPublicUrl?: StringNullableFilter<"SystemSetting"> | string | null
+    uploadConflictStrategy?: StringFilter<"SystemSetting"> | string
+    updatedAt?: DateTimeFilter<"SystemSetting"> | Date | string
+  }
+
+  export type UserUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: UserWhereUniqueInput
+    update: XOR<UserUpdateWithoutWorkspaceInput, UserUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<UserCreateWithoutWorkspaceInput, UserUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type UserUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: UserWhereUniqueInput
+    data: XOR<UserUpdateWithoutWorkspaceInput, UserUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type UserUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: UserScalarWhereInput
+    data: XOR<UserUpdateManyMutationInput, UserUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type UserScalarWhereInput = {
+    AND?: UserScalarWhereInput | UserScalarWhereInput[]
+    OR?: UserScalarWhereInput[]
+    NOT?: UserScalarWhereInput | UserScalarWhereInput[]
+    id?: StringFilter<"User"> | string
+    email?: StringFilter<"User"> | string
+    name?: StringNullableFilter<"User"> | string | null
+    role?: EnumRoleFilter<"User"> | $Enums.Role
+    status?: StringFilter<"User"> | string
+    permissions?: JsonNullableFilter<"User">
+    workspaceId?: StringNullableFilter<"User"> | string | null
+    createdAt?: DateTimeFilter<"User"> | Date | string
+    updatedAt?: DateTimeFilter<"User"> | Date | string
+  }
+
+  export type UserUpsertWithoutOwnedWorkspaceInput = {
+    update: XOR<UserUpdateWithoutOwnedWorkspaceInput, UserUncheckedUpdateWithoutOwnedWorkspaceInput>
+    create: XOR<UserCreateWithoutOwnedWorkspaceInput, UserUncheckedCreateWithoutOwnedWorkspaceInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutOwnedWorkspaceInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutOwnedWorkspaceInput, UserUncheckedUpdateWithoutOwnedWorkspaceInput>
+  }
+
+  export type UserUpdateWithoutOwnedWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutUsersNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutOwnedWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkspaceCreateWithoutCategoriesInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutCategoriesInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutCategoriesInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutCategoriesInput, WorkspaceUncheckedCreateWithoutCategoriesInput>
+  }
+
   export type ProductCreateWithoutCategoryInput = {
     id?: string
     sku?: string | null
@@ -20509,6 +25590,7 @@ export namespace Prisma {
     gallery?: GalleryItemCreateNestedManyWithoutProductInput
     outboundItems?: OutboundOrderItemCreateNestedManyWithoutProductInput
     supplier?: SupplierCreateNestedOneWithoutProductsInput
+    workspace?: WorkspaceCreateNestedOneWithoutProductsInput
     orderItems?: PurchaseOrderItemCreateNestedManyWithoutProductInput
   }
 
@@ -20522,6 +25604,7 @@ export namespace Prisma {
     image?: string | null
     isPublic?: boolean
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     brushOrderItems?: BrushOrderItemUncheckedCreateNestedManyWithoutProductInput
@@ -20540,6 +25623,51 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WorkspaceUpsertWithoutCategoriesInput = {
+    update: XOR<WorkspaceUpdateWithoutCategoriesInput, WorkspaceUncheckedUpdateWithoutCategoriesInput>
+    create: XOR<WorkspaceCreateWithoutCategoriesInput, WorkspaceUncheckedCreateWithoutCategoriesInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutCategoriesInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutCategoriesInput, WorkspaceUncheckedUpdateWithoutCategoriesInput>
+  }
+
+  export type WorkspaceUpdateWithoutCategoriesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutCategoriesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
   export type ProductUpsertWithWhereUniqueWithoutCategoryInput = {
     where: ProductWhereUniqueInput
     update: XOR<ProductUpdateWithoutCategoryInput, ProductUncheckedUpdateWithoutCategoryInput>
@@ -20554,24 +25682,6 @@ export namespace Prisma {
   export type ProductUpdateManyWithWhereWithoutCategoryInput = {
     where: ProductScalarWhereInput
     data: XOR<ProductUpdateManyMutationInput, ProductUncheckedUpdateManyWithoutCategoryInput>
-  }
-
-  export type ProductScalarWhereInput = {
-    AND?: ProductScalarWhereInput | ProductScalarWhereInput[]
-    OR?: ProductScalarWhereInput[]
-    NOT?: ProductScalarWhereInput | ProductScalarWhereInput[]
-    id?: StringFilter<"Product"> | string
-    sku?: StringNullableFilter<"Product"> | string | null
-    name?: StringFilter<"Product"> | string
-    costPrice?: FloatFilter<"Product"> | number
-    hideCost?: BoolFilter<"Product"> | boolean
-    stock?: IntFilter<"Product"> | number
-    image?: StringNullableFilter<"Product"> | string | null
-    isPublic?: BoolFilter<"Product"> | boolean
-    categoryId?: StringFilter<"Product"> | string
-    supplierId?: StringNullableFilter<"Product"> | string | null
-    createdAt?: DateTimeFilter<"Product"> | Date | string
-    updatedAt?: DateTimeFilter<"Product"> | Date | string
   }
 
   export type BrushOrderItemCreateWithoutProductInput = {
@@ -20608,6 +25718,7 @@ export namespace Prisma {
     type?: string
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutGalleryItemsInput
   }
 
   export type GalleryItemUncheckedCreateWithoutProductInput = {
@@ -20616,6 +25727,7 @@ export namespace Prisma {
     tags?: GalleryItemCreatetagsInput | string[]
     isPublic?: boolean
     type?: string
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -20660,12 +25772,14 @@ export namespace Prisma {
     description?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutCategoriesInput
   }
 
   export type CategoryUncheckedCreateWithoutProductsInput = {
     id?: string
     name: string
     description?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -20686,6 +25800,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     purchaseOrderItems?: PurchaseOrderItemCreateNestedManyWithoutSupplierInput
+    workspace?: WorkspaceCreateNestedOneWithoutSuppliersInput
   }
 
   export type SupplierUncheckedCreateWithoutProductsInput = {
@@ -20696,6 +25811,7 @@ export namespace Prisma {
     phone?: string | null
     email?: string | null
     address?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     purchaseOrderItems?: PurchaseOrderItemUncheckedCreateNestedManyWithoutSupplierInput
@@ -20704,6 +25820,45 @@ export namespace Prisma {
   export type SupplierCreateOrConnectWithoutProductsInput = {
     where: SupplierWhereUniqueInput
     create: XOR<SupplierCreateWithoutProductsInput, SupplierUncheckedCreateWithoutProductsInput>
+  }
+
+  export type WorkspaceCreateWithoutProductsInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutProductsInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutProductsInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutProductsInput, WorkspaceUncheckedCreateWithoutProductsInput>
   }
 
   export type PurchaseOrderItemCreateWithoutProductInput = {
@@ -20782,20 +25937,6 @@ export namespace Prisma {
     data: XOR<GalleryItemUpdateManyMutationInput, GalleryItemUncheckedUpdateManyWithoutProductInput>
   }
 
-  export type GalleryItemScalarWhereInput = {
-    AND?: GalleryItemScalarWhereInput | GalleryItemScalarWhereInput[]
-    OR?: GalleryItemScalarWhereInput[]
-    NOT?: GalleryItemScalarWhereInput | GalleryItemScalarWhereInput[]
-    id?: StringFilter<"GalleryItem"> | string
-    url?: StringFilter<"GalleryItem"> | string
-    productId?: StringFilter<"GalleryItem"> | string
-    tags?: StringNullableListFilter<"GalleryItem">
-    isPublic?: BoolFilter<"GalleryItem"> | boolean
-    type?: StringFilter<"GalleryItem"> | string
-    createdAt?: DateTimeFilter<"GalleryItem"> | Date | string
-    updatedAt?: DateTimeFilter<"GalleryItem"> | Date | string
-  }
-
   export type OutboundOrderItemUpsertWithWhereUniqueWithoutProductInput = {
     where: OutboundOrderItemWhereUniqueInput
     update: XOR<OutboundOrderItemUpdateWithoutProductInput, OutboundOrderItemUncheckedUpdateWithoutProductInput>
@@ -20840,12 +25981,14 @@ export namespace Prisma {
     description?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutCategoriesNestedInput
   }
 
   export type CategoryUncheckedUpdateWithoutProductsInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -20872,6 +26015,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     purchaseOrderItems?: PurchaseOrderItemUpdateManyWithoutSupplierNestedInput
+    workspace?: WorkspaceUpdateOneWithoutSuppliersNestedInput
   }
 
   export type SupplierUncheckedUpdateWithoutProductsInput = {
@@ -20882,9 +26026,55 @@ export namespace Prisma {
     phone?: NullableStringFieldUpdateOperationsInput | string | null
     email?: NullableStringFieldUpdateOperationsInput | string | null
     address?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     purchaseOrderItems?: PurchaseOrderItemUncheckedUpdateManyWithoutSupplierNestedInput
+  }
+
+  export type WorkspaceUpsertWithoutProductsInput = {
+    update: XOR<WorkspaceUpdateWithoutProductsInput, WorkspaceUncheckedUpdateWithoutProductsInput>
+    create: XOR<WorkspaceCreateWithoutProductsInput, WorkspaceUncheckedCreateWithoutProductsInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutProductsInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutProductsInput, WorkspaceUncheckedUpdateWithoutProductsInput>
+  }
+
+  export type WorkspaceUpdateWithoutProductsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutProductsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
   }
 
   export type PurchaseOrderItemUpsertWithWhereUniqueWithoutProductInput = {
@@ -20933,6 +26123,7 @@ export namespace Prisma {
     gallery?: GalleryItemCreateNestedManyWithoutProductInput
     outboundItems?: OutboundOrderItemCreateNestedManyWithoutProductInput
     category: CategoryCreateNestedOneWithoutProductsInput
+    workspace?: WorkspaceCreateNestedOneWithoutProductsInput
     orderItems?: PurchaseOrderItemCreateNestedManyWithoutProductInput
   }
 
@@ -20946,6 +26137,7 @@ export namespace Prisma {
     image?: string | null
     isPublic?: boolean
     categoryId: string
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     brushOrderItems?: BrushOrderItemUncheckedCreateNestedManyWithoutProductInput
@@ -20996,6 +26188,45 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WorkspaceCreateWithoutSuppliersInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutSuppliersInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutSuppliersInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutSuppliersInput, WorkspaceUncheckedCreateWithoutSuppliersInput>
+  }
+
   export type ProductUpsertWithWhereUniqueWithoutSupplierInput = {
     where: ProductWhereUniqueInput
     update: XOR<ProductUpdateWithoutSupplierInput, ProductUncheckedUpdateWithoutSupplierInput>
@@ -21026,6 +26257,90 @@ export namespace Prisma {
   export type PurchaseOrderItemUpdateManyWithWhereWithoutSupplierInput = {
     where: PurchaseOrderItemScalarWhereInput
     data: XOR<PurchaseOrderItemUpdateManyMutationInput, PurchaseOrderItemUncheckedUpdateManyWithoutSupplierInput>
+  }
+
+  export type WorkspaceUpsertWithoutSuppliersInput = {
+    update: XOR<WorkspaceUpdateWithoutSuppliersInput, WorkspaceUncheckedUpdateWithoutSuppliersInput>
+    create: XOR<WorkspaceCreateWithoutSuppliersInput, WorkspaceUncheckedCreateWithoutSuppliersInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutSuppliersInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutSuppliersInput, WorkspaceUncheckedUpdateWithoutSuppliersInput>
+  }
+
+  export type WorkspaceUpdateWithoutSuppliersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutSuppliersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceCreateWithoutPurchaseOrdersInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutPurchaseOrdersInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutPurchaseOrdersInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutPurchaseOrdersInput, WorkspaceUncheckedCreateWithoutPurchaseOrdersInput>
   }
 
   export type PurchaseOrderItemCreateWithoutPurchaseOrderInput = {
@@ -21060,6 +26375,51 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WorkspaceUpsertWithoutPurchaseOrdersInput = {
+    update: XOR<WorkspaceUpdateWithoutPurchaseOrdersInput, WorkspaceUncheckedUpdateWithoutPurchaseOrdersInput>
+    create: XOR<WorkspaceCreateWithoutPurchaseOrdersInput, WorkspaceUncheckedCreateWithoutPurchaseOrdersInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutPurchaseOrdersInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutPurchaseOrdersInput, WorkspaceUncheckedUpdateWithoutPurchaseOrdersInput>
+  }
+
+  export type WorkspaceUpdateWithoutPurchaseOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutPurchaseOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
   export type PurchaseOrderItemUpsertWithWhereUniqueWithoutPurchaseOrderInput = {
     where: PurchaseOrderItemWhereUniqueInput
     update: XOR<PurchaseOrderItemUpdateWithoutPurchaseOrderInput, PurchaseOrderItemUncheckedUpdateWithoutPurchaseOrderInput>
@@ -21092,6 +26452,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemCreateNestedManyWithoutProductInput
     category: CategoryCreateNestedOneWithoutProductsInput
     supplier?: SupplierCreateNestedOneWithoutProductsInput
+    workspace?: WorkspaceCreateNestedOneWithoutProductsInput
   }
 
   export type ProductUncheckedCreateWithoutOrderItemsInput = {
@@ -21105,6 +26466,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId: string
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     brushOrderItems?: BrushOrderItemUncheckedCreateNestedManyWithoutProductInput
@@ -21130,6 +26492,7 @@ export namespace Prisma {
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutPurchaseOrdersInput
   }
 
   export type PurchaseOrderUncheckedCreateWithoutItemsInput = {
@@ -21143,6 +26506,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21163,6 +26527,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     products?: ProductCreateNestedManyWithoutSupplierInput
+    workspace?: WorkspaceCreateNestedOneWithoutSuppliersInput
   }
 
   export type SupplierUncheckedCreateWithoutPurchaseOrderItemsInput = {
@@ -21173,6 +26538,7 @@ export namespace Prisma {
     phone?: string | null
     email?: string | null
     address?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     products?: ProductUncheckedCreateNestedManyWithoutSupplierInput
@@ -21210,6 +26576,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemUpdateManyWithoutProductNestedInput
     category?: CategoryUpdateOneRequiredWithoutProductsNestedInput
     supplier?: SupplierUpdateOneWithoutProductsNestedInput
+    workspace?: WorkspaceUpdateOneWithoutProductsNestedInput
   }
 
   export type ProductUncheckedUpdateWithoutOrderItemsInput = {
@@ -21223,6 +26590,7 @@ export namespace Prisma {
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     brushOrderItems?: BrushOrderItemUncheckedUpdateManyWithoutProductNestedInput
@@ -21254,6 +26622,7 @@ export namespace Prisma {
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutPurchaseOrdersNestedInput
   }
 
   export type PurchaseOrderUncheckedUpdateWithoutItemsInput = {
@@ -21267,6 +26636,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21293,6 +26663,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     products?: ProductUpdateManyWithoutSupplierNestedInput
+    workspace?: WorkspaceUpdateOneWithoutSuppliersNestedInput
   }
 
   export type SupplierUncheckedUpdateWithoutPurchaseOrderItemsInput = {
@@ -21303,9 +26674,49 @@ export namespace Prisma {
     phone?: NullableStringFieldUpdateOperationsInput | string | null
     email?: NullableStringFieldUpdateOperationsInput | string | null
     address?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     products?: ProductUncheckedUpdateManyWithoutSupplierNestedInput
+  }
+
+  export type WorkspaceCreateWithoutOutboundOrdersInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutOutboundOrdersInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutOutboundOrdersInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutOutboundOrdersInput, WorkspaceUncheckedCreateWithoutOutboundOrdersInput>
   }
 
   export type OutboundOrderItemCreateWithoutOutboundOrderInput = {
@@ -21332,6 +26743,51 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WorkspaceUpsertWithoutOutboundOrdersInput = {
+    update: XOR<WorkspaceUpdateWithoutOutboundOrdersInput, WorkspaceUncheckedUpdateWithoutOutboundOrdersInput>
+    create: XOR<WorkspaceCreateWithoutOutboundOrdersInput, WorkspaceUncheckedCreateWithoutOutboundOrdersInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutOutboundOrdersInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutOutboundOrdersInput, WorkspaceUncheckedUpdateWithoutOutboundOrdersInput>
+  }
+
+  export type WorkspaceUpdateWithoutOutboundOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutOutboundOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
   export type OutboundOrderItemUpsertWithWhereUniqueWithoutOutboundOrderInput = {
     where: OutboundOrderItemWhereUniqueInput
     update: XOR<OutboundOrderItemUpdateWithoutOutboundOrderInput, OutboundOrderItemUncheckedUpdateWithoutOutboundOrderInput>
@@ -21346,6 +26802,33 @@ export namespace Prisma {
   export type OutboundOrderItemUpdateManyWithWhereWithoutOutboundOrderInput = {
     where: OutboundOrderItemScalarWhereInput
     data: XOR<OutboundOrderItemUpdateManyMutationInput, OutboundOrderItemUncheckedUpdateManyWithoutOutboundOrderInput>
+  }
+
+  export type OutboundOrderCreateWithoutItemsInput = {
+    id?: string
+    type?: string
+    date?: Date | string
+    note?: string | null
+    totalAmount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutOutboundOrdersInput
+  }
+
+  export type OutboundOrderUncheckedCreateWithoutItemsInput = {
+    id?: string
+    type?: string
+    date?: Date | string
+    note?: string | null
+    totalAmount?: number
+    workspaceId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type OutboundOrderCreateOrConnectWithoutItemsInput = {
+    where: OutboundOrderWhereUniqueInput
+    create: XOR<OutboundOrderCreateWithoutItemsInput, OutboundOrderUncheckedCreateWithoutItemsInput>
   }
 
   export type ProductCreateWithoutOutboundItemsInput = {
@@ -21363,6 +26846,7 @@ export namespace Prisma {
     gallery?: GalleryItemCreateNestedManyWithoutProductInput
     category: CategoryCreateNestedOneWithoutProductsInput
     supplier?: SupplierCreateNestedOneWithoutProductsInput
+    workspace?: WorkspaceCreateNestedOneWithoutProductsInput
     orderItems?: PurchaseOrderItemCreateNestedManyWithoutProductInput
   }
 
@@ -21377,6 +26861,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId: string
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     brushOrderItems?: BrushOrderItemUncheckedCreateNestedManyWithoutProductInput
@@ -21389,29 +26874,37 @@ export namespace Prisma {
     create: XOR<ProductCreateWithoutOutboundItemsInput, ProductUncheckedCreateWithoutOutboundItemsInput>
   }
 
-  export type OutboundOrderCreateWithoutItemsInput = {
-    id?: string
-    type?: string
-    date?: Date | string
-    note?: string | null
-    totalAmount?: number
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type OutboundOrderUncheckedCreateWithoutItemsInput = {
-    id?: string
-    type?: string
-    date?: Date | string
-    note?: string | null
-    totalAmount?: number
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type OutboundOrderCreateOrConnectWithoutItemsInput = {
-    where: OutboundOrderWhereUniqueInput
+  export type OutboundOrderUpsertWithoutItemsInput = {
+    update: XOR<OutboundOrderUpdateWithoutItemsInput, OutboundOrderUncheckedUpdateWithoutItemsInput>
     create: XOR<OutboundOrderCreateWithoutItemsInput, OutboundOrderUncheckedCreateWithoutItemsInput>
+    where?: OutboundOrderWhereInput
+  }
+
+  export type OutboundOrderUpdateToOneWithWhereWithoutItemsInput = {
+    where?: OutboundOrderWhereInput
+    data: XOR<OutboundOrderUpdateWithoutItemsInput, OutboundOrderUncheckedUpdateWithoutItemsInput>
+  }
+
+  export type OutboundOrderUpdateWithoutItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutOutboundOrdersNestedInput
+  }
+
+  export type OutboundOrderUncheckedUpdateWithoutItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProductUpsertWithoutOutboundItemsInput = {
@@ -21440,6 +26933,7 @@ export namespace Prisma {
     gallery?: GalleryItemUpdateManyWithoutProductNestedInput
     category?: CategoryUpdateOneRequiredWithoutProductsNestedInput
     supplier?: SupplierUpdateOneWithoutProductsNestedInput
+    workspace?: WorkspaceUpdateOneWithoutProductsNestedInput
     orderItems?: PurchaseOrderItemUpdateManyWithoutProductNestedInput
   }
 
@@ -21454,42 +26948,12 @@ export namespace Prisma {
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     brushOrderItems?: BrushOrderItemUncheckedUpdateManyWithoutProductNestedInput
     gallery?: GalleryItemUncheckedUpdateManyWithoutProductNestedInput
     orderItems?: PurchaseOrderItemUncheckedUpdateManyWithoutProductNestedInput
-  }
-
-  export type OutboundOrderUpsertWithoutItemsInput = {
-    update: XOR<OutboundOrderUpdateWithoutItemsInput, OutboundOrderUncheckedUpdateWithoutItemsInput>
-    create: XOR<OutboundOrderCreateWithoutItemsInput, OutboundOrderUncheckedCreateWithoutItemsInput>
-    where?: OutboundOrderWhereInput
-  }
-
-  export type OutboundOrderUpdateToOneWithWhereWithoutItemsInput = {
-    where?: OutboundOrderWhereInput
-    data: XOR<OutboundOrderUpdateWithoutItemsInput, OutboundOrderUncheckedUpdateWithoutItemsInput>
-  }
-
-  export type OutboundOrderUpdateWithoutItemsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
-    date?: DateTimeFieldUpdateOperationsInput | Date | string
-    note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type OutboundOrderUncheckedUpdateWithoutItemsInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
-    date?: DateTimeFieldUpdateOperationsInput | Date | string
-    note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProductCreateWithoutGalleryInput = {
@@ -21507,6 +26971,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemCreateNestedManyWithoutProductInput
     category: CategoryCreateNestedOneWithoutProductsInput
     supplier?: SupplierCreateNestedOneWithoutProductsInput
+    workspace?: WorkspaceCreateNestedOneWithoutProductsInput
     orderItems?: PurchaseOrderItemCreateNestedManyWithoutProductInput
   }
 
@@ -21521,6 +26986,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId: string
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     brushOrderItems?: BrushOrderItemUncheckedCreateNestedManyWithoutProductInput
@@ -21531,6 +26997,45 @@ export namespace Prisma {
   export type ProductCreateOrConnectWithoutGalleryInput = {
     where: ProductWhereUniqueInput
     create: XOR<ProductCreateWithoutGalleryInput, ProductUncheckedCreateWithoutGalleryInput>
+  }
+
+  export type WorkspaceCreateWithoutGalleryItemsInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutGalleryItemsInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutGalleryItemsInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutGalleryItemsInput, WorkspaceUncheckedCreateWithoutGalleryItemsInput>
   }
 
   export type ProductUpsertWithoutGalleryInput = {
@@ -21559,6 +27064,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemUpdateManyWithoutProductNestedInput
     category?: CategoryUpdateOneRequiredWithoutProductsNestedInput
     supplier?: SupplierUpdateOneWithoutProductsNestedInput
+    workspace?: WorkspaceUpdateOneWithoutProductsNestedInput
     orderItems?: PurchaseOrderItemUpdateManyWithoutProductNestedInput
   }
 
@@ -21573,11 +27079,432 @@ export namespace Prisma {
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     brushOrderItems?: BrushOrderItemUncheckedUpdateManyWithoutProductNestedInput
     outboundItems?: OutboundOrderItemUncheckedUpdateManyWithoutProductNestedInput
     orderItems?: PurchaseOrderItemUncheckedUpdateManyWithoutProductNestedInput
+  }
+
+  export type WorkspaceUpsertWithoutGalleryItemsInput = {
+    update: XOR<WorkspaceUpdateWithoutGalleryItemsInput, WorkspaceUncheckedUpdateWithoutGalleryItemsInput>
+    create: XOR<WorkspaceCreateWithoutGalleryItemsInput, WorkspaceUncheckedCreateWithoutGalleryItemsInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutGalleryItemsInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutGalleryItemsInput, WorkspaceUncheckedUpdateWithoutGalleryItemsInput>
+  }
+
+  export type WorkspaceUpdateWithoutGalleryItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutGalleryItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceCreateWithoutGallerySubmissionsInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutGallerySubmissionsInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutGallerySubmissionsInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutGallerySubmissionsInput, WorkspaceUncheckedCreateWithoutGallerySubmissionsInput>
+  }
+
+  export type WorkspaceUpsertWithoutGallerySubmissionsInput = {
+    update: XOR<WorkspaceUpdateWithoutGallerySubmissionsInput, WorkspaceUncheckedUpdateWithoutGallerySubmissionsInput>
+    create: XOR<WorkspaceCreateWithoutGallerySubmissionsInput, WorkspaceUncheckedCreateWithoutGallerySubmissionsInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutGallerySubmissionsInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutGallerySubmissionsInput, WorkspaceUncheckedUpdateWithoutGallerySubmissionsInput>
+  }
+
+  export type WorkspaceUpdateWithoutGallerySubmissionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutGallerySubmissionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceCreateWithoutUsersInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutUsersInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutUsersInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutUsersInput, WorkspaceUncheckedCreateWithoutUsersInput>
+  }
+
+  export type WorkspaceCreateWithoutOwnerInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutOwnerInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutOwnerInput, WorkspaceUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type WorkspaceUpsertWithoutUsersInput = {
+    update: XOR<WorkspaceUpdateWithoutUsersInput, WorkspaceUncheckedUpdateWithoutUsersInput>
+    create: XOR<WorkspaceCreateWithoutUsersInput, WorkspaceUncheckedCreateWithoutUsersInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutUsersInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutUsersInput, WorkspaceUncheckedUpdateWithoutUsersInput>
+  }
+
+  export type WorkspaceUpdateWithoutUsersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutUsersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceUpsertWithoutOwnerInput = {
+    update: XOR<WorkspaceUpdateWithoutOwnerInput, WorkspaceUncheckedUpdateWithoutOwnerInput>
+    create: XOR<WorkspaceCreateWithoutOwnerInput, WorkspaceUncheckedCreateWithoutOwnerInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutOwnerInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutOwnerInput, WorkspaceUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type WorkspaceUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceCreateWithoutSystemSettingsInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutSystemSettingsInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    brushOrders?: BrushOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutSystemSettingsInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutSystemSettingsInput, WorkspaceUncheckedCreateWithoutSystemSettingsInput>
+  }
+
+  export type WorkspaceUpsertWithoutSystemSettingsInput = {
+    update: XOR<WorkspaceUpdateWithoutSystemSettingsInput, WorkspaceUncheckedUpdateWithoutSystemSettingsInput>
+    create: XOR<WorkspaceCreateWithoutSystemSettingsInput, WorkspaceUncheckedCreateWithoutSystemSettingsInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutSystemSettingsInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutSystemSettingsInput, WorkspaceUncheckedUpdateWithoutSystemSettingsInput>
+  }
+
+  export type WorkspaceUpdateWithoutSystemSettingsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutSystemSettingsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrders?: BrushOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type WorkspaceCreateWithoutBrushOrdersInput = {
+    id?: string
+    name?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    categories?: CategoryCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderCreateNestedManyWithoutWorkspaceInput
+    products?: ProductCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingCreateNestedManyWithoutWorkspaceInput
+    users?: UserCreateNestedManyWithoutWorkspaceInput
+    owner: UserCreateNestedOneWithoutOwnedWorkspaceInput
+  }
+
+  export type WorkspaceUncheckedCreateWithoutBrushOrdersInput = {
+    id?: string
+    name?: string
+    ownerId: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    categories?: CategoryUncheckedCreateNestedManyWithoutWorkspaceInput
+    galleryItems?: GalleryItemUncheckedCreateNestedManyWithoutWorkspaceInput
+    gallerySubmissions?: GallerySubmissionUncheckedCreateNestedManyWithoutWorkspaceInput
+    outboundOrders?: OutboundOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    products?: ProductUncheckedCreateNestedManyWithoutWorkspaceInput
+    purchaseOrders?: PurchaseOrderUncheckedCreateNestedManyWithoutWorkspaceInput
+    suppliers?: SupplierUncheckedCreateNestedManyWithoutWorkspaceInput
+    systemSettings?: SystemSettingUncheckedCreateNestedManyWithoutWorkspaceInput
+    users?: UserUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type WorkspaceCreateOrConnectWithoutBrushOrdersInput = {
+    where: WorkspaceWhereUniqueInput
+    create: XOR<WorkspaceCreateWithoutBrushOrdersInput, WorkspaceUncheckedCreateWithoutBrushOrdersInput>
   }
 
   export type BrushOrderItemCreateWithoutBrushOrderInput = {
@@ -21604,6 +27531,51 @@ export namespace Prisma {
   export type BrushOrderItemCreateManyBrushOrderInputEnvelope = {
     data: BrushOrderItemCreateManyBrushOrderInput | BrushOrderItemCreateManyBrushOrderInput[]
     skipDuplicates?: boolean
+  }
+
+  export type WorkspaceUpsertWithoutBrushOrdersInput = {
+    update: XOR<WorkspaceUpdateWithoutBrushOrdersInput, WorkspaceUncheckedUpdateWithoutBrushOrdersInput>
+    create: XOR<WorkspaceCreateWithoutBrushOrdersInput, WorkspaceUncheckedCreateWithoutBrushOrdersInput>
+    where?: WorkspaceWhereInput
+  }
+
+  export type WorkspaceUpdateToOneWithWhereWithoutBrushOrdersInput = {
+    where?: WorkspaceWhereInput
+    data: XOR<WorkspaceUpdateWithoutBrushOrdersInput, WorkspaceUncheckedUpdateWithoutBrushOrdersInput>
+  }
+
+  export type WorkspaceUpdateWithoutBrushOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    categories?: CategoryUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUpdateManyWithoutWorkspaceNestedInput
+    owner?: UserUpdateOneRequiredWithoutOwnedWorkspaceNestedInput
+  }
+
+  export type WorkspaceUncheckedUpdateWithoutBrushOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    categories?: CategoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+    galleryItems?: GalleryItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+    gallerySubmissions?: GallerySubmissionUncheckedUpdateManyWithoutWorkspaceNestedInput
+    outboundOrders?: OutboundOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    products?: ProductUncheckedUpdateManyWithoutWorkspaceNestedInput
+    purchaseOrders?: PurchaseOrderUncheckedUpdateManyWithoutWorkspaceNestedInput
+    suppliers?: SupplierUncheckedUpdateManyWithoutWorkspaceNestedInput
+    systemSettings?: SystemSettingUncheckedUpdateManyWithoutWorkspaceNestedInput
+    users?: UserUncheckedUpdateManyWithoutWorkspaceNestedInput
   }
 
   export type BrushOrderItemUpsertWithWhereUniqueWithoutBrushOrderInput = {
@@ -21634,6 +27606,7 @@ export namespace Prisma {
     note?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    workspace?: WorkspaceCreateNestedOneWithoutBrushOrdersInput
   }
 
   export type BrushOrderUncheckedCreateWithoutItemsInput = {
@@ -21646,6 +27619,7 @@ export namespace Prisma {
     receivedAmount?: number
     commission?: number
     note?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21670,6 +27644,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemCreateNestedManyWithoutProductInput
     category: CategoryCreateNestedOneWithoutProductsInput
     supplier?: SupplierCreateNestedOneWithoutProductsInput
+    workspace?: WorkspaceCreateNestedOneWithoutProductsInput
     orderItems?: PurchaseOrderItemCreateNestedManyWithoutProductInput
   }
 
@@ -21684,6 +27659,7 @@ export namespace Prisma {
     isPublic?: boolean
     categoryId: string
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     gallery?: GalleryItemUncheckedCreateNestedManyWithoutProductInput
@@ -21719,6 +27695,7 @@ export namespace Prisma {
     note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutBrushOrdersNestedInput
   }
 
   export type BrushOrderUncheckedUpdateWithoutItemsInput = {
@@ -21731,6 +27708,7 @@ export namespace Prisma {
     receivedAmount?: FloatFieldUpdateOperationsInput | number
     commission?: FloatFieldUpdateOperationsInput | number
     note?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21761,6 +27739,7 @@ export namespace Prisma {
     outboundItems?: OutboundOrderItemUpdateManyWithoutProductNestedInput
     category?: CategoryUpdateOneRequiredWithoutProductsNestedInput
     supplier?: SupplierUpdateOneWithoutProductsNestedInput
+    workspace?: WorkspaceUpdateOneWithoutProductsNestedInput
     orderItems?: PurchaseOrderItemUpdateManyWithoutProductNestedInput
   }
 
@@ -21775,11 +27754,538 @@ export namespace Prisma {
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     gallery?: GalleryItemUncheckedUpdateManyWithoutProductNestedInput
     outboundItems?: OutboundOrderItemUncheckedUpdateManyWithoutProductNestedInput
     orderItems?: PurchaseOrderItemUncheckedUpdateManyWithoutProductNestedInput
+  }
+
+  export type BrushOrderCreateManyWorkspaceInput = {
+    id?: string
+    date?: Date | string
+    type: string
+    status?: string
+    principalAmount?: number
+    paymentAmount?: number
+    receivedAmount?: number
+    commission?: number
+    note?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CategoryCreateManyWorkspaceInput = {
+    id?: string
+    name: string
+    description?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GalleryItemCreateManyWorkspaceInput = {
+    id?: string
+    url: string
+    productId: string
+    tags?: GalleryItemCreatetagsInput | string[]
+    isPublic?: boolean
+    type?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GallerySubmissionCreateManyWorkspaceInput = {
+    id?: string
+    urls: JsonNullValueInput | InputJsonValue
+    sku?: string | null
+    productName?: string | null
+    status?: string
+    notes?: string | null
+    productId?: string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type OutboundOrderCreateManyWorkspaceInput = {
+    id?: string
+    type?: string
+    date?: Date | string
+    note?: string | null
+    totalAmount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProductCreateManyWorkspaceInput = {
+    id?: string
+    sku?: string | null
+    name: string
+    costPrice?: number
+    hideCost?: boolean
+    stock?: number
+    image?: string | null
+    isPublic?: boolean
+    categoryId: string
+    supplierId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PurchaseOrderCreateManyWorkspaceInput = {
+    id?: string
+    type?: string
+    status?: string
+    totalAmount?: number
+    date?: Date | string
+    shippingFees?: number
+    extraFees?: number
+    paymentVoucher?: string | null
+    paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
+    trackingData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SupplierCreateManyWorkspaceInput = {
+    id?: string
+    code?: string | null
+    name: string
+    contact?: string | null
+    phone?: string | null
+    email?: string | null
+    address?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SystemSettingCreateManyWorkspaceInput = {
+    id?: string
+    lowStockThreshold?: number
+    allowDataImport?: boolean
+    allowGalleryUpload?: boolean
+    storageType?: string
+    minioEndpoint?: string | null
+    minioPort?: number | null
+    minioAccessKey?: string | null
+    minioSecretKey?: string | null
+    minioBucket?: string | null
+    minioUseSSL?: boolean
+    minioPublicUrl?: string | null
+    uploadConflictStrategy?: string
+    updatedAt?: Date | string
+  }
+
+  export type UserCreateManyWorkspaceInput = {
+    id?: string
+    email: string
+    name?: string | null
+    role?: $Enums.Role
+    status?: string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BrushOrderUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    principalAmount?: FloatFieldUpdateOperationsInput | number
+    paymentAmount?: FloatFieldUpdateOperationsInput | number
+    receivedAmount?: FloatFieldUpdateOperationsInput | number
+    commission?: FloatFieldUpdateOperationsInput | number
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: BrushOrderItemUpdateManyWithoutBrushOrderNestedInput
+  }
+
+  export type BrushOrderUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    principalAmount?: FloatFieldUpdateOperationsInput | number
+    paymentAmount?: FloatFieldUpdateOperationsInput | number
+    receivedAmount?: FloatFieldUpdateOperationsInput | number
+    commission?: FloatFieldUpdateOperationsInput | number
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: BrushOrderItemUncheckedUpdateManyWithoutBrushOrderNestedInput
+  }
+
+  export type BrushOrderUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    principalAmount?: FloatFieldUpdateOperationsInput | number
+    paymentAmount?: FloatFieldUpdateOperationsInput | number
+    receivedAmount?: FloatFieldUpdateOperationsInput | number
+    commission?: FloatFieldUpdateOperationsInput | number
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CategoryUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    products?: ProductUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type CategoryUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    products?: ProductUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type CategoryUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GalleryItemUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    tags?: GalleryItemUpdatetagsInput | string[]
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
+    type?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    product?: ProductUpdateOneRequiredWithoutGalleryNestedInput
+  }
+
+  export type GalleryItemUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    productId?: StringFieldUpdateOperationsInput | string
+    tags?: GalleryItemUpdatetagsInput | string[]
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
+    type?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GalleryItemUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    productId?: StringFieldUpdateOperationsInput | string
+    tags?: GalleryItemUpdatetagsInput | string[]
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
+    type?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GallerySubmissionUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    urls?: JsonNullValueInput | InputJsonValue
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    productName?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    productId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GallerySubmissionUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    urls?: JsonNullValueInput | InputJsonValue
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    productName?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    productId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GallerySubmissionUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    urls?: JsonNullValueInput | InputJsonValue
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    productName?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    productId?: NullableStringFieldUpdateOperationsInput | string | null
+    selectedIndices?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OutboundOrderUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: OutboundOrderItemUpdateManyWithoutOutboundOrderNestedInput
+  }
+
+  export type OutboundOrderUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: OutboundOrderItemUncheckedUpdateManyWithoutOutboundOrderNestedInput
+  }
+
+  export type OutboundOrderUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProductUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    costPrice?: FloatFieldUpdateOperationsInput | number
+    hideCost?: BoolFieldUpdateOperationsInput | boolean
+    stock?: IntFieldUpdateOperationsInput | number
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrderItems?: BrushOrderItemUpdateManyWithoutProductNestedInput
+    gallery?: GalleryItemUpdateManyWithoutProductNestedInput
+    outboundItems?: OutboundOrderItemUpdateManyWithoutProductNestedInput
+    category?: CategoryUpdateOneRequiredWithoutProductsNestedInput
+    supplier?: SupplierUpdateOneWithoutProductsNestedInput
+    orderItems?: PurchaseOrderItemUpdateManyWithoutProductNestedInput
+  }
+
+  export type ProductUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    costPrice?: FloatFieldUpdateOperationsInput | number
+    hideCost?: BoolFieldUpdateOperationsInput | boolean
+    stock?: IntFieldUpdateOperationsInput | number
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
+    categoryId?: StringFieldUpdateOperationsInput | string
+    supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    brushOrderItems?: BrushOrderItemUncheckedUpdateManyWithoutProductNestedInput
+    gallery?: GalleryItemUncheckedUpdateManyWithoutProductNestedInput
+    outboundItems?: OutboundOrderItemUncheckedUpdateManyWithoutProductNestedInput
+    orderItems?: PurchaseOrderItemUncheckedUpdateManyWithoutProductNestedInput
+  }
+
+  export type ProductUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sku?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    costPrice?: FloatFieldUpdateOperationsInput | number
+    hideCost?: BoolFieldUpdateOperationsInput | boolean
+    stock?: IntFieldUpdateOperationsInput | number
+    image?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublic?: BoolFieldUpdateOperationsInput | boolean
+    categoryId?: StringFieldUpdateOperationsInput | string
+    supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PurchaseOrderUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    shippingFees?: FloatFieldUpdateOperationsInput | number
+    extraFees?: FloatFieldUpdateOperationsInput | number
+    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
+    paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
+    trackingData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: PurchaseOrderItemUpdateManyWithoutPurchaseOrderNestedInput
+  }
+
+  export type PurchaseOrderUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    shippingFees?: FloatFieldUpdateOperationsInput | number
+    extraFees?: FloatFieldUpdateOperationsInput | number
+    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
+    paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
+    trackingData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: PurchaseOrderItemUncheckedUpdateManyWithoutPurchaseOrderNestedInput
+  }
+
+  export type PurchaseOrderUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    totalAmount?: FloatFieldUpdateOperationsInput | number
+    date?: DateTimeFieldUpdateOperationsInput | Date | string
+    shippingFees?: FloatFieldUpdateOperationsInput | number
+    extraFees?: FloatFieldUpdateOperationsInput | number
+    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
+    paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
+    trackingData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SupplierUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    code?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    contact?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    products?: ProductUpdateManyWithoutSupplierNestedInput
+    purchaseOrderItems?: PurchaseOrderItemUpdateManyWithoutSupplierNestedInput
+  }
+
+  export type SupplierUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    code?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    contact?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    products?: ProductUncheckedUpdateManyWithoutSupplierNestedInput
+    purchaseOrderItems?: PurchaseOrderItemUncheckedUpdateManyWithoutSupplierNestedInput
+  }
+
+  export type SupplierUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    code?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    contact?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SystemSettingUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    lowStockThreshold?: IntFieldUpdateOperationsInput | number
+    allowDataImport?: BoolFieldUpdateOperationsInput | boolean
+    allowGalleryUpload?: BoolFieldUpdateOperationsInput | boolean
+    storageType?: StringFieldUpdateOperationsInput | string
+    minioEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    minioPort?: NullableIntFieldUpdateOperationsInput | number | null
+    minioAccessKey?: NullableStringFieldUpdateOperationsInput | string | null
+    minioSecretKey?: NullableStringFieldUpdateOperationsInput | string | null
+    minioBucket?: NullableStringFieldUpdateOperationsInput | string | null
+    minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
+    minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SystemSettingUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    lowStockThreshold?: IntFieldUpdateOperationsInput | number
+    allowDataImport?: BoolFieldUpdateOperationsInput | boolean
+    allowGalleryUpload?: BoolFieldUpdateOperationsInput | boolean
+    storageType?: StringFieldUpdateOperationsInput | string
+    minioEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    minioPort?: NullableIntFieldUpdateOperationsInput | number | null
+    minioAccessKey?: NullableStringFieldUpdateOperationsInput | string | null
+    minioSecretKey?: NullableStringFieldUpdateOperationsInput | string | null
+    minioBucket?: NullableStringFieldUpdateOperationsInput | string | null
+    minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
+    minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SystemSettingUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    lowStockThreshold?: IntFieldUpdateOperationsInput | number
+    allowDataImport?: BoolFieldUpdateOperationsInput | boolean
+    allowGalleryUpload?: BoolFieldUpdateOperationsInput | boolean
+    storageType?: StringFieldUpdateOperationsInput | string
+    minioEndpoint?: NullableStringFieldUpdateOperationsInput | string | null
+    minioPort?: NullableIntFieldUpdateOperationsInput | number | null
+    minioAccessKey?: NullableStringFieldUpdateOperationsInput | string | null
+    minioSecretKey?: NullableStringFieldUpdateOperationsInput | string | null
+    minioBucket?: NullableStringFieldUpdateOperationsInput | string | null
+    minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
+    minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    ownedWorkspace?: WorkspaceUpdateOneWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    ownedWorkspace?: WorkspaceUncheckedUpdateOneWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    status?: StringFieldUpdateOperationsInput | string
+    permissions?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProductCreateManyCategoryInput = {
@@ -21792,6 +28298,7 @@ export namespace Prisma {
     image?: string | null
     isPublic?: boolean
     supplierId?: string | null
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21811,6 +28318,7 @@ export namespace Prisma {
     gallery?: GalleryItemUpdateManyWithoutProductNestedInput
     outboundItems?: OutboundOrderItemUpdateManyWithoutProductNestedInput
     supplier?: SupplierUpdateOneWithoutProductsNestedInput
+    workspace?: WorkspaceUpdateOneWithoutProductsNestedInput
     orderItems?: PurchaseOrderItemUpdateManyWithoutProductNestedInput
   }
 
@@ -21824,6 +28332,7 @@ export namespace Prisma {
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     brushOrderItems?: BrushOrderItemUncheckedUpdateManyWithoutProductNestedInput
@@ -21842,6 +28351,7 @@ export namespace Prisma {
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     supplierId?: NullableStringFieldUpdateOperationsInput | string | null
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21860,6 +28370,7 @@ export namespace Prisma {
     tags?: GalleryItemCreatetagsInput | string[]
     isPublic?: boolean
     type?: string
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21914,6 +28425,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: WorkspaceUpdateOneWithoutGalleryItemsNestedInput
   }
 
   export type GalleryItemUncheckedUpdateWithoutProductInput = {
@@ -21922,6 +28434,7 @@ export namespace Prisma {
     tags?: GalleryItemUpdatetagsInput | string[]
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     type?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21932,6 +28445,7 @@ export namespace Prisma {
     tags?: GalleryItemUpdatetagsInput | string[]
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     type?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -22000,6 +28514,7 @@ export namespace Prisma {
     image?: string | null
     isPublic?: boolean
     categoryId: string
+    workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -22030,6 +28545,7 @@ export namespace Prisma {
     gallery?: GalleryItemUpdateManyWithoutProductNestedInput
     outboundItems?: OutboundOrderItemUpdateManyWithoutProductNestedInput
     category?: CategoryUpdateOneRequiredWithoutProductsNestedInput
+    workspace?: WorkspaceUpdateOneWithoutProductsNestedInput
     orderItems?: PurchaseOrderItemUpdateManyWithoutProductNestedInput
   }
 
@@ -22043,6 +28559,7 @@ export namespace Prisma {
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     brushOrderItems?: BrushOrderItemUncheckedUpdateManyWithoutProductNestedInput
@@ -22061,6 +28578,7 @@ export namespace Prisma {
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
     categoryId?: StringFieldUpdateOperationsInput | string
+    workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -22208,6 +28726,10 @@ export namespace Prisma {
    * Aliases for legacy arg types
    */
     /**
+     * @deprecated Use WorkspaceCountOutputTypeDefaultArgs instead
+     */
+    export type WorkspaceCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
+    /**
      * @deprecated Use CategoryCountOutputTypeDefaultArgs instead
      */
     export type CategoryCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = CategoryCountOutputTypeDefaultArgs<ExtArgs>
@@ -22231,6 +28753,10 @@ export namespace Prisma {
      * @deprecated Use BrushOrderCountOutputTypeDefaultArgs instead
      */
     export type BrushOrderCountOutputTypeArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = BrushOrderCountOutputTypeDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use WorkspaceDefaultArgs instead
+     */
+    export type WorkspaceArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = WorkspaceDefaultArgs<ExtArgs>
     /**
      * @deprecated Use CategoryDefaultArgs instead
      */
@@ -22271,6 +28797,10 @@ export namespace Prisma {
      * @deprecated Use UserDefaultArgs instead
      */
     export type UserArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = UserDefaultArgs<ExtArgs>
+    /**
+     * @deprecated Use EmailWhitelistDefaultArgs instead
+     */
+    export type EmailWhitelistArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = EmailWhitelistDefaultArgs<ExtArgs>
     /**
      * @deprecated Use VerificationCodeDefaultArgs instead
      */

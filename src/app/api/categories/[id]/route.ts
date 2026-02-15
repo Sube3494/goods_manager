@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
+    const session = await getSession() as SessionUser | null;
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    if (!hasPermission(session, "category:manage")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const category = await prisma.category.update({
@@ -32,10 +38,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
+    const session = await getSession() as SessionUser | null;
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    if (!hasPermission(session, "category:manage")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const { id: idParam } = await params;
     
     // 支持逗号分隔的批量 ID

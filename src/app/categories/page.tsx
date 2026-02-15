@@ -141,7 +141,7 @@ export default function CategoriesPage() {
         )}
       </div>
 
-      <div className="h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full mb-2">
+      <div className="h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full mb-6 md:mb-8">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input 
               type="text"

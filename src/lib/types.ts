@@ -6,6 +6,7 @@ export interface Supplier {
   phone: string;
   email: string;
   address: string;
+  workspaceId?: string;
   _count?: {
     products: number;
   };
@@ -24,6 +25,7 @@ export interface Product {
   supplier?: Supplier;
   isPublic?: boolean;
   hideCost?: boolean;
+  workspaceId?: string;
 }
 
 export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered"; // 暂时保留 Ordered 以防万一，但主推前四个
@@ -42,9 +44,11 @@ export interface PurchaseOrder {
   status: PurchaseStatus;
   totalAmount: number;
   date: string;
+  supplierId?: string;
   items: PurchaseOrderItem[];
   shippingFees: number;
   extraFees: number;
+  workspaceId?: string;
   paymentVoucher?: string;
   paymentVouchers?: string[];
   trackingData?: TrackingInfo[];
@@ -73,6 +77,7 @@ export interface Category {
   name: string;
   count: number;
   description?: string;
+  workspaceId?: string;
 
   products?: Product[];
   items?: Product[]; // For compatibility if used elsewhere
@@ -88,6 +93,7 @@ export interface GalleryItem {
   tags: string[];
   isPublic?: boolean;
   type?: "image" | "video";
+  workspaceId?: string;
   createdAt?: string;
 }
 
@@ -145,6 +151,7 @@ export interface BrushOrder {
   commission: number;      // 佣金
   note?: string;           // 备注
   items: BrushOrderItem[];
+  workspaceId?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -165,6 +172,7 @@ export interface OutboundOrder {
   note?: string;
   totalAmount?: number;
   items: OutboundOrderItem[];
+  workspaceId?: string;
   createdAt?: string;
   updatedAt?: string;
 }

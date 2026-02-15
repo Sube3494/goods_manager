@@ -16,7 +16,9 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 import { useUser } from "@/hooks/useUser";
+import { hasPermission } from "@/lib/permissions";
 import { Product, GalleryItem, Category } from "@/lib/types";
+import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
 import { pinyin } from 'pinyin-pro';
 
@@ -206,6 +208,8 @@ function GalleryContent() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   const { showToast } = useToast();
+  const canUpload = hasPermission(user as SessionUser | null, "gallery:upload");
+  const canDelete = hasPermission(user as SessionUser | null, "gallery:delete");
   
   // Lightbox Enhancements
   const [previewDirection, setPreviewDirection] = useState(0);
@@ -661,7 +665,7 @@ function GalleryContent() {
                 {/* Removed redundant Review Submissions button */}
                 
 
-               {(isUploadAllowed || isAdmin) && (
+               {(isUploadAllowed || isAdmin) && canUpload && (
                  <button 
                    onClick={() => {
                      setIsUploadModalOpen(true);
@@ -695,7 +699,7 @@ function GalleryContent() {
           </div>
 
           {!productIdFilter && (
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 mb-3">
               <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full shrink-0">
                 <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
@@ -709,17 +713,17 @@ function GalleryContent() {
             </div>
           )}
 
-        {/* Filters */}
-        {!productIdFilter && (
-          <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
-              <div className="flex items-center gap-2 pb-2">
+          {/* Filters */}
+          {!productIdFilter && (
+            <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide mb-6 md:mb-8">
+                <div className="flex items-center gap-2 pb-2">
                   <button
                       onClick={() => setSelectedCategory("All")}
                       className={cn(
                           "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
                           selectedCategory === "All" 
-                          ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
-                          : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
+                          ? "bg-foreground text-background border-foreground shadow-sm" 
+                          : "bg-muted/50 dark:bg-white/5 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground hover:border-border transition-all"
                       )}
                   >
                       全部展示
@@ -732,8 +736,8 @@ function GalleryContent() {
                           className={cn(
                               "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
                               selectedCategory === cat.name
-                              ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" 
-                              : "bg-muted/50 dark:glass text-muted-foreground border-border/50 hover:border-primary/30 hover:text-primary"
+                              ? "bg-foreground text-background border-foreground shadow-sm" 
+                              : "bg-muted/50 dark:bg-white/5 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground hover:border-border transition-all"
                           )}
                       >
                           {cat.name}
@@ -1503,7 +1507,7 @@ function GalleryContent() {
             }}
             onClear={() => setSelectedIds([])}
             label="个项目"
-            onDelete={handleBatchDelete}
+            onDelete={canDelete ? handleBatchDelete : undefined}
         />
       </>
     )}

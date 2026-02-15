@@ -5,6 +5,8 @@ interface User {
   email: string;
   name?: string;
   role: string;
+  workspaceId: string;
+  permissions?: Record<string, boolean>;
 }
 
 export function useUser() {

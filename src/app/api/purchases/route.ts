@@ -1,15 +1,29 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PurchaseOrderItem } from "@/lib/types";
+import { Prisma } from "../../../../prisma/generated-client";
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 // 获取所有采购订单
 export async function GET(request: Request) {
+  const session = await getFreshSession() as SessionUser | null;
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
   const productId = searchParams.get("productId");
 
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // 权限检查
+  const permission = type === "Inbound" ? "inbound:read" : "purchase:read";
+  if (!hasPermission(session, permission)) {
+    return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+  }
+
   try {
-    const where: any = {};
+    const where: Prisma.PurchaseOrderWhereInput = {};
     if (type) where.type = type;
     if (productId) {
       where.items = {
@@ -20,7 +34,11 @@ export async function GET(request: Request) {
     }
 
     const purchases = await prisma.purchaseOrder.findMany({
-      where,
+      where: {
+        ...where,
+        // Optional: constrain by workspace check if needed, though permission might be enough if we trust workspaceId
+        workspaceId: session.workspaceId
+      },
       include: {
         items: {
           include: {
@@ -50,8 +68,14 @@ function generateOrderId() {
 // 创建新采购订单
 export async function POST(request: Request) {
   try {
+    const session = await getSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { 
+      type,
       status, 
       date, 
       totalAmount, 
@@ -63,11 +87,18 @@ export async function POST(request: Request) {
       paymentVouchers
     } = body;
 
+    // 权限检查
+    const permission = type === "Inbound" ? "inbound:create" : "purchase:create";
+    if (!hasPermission(session, permission)) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const orderId = generateOrderId();
 
     const purchase = await prisma.purchaseOrder.create({
       data: {
         id: orderId,
+        type: type || undefined,
         status: status || "Draft",
         date: date ? new Date(date) : new Date(),
         totalAmount: Number(totalAmount) || 0,
@@ -76,6 +107,7 @@ export async function POST(request: Request) {
         paymentVoucher: paymentVoucher || null,
         paymentVouchers: paymentVouchers || [],
         trackingData: trackingData || [],
+        workspaceId: session.workspaceId,
         items: {
           create: items.map((item: PurchaseOrderItem) => ({
             productId: item.productId,

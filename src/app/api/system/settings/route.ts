@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "../../../../../prisma/generated-client";
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 // 获取系统设置
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !hasPermission(session, "system:manage")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // 使用 upsert 确保记录存在
     const settings = await prisma.systemSetting.upsert({
       where: { id: "system" },
@@ -29,6 +36,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !hasPermission(session, "system:manage")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { 
       lowStockThreshold, 

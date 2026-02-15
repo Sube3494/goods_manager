@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Edit2, Trash2, Truck, Phone, Mail, MapPin, Check, Package } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Truck, Check, Package } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ActionBar } from "@/components/ui/ActionBar";
+import { useUser } from "@/hooks/useUser";
+import { hasPermission } from "@/lib/permissions";
 import { Supplier } from "@/lib/types";
+import { SessionUser } from "@/lib/permissions";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -28,6 +31,8 @@ export default function SuppliersPage() {
   });
   
   const { showToast } = useToast();
+  const { user } = useUser();
+  const canManage = hasPermission(user as SessionUser | null, "supplier:manage");
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -131,17 +136,19 @@ export default function SuppliersPage() {
           <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理供应链合作伙伴与联系信息。</p>
         </div>
         
-        <button 
-            onClick={handleOpenCreate}
-            className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
-        >
-            <Plus size={16} className="md:w-[18px] md:h-[18px]" />
-            新建供应商
-        </button>
+        {canManage && (
+          <button 
+              onClick={handleOpenCreate}
+              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
+          >
+              <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+              新建供应商
+          </button>
+        )}
       </div>
 
       {/* Search Box */}
-      <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
+      <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 mb-6 md:mb-8">
         <Search size={18} className="text-muted-foreground shrink-0" />
         <input
           type="text"
@@ -202,22 +209,24 @@ export default function SuppliersPage() {
                             </div>
                         </div>
                         
-                        <div className="flex gap-1 opacity-100 translate-y-0 lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 transition-all duration-300">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); handleOpenEdit(supplier); }} 
-                                className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
-                                title="编辑"
-                            >
-                                <Edit2 size={14} />
-                            </button>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); handleDelete(supplier.id, supplier.name); }} 
-                                className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                title="删除"
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
+                        {canManage && (
+                          <div className="flex gap-1 opacity-100 translate-y-0 lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 transition-all duration-300">
+                              <button 
+                                  onClick={(e) => { e.stopPropagation(); handleOpenEdit(supplier); }} 
+                                  className="p-1.5 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
+                                  title="编辑"
+                              >
+                                  <Edit2 size={14} />
+                              </button>
+                              <button 
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(supplier.id, supplier.name); }} 
+                                  className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                  title="删除"
+                              >
+                                  <Trash2 size={14} />
+                              </button>
+                          </div>
+                        )}
                     </div>
                 </div>
              );
@@ -265,7 +274,7 @@ export default function SuppliersPage() {
         }}
         onClear={() => setSelectedIds([])}
         label="个供应商"
-        onDelete={() => {
+        onDelete={canManage ? () => {
           setConfirmConfig({
             isOpen: true,
             title: "批量删除供应商",
@@ -289,7 +298,7 @@ export default function SuppliersPage() {
               }
             },
           });
-        }}
+        } : undefined}
       />
     </div>
   );

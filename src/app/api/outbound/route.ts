@@ -1,10 +1,24 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { OutboundOrderItem, Prisma } from '../../../../prisma/generated-client';
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export async function GET() {
   try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!hasPermission(session, "outbound:read")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const orders = await prisma.outboundOrder.findMany({
+      where: {
+        workspaceId: session.workspaceId
+      },
       include: {
         items: {
           include: {
@@ -25,6 +39,15 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!hasPermission(session, "outbound:create")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const body = await request.json();
     const { type, date, note, items } = body;
 
@@ -40,6 +63,7 @@ export async function POST(request: Request) {
           type: type || "Sale",
           date: date ? new Date(date) : new Date(),
           note: note || "",
+          workspaceId: session.workspaceId,
           items: {
             create: items.map((item: OutboundOrderItem) => ({
               productId: item.productId,

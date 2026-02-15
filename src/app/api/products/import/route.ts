@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { SessionUser } from "@/lib/permissions";
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getSession() as SessionUser | null;
+    const workspaceId = session?.workspaceId;
+    if (!session || !workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -47,9 +49,14 @@ export async function POST(request: Request) {
                 continue;
             }
 
-            // Find existing product by SKU
+            // Find existing product by SKU in CURRENT workspace
             const existingProduct = await prisma.product.findUnique({
-                where: { sku }
+                where: { 
+                    sku_workspaceId: {
+                        sku,
+                        workspaceId
+                    }
+                }
             });
 
             if (existingProduct) {
@@ -113,6 +120,7 @@ export async function POST(request: Request) {
                 type: "Inbound",
                 status: "Received",
                 date: new Date(),
+                workspaceId,
                 totalAmount: importedItems.reduce((acc, curr) => acc + (curr.quantity * curr.costPrice), 0),
                 items: {
                     create: importedItems.map(item => ({

@@ -123,8 +123,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           fetch("/api/suppliers"),
           fetch("/api/categories")
         ]);
-        if (sRes.ok && cRes.ok) {
+        
+        if (sRes.ok) {
           setSuppliers(await sRes.json());
+        }
+        
+        if (cRes.ok) {
           setCategories(await cRes.json());
         }
       } catch (error) {
@@ -570,14 +574,14 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-20000 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-20000 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">{initialData ? "编辑商品" : "新增商品"}</h2>
@@ -1024,7 +1028,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
       <AnimatePresence>
         {selectedPreviewImage && (
           <div 
-            className="fixed inset-0 z-99999 flex items-center justify-center p-4 overflow-hidden touch-none"
+            className="fixed inset-0 z-200 flex items-center justify-center p-4 overflow-hidden touch-none"
             onWheel={handleWheel}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}

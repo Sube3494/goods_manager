@@ -8,20 +8,31 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { RecentInbound } from "@/components/Dashboard/RecentInbound";
 import { QuickActions } from "@/components/Dashboard/QuickActions";
 import { format } from "date-fns";
 import { StatsData } from "@/lib/types";
-
+import { useUser } from "@/hooks/useUser";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const { user, isLoading: isUserLoading } = useUser();
+  const router = useRouter();
   const [statsData, setStatsData] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, isUserLoading, router]);
+
   const fetchData = useCallback(async () => {
+    if (!user) return; // Don't fetch if not logged in
+    
     setIsLoading(true);
     try {
       const res = await fetch('/api/stats', { cache: 'no-store' });
@@ -35,11 +46,23 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  if (isUserLoading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[60vh]">
+        <Loader2 className="animate-spin text-muted-foreground" size={32} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect in useEffect
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">

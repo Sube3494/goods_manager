@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { SessionUser } from "@/lib/permissions";
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getSession() as SessionUser | null;
+    const workspaceId = session?.workspaceId;
+    if (!session || !workspaceId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const data = await req.json();
     if (!Array.isArray(data)) {
       return NextResponse.json({ error: "数据格式不正确" }, { status: 400 });
@@ -39,13 +47,25 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Try to find product
+        // Try to find product in CURRENT workspace
         let product = null;
         if (sku) {
-          product = await prisma.product.findUnique({ where: { sku: String(sku) } });
+          product = await prisma.product.findUnique({ 
+              where: { 
+                  sku_workspaceId: { 
+                      sku: String(sku), 
+                      workspaceId 
+                  } 
+              } 
+          });
         }
         if (!product && productName) {
-          product = await prisma.product.findFirst({ where: { name: String(productName) } });
+          product = await prisma.product.findFirst({ 
+              where: { 
+                  name: String(productName), 
+                  workspaceId 
+              } 
+          });
         }
 
         if (!product) {
@@ -59,6 +79,7 @@ export async function POST(req: NextRequest) {
             date: new Date(dateStr),
             type: String(type),
             status: "Completed", // Default to completed for imports
+            workspaceId,
             principalAmount: parseFloat(String(principal || 0)),
             paymentAmount: parseFloat(String(payment || 0)),
             receivedAmount: parseFloat(String(received || 0)),

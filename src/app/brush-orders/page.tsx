@@ -12,13 +12,17 @@ import * as XLSX from "xlsx";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-
 import { DatePicker } from "@/components/ui/DatePicker";
 import { isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
 import { pinyinMatch } from "@/lib/pinyin";
+import { useUser } from "@/hooks/useUser";
+import { hasPermission } from "@/lib/permissions";
+import { SessionUser } from "@/lib/permissions";
 
 export default function BrushOrdersPage() {
   const { showToast } = useToast();
+  const { user } = useUser();
+  const canBrush = hasPermission(user as SessionUser | null, "brush:create");
   const [orders, setOrders] = useState<BrushOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<BrushOrder | null>(null);
@@ -308,33 +312,37 @@ export default function BrushOrdersPage() {
         </div>
         
         <div className="flex items-center gap-2 shrink-0">
-           <div className="flex items-center gap-1 sm:gap-2">
-            <button 
-                onClick={() => setIsImportModalOpen(true)}
-                className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full border border-border bg-white dark:bg-white/5 sm:px-4 text-xs font-bold text-foreground hover:bg-muted transition-all"
-                title="导入"
-            >
-                <Upload size={16} className="sm:size-[18px]" />
-                <span className="hidden sm:inline">导入</span>
-            </button>
-            <button 
-                onClick={handleExport}
-                className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full border border-border bg-white dark:bg-white/5 sm:px-4 text-xs font-bold text-foreground hover:bg-muted transition-all"
-                title="导出"
-            >
-                <Download size={16} className="sm:size-[18px]" />
-                <span className="hidden sm:inline">导出</span>
-            </button>
-           </div>
+           {canBrush && (
+             <div className="flex items-center gap-1 sm:gap-2">
+              <button 
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full border border-border bg-white dark:bg-white/5 sm:px-4 text-xs font-bold text-foreground hover:bg-muted transition-all"
+                  title="导入"
+              >
+                  <Upload size={16} className="sm:size-[18px]" />
+                  <span className="hidden sm:inline">导入</span>
+              </button>
+              <button 
+                  onClick={handleExport}
+                  className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full border border-border bg-white dark:bg-white/5 sm:px-4 text-xs font-bold text-foreground hover:bg-muted transition-all"
+                  title="导出"
+              >
+                  <Download size={16} className="sm:size-[18px]" />
+                  <span className="hidden sm:inline">导出</span>
+              </button>
+             </div>
+           )}
            
-          <button 
-            onClick={handleCreate}
-            className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
-          >
-            <Plus size={16} className="md:w-[18px] md:h-[18px]" />
-             <span className="hidden sm:inline">新建刷单</span>
-             <span className="inline sm:hidden">新建</span>
-          </button>
+          {canBrush && (
+            <button 
+              onClick={handleCreate}
+              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
+            >
+              <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+               <span className="hidden sm:inline">新建刷单</span>
+               <span className="inline sm:hidden">新建</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -356,8 +364,8 @@ export default function BrushOrdersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="h-10 px-5 w-full md:flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm">
+      <div className="flex flex-col md:flex-row gap-3 mb-6 md:mb-8">
+        <div className="h-10 sm:h-11 px-5 w-full md:flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -610,7 +618,7 @@ export default function BrushOrdersPage() {
           }
         }}
         onClear={() => setSelectedIds([])}
-        onDelete={handleBatchDelete}
+        onDelete={canBrush ? handleBatchDelete : undefined}
         label="个订单"
       />
     <ImportModal 

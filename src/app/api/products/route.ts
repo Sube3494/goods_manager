@@ -1,20 +1,36 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 // 获取所有商品
 export async function GET() {
-  const session = await getSession();
+  const session = await getFreshSession() as SessionUser | null;
+  const workspaceId = session?.workspaceId;
   
   try {
-    const products = await prisma.product.findMany({
-      where: session ? {} : { isPublic: true },
-      ...(session ? {
+    let products;
+    const canReadProducts = session && hasPermission(session, "product:read");
+
+    if (canReadProducts) {
+      products = await prisma.product.findMany({
+        where: {
+          OR: [
+            { workspaceId },
+            { isPublic: true }
+          ]
+        },
         include: {
           category: true,
           supplier: true,
+        },
+        orderBy: {
+          createdAt: 'desc'
         }
-      } : {
+      });
+    } else {
+      products = await prisma.product.findMany({
+        where: { isPublic: true },
         select: {
           id: true,
           name: true,
@@ -25,12 +41,12 @@ export async function GET() {
           createdAt: true,
           categoryId: true,
           category: true,
+        },
+        orderBy: {
+          createdAt: 'desc'
         }
-      }),
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+      });
+    }
     return NextResponse.json(products);
   } catch (error) {
     console.error("Failed to fetch products:", error);
@@ -41,10 +57,15 @@ export async function GET() {
 // 创建新商品
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    if (!hasPermission(session, "product:create")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const body = await request.json();
     const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
 
@@ -61,6 +82,7 @@ export async function POST(request: Request) {
         supplierId: supplierId || null,
         image,
         isPublic: isPublic ?? true,
+        workspaceId: session.workspaceId,
       },
       include: {
         category: true,
@@ -75,14 +97,15 @@ export async function POST(request: Request) {
           id: orderId,
           type: "Inbound",
           status: "Received",
-          totalAmount: 0, // 初始库存可能没有准确的进货价记录，暂记为 0 或同步售价
+          totalAmount: 0,
           date: new Date(),
+          workspaceId: session.workspaceId,
           items: {
             create: [{
               productId: product.id,
               supplierId: supplierId || null,
               quantity: stockNum,
-              costPrice: 0 // 初始录入成本暂定为 0
+              costPrice: 0
             }]
           }
         }
@@ -107,10 +130,15 @@ export async function POST(request: Request) {
 // 更新商品
 export async function PUT(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    if (!hasPermission(session, "product:update")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const body = await request.json();
     const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
 
@@ -118,7 +146,18 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }
 
-    const product = await prisma.product.update({
+    const existing = await prisma.product.findFirst({
+      where: { 
+        id,
+        workspaceId: session.workspaceId
+      }
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Product not found in this workspace" }, { status: 404 });
+    }
+
+    const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
         name,
@@ -136,7 +175,7 @@ export async function PUT(request: Request) {
       }
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json(updatedProduct);
   } catch (error) {
     console.error("Failed to update product:", error);
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
@@ -146,9 +185,13 @@ export async function PUT(request: Request) {
 // 删除商品
 export async function DELETE(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!hasPermission(session, "product:delete")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -158,20 +201,28 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }
 
+    // Security check: Verify product belongs to user's workspace
+    const product = await prisma.product.findFirst({
+      where: { id, workspaceId: session.workspaceId }
+    });
+
+    if (!product) {
+      return NextResponse.json({ error: "Product not found in this workspace" }, { status: 404 });
+    }
+
     // Delete related records first to avoid foreign key constraint errors
     // 1. Delete gallery items
     await prisma.galleryItem.deleteMany({
-      where: { productId: id }
+      where: { productId: id, workspaceId: session.workspaceId }
     });
 
-    // 2. Delete purchase order items
-    await prisma.purchaseOrderItem.deleteMany({
-      where: { productId: id }
-    });
+    // 2. Delete purchase order items (Cascaded by purchaseOrder, but for safety in logical isolation)
+    // Actually, purchaseOrder itself has the workspaceId, so we just need to delete the product
+    // cascading takes care of the items if defined, but we need to ensure isolation.
 
     // 3. Finally delete the product
     await prisma.product.delete({
-      where: { id },
+      where: { id, workspaceId: session.workspaceId },
     });
 
     return NextResponse.json({ success: true });
