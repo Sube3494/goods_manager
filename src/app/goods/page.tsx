@@ -4,14 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download } from "lucide-react";
+import { Search, Plus, Download, ArrowUp } from "lucide-react";
 import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-
+import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
+import * as XLSX from "xlsx";
 
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
@@ -27,6 +29,7 @@ export default function GoodsPage() {
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
   const [settings, setSettings] = useState<{ lowStockThreshold: number }>({ lowStockThreshold: 10 });
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -107,6 +110,30 @@ export default function GoodsPage() {
     fetchGoods();
     fetchSettings();
   }, [fetchGoods, fetchSettings]);
+
+  useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const target = e.target;
+      let st = 0;
+      
+      if (target === document || target === window) {
+        st = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      } else if (target instanceof HTMLElement) {
+        st = target.scrollTop;
+      }
+        
+      setShowScrollTop(st > 10);
+    };
+    
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const handleCreate = () => {
     setEditingProduct(undefined);
@@ -245,6 +272,30 @@ export default function GoodsPage() {
     }
   };
 
+  const handleExport = () => {
+    if (filteredGoods.length === 0) {
+      showToast("没有可导出的商品", "error");
+      return;
+    }
+
+    const exportData = filteredGoods.map(g => ({
+      "商品名称": g.name,
+      "SKU/店内码": g.sku || "",
+      "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
+      "进货单价": g.costPrice,
+      "当前库存": g.stock,
+      "供应商": g.supplier?.name || "未知供应商",
+      "商品图片": g.image || "暂无图片",
+      "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "商品列表");
+    XLSX.writeFile(workbook, `商品库导出_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast("已开始下载 Excel 文件", "success");
+  };
+
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
     if (!Array.isArray(data)) return;
     try {
@@ -316,8 +367,17 @@ export default function GoodsPage() {
         
         <div className="flex items-center gap-2 shrink-0">
            {(canCreate) && (
-             <div className="glass p-1 rounded-full flex gap-1 items-center h-9 sm:h-10 shadow-sm border border-white/10">
-               <button 
+              <div className="glass p-1 rounded-full flex gap-1 items-center h-9 sm:h-10 shadow-sm border border-white/10">
+                <button 
+                  onClick={handleExport}
+                  className="flex items-center justify-center rounded-full w-7 h-7 sm:w-auto sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+                  title="导出 Excel"
+                >
+                  <Download size={16} className="sm:size-[18px] rotate-180" />
+                  <span className="hidden sm:inline ml-2">导出</span>
+                </button>
+                <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
+                <button 
                   onClick={() => setIsImportOpen(true)}
                   className="flex items-center justify-center rounded-full w-7 h-7 sm:w-auto sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                   title="Excel 导入"
@@ -334,7 +394,7 @@ export default function GoodsPage() {
                   <span className="hidden sm:inline">新建商品</span>
                   <span className="inline sm:hidden">新建</span>
                 </button>
-             </div>
+              </div>
            )}
         </div>
       </div>
@@ -430,7 +490,8 @@ export default function GoodsPage() {
             "*进货单价": 99.00,
             "库存": 100,
             "SKU": "EXAMPLE-001",
-            "供应商": "默认供应商"
+            "供应商": "默认供应商",
+            "商品图片": "https://example.com/image.jpg"
           }
         ]}
       />
@@ -477,6 +538,24 @@ export default function GoodsPage() {
         onDelete={handleBatchDelete}
         onEdit={() => setIsBatchEditOpen(true)}
       />
+
+      {/* Back to Top Button */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: 20 }}
+              onClick={scrollToTop}
+              className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"
+            >
+              <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

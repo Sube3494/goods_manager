@@ -10,6 +10,8 @@ export interface Supplier {
   _count?: {
     products: number;
   };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Product {
@@ -26,6 +28,8 @@ export interface Product {
   isPublic?: boolean;
   hideCost?: boolean;
   workspaceId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered"; // 暂时保留 Ordered 以防万一，但主推前四个

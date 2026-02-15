@@ -19669,11 +19669,10 @@ export namespace Prisma {
 
   export type ProductWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    sku_workspaceId?: ProductSkuWorkspaceIdCompoundUniqueInput
+    sku?: string
     AND?: ProductWhereInput | ProductWhereInput[]
     OR?: ProductWhereInput[]
     NOT?: ProductWhereInput | ProductWhereInput[]
-    sku?: StringNullableFilter<"Product"> | string | null
     name?: StringFilter<"Product"> | string
     costPrice?: FloatFilter<"Product"> | number
     hideCost?: BoolFilter<"Product"> | boolean
@@ -19692,7 +19691,7 @@ export namespace Prisma {
     supplier?: XOR<SupplierNullableRelationFilter, SupplierWhereInput> | null
     workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
     orderItems?: PurchaseOrderItemListRelationFilter
-  }, "id" | "sku_workspaceId">
+  }, "id" | "sku">
 
   export type ProductOrderByWithAggregationInput = {
     id?: SortOrder
@@ -22489,11 +22488,6 @@ export namespace Prisma {
 
   export type PurchaseOrderItemOrderByRelationAggregateInput = {
     _count?: SortOrder
-  }
-
-  export type ProductSkuWorkspaceIdCompoundUniqueInput = {
-    sku: string
-    workspaceId: string
   }
 
   export type ProductCountOrderByAggregateInput = {

@@ -32,10 +32,13 @@ export async function POST(request: Request) {
 
     for (const item of products) {
         try {
-            // Map keys for SKU and Quantity
-            const sku = String(item.sku || item['SKU'] || item['编码'] || item['*SKU'] || "");
-            const quantity = Number(item['入库数量'] || item['*入库数量'] || item.stock || item['数量'] || item['Quantity'] || 0);
+            // Map keys for SKU and Quantity (Supporting both internal formats and exported headers)
+            const sku = String(item.sku || item['SKU/店内码'] || item['SKU'] || item['编码'] || item['*SKU'] || "");
+            const quantity = Number(item['入库数量'] || item['*入库数量'] || item['当前库存'] || item.stock || item['数量'] || item['Quantity'] || 0);
             const costPrice = Number(item['进货单价'] || item['*进货单价'] || item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
+            const image = String(item['商品图片'] || item.image || item['图片'] || "");
+            const name = String(item['商品名称'] || item.name || "");
+            const categoryName = String(item['分类'] || item.category || "");
             
             if (!sku) {
                 failCount++;
@@ -43,71 +46,137 @@ export async function POST(request: Request) {
                 continue;
             }
 
-            if (quantity <= 0) {
-                failCount++;
-                errors.push({ sku, reason: `入库数量无效 (${quantity})` });
-                continue;
-            }
-
-            // Find existing product by SKU in CURRENT workspace
-            const existingProduct = await prisma.product.findUnique({
-                where: { 
-                    sku_workspaceId: {
-                        sku,
-                        workspaceId
-                    }
-                }
+            // Find existing product by SKU GLOBALLY
+            const product = await prisma.product.findUnique({
+                where: { sku: sku }
             });
 
-            if (existingProduct) {
-                // Simplified flow: Update existing product stock
-                
-                const currentStock = existingProduct.stock;
-                const currentCost = existingProduct.costPrice || 0;
+            if (product) {
+                // UPDATE: Replenishment & metadata update
+                const currentStock = product.stock;
+                const currentCost = product.costPrice || 0;
                 
                 let newCostPrice = currentCost;
                 
-                // Calculate Weighted Average Cost
-                if (costPrice > 0) {
+                if (costPrice > 0 && quantity > 0) {
                     if (currentStock <= 0) {
-                        // If current stock is 0 or negative, reset cost to incoming price
                         newCostPrice = costPrice;
                     } else {
-                        // Weighted Average Formula
-                        // ((Current Stock * Current Cost) + (Incoming Qty * Incoming Cost)) / (Current Stock + Incoming Qty)
                         const totalValue = (currentStock * currentCost) + (quantity * costPrice);
                         const totalQty = currentStock + quantity;
                         newCostPrice = totalValue / totalQty;
                     }
                 }
 
-                const updateData = {
-                    stock: { increment: quantity },
+                const updateData: Record<string, unknown> = {
                     costPrice: newCostPrice
-                } as Parameters<typeof prisma.product.update>[0]['data'];
+                };
+
+                if (quantity > 0) {
+                    updateData.stock = { increment: quantity };
+                }
+
+                if (image && image !== "暂无图片") {
+                    let finalImage = image;
+                    const uploadIndex = finalImage.indexOf('/uploads/');
+                    if (uploadIndex !== -1) {
+                        finalImage = finalImage.substring(uploadIndex);
+                    } else if (finalImage.startsWith('http')) {
+                        try {
+                            const url = new URL(finalImage);
+                            if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.startsWith('192.168.')) {
+                                finalImage = url.pathname + url.search;
+                            }
+                        } catch { }
+                    }
+                    updateData.image = finalImage;
+                }
 
                 await prisma.product.update({
-                    where: { id: existingProduct.id },
+                    where: { id: product.id },
                     data: updateData
                 });
 
-                importedItems.push({
-                    productId: existingProduct.id,
-                    quantity: quantity,
-                    costPrice: costPrice
-                });
-
+                if (quantity > 0) {
+                    importedItems.push({
+                        productId: product.id,
+                        quantity: quantity,
+                        costPrice: costPrice
+                    });
+                }
                 successCount++;
             } else {
-                // If SKU doesn't exist, we can't replenish
-                console.warn(`Import: SKU ${sku} not found. Skipping.`);
-                failCount++;
-                errors.push({ sku, reason: "系统内未找到该 SKU" });
+                // CREATE: If SKU doesn't exist, create a new product
+                if (!name) {
+                    failCount++;
+                    errors.push({ sku, reason: "系统内未找到该 SKU，且导入数据中缺少商品名称，无法创建商品" });
+                    continue;
+                }
+
+                // Handle Category for new product
+                let finalCategoryId: string;
+                if (categoryName) {
+                    let category = await prisma.category.findFirst({
+                        where: { name: categoryName }
+                    });
+                    
+                    if (!category) {
+                        category = await prisma.category.create({
+                            data: { name: categoryName, workspaceId }
+                        });
+                    }
+                    finalCategoryId = category.id;
+                } else {
+                    // Try to find or create a default category if none exists
+                    const defaultCat = await prisma.category.findFirst({
+                        where: { name: "其他分类" }
+                    });
+                    if (defaultCat) {
+                        finalCategoryId = defaultCat.id;
+                    } else {
+                        const newDefaultCat = await prisma.category.create({
+                            data: { name: "其他分类", workspaceId }
+                        });
+                        finalCategoryId = newDefaultCat.id;
+                    }
+                }
+
+                let finalImage: string | undefined = undefined;
+                if (image && image !== "暂无图片") {
+                    finalImage = image;
+                    const uploadIndex = finalImage.indexOf('/uploads/');
+                    if (uploadIndex !== -1) {
+                        finalImage = finalImage.substring(uploadIndex);
+                    }
+                }
+
+                const newProduct = await prisma.product.create({
+                    data: {
+                        sku,
+                        name,
+                        categoryId: finalCategoryId as string,
+                        costPrice: costPrice > 0 ? costPrice : 0,
+                        stock: quantity > 0 ? quantity : 0,
+                        image: finalImage,
+                        workspaceId,
+                        isPublic: true
+                    }
+                });
+
+                if (quantity > 0) {
+                    importedItems.push({
+                        productId: newProduct.id,
+                        quantity: quantity,
+                        costPrice: costPrice > 0 ? costPrice : 0
+                    });
+                }
+                successCount++;
             }
         } catch (e) {
             console.error("Import item error:", e);
+            const sku = item.sku || item['SKU/店内码'] || "未知";
             failCount++;
-            errors.push({ sku: item.sku || "未知", reason: "数据解析或数据库更新失败" });
+            errors.push({ sku: String(sku), reason: "数据解析或数据库更新失败" });
         }
     }
 

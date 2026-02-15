@@ -3,50 +3,18 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
-// 获取所有商品
+// 获取所有商品 (共享模式)
 export async function GET() {
-  const session = await getFreshSession() as SessionUser | null;
-  const workspaceId = session?.workspaceId;
-  
   try {
-    let products;
-    const canReadProducts = session && hasPermission(session, "product:read");
-
-    if (canReadProducts) {
-      products = await prisma.product.findMany({
-        where: {
-          OR: [
-            { workspaceId },
-            { isPublic: true }
-          ]
-        },
-        include: {
-          category: true,
-          supplier: true,
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-    } else {
-      products = await prisma.product.findMany({
-        where: { isPublic: true },
-        select: {
-          id: true,
-          name: true,
-          sku: true,
-          image: true,
-          stock: true,
-          isPublic: true,
-          createdAt: true,
-          categoryId: true,
-          category: true,
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-    }
+    const products = await prisma.product.findMany({
+      include: {
+        category: true,
+        supplier: true,
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
     return NextResponse.json(products);
   } catch (error) {
     console.error("Failed to fetch products:", error);
@@ -67,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image } = body;
 
     const stockNum = Number(stock) || 0;
 
@@ -81,7 +49,7 @@ export async function POST(request: Request) {
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
-        isPublic: isPublic ?? true,
+        isPublic: true, // Default to true
         workspaceId: session.workspaceId,
       },
       include: {
@@ -140,21 +108,18 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }
 
     const existing = await prisma.product.findFirst({
-      where: { 
-        id,
-        workspaceId: session.workspaceId
-      }
+      where: { id }
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "Product not found in this workspace" }, { status: 404 });
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     const updatedProduct = await prisma.product.update({
@@ -168,7 +133,7 @@ export async function PUT(request: Request) {
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
-        isPublic: isPublic ?? true,
+        isPublic: true,
       },
       include: {
         category: true,
@@ -201,19 +166,19 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }
 
-    // Security check: Verify product belongs to user's workspace
+    // Security check: Global access
     const product = await prisma.product.findFirst({
-      where: { id, workspaceId: session.workspaceId }
+      where: { id }
     });
 
     if (!product) {
-      return NextResponse.json({ error: "Product not found in this workspace" }, { status: 404 });
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
     // Delete related records first to avoid foreign key constraint errors
     // 1. Delete gallery items
     await prisma.galleryItem.deleteMany({
-      where: { productId: id, workspaceId: session.workspaceId }
+      where: { productId: id }
     });
 
     // 2. Delete purchase order items (Cascaded by purchaseOrder, but for safety in logical isolation)
@@ -222,12 +187,20 @@ export async function DELETE(request: Request) {
 
     // 3. Finally delete the product
     await prisma.product.delete({
-      where: { id, workspaceId: session.workspaceId },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to delete product:", error);
+    
+    // Handle Prisma Foreign Key Constraint error (linked to orders, etc.)
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
+      return NextResponse.json({ 
+        error: "该商品存在订单或交易记录，为了审计安全无法删除。建议调整库存或修改信息。" 
+      }, { status: 409 });
+    }
+
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }
 }

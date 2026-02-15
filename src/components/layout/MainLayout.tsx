@@ -35,7 +35,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
     return (
     <ToastProvider>
-        <div className="w-full min-h-screen bg-transparent text-foreground relative flex font-sans overflow-hidden">
+        <div className="w-full min-h-screen bg-transparent text-foreground relative flex font-sans overflow-x-hidden">
         {/* Ambient Background Mesh - Animated Blobs */}
         <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
             {/* Subtle Ambient Light - Clean & Professional */}

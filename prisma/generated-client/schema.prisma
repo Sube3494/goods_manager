@@ -68,7 +68,7 @@ model Product {
   workspace       Workspace?          @relation(fields: [workspaceId], references: [id])
   orderItems      PurchaseOrderItem[]
 
-  @@unique([sku, workspaceId])
+  @@unique([sku])
   @@index([categoryId])
   @@index([supplierId])
   @@index([workspaceId])

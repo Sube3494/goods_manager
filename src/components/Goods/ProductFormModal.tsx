@@ -39,7 +39,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     image: initialData?.image || "",
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
-    isPublic: initialData?.isPublic ?? true,
     hideCost: initialData?.hideCost ?? false
   });
   
@@ -166,7 +165,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: initialData.categoryId || "",
           supplierId: initialData.supplierId || "",
           image: initialData.image || "",
-          isPublic: initialData.isPublic ?? true,
           hideCost: initialData.hideCost ?? false,
         });
         fetchGallery(initialData.id);
@@ -179,7 +177,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: "",
           supplierId: "",
           image: "",
-          isPublic: true,
           hideCost: false,
         });
       }
@@ -675,18 +672,18 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Eye size={16} /> 对外展示
+                                <Eye size={16} /> 展示设置
                             </label>
                             <div
-                                onClick={() => setFormData({...formData, isPublic: !formData.isPublic})}
+                                onClick={() => setFormData({...formData, hideCost: !formData.hideCost})}
                                 className="w-full rounded-full px-5 py-2.5 flex items-center justify-between border border-border bg-white dark:bg-white/5 transition-all duration-300 font-medium text-foreground cursor-pointer dark:hover:bg-white/10 group h-[46px]"
                             >
                                 <span className="group-hover:text-primary transition-colors text-sm">
-                                    {formData.isPublic ? "公开" : "私有"}
+                                    {formData.hideCost ? "隐藏进货价" : "显示进货价"}
                                 </span>
                                 <Switch 
-                                    checked={formData.isPublic} 
-                                    onChange={(val) => setFormData({...formData, isPublic: val})} 
+                                    checked={formData.hideCost} 
+                                    onChange={(val) => setFormData({...formData, hideCost: val})} 
                                 />
                             </div>
                         </div>
