@@ -29,7 +29,8 @@ export async function GET() {
         where: { id: "system" },
         select: {
             allowGalleryUpload: true,
-            allowDataImport: true
+            allowDataImport: true,
+            lastBackup: true
         }
     });
 
@@ -38,8 +39,7 @@ export async function GET() {
       dbType,
       nodeVersion,
       platform,
-      // Backup logic can be expanded here later
-      lastBackup: "尚未建立自动备份任务",
+      lastBackup: settings?.lastBackup ? new Date(settings.lastBackup).toLocaleString('zh-CN') : "尚未进行过物理备份",
       // Public flags
       allowGalleryUpload: settings?.allowGalleryUpload ?? true,
       allowDataImport: settings?.allowDataImport ?? true

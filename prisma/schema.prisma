@@ -236,6 +236,7 @@ model SystemSetting {
   minioUseSSL            Boolean    @default(true)
   minioPublicUrl         String?
   uploadConflictStrategy String     @default("hash")
+  lastBackup             DateTime?
   updatedAt              DateTime   @updatedAt
   workspace              Workspace? @relation(fields: [workspaceId], references: [id])
 

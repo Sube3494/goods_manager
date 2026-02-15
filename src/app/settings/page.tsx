@@ -229,8 +229,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-700">
       {/* Unified Header with Auto-save Status */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 transition-all">
-        <div>
+      <div className="relative flex flex-col gap-4 mb-8 transition-all">
+        <div className="flex-1 min-w-0 pr-32 sm:pr-0">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
             系统管理
           </h1>
@@ -238,50 +238,52 @@ export default function SettingsPage() {
             配置全局核心逻辑、文件仓库与数据安全。
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-muted/30 px-4 py-2 rounded-2xl border border-border/50 backdrop-blur-sm self-start md:self-auto">
+        <div className="absolute top-0 right-0 flex items-center gap-2.5 bg-muted/30 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-2xl border border-border/50 backdrop-blur-sm shrink-0 shadow-sm">
           {saveStatus === "saving" && (
-            <div className="flex items-center gap-2 text-primary font-medium text-xs">
-              <div className="h-2 w-2 bg-primary rounded-full animate-ping" />
+            <div className="flex items-center gap-2 text-primary font-bold text-[10px] sm:text-xs">
+              <div className="h-1.5 w-1.5 bg-primary rounded-full animate-ping" />
               正在同步...
             </div>
           )}
           {saveStatus === "saved" && (
-            <div className="flex items-center gap-2 text-muted-foreground/60 text-xs">
+            <div className="flex items-center gap-2 text-muted-foreground/80 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
               <ShieldCheck size={14} className="text-emerald-500" />
-              所有更改已保存
+              已同步
             </div>
           )}
-          {saveStatus === "error" && <span className="text-xs text-red-500 font-bold">同步失败</span>}
+          {saveStatus === "error" && <span className="text-[10px] sm:text-xs text-red-500 font-bold">同步失败</span>}
         </div>
       </div>
 
       {/* Tab Navigation - Segmented Control Style */}
-      <div className="flex p-1.5 bg-muted/40 backdrop-blur-md rounded-2xl border border-border/50 w-fit max-w-full overflow-x-auto no-scrollbar">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "relative flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap",
-                isActive 
-                  ? "text-primary-foreground shadow-lg shadow-primary/20" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-              )}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="activeSettingTab"
-                  className="absolute inset-0 bg-primary z-0 rounded-xl"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
-              )}
-              <tab.icon size={18} className={cn("relative z-10", isActive ? "" : "opacity-70")} />
-              <span className="relative z-10">{tab.label}</span>
-            </button>
-          );
-        })}
+      <div className="flex p-1.5 bg-muted/40 backdrop-blur-md rounded-2xl border border-border/50 w-fit max-w-full overflow-x-auto scrollbar-hide">
+        <div className="flex items-center min-w-max">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "relative flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 whitespace-nowrap",
+                  isActive 
+                    ? "text-primary-foreground shadow-lg shadow-primary/20" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                )}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="activeSettingTab"
+                    className="absolute inset-0 bg-primary z-0 rounded-xl"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <tab.icon size={18} className={cn("relative z-10", isActive ? "" : "opacity-70")} />
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid gap-8">
@@ -455,14 +457,14 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 pt-8 px-6 border-t border-border/50">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-8 px-6 border-t border-border/50">
                     <div className="flex-1">
                       <h4 className="font-bold text-foreground">系统级加密备份与数据恢复</h4>
                       <p className="text-sm text-muted-foreground mt-1">
                           通过 AES-256-GCM 高强度加密技术，全量导出系统所有业务模型。恢复时需严格匹配备份密码。
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex flex-col xs:flex-row items-center gap-3 shrink-0">
                       <button
                         onClick={() => {
                             const input = document.createElement("input");
@@ -474,14 +476,14 @@ export default function SettingsPage() {
                             };
                             input.click();
                         }}
-                        className="h-12 px-8 rounded-2xl bg-white dark:bg-white/5 border border-border hover:bg-muted font-medium transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center gap-2"
+                        className="w-full xs:w-auto h-12 px-8 rounded-2xl bg-white dark:bg-white/5 border border-border hover:bg-muted font-bold transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center justify-center gap-2"
                       >
                         <Upload size={18} className="text-emerald-500" />
                         系统恢复
                       </button>
                       <button
                         onClick={() => setBackupConfig({ isOpen: true, type: "export" })}
-                        className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-95 font-medium transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center gap-2"
+                        className="w-full xs:w-auto h-12 px-8 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-95 font-bold transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center justify-center gap-2"
                       >
                         <Download size={18} />
                         立即备份

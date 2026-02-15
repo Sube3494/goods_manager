@@ -71,7 +71,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                             className="flex items-center gap-2 px-5 h-10 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm active:scale-95"
                         >
                             <LogIn size={18} />
-                            管理员登录
+                            登录
                         </Link>
                     )}
                     <ThemeToggle />

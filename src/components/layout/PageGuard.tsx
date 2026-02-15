@@ -30,8 +30,8 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
         return true;
     }
 
-    // Auth Check
-    if (!user) {
+    // Auth Check: Always allow if marked as public, otherwise requires valid user
+    if (!user && !currentNavItem.public) {
         return false;
     }
 

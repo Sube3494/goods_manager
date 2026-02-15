@@ -1,28 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Package, Calendar, Eye, FileSpreadsheet, AlertCircle, X } from "lucide-react";
+import { Search, Package, Calendar, Eye } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
-import { ImportModal } from "@/components/Goods/ImportModal";
-import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { PurchaseOrder, Product } from "@/lib/types";
+import { PurchaseOrder } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
 import { formatLocalDateTime } from "@/lib/dateUtils";
-import { useUser } from "@/hooks/useUser";
-import { hasPermission } from "@/lib/permissions";
-import { SessionUser } from "@/lib/permissions";
 
 import { Suspense } from "react";
 
 function InboundContent() {
   const { showToast } = useToast();
-  const { user } = useUser();
-  const canInbound = hasPermission(user as SessionUser | null, "inbound:create");
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  
   // Data States
   const [inbounds, setInbounds] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,10 +21,6 @@ function InboundContent() {
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // Registration States
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showManualModal, setShowManualModal] = useState(false);
-  const [importErrors, setImportErrors] = useState<{ sku: string; reason: string }[]>([]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -54,66 +39,8 @@ function InboundContent() {
 
   useEffect(() => {
     fetchData();
-    // Auto-open import if action is set in URL
-    if (searchParams.get("action") === "import") {
-      setShowImportModal(true);
-      // Clear the param after opening
-      const params = new URLSearchParams(searchParams);
-      params.delete("action");
-      router.replace(`/inbound?${params.toString()}`);
-    }
-  }, [fetchData, searchParams, router]);
+  }, [fetchData]);
 
-  const handleManualAdd = async (data: Omit<Product, "id">) => {
-    try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (res.ok) {
-        showToast(`"${data.name}" 已创建并自动入库记录`, "success");
-        fetchData();
-        setShowManualModal(false);
-      } else {
-        const err = await res.json();
-        showToast(err.error || "创建失败", "error");
-      }
-    } catch (error) {
-      console.error("Manual add failed:", error);
-      showToast("网络错误", "error");
-    }
-  };
-
-  const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
-    try {
-      const res = await fetch("/api/products/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: data }),
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        setImportErrors(result.errors || []);
-        
-        if (result.failCount > 0) {
-          showToast(`导入完成：成功 ${result.successCount} 件，失败 ${result.failCount} 件。请查看详情。`, "warning");
-        } else {
-          showToast(`成功导入 ${result.successCount} 件商品`, "success");
-          setShowImportModal(false);
-        }
-        
-        fetchData();
-      } else {
-        showToast("导入失败", "error");
-      }
-    } catch (error) {
-      console.error("Import failed:", error);
-      showToast("网络错误", "error");
-    }
-  };
 
   const handleView = (po: PurchaseOrder) => {
     setSelectedOrder(po);
@@ -136,62 +63,8 @@ function InboundContent() {
           <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">查看入库历史、凭证明细，并进行批量或手动入库登记。</p>
         </div>
         
-        {canInbound && (
-          <div className="flex items-center gap-2 shrink-0">
-              <button 
-                  onClick={() => setShowImportModal(true)}
-                  className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full bg-emerald-500/10 sm:px-4 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 transition-all border border-emerald-500/10 shadow-lg shadow-emerald-500/5 hover:-translate-y-0.5"
-                  title="Excel 批量导入"
-              >
-                  <FileSpreadsheet size={16} className="sm:size-[18px]" />
-                  <span className="hidden sm:inline">批量导入</span>
-              </button>
-              <button 
-                  onClick={() => setShowManualModal(true)}
-                  className="h-9 w-9 sm:w-auto sm:h-10 flex items-center justify-center gap-2 rounded-full bg-primary sm:px-4 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
-                  title="手动录入"
-              >
-                  <Plus size={16} className="sm:size-[18px]" />
-                  <span className="hidden sm:inline">手动录入</span>
-              </button>
-          </div>
-        )}
       </div>
 
-      {/* Import Error Report */}
-      {importErrors.length > 0 && (
-        <div className="animate-in slide-in-from-top-4 duration-500 overflow-hidden rounded-3xl border border-destructive/20 bg-destructive/5 glass-panel">
-          <div className="flex items-center justify-between border-b border-destructive/10 p-4 px-6 bg-destructive/5">
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertCircle size={18} />
-              <h3 className="font-bold">导入异常报告 ({importErrors.length})</h3>
-            </div>
-            <button 
-              onClick={() => setImportErrors([])}
-              className="p-1 hover:bg-destructive/10 rounded-full text-destructive/60 hover:text-destructive transition-colors"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <div className="p-6">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {importErrors.map((err, idx) => (
-                <div key={idx} className="flex flex-col gap-1 p-3 rounded-xl bg-white/50 dark:bg-gray-900/50 border border-destructive/10 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">SKU</span>
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">失败</span>
-                  </div>
-                  <div className="text-sm font-mono font-bold text-foreground truncate">{err.sku}</div>
-                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <div className="size-1 rounded-full bg-destructive/40" />
-                    {err.reason}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Search Box */}
       <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 mb-6 md:mb-8">
@@ -318,31 +191,6 @@ function InboundContent() {
         </AnimatePresence>
       </div>
 
-      {/* Registration Modals */}
-      <ImportModal 
-        isOpen={showImportModal} 
-        onClose={() => setShowImportModal(false)} 
-        onImport={handleImport} 
-        templateData={[
-          {
-            "*SKU": "SKU001",
-            "*入库数量": 50,
-            "*进货单价": 15.5
-          },
-          {
-            "*SKU": "SKU002",
-            "*入库数量": 100,
-            "*进货单价": 22.0
-          }
-        ]}
-        templateFileName="入库导入模板.xlsx"
-      />
-
-      <ProductFormModal 
-        isOpen={showManualModal}
-        onClose={() => setShowManualModal(false)}
-        onSubmit={handleManualAdd}
-      />
 
       <PurchaseOrderModal
         isOpen={isModalOpen}

@@ -7,7 +7,7 @@ import { X, Truck, Plus, Trash2, CheckCircle2, Camera, ExternalLink, Copy } from
 import { TrackingInfo } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
 
-interface TrackingNumberModalProps {
+export interface TrackingNumberModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (trackingData: TrackingInfo[], paymentVouchers?: string[]) => void;
@@ -17,6 +17,7 @@ interface TrackingNumberModalProps {
   readOnly?: boolean;
   lockPackages?: boolean;
   onViewImages?: (images: string[], index?: number) => void;
+  mode?: "all" | "payment" | "tracking" | "waybill";
 }
 
 const COURIER_OPTIONS = [
@@ -175,6 +176,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
   readOnly = false,
   lockPackages = false,
   onViewImages,
+  mode = "all",
 }) => {
   const { showToast } = useToast();
   const [rows, setRows] = useState<TrackingInfo[]>([]);
@@ -207,11 +209,13 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
     setRows(rows.filter((_, i) => i !== index));
   };
 
-  const updateRow = (index: number, field: keyof TrackingInfo, value: string | string[]) => {
-    const newRows = [...rows];
-    newRows[index] = { ...newRows[index], [field]: value } as TrackingInfo;
-    setRows(newRows);
-  };
+  const updateRow = React.useCallback((index: number, field: keyof TrackingInfo, value: string | string[]) => {
+    setRows(prev => {
+        const newRows = [...prev];
+        newRows[index] = { ...newRows[index], [field]: value } as TrackingInfo;
+        return newRows;
+    });
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,6 +259,66 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
     }
   };
 
+  const handlePasteUpload = React.useCallback(async (e: React.ClipboardEvent | ClipboardEvent, type: 'payment' | 'waybill', rowIndex?: number) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'));
+      if (imageItems.length === 0) return;
+
+      e.preventDefault();
+      setIsUploadingVoucher(true); // Reusing this loading state for simplicity, or could add isUploadingWaybill
+
+      // Only process the first image found to avoid duplicates (e.g. multiple formats of same image)
+      const item = imageItems[0];
+      const file = item.getAsFile();
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      try {
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          if (res.ok) {
+              const { url } = await res.json();
+              if (url) {
+                  if (type === 'payment') {
+                      setPaymentVouchers(prev => [...prev, url]);
+                      showToast("支付凭证上传成功", "success");
+                  } else if (type === 'waybill' && typeof rowIndex === 'number') {
+                       setRows(prev => {
+                           const newRows = [...prev];
+                           const currentRow = newRows[rowIndex];
+                           const currentImages = currentRow.waybillImages || (currentRow.waybillImage ? [currentRow.waybillImage] : []);
+                           newRows[rowIndex] = { ...currentRow, waybillImages: [...currentImages, url] };
+                           return newRows;
+                       });
+                       showToast("面单上传成功", "success");
+                  }
+              }
+          }
+      } catch (error) {
+          console.error("Paste upload failed:", error);
+      }
+      return;
+
+
+  }, [showToast, setRows]);
+
+  // Global paste listener for Payment Mode
+
+  useEffect(() => {
+      if (!isOpen || mode !== 'payment') return;
+
+      const handleGlobalPaste = (e: ClipboardEvent) => {
+          handlePasteUpload(e, 'payment');
+      };
+
+      document.addEventListener('paste', handleGlobalPaste);
+      return () => document.removeEventListener('paste', handleGlobalPaste);
+  }, [isOpen, mode, handlePasteUpload]); // Dependencies
+
+
   if (!mounted) return null;
 
   return createPortal(
@@ -272,7 +336,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-4xl sm:rounded-[2.5rem] bg-white/95 dark:bg-gray-900/60 backdrop-blur-3xl border border-border/40 dark:border-white/10 shadow-2xl flex flex-col min-h-[400px] sm:min-h-[500px] max-h-[90vh] sm:max-h-[85vh] overflow-hidden"
+            className={`fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-4xl sm:rounded-[2.5rem] bg-white/95 dark:bg-gray-900/60 backdrop-blur-3xl border border-border/40 dark:border-white/10 shadow-2xl flex flex-col ${mode === 'payment' ? 'min-h-[300px] sm:min-h-[360px]' : 'min-h-[400px] sm:min-h-[500px]'} max-h-[90vh] sm:max-h-[85vh] overflow-hidden`}
           >
             <div className="relative p-6 sm:p-10 border-b border-border/40 shrink-0 flex items-center gap-4 sm:gap-6">
               <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
@@ -280,8 +344,12 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
               </div>
               
               <div className="flex flex-col">
-                <h3 className="text-xl font-black text-foreground tracking-tight">补全进货资料</h3>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">录入支付凭证与包裹追踪信息</p>
+                <h3 className="text-xl font-black text-foreground tracking-tight">
+                    {mode === "payment" ? "上传支付凭证" : mode === "tracking" ? "录入物流单号" : mode === "waybill" ? "上传物流面单" : "补全进货资料"}
+                </h3>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">
+                    {mode === "payment" ? "请上传付款成功截图" : mode === "tracking" ? "请填写物流追踪信息" : mode === "waybill" ? "请上传对应的物流面单截图" : "录入支付凭证与包裹追踪信息"}
+                </p>
               </div>
 
               <button 
@@ -292,9 +360,9 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
               </button>
             </div>
 
-             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 bg-background/20">
-              <div className="flex-1 overflow-y-auto p-6 sm:p-12 space-y-6 sm:space-y-8">
-                {rows.map((row, index) => {
+             <form onSubmit={handleSubmit} className={`flex flex-col min-h-0 bg-background/20 ${mode === 'payment' ? 'justify-center' : ''}`}>
+              <div className={`flex-1 overflow-y-auto p-6 sm:p-12 ${mode !== "payment" ? "space-y-6 sm:space-y-8" : "space-y-0"}`}>
+                {mode !== "payment" && rows.map((row, index) => {
                   const isStandard = COURIER_OPTIONS.filter(o => o !== "其他").includes(row.courier);
                   const showCustomInput = !isStandard;
 
@@ -311,7 +379,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest bg-zinc-500/5 dark:bg-white/5 px-3 py-1.5 rounded-full">包裹 #{index + 1}</span>
-                        {rows.length > 1 && !readOnly && !lockPackages && (
+                        {rows.length > 1 && !readOnly && !lockPackages && mode !== "waybill" && (
                           <button
                             type="button"
                             onClick={() => removeRow(index)}
@@ -329,13 +397,13 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                             {showCustomInput ? (
                               <div className="relative group/custom animate-in zoom-in-95 duration-200">
                                 <input
-                                  autoFocus={!readOnly && !lockPackages}
                                   type="text"
                                   placeholder="输入快递名称"
                                   value={row.courier === "其他" ? "" : row.courier}
-                                  readOnly={readOnly || lockPackages}
+                                  readOnly={readOnly || lockPackages || mode === "waybill"}
                                   onChange={(e) => updateRow(index, "courier", e.target.value)}
                                   className="w-full h-11 rounded-xl bg-zinc-500/5 dark:bg-white/5 border border-border dark:border-white/10 px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all read-only:opacity-70"
+                                  onPaste={(e) => handlePasteUpload(e, 'waybill', index)}
                                 />
                                 {!readOnly && !lockPackages && (
                                   <button 
@@ -349,10 +417,10 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                                 )}
                               </div>
                             ) : (
-                              <CourierSelect 
+                                <CourierSelect 
                                 value={row.courier} 
                                 isStandard={isStandard}
-                                readOnly={readOnly || lockPackages}
+                                readOnly={readOnly || lockPackages || mode === "waybill"}
                                 onSelect={(val) => updateRow(index, "courier", val)} 
                               />
                             )}
@@ -365,9 +433,10 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                               type="text"
                               placeholder={readOnly ? "未填写" : "单号..."}
                               value={row.number}
-                              readOnly={readOnly || lockPackages}
+                              readOnly={readOnly || lockPackages || mode === "waybill"}
                               onChange={(e) => updateRow(index, "number", e.target.value)}
                               className="w-full h-11 rounded-xl bg-zinc-500/5 dark:bg-white/5 border border-border dark:border-white/10 px-4 pr-12 text-sm text-foreground outline-none ring-primary/20 focus:ring-2 focus:border-primary transition-all font-mono read-only:opacity-70"
+                              onPaste={(e) => handlePasteUpload(e, 'waybill', index)}
                             />
                               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                 <button
@@ -403,7 +472,8 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
 
 
 
-                      {/* Waybill Images Management */}
+                      {/* Waybill Images Management - Only visible if not in pure tracking entry mode */}
+                      {mode !== "tracking" && (
                       <div className="space-y-2 pt-2">
                         <label className="text-xs font-bold text-muted-foreground/50 uppercase tracking-tighter ml-1">物流面单</label>
                         <div className="flex flex-wrap gap-3">
@@ -475,7 +545,10 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                                 }}
                               />
                               <Camera size={20} className="text-muted-foreground group-hover/up:text-primary transition-colors" />
-                              <span className="text-[10px] font-bold text-muted-foreground/60 group-hover/up:text-primary mb-1">上传凭证</span>
+                              <div className="flex flex-col items-center">
+                                  <span className="text-[10px] font-bold text-muted-foreground/60 group-hover/up:text-primary mb-0.5">上传凭证</span>
+                                  <span className="text-[10px] scale-90 text-muted-foreground/40 font-medium group-hover/up:text-primary/60 transition-colors">支持 Ctrl+V</span>
+                              </div>
                             </label>
                           )}
                           
@@ -486,13 +559,14 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                           )}
                         </div>
                       </div>
+                      )}
 
 
                     </div>
                   );
                 })}
 
-                 {!readOnly && !lockPackages && (
+                  {mode !== "payment" && mode !== "waybill" && !readOnly && !lockPackages && (
                   <button
                     type="button"
                     onClick={addRow}
@@ -504,15 +578,16 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                 )}
 
                 {/* Unified Payment Voucher Section */}
-                <div className="space-y-4 pt-8 border-t border-border/40">
+                {mode !== "tracking" && mode !== "waybill" && (
+                <div className={`space-y-4 ${mode === "all" ? "pt-8 border-t border-border/40" : ""} ${mode === 'payment' ? 'flex flex-col items-center w-full' : ''}`}>
                     <div className="flex items-center gap-2">
                         <Camera size={18} className="text-primary" />
                         <span className="text-sm font-bold text-foreground">支付凭证 (必填)</span>
                     </div>
                     
-                    <div className="flex flex-wrap gap-3 sm:gap-4">
+                    <div className={`flex flex-wrap gap-3 sm:gap-4 ${mode === 'payment' ? 'justify-center' : ''}`}>
                         {paymentVouchers.map((url, vIdx) => (
-                            <div key={url || vIdx} className="group/voucher relative h-20 sm:h-32 w-28 sm:w-48 rounded-2xl overflow-hidden border border-border shadow-sm animate-in zoom-in-95 duration-200">
+                            <div key={vIdx} className={`group/voucher relative rounded-2xl overflow-hidden border border-border shadow-sm animate-in zoom-in-95 duration-200 ${mode === 'payment' ? 'h-32 sm:h-40 w-full sm:w-56' : 'h-20 sm:h-32 w-28 sm:w-48'}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img 
                                     src={url} 
@@ -535,7 +610,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                         ))}
                         
                         {!readOnly && (
-                            <label className="h-20 sm:h-32 w-28 sm:w-48 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up">
+                            <label className={`rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up ${mode === 'payment' ? 'h-32 sm:h-40 w-full sm:w-56' : 'h-20 sm:h-32 w-28 sm:w-48'}`}>
                                 <input
                                     type="file"
                                     accept="image/*"
@@ -547,11 +622,15 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                                 <div className="p-2 sm:p-3 rounded-full bg-muted group-hover/up:bg-primary/10 transition-colors">
                                     <Camera size={24} className={`${isUploadingVoucher ? 'animate-spin' : 'text-muted-foreground group-hover/up:text-primary'}`} />
                                 </div>
-                                <span className="text-xs font-bold text-muted-foreground group-hover/up:text-primary">{isUploadingVoucher ? "上传中..." : "上传支付截图"}</span>
+                                <div className="flex flex-col items-center">
+                                    <span className="text-xs font-bold text-muted-foreground group-hover/up:text-primary">{isUploadingVoucher ? "上传中..." : "上传支付截图"}</span>
+                                    <span className="text-[10px] scale-90 text-muted-foreground/50 font-medium mt-0.5 group-hover/up:text-primary/60 transition-colors">支持 Ctrl+V 粘贴</span>
+                                </div>
                             </label>
                         )}
                     </div>
                 </div>
+                )}
               </div>
 
                <div className="p-6 sm:p-10 border-t border-border/40 shrink-0 bg-muted/10">
@@ -580,7 +659,9 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                     ) : (
                         <>
                             <CheckCircle2 size={18} />
-                            <span className="truncate">保存进货资料</span>
+                            <span className="truncate">
+                                {mode === "payment" ? "保存支付凭证" : mode === "tracking" ? "保存物流单号" : mode === "waybill" ? "保存物流面单" : "保存进货资料"}
+                            </span>
                         </>
                     )}
                   </button>

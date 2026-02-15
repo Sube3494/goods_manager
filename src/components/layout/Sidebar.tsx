@@ -161,22 +161,27 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
             })}
           </div>
           
-          <div className={cn("mt-auto pt-4 space-y-2 shrink-0")}>
-            <div className={cn("pt-4 border-t border-white/10", isCollapsed && "flex flex-col items-center gap-4")}>
+          <div className={cn("mt-auto pt-4 shrink-0")}>
+            <div className={cn("pt-4 border-t border-white/10 flex items-center", isCollapsed ? "flex-col gap-4" : "gap-1")}>
                 {user ? (
                 <>
-                    <div className={cn(
-                        "flex items-center gap-2 p-1.5 rounded-xl hover:bg-white/5 transition-colors group relative",
-                        isCollapsed ? "justify-center p-0 h-10 w-10" : "mx-1"
-                    )}>
-                        <div className="relative h-8 w-8 rounded-full overflow-hidden border-2 border-white/20 shadow-sm shrink-0">
-                        <Image 
-                            src={`https://cravatar.cn/avatar/${md5(user.email || "")}?d=mp`} 
-                            alt="Current user"
-                            fill
-                            sizes="32px"
-                            className="object-cover"
-                        />
+                    <Link 
+                        href="/profile"
+                        onClick={onClose}
+                        title={isCollapsed ? "个人中心" : undefined}
+                        className={cn(
+                            "flex items-center gap-2 p-1.5 rounded-xl hover:bg-white/5 transition-all group relative min-w-0 flex-1",
+                            isCollapsed ? "justify-center h-10 w-10" : "ml-1"
+                        )}
+                    >
+                        <div className="relative h-8 w-8 rounded-full overflow-hidden border-2 border-white/20 shadow-sm shrink-0 group-hover:border-primary/50 transition-colors">
+                            <Image 
+                                src={`https://cravatar.cn/avatar/${md5(user.email || "")}?d=mp`} 
+                                alt="Current user"
+                                fill
+                                sizes="32px"
+                                className="object-cover"
+                            />
                         </div>
                         {!isCollapsed && (
                         <motion.div 
@@ -184,24 +189,25 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                             animate={{ opacity: 1 }}
                             className="flex-1 flex flex-col overflow-hidden"
                         >
-                            <p className="text-sm font-medium text-foreground truncate">{user.email}</p>
-                            <p className="text-[10px] text-muted-foreground/60">{user.role === 'SUPER_ADMIN' ? '超级管理员' : (user.role === 'ADMIN' ? '工作区管理员' : '普通成员')}</p>
+                            <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                                {user.name || user.email}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60 truncate">{user.role === 'SUPER_ADMIN' ? '超级管理员' : (user.role === 'ADMIN' ? '工作区管理员' : '普通成员')}</p>
                         </motion.div>
                         )}
-                    </div>
+                    </Link>
 
                     <button 
                         onClick={(e) => { e.preventDefault(); handleLogout(); }}
-                        title={isCollapsed ? "退出登录" : undefined}
+                        title="退出登录"
                         className={cn(
-                            "flex items-center transition-all duration-300 rounded-xl",
+                            "flex items-center justify-center transition-all duration-300 rounded-xl shrink-0 group/logout",
                             isCollapsed 
-                                ? "justify-center h-10 w-10 text-red-400 hover:bg-red-500/10 hover:text-red-500" 
-                                : "px-3 py-2.5 mx-1 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-500"
+                                ? "h-10 w-10 text-red-400 hover:bg-red-500/10 hover:text-red-500" 
+                                : "h-9 w-9 mr-1 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
                         )}
                     >
-                        <LogOut size={18} className={cn(!isCollapsed && "mr-3")} />
-                        {!isCollapsed && <span className="whitespace-nowrap">退出登录</span>}
+                        <LogOut size={16} className="transition-transform group-hover/logout:scale-110" />
                     </button>
                 </>
                 ) : (

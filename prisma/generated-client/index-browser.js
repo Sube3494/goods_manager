@@ -285,6 +285,7 @@ exports.Prisma.SystemSettingScalarFieldEnum = {
   minioUseSSL: 'minioUseSSL',
   minioPublicUrl: 'minioPublicUrl',
   uploadConflictStrategy: 'uploadConflictStrategy',
+  lastBackup: 'lastBackup',
   updatedAt: 'updatedAt'
 };
 

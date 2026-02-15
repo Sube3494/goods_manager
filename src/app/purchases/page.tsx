@@ -8,7 +8,7 @@ import { PurchaseOrder, PurchaseStatus, TrackingInfo } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
-import TrackingNumberModal from "@/components/Purchases/TrackingNumberModal";
+import TrackingNumberModal, { TrackingNumberModalProps } from "@/components/Purchases/TrackingNumberModal";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
@@ -73,6 +73,7 @@ function PurchasesContent() {
     paymentVouchers?: string[];
     paymentVoucher?: string;
     lockPackages: boolean;
+    mode: NonNullable<TrackingNumberModalProps['mode']>;
   }>({
     isOpen: false,
     purchaseId: null,
@@ -80,6 +81,7 @@ function PurchasesContent() {
     paymentVouchers: [],
     paymentVoucher: undefined,
     lockPackages: false,
+    mode: "all",
   });
 
   const [galleryState, setGalleryState] = useState<{
@@ -243,9 +245,11 @@ function PurchasesContent() {
 
   const handleUpdateTracking = async (id: string, trackingData: TrackingInfo[], paymentVouchers?: string[]) => {
     try {
-      // 记录当前状态，如果是 Confirmed/Ordered，则流转到 Shipped
+      // 记录当前状态，如果是 Confirmed/Ordered，则流转到 Shipped (仅当有物流信息时)
       const currentOrder = purchases.find(p => p.id === id);
-      const newStatus = (currentOrder?.status === "Confirmed" || (currentOrder?.status as string) === "Ordered") 
+      const hasTracking = trackingData && trackingData.length > 0 && trackingData.some(td => td.number.trim());
+      
+      const newStatus = ((currentOrder?.status === "Confirmed" || (currentOrder?.status as string) === "Ordered") && hasTracking)
         ? "Shipped" 
         : currentOrder?.status;
 
@@ -499,74 +503,77 @@ function PurchasesContent() {
                         )}
 
                         {/* Management Actions: Show Truck for Confirmed, Ordered, or Shipped */}
-                               {(po.status === "Confirmed" || (po.status as string) === "Ordered" || po.status === "Shipped") && (
-                                <div className="flex items-center gap-1">
-                                   {/* If not all info is provided, show "Complete Info" button */}
-                                    {(() => {
-                                      const tracking = po.trackingData || [];
-                                      const hasTracking = tracking.length > 0;
-                                      const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
-                                      const hasPayment = po.paymentVoucher || (po.paymentVouchers && po.paymentVouchers.length > 0);
-                                      
-                                      if (!(hasTracking && hasAllWaybills && hasPayment)) {
-                                          let label = "补全资料";
-                                          let colorClass = "text-orange-500 bg-orange-500/10";
-                                          let Icon = Truck;
-                                          let animate = "";
-                                          
-                                          if (!hasPayment) {
-                                              label = "上传凭证";
-                                              colorClass = "text-amber-500 bg-amber-500/10";
-                                              Icon = FileText;
-                                          } else if (!hasTracking) {
-                                              label = "录入单号";
-                                              colorClass = "text-blue-500 bg-blue-500/10";
-                                              Icon = Hash;
-                                          } else if (!hasAllWaybills) {
-                                              label = "上传面单";
-                                              colorClass = "text-orange-500 bg-orange-500/10";
-                                              Icon = Camera;
-                                              animate = "animate-pulse";
-                                          }
+                        {(po.status === "Confirmed" || (po.status as string) === "Ordered" || po.status === "Shipped") && (
+                            <div className="flex items-center gap-1">
+                                {(() => {
+                                    const tracking = po.trackingData || [];
+                                    const hasTracking = tracking.length > 0;
+                                    const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
+                                    const hasPayment = po.paymentVoucher || (po.paymentVouchers && po.paymentVouchers.length > 0);
+                                    
+                                    if (!(hasTracking && hasAllWaybills && hasPayment)) {
+                                        let label = "补全资料";
+                                        let colorClass = "text-orange-500 bg-orange-500/10";
+                                        let Icon = Truck;
+                                        let animate = "";
+                                        
+                                        if (!hasPayment) {
+                                            label = "上传凭证";
+                                            colorClass = "text-amber-500 bg-amber-500/10";
+                                            Icon = FileText;
+                                        } else if (!hasTracking) {
+                                            label = "录入单号";
+                                            colorClass = "text-blue-500 bg-blue-500/10";
+                                            Icon = Hash;
+                                        } else if (!hasAllWaybills) {
+                                            label = "上传面单";
+                                            colorClass = "text-orange-500 bg-orange-500/10";
+                                            Icon = Camera;
+                                            animate = "animate-pulse";
+                                        }
 
-                                          return (
-                                              <button 
-                                                  onClick={(e) => { e.stopPropagation(); setTrackingModal({
-                                                      isOpen: true,
-                                                      purchaseId: po.id,
-                                                      initialValue: po.trackingData || [],
-                                                      paymentVoucher: po.paymentVoucher,
-                                                      paymentVouchers: po.paymentVouchers || [],
-                                                      lockPackages: false
-                                                  }); }}
-                                                  className={`p-2 rounded-lg ${colorClass} ${animate} flex items-center gap-2 transition-all hover:scale-105`}
-                                                  title={`点击以${label}`}
-                                              >
-                                                  <Icon size={16} />
-                                                  <span className="text-[10px] font-bold">{label}</span>
-                                              </button>
-                                          );
-                                      }
-                                      return null;
-                                   })()}
- 
-                                   {/* Show Confirm button if it's Shipped (or legacy Ordered) AND all waybills are present */}
-                                    {(po.status === "Shipped" || (po.status as string) === "Ordered") && 
-                                     (po.trackingData || []).length > 0 && 
-                                     (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && 
-                                     canInbound && (
-                                           <button 
-                                               onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
-                                               className="p-2 rounded-lg text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center gap-2 animate-in zoom-in-95 duration-300"
-                                               title="确认入库"
-                                           >
-                                               <CheckCircle2 size={16} />
-                                               <span className="text-[10px] font-bold ml-1">确认入库</span>
-                                           </button>
-                                      )
-                                   }
-                               </div>
-                             )}
+                                        return (
+                                            <button 
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    setTrackingModal({
+                                                        isOpen: true,
+                                                        purchaseId: po.id,
+                                                        initialValue: po.trackingData || [],
+                                                        paymentVoucher: po.paymentVoucher,
+                                                        paymentVouchers: po.paymentVouchers || [],
+                                                        lockPackages: false,
+                                                        mode: (!hasPayment ? "payment" : !hasTracking ? "tracking" : !hasAllWaybills ? "waybill" : "all") as NonNullable<TrackingNumberModalProps['mode']>
+                                                    }); 
+                                                }}
+                                                className={`p-2 rounded-lg ${colorClass} ${animate} flex items-center gap-2 transition-all hover:scale-105`}
+                                                title={`点击以${label}`}
+                                            >
+                                                <Icon size={16} />
+                                                <span className="text-[10px] font-bold">{label}</span>
+                                            </button>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+                                
+                                {/* Show Confirm button if it's Shipped (or legacy Ordered) AND all waybills are present */}
+                                {(po.status === "Shipped" || (po.status as string) === "Ordered") && 
+                                    (po.trackingData || []).length > 0 && 
+                                    (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && 
+                                    canInbound && (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
+                                            className="p-2 rounded-lg text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center gap-2 animate-in zoom-in-95 duration-300"
+                                            title="确认入库"
+                                        >
+                                            <CheckCircle2 size={16} />
+                                            <span className="text-[10px] font-bold ml-1">确认入库</span>
+                                        </button>
+                                    )
+                                }
+                            </div>
+                        )}
 
                         {/* Actions: Only allow edit/delete for Drafts */}
                         {po.status === "Draft" ? (
@@ -727,64 +734,72 @@ function PurchasesContent() {
   
                     {/* Management Actions: Show Truck for Ordered/Received */}
                     {/* Management Actions: Show Truck for Confirmed/Shipped/Ordered */}
-                     {(po.status === "Confirmed" || po.status === "Shipped" || (po.status as string) === "Ordered") && (
-                      <div className="flex-2 flex gap-2 w-full">
-                                {(() => {
-                                    const tracking = po.trackingData || [];
-                                    const hasTracking = tracking.length > 0;
-                                    const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
-                                    const hasPayment = po.paymentVoucher || (po.paymentVouchers && po.paymentVouchers.length > 0);
+                    {(po.status === "Confirmed" || po.status === "Shipped" || (po.status as string) === "Ordered") && (
+                        <div className="flex gap-2 w-full">
+                            {(() => {
+                                const tracking = po.trackingData || [];
+                                const hasTracking = tracking.length > 0;
+                                const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
+                                const hasPayment = po.paymentVoucher || (po.paymentVouchers && po.paymentVouchers.length > 0);
+                                
+                                if (!(hasTracking && hasAllWaybills && hasPayment)) {
+                                    let label = "补全资料";
+                                    let colorClass = "bg-orange-500";
+                                    let Icon = Truck;
+                                    let animate = "";
                                     
-                                   if (hasTracking && hasAllWaybills && hasPayment) return null;
-  
-                                   let label = "补全进货资料";
-                                   let colorClass = "bg-orange-500";
-                                   let Icon = Truck;
-                                   let animate = "";
-  
-                                   if (!hasPayment) {
-                                       label = "上传凭证";
-                                       colorClass = "bg-amber-500";
-                                       Icon = FileText;
-                                   } else if (!hasTracking) {
-                                       label = "录入单号";
-                                       colorClass = "bg-blue-500";
-                                       Icon = Hash;
-                                   } else if (!hasAllWaybills) {
-                                       label = "上传面单";
-                                       colorClass = "bg-orange-500";
-                                       Icon = Camera;
-                                       animate = "animate-pulse";
-                                   }
-                                   
-                                   return (
-                                      <button 
-                                          onClick={(e) => { e.stopPropagation(); setTrackingModal({
-                                              isOpen: true,
-                                              purchaseId: po.id,
-                                              initialValue: po.trackingData || [],
-                                              paymentVoucher: po.paymentVoucher,
-                                              paymentVouchers: po.paymentVouchers || [],
-                                              lockPackages: false
-                                          }); }}
-                                          className={`flex-1 flex items-center justify-center gap-2 h-9 rounded-lg ${colorClass} text-white shadow-lg ${colorClass}/20 ${animate} font-medium active:scale-95 transition-all text-xs`}
-                                      >
-                                          <Icon size={14} />
-                                          {label}
-                                      </button>
-                                   );
-                               })()}
-  
-                                  {((po.trackingData || []).length > 0) && (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && (
-                                      <button 
-                                          onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
-                                          className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-500 text-white font-medium hover:bg-emerald-600 active:scale-95 transition-all text-xs shadow-lg shadow-emerald-500/20"
-                                      >
-                                          <CheckCircle2 size={14} />
-                                          确认入库
-                                      </button>
-                                  )}
-                      </div>
+                                    if (!hasPayment) {
+                                        label = "上传凭证";
+                                        colorClass = "bg-amber-500";
+                                        Icon = FileText;
+                                    } else if (!hasTracking) {
+                                        label = "录入单号";
+                                        colorClass = "bg-blue-500";
+                                        Icon = Hash;
+                                    } else if (!hasAllWaybills) {
+                                        label = "上传面单";
+                                        colorClass = "bg-orange-500";
+                                        Icon = Camera;
+                                        animate = "animate-pulse";
+                                    }
+
+
+                                    const mode = !hasPayment ? "payment" : !hasTracking ? "tracking" : !hasAllWaybills ? "waybill" : "all";
+                                    
+                                    return (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setTrackingModal({
+                                                isOpen: true,
+                                                purchaseId: po.id,
+                                                initialValue: po.trackingData || [],
+                                                paymentVoucher: po.paymentVoucher,
+                                                paymentVouchers: po.paymentVouchers || [],
+                                                lockPackages: false,
+                                                mode: mode as NonNullable<TrackingNumberModalProps['mode']>
+                                            }); }}
+                                            className={`flex-1 flex items-center justify-center gap-2 h-9 rounded-lg ${colorClass} text-white shadow-lg ${colorClass}/20 ${animate} font-medium active:scale-95 transition-all text-xs`}
+                                        >
+                                            <Icon size={14} />
+                                            {label}
+                                        </button>
+                                    );
+                                }
+                                return null;
+                            })()}
+
+                            {(po.status === "Shipped" || (po.status as string) === "Ordered") && 
+                             (po.trackingData || []).length > 0 && 
+                             (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && 
+                             canInbound && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
+                                    className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-500 text-white font-medium hover:bg-emerald-600 active:scale-95 transition-all text-xs shadow-lg shadow-emerald-500/20"
+                                >
+                                    <CheckCircle2 size={14} />
+                                    确认入库
+                                </button>
+                            )}
+                        </div>
                     )}
   
                     
@@ -828,7 +843,7 @@ function PurchasesContent() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSave}
-        initialData={editingPurchase}
+        initialData={editingPurchase || undefined}
         readOnly={detailReadOnly || (editingPurchase ? editingPurchase.status !== "Draft" : false)}
       />
 
@@ -850,9 +865,10 @@ function PurchasesContent() {
         paymentVoucher={trackingModal.paymentVoucher}
         readOnly={purchases.find(p => p.id === trackingModal.purchaseId)?.status === "Received"}
         lockPackages={trackingModal.lockPackages}
-        onConfirm={(val, vouchers) => {
+        mode={trackingModal.mode}
+        onConfirm={(trackingData: TrackingInfo[], paymentVouchers?: string[]) => {
             if (trackingModal.purchaseId) {
-                handleUpdateTracking(trackingModal.purchaseId, val, vouchers);
+                handleUpdateTracking(trackingModal.purchaseId, trackingData, paymentVouchers);
             }
         }}
         onViewImages={(images: string[], index?: number) => {

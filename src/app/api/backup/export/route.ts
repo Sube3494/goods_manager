@@ -41,14 +41,21 @@ export async function POST(request: Request) {
       }),
       galleryItems: await prisma.galleryItem.findMany({ where: { workspaceId } }),
       systemSettings: await prisma.systemSetting.findMany({ where: { workspaceId } }),
+      users: await prisma.user.findMany({ where: { workspaceId } }),
+      whitelists: await prisma.emailWhitelist.findMany(),
     };
 
     // 2. 加密序列化后的 JSON
     const jsonString = JSON.stringify(database);
     const encryptedBuffer = BackupCrypto.encrypt(jsonString, password);
 
-    // 3. 返回加密后的 PNK 备份包
-    return new Response(encryptedBuffer as any, {
+    // 3. 更新最后备份时间并返回加密后的 PNK 备份包
+    await prisma.systemSetting.update({
+      where: { id: "system" },
+      data: { lastBackup: new Date() }
+    });
+
+    return new Response(encryptedBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',

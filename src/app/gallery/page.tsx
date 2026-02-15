@@ -139,7 +139,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
                 x: { type: "spring", stiffness: 400, damping: 40, mass: 1 },
                 opacity: { duration: 0.25 }
             }}
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            className="absolute inset-0 flex items-center justify-center pb-24 sm:pb-32 pointer-events-none"
         >
             <motion.div 
                 className={cn(
@@ -172,7 +172,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
                     <img 
                         src={item.url} 
                         alt="Gallery View" 
-                        className="max-w-[95%] sm:max-w-[90%] max-h-[85%] sm:max-h-[75%] object-contain rounded-2xl shadow-2xl mx-auto border border-white/5"
+                        className="max-w-[95%] sm:max-w-[90%] max-h-[70%] sm:max-h-[75%] object-contain rounded-2xl shadow-2xl mx-auto border border-white/5"
                         draggable={false}
                     />
                 )}
@@ -208,7 +208,7 @@ function GalleryContent() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   const { showToast } = useToast();
-  const canUpload = hasPermission(user as SessionUser | null, "gallery:upload");
+  const canUpload = isAdmin ? hasPermission(user as SessionUser | null, "gallery:upload") : isUploadAllowed;
   const canDelete = hasPermission(user as SessionUser | null, "gallery:delete");
   
   // Lightbox Enhancements

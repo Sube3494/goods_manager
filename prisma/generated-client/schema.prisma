@@ -193,6 +193,7 @@ model User {
   email          String     @unique
   name           String?
   role           Role       @default(USER)
+  status         String     @default("ACTIVE") // ACTIVE, DISABLED
   permissions    Json?      @default("{}")
   workspaceId    String?
   createdAt      DateTime   @default(now())
@@ -235,6 +236,7 @@ model SystemSetting {
   minioUseSSL            Boolean    @default(true)
   minioPublicUrl         String?
   uploadConflictStrategy String     @default("hash")
+  lastBackup             DateTime?
   updatedAt              DateTime   @updatedAt
   workspace              Workspace? @relation(fields: [workspaceId], references: [id])
 

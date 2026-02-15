@@ -49,8 +49,13 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     shippingFees: initialData?.shippingFees || 0,
     extraFees: initialData?.extraFees || 0,
     totalAmount: initialData?.totalAmount || 0,
+
     trackingData: initialData?.trackingData
   }));
+  
+  // Local state for fee inputs to allow typing "0." or decimals comfortably
+  const [shippingFeeInput, setShippingFeeInput] = useState(initialData?.shippingFees?.toString() || "0");
+  const [extraFeeInput, setExtraFeeInput] = useState(initialData?.extraFees?.toString() || "0");
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -109,6 +114,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
       if (initialData && initialData !== prevInitialDataRef.current) {
         prevInitialDataRef.current = initialData;
         setFormData(initialData);
+        setShippingFeeInput(initialData.shippingFees?.toString() || "0");
+        setExtraFeeInput(initialData.extraFees?.toString() || "0");
       } else if (!initialData && prevInitialDataRef.current) {
         prevInitialDataRef.current = undefined;
         setFormData({
@@ -121,7 +128,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
           totalAmount: 0,
           trackingData: undefined
         });
+        setShippingFeeInput("0");
+        setExtraFeeInput("0");
       }
+
     }, 0);
     
     return () => clearTimeout(timeoutId);
@@ -466,8 +476,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
 
 
-                    {/* Payment Voucher Section - Only for Purchases */}
-                    {formData.type !== "Inbound" && (
+                    {/* Payment Voucher Section - Only for Purchases and not in Draft status */}
+                    {formData.type !== "Inbound" && formData.status !== "Draft" && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-2">
                             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-primary pl-2">
@@ -507,8 +517,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                     </div>
                     )}
                     
-                    {/* Tracking Info Section - Only visible if tracking data exists */}
-                    {formData.type !== "Inbound" && (
+                    {/* Tracking Info Section - Only visible if not in Draft and not Inbound */}
+                    {formData.type !== "Inbound" && formData.status !== "Draft" && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between px-2">
                                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-orange-500 pl-2">
@@ -703,8 +713,12 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                             type="number" 
                                             min="0"
                                             step="0.01"
-                                            value={formData.shippingFees || ""}
-                                            onChange={(e) => setFormData({...formData, shippingFees: parseFloat(e.target.value) || 0})}
+                                            value={shippingFeeInput}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setShippingFeeInput(val);
+                                                setFormData({...formData, shippingFees: parseFloat(val) || 0});
+                                            }}
                                             className="w-full sm:w-20 rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-6 pr-2 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                                         />
                                     </div>
@@ -726,8 +740,12 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                             type="number" 
                                             min="0"
                                             step="0.01"
-                                            value={formData.extraFees || ""}
-                                            onChange={(e) => setFormData({...formData, extraFees: parseFloat(e.target.value) || 0})}
+                                            value={extraFeeInput}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setExtraFeeInput(val);
+                                                setFormData({...formData, extraFees: parseFloat(val) || 0});
+                                            }}
                                             className="w-full sm:w-20 rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-6 pr-2 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                                         />
                                     </div>

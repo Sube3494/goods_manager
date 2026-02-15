@@ -15906,6 +15906,7 @@ export namespace Prisma {
     minioUseSSL: boolean | null
     minioPublicUrl: string | null
     uploadConflictStrategy: string | null
+    lastBackup: Date | null
     updatedAt: Date | null
   }
 
@@ -15924,6 +15925,7 @@ export namespace Prisma {
     minioUseSSL: boolean | null
     minioPublicUrl: string | null
     uploadConflictStrategy: string | null
+    lastBackup: Date | null
     updatedAt: Date | null
   }
 
@@ -15942,6 +15944,7 @@ export namespace Prisma {
     minioUseSSL: number
     minioPublicUrl: number
     uploadConflictStrategy: number
+    lastBackup: number
     updatedAt: number
     _all: number
   }
@@ -15972,6 +15975,7 @@ export namespace Prisma {
     minioUseSSL?: true
     minioPublicUrl?: true
     uploadConflictStrategy?: true
+    lastBackup?: true
     updatedAt?: true
   }
 
@@ -15990,6 +15994,7 @@ export namespace Prisma {
     minioUseSSL?: true
     minioPublicUrl?: true
     uploadConflictStrategy?: true
+    lastBackup?: true
     updatedAt?: true
   }
 
@@ -16008,6 +16013,7 @@ export namespace Prisma {
     minioUseSSL?: true
     minioPublicUrl?: true
     uploadConflictStrategy?: true
+    lastBackup?: true
     updatedAt?: true
     _all?: true
   }
@@ -16113,6 +16119,7 @@ export namespace Prisma {
     minioUseSSL: boolean
     minioPublicUrl: string | null
     uploadConflictStrategy: string
+    lastBackup: Date | null
     updatedAt: Date
     _count: SystemSettingCountAggregateOutputType | null
     _avg: SystemSettingAvgAggregateOutputType | null
@@ -16150,6 +16157,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: boolean
     uploadConflictStrategy?: boolean
+    lastBackup?: boolean
     updatedAt?: boolean
     workspace?: boolean | SystemSetting$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["systemSetting"]>
@@ -16169,6 +16177,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: boolean
     uploadConflictStrategy?: boolean
+    lastBackup?: boolean
     updatedAt?: boolean
     workspace?: boolean | SystemSetting$workspaceArgs<ExtArgs>
   }, ExtArgs["result"]["systemSetting"]>
@@ -16188,6 +16197,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: boolean
     uploadConflictStrategy?: boolean
+    lastBackup?: boolean
     updatedAt?: boolean
   }
 
@@ -16218,6 +16228,7 @@ export namespace Prisma {
       minioUseSSL: boolean
       minioPublicUrl: string | null
       uploadConflictStrategy: string
+      lastBackup: Date | null
       updatedAt: Date
     }, ExtArgs["result"]["systemSetting"]>
     composites: {}
@@ -16627,6 +16638,7 @@ export namespace Prisma {
     readonly minioUseSSL: FieldRef<"SystemSetting", 'Boolean'>
     readonly minioPublicUrl: FieldRef<"SystemSetting", 'String'>
     readonly uploadConflictStrategy: FieldRef<"SystemSetting", 'String'>
+    readonly lastBackup: FieldRef<"SystemSetting", 'DateTime'>
     readonly updatedAt: FieldRef<"SystemSetting", 'DateTime'>
   }
     
@@ -19280,6 +19292,7 @@ export namespace Prisma {
     minioUseSSL: 'minioUseSSL',
     minioPublicUrl: 'minioPublicUrl',
     uploadConflictStrategy: 'uploadConflictStrategy',
+    lastBackup: 'lastBackup',
     updatedAt: 'updatedAt'
   };
 
@@ -20495,6 +20508,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFilter<"SystemSetting"> | boolean
     minioPublicUrl?: StringNullableFilter<"SystemSetting"> | string | null
     uploadConflictStrategy?: StringFilter<"SystemSetting"> | string
+    lastBackup?: DateTimeNullableFilter<"SystemSetting"> | Date | string | null
     updatedAt?: DateTimeFilter<"SystemSetting"> | Date | string
     workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }
@@ -20514,6 +20528,7 @@ export namespace Prisma {
     minioUseSSL?: SortOrder
     minioPublicUrl?: SortOrderInput | SortOrder
     uploadConflictStrategy?: SortOrder
+    lastBackup?: SortOrderInput | SortOrder
     updatedAt?: SortOrder
     workspace?: WorkspaceOrderByWithRelationInput
   }
@@ -20536,6 +20551,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFilter<"SystemSetting"> | boolean
     minioPublicUrl?: StringNullableFilter<"SystemSetting"> | string | null
     uploadConflictStrategy?: StringFilter<"SystemSetting"> | string
+    lastBackup?: DateTimeNullableFilter<"SystemSetting"> | Date | string | null
     updatedAt?: DateTimeFilter<"SystemSetting"> | Date | string
     workspace?: XOR<WorkspaceNullableRelationFilter, WorkspaceWhereInput> | null
   }, "id">
@@ -20555,6 +20571,7 @@ export namespace Prisma {
     minioUseSSL?: SortOrder
     minioPublicUrl?: SortOrderInput | SortOrder
     uploadConflictStrategy?: SortOrder
+    lastBackup?: SortOrderInput | SortOrder
     updatedAt?: SortOrder
     _count?: SystemSettingCountOrderByAggregateInput
     _avg?: SystemSettingAvgOrderByAggregateInput
@@ -20581,6 +20598,7 @@ export namespace Prisma {
     minioUseSSL?: BoolWithAggregatesFilter<"SystemSetting"> | boolean
     minioPublicUrl?: StringNullableWithAggregatesFilter<"SystemSetting"> | string | null
     uploadConflictStrategy?: StringWithAggregatesFilter<"SystemSetting"> | string
+    lastBackup?: DateTimeNullableWithAggregatesFilter<"SystemSetting"> | Date | string | null
     updatedAt?: DateTimeWithAggregatesFilter<"SystemSetting"> | Date | string
   }
 
@@ -21857,6 +21875,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: string | null
     uploadConflictStrategy?: string
+    lastBackup?: Date | string | null
     updatedAt?: Date | string
     workspace?: WorkspaceCreateNestedOneWithoutSystemSettingsInput
   }
@@ -21876,6 +21895,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: string | null
     uploadConflictStrategy?: string
+    lastBackup?: Date | string | null
     updatedAt?: Date | string
   }
 
@@ -21893,6 +21913,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    lastBackup?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     workspace?: WorkspaceUpdateOneWithoutSystemSettingsNestedInput
   }
@@ -21912,6 +21933,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    lastBackup?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -21930,6 +21952,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: string | null
     uploadConflictStrategy?: string
+    lastBackup?: Date | string | null
     updatedAt?: Date | string
   }
 
@@ -21947,6 +21970,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    lastBackup?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -21965,6 +21989,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    lastBackup?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -23113,6 +23138,17 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
+  export type DateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
   export type SystemSettingCountOrderByAggregateInput = {
     id?: SortOrder
     workspaceId?: SortOrder
@@ -23128,6 +23164,7 @@ export namespace Prisma {
     minioUseSSL?: SortOrder
     minioPublicUrl?: SortOrder
     uploadConflictStrategy?: SortOrder
+    lastBackup?: SortOrder
     updatedAt?: SortOrder
   }
 
@@ -23151,6 +23188,7 @@ export namespace Prisma {
     minioUseSSL?: SortOrder
     minioPublicUrl?: SortOrder
     uploadConflictStrategy?: SortOrder
+    lastBackup?: SortOrder
     updatedAt?: SortOrder
   }
 
@@ -23169,12 +23207,27 @@ export namespace Prisma {
     minioUseSSL?: SortOrder
     minioPublicUrl?: SortOrder
     uploadConflictStrategy?: SortOrder
+    lastBackup?: SortOrder
     updatedAt?: SortOrder
   }
 
   export type SystemSettingSumOrderByAggregateInput = {
     lowStockThreshold?: SortOrder
     minioPort?: SortOrder
+  }
+
+  export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
   export type BrushOrderCountOrderByAggregateInput = {
@@ -24423,6 +24476,10 @@ export namespace Prisma {
     connect?: WorkspaceWhereUniqueInput
   }
 
+  export type NullableDateTimeFieldUpdateOperationsInput = {
+    set?: Date | string | null
+  }
+
   export type WorkspaceUpdateOneWithoutSystemSettingsNestedInput = {
     create?: XOR<WorkspaceCreateWithoutSystemSettingsInput, WorkspaceUncheckedCreateWithoutSystemSettingsInput>
     connectOrCreate?: WorkspaceCreateOrConnectWithoutSystemSettingsInput
@@ -24772,6 +24829,31 @@ export namespace Prisma {
     _max?: NestedEnumRoleFilter<$PrismaModel>
   }
 
+  export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
+  export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  }
+
   export type BrushOrderCreateWithoutWorkspaceInput = {
     id?: string
     date?: Date | string
@@ -25082,6 +25164,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: string | null
     uploadConflictStrategy?: string
+    lastBackup?: Date | string | null
     updatedAt?: Date | string
   }
 
@@ -25099,6 +25182,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: string | null
     uploadConflictStrategy?: string
+    lastBackup?: Date | string | null
     updatedAt?: Date | string
   }
 
@@ -25467,6 +25551,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFilter<"SystemSetting"> | boolean
     minioPublicUrl?: StringNullableFilter<"SystemSetting"> | string | null
     uploadConflictStrategy?: StringFilter<"SystemSetting"> | string
+    lastBackup?: DateTimeNullableFilter<"SystemSetting"> | Date | string | null
     updatedAt?: DateTimeFilter<"SystemSetting"> | Date | string
   }
 
@@ -27874,6 +27959,7 @@ export namespace Prisma {
     minioUseSSL?: boolean
     minioPublicUrl?: string | null
     uploadConflictStrategy?: string
+    lastBackup?: Date | string | null
     updatedAt?: Date | string
   }
 
@@ -28216,6 +28302,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    lastBackup?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -28233,6 +28320,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    lastBackup?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -28250,6 +28338,7 @@ export namespace Prisma {
     minioUseSSL?: BoolFieldUpdateOperationsInput | boolean
     minioPublicUrl?: NullableStringFieldUpdateOperationsInput | string | null
     uploadConflictStrategy?: StringFieldUpdateOperationsInput | string
+    lastBackup?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 

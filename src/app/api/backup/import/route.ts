@@ -44,10 +44,14 @@ export async function POST(request: Request) {
       await tx.product.deleteMany();
       await tx.supplier.deleteMany();
       await tx.category.deleteMany();
-      // System settings 通常保留当前，除非备份有特定配置
-      // await tx.systemSetting.deleteMany(); 
+      await tx.emailWhitelist.deleteMany();
+      await tx.user.deleteMany();
+      await tx.systemSetting.deleteMany(); 
 
       // 导入数据 (按依赖顺序顺序插入)
+      if (data.systemSettings) await tx.systemSetting.createMany({ data: data.systemSettings });
+      if (data.whitelists) await tx.emailWhitelist.createMany({ data: data.whitelists });
+      if (data.users) await tx.user.createMany({ data: data.users });
       if (data.categories) await tx.category.createMany({ data: data.categories });
       if (data.suppliers) await tx.supplier.createMany({ data: data.suppliers });
       if (data.products) await tx.product.createMany({ data: data.products });
