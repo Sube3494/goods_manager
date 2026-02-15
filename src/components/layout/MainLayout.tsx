@@ -8,13 +8,25 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
 import { LogIn } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MobileHeader } from "./MobileHeader";
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, isLoading } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sidebar-collapsed") === "true";
+    }
+    return false;
+  });
+
+  const toggleCollapse = () => {
+    const newValue = !isCollapsed;
+    setIsCollapsed(newValue);
+    localStorage.setItem("sidebar-collapsed", String(newValue));
+  };
   
   const isLoginPage = pathname === "/login";
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
@@ -34,12 +46,14 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           <Sidebar 
             isOpen={isSidebarOpen} 
             onClose={() => setIsSidebarOpen(false)} 
+            isCollapsed={isCollapsed}
+            onToggleCollapse={toggleCollapse}
           />
         )}
         
         <div className={cn(
             "flex-1 flex flex-col min-h-screen transition-all duration-500 ease-in-out relative z-10 w-full",
-            showSidebar ? "lg:pl-72" : "pl-0"
+            showSidebar ? (isCollapsed ? "lg:pl-28" : "lg:pl-72") : "pl-0"
         )}>
             {!isLoginPage && (
               <MobileHeader 

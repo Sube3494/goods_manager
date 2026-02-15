@@ -316,7 +316,7 @@ export default function SettingsPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={cn(
                 "relative flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap",
                 isActive 
@@ -616,7 +616,7 @@ export default function SettingsPage() {
                                   ].map((mode) => (
                                     <button
                                       key={mode.id}
-                                      onClick={() => { setStorageType(mode.id as any); saveSettings({ storageType: mode.id }); }}
+                                      onClick={() => { setStorageType(mode.id as "local" | "minio"); saveSettings({ storageType: mode.id }); }}
                                       className={cn(
                                         "flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl transition-all duration-300 text-sm font-medium",
                                         storageType === mode.id 
@@ -643,7 +643,7 @@ export default function SettingsPage() {
                                       value={uploadConflictStrategy}
                                       triggerClassName="h-[54px] rounded-2xl border-border bg-muted/20"
                                       onChange={(val) => {
-                                          setUploadConflictStrategy(val as any);
+                                          setUploadConflictStrategy(val as "overwrite" | "rename" | "skip");
                                           saveSettings({ uploadConflictStrategy: val });
                                       }}
                                       options={[

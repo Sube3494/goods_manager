@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { Prisma } from "../../../../../prisma/generated-client";
 
 // 获取待审核的提交列表 (仅管理员)
 export async function GET(request: Request) {
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || "pending";
 
-    const where: any = {};
+    const where: Prisma.GallerySubmissionWhereInput = {};
     if (status !== "all") {
       where.status = status;
     }

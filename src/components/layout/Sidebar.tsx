@@ -32,9 +32,11 @@ const navItems = [
 interface SidebarProps {
   onClose?: () => void;
   isOpen?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ onClose, isOpen }: SidebarProps) {
+export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const { showToast } = useToast();
   const { user, isLoading } = useUser();
@@ -66,10 +68,20 @@ export function Sidebar({ onClose, isOpen }: SidebarProps) {
       />
 
       <aside className={cn(
-        "fixed left-4 top-4 z-50 h-[calc(100vh-2rem)] w-64 rounded-2xl glass border-border transition-all duration-300 lg:translate-x-0 outline-none",
+        "fixed left-4 top-4 z-50 h-[calc(100vh-2rem)] rounded-2xl glass border-border transition-all duration-300 lg:translate-x-0 outline-none group/sidebar",
+        isCollapsed ? "w-20" : "w-64",
         isOpen ? "translate-x-0" : "-translate-x-[120%]"
       )}>
-        <div className="flex h-full flex-col px-4 py-8 relative">
+        {/* Edge Trigger - Stealthy interaction */}
+        <button
+          onClick={(e) => { e.preventDefault(); onToggleCollapse?.(); }}
+          className="hidden lg:block absolute -right-1 top-0 bottom-0 w-3 cursor-pointer z-60 group/edge opacity-0 hover:opacity-100 transition-opacity"
+          title={isCollapsed ? "展开" : "收起"}
+        >
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 w-1 h-12 rounded-full bg-primary/40 group-hover/edge:bg-primary transition-all group-hover/edge:h-20" />
+        </button>
+
+        <div className="flex h-full flex-col p-4 relative">
           {/* Mobile Close Button */}
           <button 
             onClick={onClose}
@@ -78,20 +90,34 @@ export function Sidebar({ onClose, isOpen }: SidebarProps) {
             <X size={18} />
           </button>
 
-          <div className="mb-10 px-2 flex items-center justify-between">
+          {/* Logo Area - Also acts as a toggle */}
+          <div 
+            onClick={onToggleCollapse}
+            className={cn(
+                "mb-8 px-2 flex items-center shrink-0 cursor-pointer transition-all duration-300 hover:opacity-80 active:scale-95", 
+                isCollapsed ? "justify-center" : "justify-between"
+            )}
+            title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
+          >
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-xl bg-linear-to-br from-primary to-blue-600 shadow-lg shadow-blue-500/30 flex items-center justify-center text-primary-foreground font-bold text-sm">
-                L
+              <div className="h-9 w-9 rounded-xl bg-linear-to-br from-primary to-blue-600 shadow-lg shadow-blue-500/30 flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
+                P
               </div>
-              <div className="flex flex-col">
-                  <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
-                  PickNote
-                  </span>
-              </div>
+              {!isCollapsed && (
+                <motion.div 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex flex-col whitespace-nowrap"
+                >
+                    <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
+                    PickNote
+                    </span>
+                </motion.div>
+              )}
             </div>
           </div>
           
-          <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-1">
+          <div className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar scroll-smooth">
             {navItems.map((item) => {
               if (item.adminOnly && !user) return null;
               
@@ -101,67 +127,110 @@ export function Sidebar({ onClose, isOpen }: SidebarProps) {
                   key={item.name}
                   href={item.href}
                   onClick={onClose}
+                  title={isCollapsed ? item.name : undefined}
                   className={cn(
-                    "relative group flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0",
+                    "relative group flex items-center rounded-xl transition-all duration-300 outline-none focus:outline-none",
+                    isCollapsed ? "justify-center h-10 w-10 mx-auto" : "px-3 py-2.5 mx-1 text-sm font-medium",
                     isActive
                       ? "text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   )}
                 >
                   {isActive && (
                     <motion.div
                       layoutId="activeNav"
                       className="absolute inset-0 bg-primary z-[-1] rounded-xl"
-                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                      transition={{ type: "spring", stiffness: 350, damping: 35 }}
                     />
                   )}
                   <item.icon
                     className={cn(
-                      "h-5 w-5 mr-3 transition-colors",
+                      "h-5 w-5 transition-colors shrink-0",
+                      !isCollapsed && "mr-3",
                       isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                     )}
                   />
-                  <span className="relative z-10">{item.name}</span>
+                  {!isCollapsed && (
+                    <motion.span 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="relative z-10 whitespace-nowrap"
+                    >
+                        {item.name}
+                    </motion.span>
+                  )}
                 </Link>
               );
             })}
           </div>
           
-          <div className="mt-auto pt-6 border-t border-white/10">
-            {user ? (
-              <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer">
-                <div className="relative h-9 w-9 rounded-full overflow-hidden border-2 border-white/20 shadow-sm">
-                  <Image 
-                      src={`https://cravatar.cn/avatar/${md5(user.email || "")}?d=mp`} 
-                      alt="Current user"
-                      fill
-                      sizes="36px"
-                      className="object-cover"
-                  />
-                </div>
-                <div className="flex-1">
-                    <p className="text-sm font-bold text-foreground truncate max-w-[100px]">{user.name || "管理员"}</p>
-                    <p className="text-xs text-muted-foreground">超级权限</p>
-                </div>
-                <button 
-                    onClick={handleLogout}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all"
-                    title="退出登录"
-                >
-                    <LogOut size={16} />
-                </button>
-              </div>
-            ) : (
-              <Link href="/login" onClick={onClose} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group">
-                <div className="h-9 w-9 rounded-full bg-secondary/80 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                  <LogIn size={18} />
-                </div>
-                <div className="flex-1">
-                    <p className="text-sm font-bold text-foreground">未登录</p>
-                    <p className="text-xs text-muted-foreground">点击登录管理员</p>
-                </div>
-              </Link>
-            )}
+          <div className={cn("mt-auto pt-4 space-y-2 shrink-0")}>
+            <div className={cn("pt-4 border-t border-white/10", isCollapsed && "flex flex-col items-center gap-4")}>
+                {user ? (
+                <>
+                    <div className={cn(
+                        "flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group relative",
+                        isCollapsed ? "justify-center p-0 h-10 w-10" : "mx-1"
+                    )}>
+                        <div className="relative h-8 w-8 rounded-full overflow-hidden border-2 border-white/20 shadow-sm shrink-0">
+                        <Image 
+                            src={`https://cravatar.cn/avatar/${md5(user.email || "")}?d=mp`} 
+                            alt="Current user"
+                            fill
+                            sizes="32px"
+                            className="object-cover"
+                        />
+                        </div>
+                        {!isCollapsed && (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex-1 flex flex-col overflow-hidden"
+                        >
+                            <p className="text-sm font-bold text-foreground truncate">{user.name || "管理员"}</p>
+                            <p className="text-xs text-muted-foreground">超级权限</p>
+                        </motion.div>
+                        )}
+                    </div>
+
+                    <button 
+                        onClick={(e) => { e.preventDefault(); handleLogout(); }}
+                        title={isCollapsed ? "退出登录" : undefined}
+                        className={cn(
+                            "flex items-center transition-all duration-300 rounded-xl",
+                            isCollapsed 
+                                ? "justify-center h-10 w-10 text-red-400 hover:bg-red-500/10 hover:text-red-500" 
+                                : "px-3 py-2.5 mx-1 text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-500"
+                        )}
+                    >
+                        <LogOut size={18} className={cn(!isCollapsed && "mr-3")} />
+                        {!isCollapsed && <span className="whitespace-nowrap">退出登录</span>}
+                    </button>
+                </>
+                ) : (
+                <Link href="/login" onClick={onClose} title={isCollapsed ? "登录" : undefined} className={cn(
+                    "flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group",
+                    isCollapsed ? "justify-center p-0 h-10 w-10" : "mx-1"
+                )}>
+                    <div className={cn(
+                    "h-8 w-8 rounded-full bg-secondary/80 flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0",
+                    isCollapsed ? "h-9 w-9" : ""
+                    )}>
+                    <LogIn size={!isCollapsed ? 18 : 20} />
+                    </div>
+                    {!isCollapsed && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex-1 overflow-hidden"
+                    >
+                        <p className="text-sm font-bold text-foreground">未登录</p>
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">点击登录管理员</p>
+                    </motion.div>
+                    )}
+                </Link>
+                )}
+            </div>
           </div>
         </div>
       </aside>
