@@ -464,7 +464,7 @@ export default function SettingsPage() {
 
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 pt-8 px-6 border-t border-border/50">
                     <div className="flex-1">
-                      <h4 className="font-bold text-foreground">系统级加密备份与灾难恢复</h4>
+                      <h4 className="font-bold text-foreground">系统级加密备份与数据恢复</h4>
                       <p className="text-sm text-muted-foreground mt-1">
                           通过 AES-256-GCM 高强度加密技术，全量导出系统所有业务模型。恢复时需严格匹配备份密码。
                       </p>

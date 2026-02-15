@@ -67,7 +67,7 @@ export function BackupModal({ isOpen, onClose, type, file, onAction }: BackupMod
                   {type === "export" ? <Download size={20} /> : <Upload size={20} />}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold">{type === "export" ? "数据加密备份" : "系统灾难恢复"}</h3>
+                  <h3 className="text-lg font-bold">{type === "export" ? "数据加密备份" : "系统数据恢复"}</h3>
                   <p className="text-xs text-muted-foreground">{type === "export" ? "打包并加密所有业务数据" : "解密并全量覆盖现有数据"}</p>
                 </div>
               </div>
@@ -94,10 +94,15 @@ export function BackupModal({ isOpen, onClose, type, file, onAction }: BackupMod
                       autoFocus
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder={type === "export" ? "设置 6 位以上安全密码" : "输入备份时的加密密码"}
                       className="w-full h-12 bg-background border border-border rounded-xl px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
                       onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
                     />
+                    <div className="mt-2 flex items-center justify-between">
+                        <p className="text-[10px] text-muted-foreground italic">
+                            {type === "export" ? "要求：至少 6 位，支持字母、数字及符号" : "请输入备份导出时设置的对应密码"}
+                        </p>
+                    </div>
                     {error && (
                       <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
                         <AlertCircle size={12} /> {error}
