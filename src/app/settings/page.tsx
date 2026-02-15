@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
-import { ImportModal } from "@/components/Goods/ImportModal";
+import { BackupModal } from "@/components/Settings/BackupModal";
 import { cn } from "@/lib/utils";
 
 interface SystemInfo {
@@ -36,8 +36,13 @@ export default function SettingsPage() {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "storage" | "data" | "system">("general");
+
+  const [backupConfig, setBackupConfig] = useState<{
+      isOpen: boolean;
+      type: "export" | "import";
+      file?: File;
+  }>({ isOpen: false, type: "export" });
 
   const tabs = [
     { id: "general", label: "常规设置", icon: Zap },
@@ -221,56 +226,6 @@ export default function SettingsPage() {
     saveSettings({ allowDataImport: newValue });
   };
 
-  const handleExportData = async () => {
-    try {
-      showToast("正在生成备份文件...", "info");
-      const res = await fetch("/api/system/export");
-      if (!res.ok) throw new Error("Export failed");
-      
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `GoodsManager_Backup_${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      showToast("数据导出成功", "success");
-    } catch (error) {
-      console.error("Export error:", error);
-      showToast("导出失败，请检查网络", "error");
-    }
-  };
-
-  const handleImportData = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
-    try {
-      showToast("正在处理并同步全量数据...", "info");
-      const res = await fetch("/api/system/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        if (result.failCount > 0) {
-            showToast(`导入完成：成功 ${result.successCount} 项，${result.failCount} 项失败。`, "warning");
-        } else {
-            showToast(`成功恢复并同步 ${result.successCount} 项数据`, "success");
-        }
-        // Force reload info to update any stats or times
-        const infoRes = await fetch("/api/system/info");
-        if (infoRes.ok) setSystemInfo(await infoRes.json());
-      } else {
-        const err = await res.json();
-        showToast(err.error || "导入失败", "error");
-      }
-    } catch (error) {
-      console.error("Import error:", error);
-      showToast("网络请求失败", "error");
-    }
-  };
 
   if (isLoading) {
     return (
@@ -507,41 +462,93 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 pt-8 border-t border-border/50">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 pt-8 px-6 border-t border-border/50">
                     <div className="flex-1">
-                      <h4 className="font-bold text-foreground">系统级备份与灾难恢复</h4>
+                      <h4 className="font-bold text-foreground">系统级加密备份与灾难恢复</h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        将当前数据库内的全量 SKU、订单流水分页打包为加密 Excel，或从现有存档中恢复。
+                          通过 AES-256-GCM 高强度加密技术，全量导出系统所有业务模型。恢复时需严格匹配备份密码。
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <button
-                        onClick={() => setShowImportModal(true)}
+                        onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = ".pnk";
+                            input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) setBackupConfig({ isOpen: true, type: "import", file });
+                            };
+                            input.click();
+                        }}
                         className="h-12 px-8 rounded-2xl bg-white dark:bg-white/5 border border-border hover:bg-muted font-medium transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center gap-2"
                       >
                         <Upload size={18} className="text-emerald-500" />
-                        导入存档
+                        系统恢复
                       </button>
                       <button
-                        onClick={handleExportData}
+                        onClick={() => setBackupConfig({ isOpen: true, type: "export" })}
                         className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-95 font-medium transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center gap-2"
                       >
                         <Download size={18} />
-                        导出备份
+                        立即备份
                       </button>
                     </div>
                   </div>
 
-                  <ImportModal
-                    isOpen={showImportModal}
-                    onClose={() => setShowImportModal(false)}
-                    onImport={handleImportData}
-                    title="导入全站备份"
-                    description="请选择之前导出的 GoodsManager 备份文件 (.xlsx)"
-                    multiSheet={true}
+                  <BackupModal 
+                    key={backupConfig.isOpen ? "open" : "closed"}
+                    isOpen={backupConfig.isOpen}
+                    type={backupConfig.type}
+                    file={backupConfig.file}
+                    onClose={() => setBackupConfig(prev => ({ ...prev, isOpen: false }))}
+                    onAction={async (password: string, onProgress: (p: number) => void) => {
+                        // 模拟更平稳的进度展示，增加专业感
+                        onProgress(10);
+                        await new Promise(r => setTimeout(r, 600));
+                        onProgress(35);
+
+                        if (backupConfig.type === "export") {
+                            const res = await fetch("/api/backup/export", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ password })
+                            });
+                            onProgress(85);
+                            if (!res.ok) {
+                                const err = await res.json();
+                                throw new Error(err.error || "导出失败");
+                            }
+                            const blob = await res.blob();
+                            onProgress(100);
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `PickNote_Backup_${new Date().toISOString().split('T')[0]}.pnk`;
+                            a.click();
+                        } else {
+                            if (!backupConfig.file) return;
+                            const formData = new FormData();
+                            formData.append("file", backupConfig.file);
+                            formData.append("password", password);
+                            
+                            const res = await fetch("/api/backup/import", {
+                                method: "POST",
+                                body: formData
+                            });
+                            onProgress(90);
+                            if (!res.ok) {
+                                const err = await res.json();
+                                throw new Error(err.error || "恢复失败");
+                            }
+                            onProgress(100);
+                            setTimeout(() => window.location.reload(), 2000);
+                        }
+                    }}
                   />
+
+                  </div>
                 </div>
-              </div>
 
               {/* Security Placeholder */}
               <div className="glass-panel rounded-3xl border border-border p-8 opacity-60 grayscale hover:grayscale-0 transition-all hover:opacity-100 bg-white/5 border-dashed">

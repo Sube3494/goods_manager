@@ -8,7 +8,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
 import { LogIn } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { MobileHeader } from "./MobileHeader";
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
