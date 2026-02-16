@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Check, Package, Tag, Truck, Plus } from "lucide-react";
@@ -8,6 +8,7 @@ import { Product, Supplier, GalleryItem } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { useToast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useDebounce";
 
 
 import { getCategoryName } from "@/lib/utils";
@@ -27,50 +28,130 @@ interface ProductSelectionModalProps {
   showPrice?: boolean;
 }
 
+function ProductSkeleton() {
+  return (
+    <div className="flex items-center gap-5 p-4 rounded-2xl border border-border/60 bg-white dark:bg-white/5 animate-pulse">
+      <div className="h-12 w-12 rounded-lg bg-muted" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-1/2 bg-muted rounded" />
+        <div className="h-3 w-1/4 bg-muted rounded" />
+      </div>
+    </div>
+  );
+}
+
 export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, singleSelect = false, showPrice = true }: ProductSelectionModalProps) {
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isNextPageLoading, setIsNextPageLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const pageRef = useRef(1);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { showToast } = useToast();
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   // 1. Sync selection when modal opens
   useEffect(() => {
     if (isOpen) {
       setTempSelectedIds(selectedIds);
+      setSelectedProducts([]); // Clear temporary session selections
       setSearchQuery("");
       setSelectedSupplierId("");
     }
   }, [isOpen, selectedIds]);
 
-   const fetchData = async () => {
-    setIsLoading(true);
+   const fetchData = useCallback(async (mode: 'initial' | 'search' | 'next' = 'initial') => {
+    if (mode === 'initial') {
+      setIsLoading(true);
+      pageRef.current = 1;
+    } else if (mode === 'search') {
+      setIsSearching(true);
+      pageRef.current = 1;
+    } else {
+      setIsNextPageLoading(true);
+    }
+
     try {
+      const targetPage = pageRef.current;
+      const queryParams = new URLSearchParams({
+        page: targetPage.toString(),
+        pageSize: "20",
+        search: debouncedSearch,
+      });
+
       const [pRes, sRes] = await Promise.all([
-        fetch("/api/products"),
-        fetch("/api/suppliers")
+        fetch(`/api/products?${queryParams.toString()}`),
+        mode === 'initial' ? fetch("/api/suppliers") : Promise.resolve(null)
       ]);
-      if (pRes.ok && sRes.ok) {
-        const [pData, sData] = await Promise.all([pRes.json(), sRes.json()]);
-        setProducts(pData);
-        setSuppliers(sData);
+
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const newItems = Array.isArray(pData.items) ? pData.items : [];
+        
+        if (mode === 'initial' || mode === 'search') {
+          setProducts(newItems);
+        } else {
+          setProducts(prev => {
+            const existingIds = new Set(prev.map(i => i.id));
+            return [...prev, ...newItems.filter((i: Product) => !existingIds.has(i.id))];
+          });
+        }
+        
+        setHasMore(pData.hasMore);
+        pageRef.current = targetPage + 1;
+      }
+
+      if (sRes && sRes.ok) {
+        setSuppliers(await sRes.json());
       }
     } catch (error) {
       console.error("Failed to fetch products or suppliers:", error);
     } finally {
       setIsLoading(false);
+      setIsSearching(false);
+      setIsNextPageLoading(false);
     }
-  };
+  }, [debouncedSearch]);
 
   // 2. Data fetching when modal opens
   useEffect(() => {
     if (!isOpen) return;
-    fetchData();
-  }, [isOpen]); 
+    fetchData('initial');
+  }, [isOpen, fetchData]);
+
+  // 3. Search change (debounced)
+  useEffect(() => {
+    if (!isOpen || isLoading) return; // Skip if modal just opened (handled by initial)
+    fetchData('search');
+  }, [debouncedSearch, isOpen, isLoading, fetchData]);
+
+  // 4. Infinite scroll observer
+  useEffect(() => {
+    if (!isOpen || !hasMore || isLoading || isSearching || isNextPageLoading) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting) {
+          fetchData('next');
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [isOpen, hasMore, isLoading, isSearching, isNextPageLoading, fetchData]);
 
   const handleQuickCreate = async (data: Partial<Product>, galleryItems?: GalleryItem[]) => {
     try {
@@ -113,25 +194,40 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     }
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         (p.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+  const filteredProducts = (Array.isArray(products) ? products : []).filter(p => {
+    // Backend already handles search, but we apply supplier filter on top of it 
+    // since backend doesn't support supplierId param yet
     const matchesSupplier = !selectedSupplierId || p.supplierId === selectedSupplierId;
-    return matchesSearch && matchesSupplier;
+    return matchesSupplier;
   });
 
-  const toggleProduct = (id: string) => {
+  const toggleProduct = (product: Product) => {
+    const id = product.id;
     if (singleSelect) {
         setTempSelectedIds([id]);
+        setSelectedProducts([product]);
     } else {
-        setTempSelectedIds(prev => 
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
+        setTempSelectedIds(prev => {
+            const isSelected = prev.includes(id);
+            if (isSelected) {
+                return prev.filter(i => i !== id);
+            } else {
+                return [...prev, id];
+            }
+        });
+        
+        setSelectedProducts(prev => {
+            const isSelected = prev.some(p => p.id === id);
+            if (isSelected) {
+                return prev.filter(p => p.id !== id);
+            } else {
+                return [...prev, product];
+            }
+        });
     }
   };
 
   const handleConfirm = () => {
-    const selectedProducts = products.filter(p => tempSelectedIds.includes(p.id));
     onSelect(selectedProducts);
     onClose();
   };
@@ -203,19 +299,21 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar min-h-0">
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar min-h-0 relative">
                  {isLoading ? (
-                    <div className="py-12 text-center text-muted-foreground animate-pulse">
-                        加载中...
+                    <div className="space-y-2">
+                        {[...Array(6)].map((_, i) => (
+                           <ProductSkeleton key={i} />
+                        ))}
                     </div>
                  ) : (
-                    <>
+                    <div className={cn("space-y-2 transition-opacity duration-200", isSearching && "opacity-50 pointer-events-none")}>
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
                       return (
                          <div 
                           key={product.id}
-                          onClick={() => toggleProduct(product.id)}
+                          onClick={() => toggleProduct(product)}
                             className={cn(
                              "group relative flex items-center gap-5 p-4 rounded-2xl border transition-all cursor-pointer",
                              isSelected 
@@ -271,12 +369,23 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                       );
                     })}
                     
-                    {filteredProducts.length === 0 && (
+                     {filteredProducts.length === 0 && !isLoading && !isSearching && (
                         <div className="py-12 text-center text-muted-foreground">
                             未找到相关商品
                         </div>
                     )}
-                    </>
+                    
+                    {hasMore && !isLoading && !isSearching && (
+                      <div ref={observerTarget} className="flex justify-center py-6">
+                        {isNextPageLoading && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+                            <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                            加载更多...
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    </div>
                  )}
                 </div>
             </div>

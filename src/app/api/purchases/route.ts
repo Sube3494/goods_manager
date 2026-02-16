@@ -142,27 +142,12 @@ export async function POST(request: Request) {
         });
 
         if (product) {
-          const currentStock = product.stock;
-          const currentCost = product.costPrice || 0;
           const incomingQty = Number(item.quantity) || 0;
-          const incomingCost = Number(item.costPrice) || 0;
-
-          let newCostPrice = currentCost;
-          if (incomingCost > 0) {
-            if (currentStock <= 0) {
-              newCostPrice = incomingCost;
-            } else {
-              const totalValue = (currentStock * currentCost) + (incomingQty * incomingCost);
-              const totalQty = currentStock + incomingQty;
-              newCostPrice = totalValue / totalQty;
-            }
-          }
 
           await prisma.product.update({
             where: { id: item.productId },
             data: {
-              stock: { increment: incomingQty },
-              costPrice: newCostPrice
+              stock: { increment: incomingQty }
             }
           });
         }

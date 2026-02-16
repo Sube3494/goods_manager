@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink } from "lucide-react";
@@ -70,7 +70,6 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     images: [],
     currentIndex: 0
   });
-  const prevInitialDataRef = useRef<PurchaseOrder | undefined>(undefined);
 
   const selectedProductIds = useMemo(() => {
     return formData.items.map(item => item.productId);
@@ -89,7 +88,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
         
         if (pRes.ok) {
           const pData = await pRes.json();
-          setProducts(pData);
+          // Backend now returns paginated object with { items, total, ... }
+          const items = Array.isArray(pData.items) ? pData.items : (Array.isArray(pData) ? pData : []);
+          setProducts(items);
         }
         
         if (sRes.ok) {
@@ -105,35 +106,34 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     return () => cancelAnimationFrame(handle);
   }, [isOpen]);
 
-  // Reset formData when modal opens with new data
+  // Sync data and reset form when modal opens or initialData changes
   useEffect(() => {
     if (!isOpen) return;
-    
-    // Use a transition to batch state updates
-    const timeoutId = setTimeout(() => {
-      if (initialData && initialData !== prevInitialDataRef.current) {
-        prevInitialDataRef.current = initialData;
-        setFormData(initialData);
-        setShippingFeeInput(initialData.shippingFees?.toString() || "0");
-        setExtraFeeInput(initialData.extraFees?.toString() || "0");
-      } else if (!initialData && prevInitialDataRef.current) {
-        prevInitialDataRef.current = undefined;
-        setFormData({
-          id: `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
-          status: "Draft",
-          date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
-          items: [],
-          shippingFees: 0,
-          extraFees: 0,
-          totalAmount: 0,
-          trackingData: undefined
-        });
-        setShippingFeeInput("0");
-        setExtraFeeInput("0");
-      }
 
+    // Use setTimeout to avoid the "cascading renders" lint error while 
+    // keeping initialization out of the render path (fixing the Math.random error)
+    const timeoutId = setTimeout(() => {
+        if (initialData) {
+            setFormData(initialData);
+            setShippingFeeInput(initialData.shippingFees?.toString() || "0");
+            setExtraFeeInput(initialData.extraFees?.toString() || "0");
+        } else {
+            const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
+            setFormData({
+                id: newId,
+                status: "Draft",
+                date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
+                items: [],
+                shippingFees: 0,
+                extraFees: 0,
+                totalAmount: 0,
+                trackingData: undefined
+            });
+            setShippingFeeInput("0");
+            setExtraFeeInput("0");
+        }
     }, 0);
-    
+
     return () => clearTimeout(timeoutId);
   }, [isOpen, initialData]);
 
@@ -170,22 +170,25 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
   };
 
   const handleBatchAdd = (selectedProducts: Product[]) => {
-    const currentProductIds = formData.items.map(item => item.productId);
-    const newItems = [...formData.items];
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      
+      selectedProducts.forEach(product => {
+        // Check against the growing newItems list to prevent duplicates within the same batch
+        if (!newItems.some(item => item.productId === product.id)) {
+          newItems.push({
+            productId: product.id,
+            product: product, // Store snapshot for stable name display
+            image: product.image,
+            supplierId: product.supplierId,
+            quantity: 1,
+            costPrice: product.costPrice
+          });
+        }
+      });
 
-    selectedProducts.forEach(product => {
-      if (!currentProductIds.includes(product.id)) {
-        newItems.push({
-          productId: product.id,
-          image: product.image,
-          supplierId: product.supplierId,
-          quantity: 1,
-          costPrice: product.costPrice
-        });
-      }
+      return { ...prev, items: newItems };
     });
-
-    setFormData({ ...formData, items: newItems });
   };
 
   const removeItem = (index: number) => {
@@ -344,10 +347,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                     {/* Product Info Column */}
                                     <div className="flex w-full items-center gap-3">
                                         <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50">
-                                            {products.find(g => g.id === item.productId)?.image ? (
+                                            {(Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.image ? (
                                                 /* eslint-disable-next-line @next/next/no-img-element */
                                                 <img 
-                                                    src={products.find(g => g.id === item.productId)?.image} 
+                                                    src={(Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.image} 
                                                     alt="product" 
                                                     className="h-full w-full object-cover" 
                                                 />
@@ -360,14 +363,14 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                         <div className="flex-1 space-y-1 min-w-0">
                                             <div className="flex flex-col gap-0.5 min-w-0">
                                                 <span className="text-xs sm:text-sm font-bold text-foreground line-clamp-2">
-                                                    {products.find(g => g.id === item.productId)?.name}
+                                                    {item.product?.name || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.name || "加载中..."}
                                                 </span>
                                                  <div className="flex items-center gap-2">
                                                     <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                                        #{products.find(g => g.id === item.productId)?.sku || products.find(g => g.id === item.productId)?.id || "N/A"}
+                                                        #{item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku || "..."}
                                                     </span>
                                                     <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                                        • {suppliers.find(s => s.id === (products.find(p => p.id === item.productId)?.supplierId || item.supplierId))?.name || "未知供应商"}
+                                                        • {suppliers.find(s => s.id === (item.product?.supplierId || item.supplierId))?.name || "未知供应商"}
                                                     </span>
                                                 </div>
                                             </div>

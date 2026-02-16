@@ -571,14 +571,14 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-11000 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-11001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">{initialData ? "编辑商品" : "新增商品"}</h2>
@@ -719,7 +719,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                                     {order.status === "Received" ? "已入库" : order.status === "Ordered" ? "待入库" : "草稿"}
                                                                 </span>
                                                             </div>
-                                                            <span className="text-xs font-medium text-foreground">单号: {order.id.slice(-6)}</span>
+                                                            <span className="text-xs font-medium text-foreground">单号: {order.id}</span>
                                                         </div>
                                                         <div className="text-right flex flex-col items-end gap-0.5">
                                                             <div className="text-xs font-semibold text-foreground">
@@ -736,7 +736,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 );
                                             })
                                         ) : (
-                                            <div className="py-2 text-center text-[10px] text-muted-foreground italic">暂无历史记录</div>
+                                            <div className="py-2 text-center text-[10px] text-muted-foreground">暂无历史记录</div>
                                         )}
                                     </div>
                                 </div>
