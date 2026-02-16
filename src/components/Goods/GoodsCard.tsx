@@ -34,7 +34,7 @@ export function GoodsCard({
   return (
     <motion.div
       onClick={handleCardClick}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer ${
+      className={`group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer transform-gpu will-change-transform translate-z-0 ${
         isSelected ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''
       }`}
     >
@@ -114,10 +114,7 @@ export function GoodsCard({
           <div className="text-right">
              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">进货单价</p>
              <p className="font-bold text-foreground">
-                {product.costPrice > 0 
-                  ? <span className="text-base sm:text-lg">¥{product.costPrice.toLocaleString()}</span> 
-                  : <span className="text-xs sm:text-base opacity-90">以实际为准</span>
-                }
+                <span className="text-base sm:text-lg">¥{Number(product.costPrice || 0).toLocaleString()}</span>
              </p>
           </div>
         </div>

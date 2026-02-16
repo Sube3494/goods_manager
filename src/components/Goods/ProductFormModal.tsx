@@ -639,7 +639,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                             <Truck size={16} /> 供应商
-
                         </label>
                         <CustomSelect 
                             value={formData.supplierId || ""}
@@ -652,41 +651,20 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         />
                     </div>
 
-                    {/* Visibility & Prices */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <FileText size={16} /> 进货单价 (￥)
-                            </label>
-                            <input 
-
-                                type="number" 
-                                step="0.01"
-                                min="0"
-                                value={formData.costPrice}
-                                onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
-                                className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
-                                placeholder="0.00"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Eye size={16} /> 展示设置
-                            </label>
-                            <div
-                                onClick={() => setFormData({...formData, hideCost: !formData.hideCost})}
-                                className="w-full rounded-full px-5 py-2.5 flex items-center justify-between border border-border bg-white dark:bg-white/5 transition-all duration-300 font-medium text-foreground cursor-pointer dark:hover:bg-white/10 group h-[46px]"
-                            >
-                                <span className="group-hover:text-primary transition-colors text-sm">
-                                    {formData.hideCost ? "隐藏进货价" : "显示进货价"}
-                                </span>
-                                <Switch 
-                                    checked={formData.hideCost} 
-                                    onChange={(val) => setFormData({...formData, hideCost: val})} 
-                                />
-                            </div>
-                        </div>
+                    {/* Cost Price */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <FileText size={16} /> 进货单价 (￥)
+                        </label>
+                        <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            value={formData.costPrice}
+                            onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
+                            className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
+                            placeholder="0.00"
+                        />
                     </div>
 
                     {/* Initial Stock */}

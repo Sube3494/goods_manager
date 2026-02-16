@@ -41,9 +41,12 @@ export function ActionBar({
           animate={{ y: 0, opacity: 1, x: "-50%" }}
           exit={{ y: 100, opacity: 0, x: "-50%" }}
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          className="fixed bottom-6 lg:bottom-10 left-1/2 lg:left-[calc(50%+144px)] z-9999 w-fit max-w-[calc(100%-2rem)]"
+          style={{ 
+            left: "calc(50% + (var(--sidebar-width, 0px) / 2))"
+          } as React.CSSProperties}
+          className="fixed bottom-6 lg:bottom-10 z-9999 pointer-events-none w-fit max-w-[calc(100%-2rem)]"
         >
-          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-6 pl-3 sm:pl-6 pr-2 sm:pr-4 h-14 sm:h-12 rounded-[24px] sm:rounded-full bg-white/90 dark:bg-zinc-900/90 border border-black/5 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-6 pl-3 sm:pl-6 pr-2 sm:pr-4 h-14 sm:h-12 rounded-[24px] sm:rounded-full bg-white/90 dark:bg-zinc-900/90 border border-black/5 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] backdrop-blur-xl pointer-events-auto">
             {/* Select All Checkbox - Minimal on mobile */}
             <button 
               onClick={onToggleSelectAll}

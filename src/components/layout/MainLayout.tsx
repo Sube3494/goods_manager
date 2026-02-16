@@ -8,7 +8,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
 import { LogIn } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MobileHeader } from "./MobileHeader";
 import { PageGuard } from "./PageGuard";
 
@@ -23,15 +23,22 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     return false;
   });
 
+  const isLoginPage = pathname === "/login";
+  // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
+  const showSidebar = !isLoginPage && !!user;
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const width = showSidebar ? (isCollapsed ? "112px" : "288px") : "0px";
+      document.documentElement.style.setProperty("--sidebar-width", width);
+    }
+  }, [isCollapsed, showSidebar]);
+
   const toggleCollapse = () => {
     const newValue = !isCollapsed;
     setIsCollapsed(newValue);
     localStorage.setItem("sidebar-collapsed", String(newValue));
   };
-  
-  const isLoginPage = pathname === "/login";
-  // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
-  const showSidebar = !isLoginPage && !!user;
 
     return (
     <ToastProvider>
@@ -39,8 +46,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         {/* Ambient Background Mesh - Animated Blobs */}
         <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
             {/* Subtle Ambient Light - Clean & Professional */}
-            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-400/5 dark:bg-blue-600/5 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen" />
-            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-400/5 dark:bg-purple-600/5 rounded-full blur-[100px] mix-blend-multiply dark:mix-blend-screen" />
+            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-500/3 dark:bg-blue-600/2 rounded-full blur-[80px] transform-gpu will-change-transform translate-z-0" />
+            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-500/3 dark:bg-purple-600/2 rounded-full blur-[60px] transform-gpu will-change-transform translate-z-0" />
         </div>
 
         {showSidebar && (
@@ -53,7 +60,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         )}
         
         <div className={cn(
-            "flex-1 flex flex-col min-h-screen transition-all duration-500 ease-in-out relative z-10 w-full",
+            "flex-1 flex flex-col min-h-screen transition-[padding] duration-500 ease-in-out relative z-10 w-full",
             showSidebar ? (isCollapsed ? "lg:pl-28" : "lg:pl-72") : "pl-0"
         )}>
             {!isLoginPage && (

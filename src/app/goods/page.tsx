@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
@@ -17,18 +17,25 @@ import * as XLSX from "xlsx";
 
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
-import { pinyinMatch } from "@/lib/pinyin";
 import { SessionUser } from "@/lib/permissions";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export default function GoodsPage() {
   const { user } = useUser();
-  const [goods, setGoods] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const observerTarget = useRef<HTMLDivElement>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
-  const [settings, setSettings] = useState<{ lowStockThreshold: number }>({ lowStockThreshold: 10 });
+  
+  // Pagination & Data states
+  const [items, setItems] = useState<Product[]>([]);
+  const [, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isNextPageLoading, setIsNextPageLoading] = useState(false);
+  
+  const [lowStockThreshold, setLowStockThreshold] = useState(10);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -52,64 +59,105 @@ export default function GoodsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<string>("sku-asc");
+
+  const debouncedSearch = useDebounce(searchQuery, 500);
 
   const { showToast } = useToast();
   const canCreate = hasPermission(user as SessionUser | null, "product:create");
   const canUpdate = hasPermission(user as SessionUser | null, "product:update");
   const canDelete = hasPermission(user as SessionUser | null, "product:delete");
 
-  const fetchGoods = useCallback(async () => {
+  const fetchGoods = useCallback(async (isFirstPage = true) => {
     try {
-      setIsLoading(true);
+      if (isFirstPage) {
+        setIsLoading(true);
+      } else {
+        setIsNextPageLoading(true);
+      }
       
-      const promises: Promise<Response>[] = [
-        fetch("/api/products"),
-        fetch("/api/categories")
-      ];
+      // 使用函数式更新来获取最新的 page，或者在调用时传入
+      // 这里我们在组件作用域直接读取 state 是可以的，但要配合依赖控制
+      setPage(prevPage => {
+        const targetPage = isFirstPage ? 1 : prevPage + 1;
+        
+        const queryParams = new URLSearchParams({
+          page: targetPage.toString(),
+          pageSize: "20",
+          search: searchQuery,
+          category: selectedCategory,
+          status: selectedStatus,
+          sortBy: sortBy,
+        });
 
-      const canReadSuppliers = user?.role === "SUPER_ADMIN" || user?.permissions?.["supplier:read"];
-      if (canReadSuppliers) {
-        promises.push(fetch("/api/suppliers"));
-      }
+        fetch(`/api/products?${queryParams.toString()}`)
+          .then(res => res.ok ? res.json() : Promise.reject())
+          .then(data => {
+            if (isFirstPage) {
+              setItems(data.items);
+            } else {
+              setItems(prev => {
+                const existingIds = new Set(prev.map(i => i.id));
+                const newItems = data.items.filter((i: Product) => !existingIds.has(i.id));
+                return [...prev, ...newItems];
+              });
+            }
+            setHasMore(data.hasMore);
+          })
+          .catch(err => console.error("Fetch items error:", err))
+          .finally(() => {
+            setIsLoading(false);
+            setIsNextPageLoading(false);
+          });
+          
+        return targetPage;
+      });
 
-      const results = await Promise.all(promises);
-      const productsRes = results[0];
-      const categoriesRes = results[1];
-      const suppliersRes = canReadSuppliers ? results[2] : null;
-
-      if (productsRes.ok && categoriesRes.ok) {
-        const productsData = await productsRes.json();
-        const categoriesData = await categoriesRes.json();
-        setGoods(productsData);
-        setCategories(categoriesData);
-
-        if (suppliersRes && suppliersRes.ok) {
-           const suppliersData = await suppliersRes.json();
-           setSuppliers(suppliersData);
+      // 仅在首次加载时获取基础元数据
+      if (isFirstPage) {
+        if (categories.length === 0) {
+          fetch("/api/categories").then(r => r.ok && r.json()).then(setCategories);
         }
+        
+        const canReadSuppliers = user?.role === "SUPER_ADMIN" || user?.permissions?.["supplier:read"];
+        if (canReadSuppliers && suppliers.length === 0) {
+          fetch("/api/suppliers").then(r => r.ok && r.json()).then(setSuppliers);
+        }
+
+        fetch("/api/system/settings").then(r => r.ok && r.json()).then(s => s && setLowStockThreshold(s.lowStockThreshold));
       }
+
     } catch (error) {
       console.error("Failed to fetch data", error);
-    } finally {
       setIsLoading(false);
+      setIsNextPageLoading(false);
     }
-  }, [user]);
-
-  const fetchSettings = useCallback(async () => {
-    try {
-      const res = await fetch("/api/system/settings");
-      if (res.ok) {
-        setSettings(await res.json());
-      }
-    } catch (error) {
-      console.error("Failed to fetch settings:", error);
-    }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, searchQuery, selectedCategory, selectedStatus, sortBy]);
 
   useEffect(() => {
-    fetchGoods();
-    fetchSettings();
-  }, [fetchGoods, fetchSettings]);
+    fetchGoods(true);
+  }, [fetchGoods, debouncedSearch, selectedCategory, selectedStatus, sortBy]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    if (!hasMore || isLoading || isNextPageLoading) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore) {
+          fetchGoods(false);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, isNextPageLoading, fetchGoods]);
 
   useEffect(() => {
     const handleScroll = (e: Event) => {
@@ -263,7 +311,7 @@ export default function GoodsPage() {
 
         showToast(editingProduct ? "商品更新成功" : "商品创建成功", "success");
         setIsNewProductOpen(false);
-        fetchGoods();
+        fetchGoods(true);
       } else {
         showToast("操作失败", "error");
       }
@@ -308,7 +356,7 @@ export default function GoodsPage() {
       if (res.ok) {
         showToast("导入成功", "success");
         setIsImportOpen(false);
-        fetchGoods();
+        fetchGoods(true);
       } else {
         showToast("导入失败", "error");
       }
@@ -321,38 +369,8 @@ export default function GoodsPage() {
   // Sync URL filter to state on mount if needed, or just use state
   // For simplicity and unified UI, we prioritize local state controlled by dropdowns
   
-  const filteredGoods = goods.filter(g => {
-    // 1. Status Filter
-    if (selectedStatus === 'low_stock') {
-       if (g.stock >= settings.lowStockThreshold) return false;
-    }
-
-    // 2. Category Filter
-    if (selectedCategory !== 'all') {
-      const catName = typeof g.category === 'object' ? (g.category as Category).name : String(g.category);
-      if (catName !== selectedCategory) return false;
-    }
-
-    const query = searchQuery.trim();
-    if (!query) return true;
-
-    const nameMatch = pinyinMatch(g.name, query);
-    
-    // Category match (for search input)
-    let categoryMatch = false;
-    if (g.category) {
-      if (typeof g.category === 'object') {
-        categoryMatch = pinyinMatch((g.category as Category).name, query);
-      } else {
-        categoryMatch = pinyinMatch(String(g.category), query);
-      }
-    }
-    
-    // SKU match
-    const skuMatch = pinyinMatch(g.sku || "", query);
-    
-    return nameMatch || categoryMatch || skuMatch;
-  });
+  // No local sorting needed anymore, we trust server-side globally-sorted pagination
+  const filteredGoods = items;
 
   return (
     <div className="space-y-8">
@@ -361,7 +379,7 @@ export default function GoodsPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
           <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
-            {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU。"}
+            {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU"}
           </p>
         </div>
         
@@ -400,8 +418,8 @@ export default function GoodsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 md:mb-8">
-          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:flex-1 shrink-0">
+      <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
+          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1 shrink-0">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -412,8 +430,8 @@ export default function GoodsPage() {
             />
           </div>
           
-          <div className="grid grid-cols-2 sm:flex gap-3 h-10 sm:h-11 w-full sm:w-auto">
-             <div className="w-full sm:w-40 h-full"> 
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto"> 
+             <div className="w-full sm:w-40 h-10 sm:h-11"> 
                 <CustomSelect 
                     value={selectedStatus}
                     onChange={setSelectedStatus}
@@ -422,10 +440,10 @@ export default function GoodsPage() {
                         { value: 'low_stock', label: '库存预警' }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm py-0"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
                 />
              </div>
-             <div className="w-full sm:w-40 h-full">
+             <div className="w-full sm:w-40 h-10 sm:h-11">
                 <CustomSelect 
                     value={selectedCategory}
                     onChange={setSelectedCategory}
@@ -434,9 +452,26 @@ export default function GoodsPage() {
                         ...categories.map(c => ({ value: c.name, label: c.name }))
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm py-0"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
                 />
              </div>
+             <div className="w-full sm:w-48 h-10 sm:h-11">
+                <CustomSelect 
+                    value={sortBy}
+                    onChange={setSortBy}
+                    options={[
+                        { value: 'sku-asc', label: '编号从小到大' },
+                        { value: 'sku-desc', label: '编号从大到小' },
+                        { value: 'createdAt-desc', label: '最新创建' },
+                        { value: 'createdAt-asc', label: '最早创建' },
+                        { value: 'stock-desc', label: '库存从高到低' },
+                        { value: 'stock-asc', label: '库存从低到高' },
+                        { value: 'name-asc', label: '名称 A-Z' }
+                    ]}
+                    className="h-full"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
+                />
+              </div>
           </div>
       </div>
 
@@ -455,13 +490,33 @@ export default function GoodsPage() {
               product={product} 
               onEdit={canUpdate ? handleEdit : undefined} 
               onDelete={canDelete ? handleDelete : undefined} 
-              lowStockThreshold={settings.lowStockThreshold}
+              lowStockThreshold={lowStockThreshold}
               isSelected={selectedIds.includes(product.id)}
               anySelected={selectedIds.length > 0}
               onToggleSelect={toggleSelectProduct}
               priority={index < 4}
             />
           ))}
+        </div>
+      )}
+
+      {/* Infinite Scroll Sentinel & Loading indicator */}
+      {filteredGoods.length > 0 && (
+        <div ref={observerTarget} className="flex justify-center mt-8 mb-12 py-4">
+          {isNextPageLoading ? (
+            <div className="flex items-center gap-3 text-muted-foreground bg-white/5 px-6 py-2 rounded-full border border-white/10 animate-pulse">
+              <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+              <span className="text-sm font-medium">正在拉取更多记录...</span>
+            </div>
+          ) : hasMore ? (
+            <div className="h-10 invisible" /> // Sentinel is active but invisible
+          ) : (
+            <div className="text-muted-foreground text-sm font-medium flex items-center gap-2 opacity-50">
+              <div className="w-1.5 h-1.5 rounded-full bg-current" />
+              已展示全部商品
+              <div className="w-1.5 h-1.5 rounded-full bg-current" />
+            </div>
+          )}
         </div>
       )}
 

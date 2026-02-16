@@ -3,19 +3,129 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
-// 获取所有商品 (共享模式)
-export async function GET() {
+// 获取所有商品 (支持分页、筛选、排序)
+export async function GET(request: Request) {
   try {
-    const products = await prisma.product.findMany({
-      include: {
-        category: true,
-        supplier: true,
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const pageSize = parseInt(searchParams.get("pageSize") || "20");
+    const search = searchParams.get("search") || "";
+    const categoryName = searchParams.get("category") || "all";
+    const status = searchParams.get("status") || "all";
+    const sortByParam = searchParams.get("sortBy") || "sku-asc";
+
+    const [field, order] = sortByParam.split("-") as [string, "asc" | "desc"];
+
+    // 查询系统设置（获取库存预警阈值）
+    const settings = await prisma.systemSetting.findFirst();
+    const lowStockThreshold = settings?.lowStockThreshold || 10;
+
+    // 构建查询条件
+    const where: {
+      OR?: any[];
+      category?: { name: string };
+      stock?: { lt: number };
+    } = {};
+
+    // 搜索词过滤 (支持 SKU、名称、分类)
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { sku: { contains: search, mode: "insensitive" } },
+        { category: { name: { contains: search, mode: "insensitive" } } }
+      ];
+    }
+
+    // 分类过滤
+    if (categoryName !== "all") {
+      where.category = { name: categoryName };
+    }
+
+    // 状态过滤 (库存预警)
+    if (status === "low_stock") {
+      where.stock = { lt: lowStockThreshold };
+    }
+
+    // 构建排序
+    let orderBy: any[] = [];
+    if (field === "sku") {
+      // 在 SQL 层面，我们无法直接用 Prisma 实现自然排序，
+      // 但可以通过增加一个基于长度的排序规则来大幅改善 10 vs 100 的问题。
+      // 注意：Prisma 不支持直接在 orderBy 中写表达式，所以这里我们保持 sku 排序，
+      // 并在前端进行最终的自然排序微调。为了让分页结果更接近预期，我们这里仅保留 sku。
+      orderBy = [{ sku: order }, { createdAt: "desc" }];
+    } else if (field === "createdAt") {
+      orderBy = [{ createdAt: order }];
+    } else if (field === "stock") {
+      orderBy = [{ stock: order }];
+    } else if (field === "name") {
+      orderBy = [{ name: order }];
+    } else {
+      orderBy = [{ createdAt: "desc" }];
+    }
+
+    // 执行分页查询
+    const skip = (page - 1) * pageSize;
+    let products = [];
+    let total = 0;
+
+    if (field === "sku") {
+      // --- 混合自然排序模式 ---
+      // 1. 获取所有符合条件的 ID 和 SKU
+      const allProductIds = await prisma.product.findMany({
+        where,
+        select: { id: true, sku: true },
+        // 不需要在这里 orderBy，我们之后在 JS 里排
+      });
+      total = allProductIds.length;
+
+      // 2. 在 JS 中进行全局自然排序
+      allProductIds.sort((a, b) => {
+        const aVal = a.sku || "";
+        const bVal = b.sku || "";
+        return order === 'asc' 
+          ? aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' })
+          : bVal.localeCompare(aVal, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      // 3. 截取当前页的 ID
+      const pageIds = allProductIds.slice(skip, skip + pageSize).map(p => p.id);
+
+      // 4. 获取详细数据（保持顺序）
+      const detailedProducts = await prisma.product.findMany({
+        where: { id: { in: pageIds } },
+        include: {
+          category: true,
+          supplier: true,
+        },
+      });
+
+      // 5. 由于 in 并不保证顺序，我们需要按 pageIds 重新排序
+      products = pageIds.map(id => detailedProducts.find((d: any) => d.id === id)).filter(Boolean);
+    } else {
+      // --- 原生数据库分页模式 (用于时间、库存等) ---
+      [products, total] = await Promise.all([
+        prisma.product.findMany({
+          where,
+          include: {
+            category: true,
+            supplier: true,
+          },
+          orderBy,
+          skip,
+          take: pageSize,
+        }),
+        prisma.product.count({ where })
+      ]);
+    }
+
+    return NextResponse.json({
+      items: products,
+      total,
+      page,
+      pageSize,
+      hasMore: (skip + products.length) < total,
     });
-    return NextResponse.json(products);
   } catch (error) {
     console.error("Failed to fetch products:", error);
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
