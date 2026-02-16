@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { updateSession } from "@/lib/auth";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Update session expiration if session exists
   const sessionResponse = await updateSession(request);
   const response = sessionResponse || NextResponse.next();
