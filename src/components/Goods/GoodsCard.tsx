@@ -1,5 +1,4 @@
-"use client";
-
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { Edit, Package, Truck, Trash2, Camera, Check } from "lucide-react";
 import Image from "next/image";
@@ -7,7 +6,7 @@ import Link from "next/link";
 import { Product } from "@/lib/types";
 import { getCategoryName } from "@/lib/utils";
 
-export function GoodsCard({ 
+export const GoodsCard = memo(function GoodsCard({ 
   product, 
   onEdit,
   onDelete,
@@ -31,14 +30,16 @@ export function GoodsCard({
       onToggleSelect(product.id);
     }
   };
+
   return (
     <motion.div
       onClick={handleCardClick}
+      layout="position"
       className={`group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer transform-gpu will-change-transform translate-z-0 ${
         isSelected ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''
       }`}
     >
-      {/* Image Container */}
+      {/* Image Container - with subtle loading optimization */}
       <div className="relative aspect-4/3 w-full overflow-hidden bg-secondary/30">
         {/* Selection Checkbox (Hover or Selected) */}
         <div className={`absolute top-3 left-3 z-10 transition-all duration-300 ${
@@ -194,4 +195,20 @@ export function GoodsCard({
 
     </motion.div>
   );
-}
+}, (prev, next) => {
+  // Precision check to minimize re-renders in huge lists
+  return (
+    prev.isSelected === next.isSelected &&
+    prev.anySelected === next.anySelected &&
+    prev.lowStockThreshold === next.lowStockThreshold &&
+    prev.priority === next.priority &&
+    prev.product.id === next.product.id &&
+    prev.product.name === next.product.name &&
+    prev.product.stock === next.product.stock &&
+    prev.product.costPrice === next.product.costPrice &&
+    prev.product.image === next.product.image &&
+    prev.product.sku === next.product.sku &&
+    prev.product.supplierId === next.product.supplierId &&
+    prev.product.categoryId === next.product.categoryId
+  );
+});

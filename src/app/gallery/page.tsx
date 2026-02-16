@@ -289,9 +289,12 @@ function GalleryContent() {
         const categoriesData = await categoriesRes.json();
         const productsData = await productsRes.json();
         
+        // Handle both Array and Paginated Object responses
+        const productsArray = Array.isArray(productsData) ? productsData : (productsData.items || []);
+        
         const sortedGalleryData = galleryData.sort((a: GalleryItem, b: GalleryItem) => {
-          const productA = productsData.find((p: Product) => p.id === a.productId);
-          const productB = productsData.find((p: Product) => p.id === b.productId);
+          const productA = productsArray.find((p: Product) => p.id === a.productId);
+          const productB = productsArray.find((p: Product) => p.id === b.productId);
           
           const isACover = productA?.image === a.url;
           const isBCover = productB?.image === b.url;
@@ -306,7 +309,7 @@ function GalleryContent() {
         
         setItems(sortedGalleryData);
         setCategories(categoriesData);
-        setProducts(productsData);
+        setProducts(productsArray);
       }
     } catch (error) {
       console.error("Gallery fetch failed:", error);
@@ -478,12 +481,14 @@ function GalleryContent() {
   // Pre-calculate pinyin for products to optimize search
   const productPinyinMap = useMemo(() => {
     const map: Record<string, { full: string, first: string }> = {};
-    products.forEach(p => {
-      if (!p.name) return;
-      const full = pinyin(p.name, { toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
-      const first = pinyin(p.name, { pattern: 'first', toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
-      map[p.id] = { full, first };
-    });
+    if (Array.isArray(products)) {
+        products.forEach(p => {
+          if (!p.name) return;
+          const full = pinyin(p.name, { toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
+          const first = pinyin(p.name, { pattern: 'first', toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
+          map[p.id] = { full, first };
+        });
+    }
     return map;
   }, [products]);
 

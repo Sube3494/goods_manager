@@ -29,9 +29,10 @@ export default function GoodsPage() {
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
   
-  // Pagination & Data states
   const [items, setItems] = useState<Product[]>([]);
+  const itemsRef = useRef<Product[]>([]);
   const [, setPage] = useState(1);
+  const currentPageRef = useRef(1);
   const [hasMore, setHasMore] = useState(true);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
   
@@ -68,76 +69,75 @@ export default function GoodsPage() {
   const canUpdate = hasPermission(user as SessionUser | null, "product:update");
   const canDelete = hasPermission(user as SessionUser | null, "product:delete");
 
+  // Sync ref with items
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
   const fetchGoods = useCallback(async (isFirstPage = true) => {
     try {
-      if (isFirstPage) {
+      const targetPage = isFirstPage ? 1 : currentPageRef.current + 1;
+      
+      if (isFirstPage && itemsRef.current.length === 0) {
         setIsLoading(true);
-      } else {
+      } else if (!isFirstPage) {
         setIsNextPageLoading(true);
       }
       
-      // 使用函数式更新来获取最新的 page，或者在调用时传入
-      // 这里我们在组件作用域直接读取 state 是可以的，但要配合依赖控制
-      setPage(prevPage => {
-        const targetPage = isFirstPage ? 1 : prevPage + 1;
-        
-        const queryParams = new URLSearchParams({
-          page: targetPage.toString(),
-          pageSize: "20",
-          search: searchQuery,
-          category: selectedCategory,
-          status: selectedStatus,
-          sortBy: sortBy,
-        });
-
-        fetch(`/api/products?${queryParams.toString()}`)
-          .then(res => res.ok ? res.json() : Promise.reject())
-          .then(data => {
-            if (isFirstPage) {
-              setItems(data.items);
-            } else {
-              setItems(prev => {
-                const existingIds = new Set(prev.map(i => i.id));
-                const newItems = data.items.filter((i: Product) => !existingIds.has(i.id));
-                return [...prev, ...newItems];
-              });
-            }
-            setHasMore(data.hasMore);
-          })
-          .catch(err => console.error("Fetch items error:", err))
-          .finally(() => {
-            setIsLoading(false);
-            setIsNextPageLoading(false);
-          });
-          
-        return targetPage;
+      const queryParams = new URLSearchParams({
+        page: targetPage.toString(),
+        pageSize: "20",
+        search: debouncedSearch,
+        category: selectedCategory,
+        status: selectedStatus,
+        sortBy: sortBy,
       });
 
-      // 仅在首次加载时获取基础元数据
+      const res = await fetch(`/api/products?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Fetch failed");
+      
+      const data = await res.json();
+      
       if (isFirstPage) {
-        if (categories.length === 0) {
-          fetch("/api/categories").then(r => r.ok && r.json()).then(setCategories);
-        }
-        
-        const canReadSuppliers = user?.role === "SUPER_ADMIN" || user?.permissions?.["supplier:read"];
-        if (canReadSuppliers && suppliers.length === 0) {
-          fetch("/api/suppliers").then(r => r.ok && r.json()).then(setSuppliers);
-        }
-
-        fetch("/api/system/settings").then(r => r.ok && r.json()).then(s => s && setLowStockThreshold(s.lowStockThreshold));
+        setItems(data.items);
+      } else {
+        setItems(prev => {
+          const existingIds = new Set(prev.map(i => i.id));
+          const newItems = data.items.filter((i: Product) => !existingIds.has(i.id));
+          return [...prev, ...newItems];
+        });
       }
-
+      
+      currentPageRef.current = targetPage;
+      setPage(targetPage);
+      setHasMore(data.hasMore);
     } catch (error) {
       console.error("Failed to fetch data", error);
+    } finally {
       setIsLoading(false);
       setIsNextPageLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, searchQuery, selectedCategory, selectedStatus, sortBy]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, sortBy]);
+
+  // Fetch metadata once on mount
+  useEffect(() => {
+    // Categories
+    fetch("/api/categories").then(r => r.ok && r.json()).then(setCategories).catch(() => {});
+    
+    // Suppliers (Permission based)
+    const canReadSuppliers = user?.role === "SUPER_ADMIN" || user?.permissions?.["supplier:read"];
+    if (canReadSuppliers) {
+      fetch("/api/suppliers").then(r => r.ok && r.json()).then(setSuppliers).catch(() => {});
+    }
+
+    // System Settings
+    fetch("/api/system/settings").then(r => r.ok && r.json()).then(s => s && setLowStockThreshold(s.lowStockThreshold)).catch(() => {});
+  }, [user]);
 
   useEffect(() => {
+    // We use a small delay or ensure this only captures external triggers
     fetchGoods(true);
-  }, [fetchGoods, debouncedSearch, selectedCategory, selectedStatus, sortBy]);
+  }, [fetchGoods]);
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -218,11 +218,11 @@ export default function GoodsPage() {
   };
 
   // Batch selection handlers
-  const toggleSelectProduct = (id: string) => {
+  const toggleSelectProduct = useCallback((id: string) => {
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
-  };
+  }, []);
 
 
   const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string }) => {
@@ -249,7 +249,7 @@ export default function GoodsPage() {
     }
   };
 
-  const handleBatchDelete = () => {
+  const handleBatchDelete = useCallback(() => {
     const count = selectedIds.length;
     setConfirmConfig({
       isOpen: true,
@@ -275,7 +275,7 @@ export default function GoodsPage() {
         }
       },
     });
-  };
+  }, [selectedIds, fetchGoods, showToast]);
 
   const handleSaveItem = async (data: Partial<Product>, galleryItems?: GalleryItem[]) => {
     try {
@@ -319,8 +319,13 @@ export default function GoodsPage() {
       showToast("请求失败", "error");
     }
   };
+  // Sync URL filter to state on mount if needed, or just use state
+  // For simplicity and unified UI, we prioritize local state controlled by dropdowns
+  
+  // No local sorting needed anymore, we trust server-side globally-sorted pagination
+  const filteredGoods = items;
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     if (filteredGoods.length === 0) {
       showToast("没有可导出的商品", "error");
       return;
@@ -342,7 +347,7 @@ export default function GoodsPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "商品列表");
     XLSX.writeFile(workbook, `商品库导出_${new Date().toISOString().split('T')[0]}.xlsx`);
     showToast("已开始下载 Excel 文件", "success");
-  };
+  }, [filteredGoods, showToast]);
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
     if (!Array.isArray(data)) return;
@@ -370,7 +375,6 @@ export default function GoodsPage() {
   // For simplicity and unified UI, we prioritize local state controlled by dropdowns
   
   // No local sorting needed anymore, we trust server-side globally-sorted pagination
-  const filteredGoods = items;
 
   return (
     <div className="space-y-8">
@@ -476,7 +480,7 @@ export default function GoodsPage() {
       </div>
 
       {/* Grid */}
-      {isLoading ? (
+      {isLoading && items.length === 0 ? (
         <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-64 rounded-2xl bg-muted/20 animate-pulse border border-border" />

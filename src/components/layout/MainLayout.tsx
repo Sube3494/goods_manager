@@ -23,9 +23,20 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     return false;
   });
 
+  const [canAnimate, setCanAnimate] = useState(false);
+
   const isLoginPage = pathname === "/login";
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
   const showSidebar = !isLoginPage && !!user;
+
+  // Track initialization to prevent initial mount transition
+  useEffect(() => {
+    if (!isLoading) {
+      // Small timeout to ensure the DOM has settled with initial padding before enabling transitions
+      const timer = setTimeout(() => setCanAnimate(true), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -60,7 +71,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         )}
         
         <div className={cn(
-            "flex-1 flex flex-col min-h-screen transition-[padding] duration-500 ease-in-out relative z-10 w-full",
+            "flex-1 flex flex-col min-h-screen relative z-10 w-full",
+            canAnimate && "transition-[padding] duration-500 ease-in-out",
             showSidebar ? (isCollapsed ? "lg:pl-28" : "lg:pl-72") : "pl-0"
         )}>
             {!isLoginPage && (
