@@ -6942,6 +6942,7 @@ export namespace Prisma {
     shippingFees: number | null
     extraFees: number | null
     paymentVoucher: string | null
+    note: string | null
     workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -6956,6 +6957,7 @@ export namespace Prisma {
     shippingFees: number | null
     extraFees: number | null
     paymentVoucher: string | null
+    note: string | null
     workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -6972,6 +6974,7 @@ export namespace Prisma {
     paymentVoucher: number
     paymentVouchers: number
     trackingData: number
+    note: number
     workspaceId: number
     createdAt: number
     updatedAt: number
@@ -7000,6 +7003,7 @@ export namespace Prisma {
     shippingFees?: true
     extraFees?: true
     paymentVoucher?: true
+    note?: true
     workspaceId?: true
     createdAt?: true
     updatedAt?: true
@@ -7014,6 +7018,7 @@ export namespace Prisma {
     shippingFees?: true
     extraFees?: true
     paymentVoucher?: true
+    note?: true
     workspaceId?: true
     createdAt?: true
     updatedAt?: true
@@ -7030,6 +7035,7 @@ export namespace Prisma {
     paymentVoucher?: true
     paymentVouchers?: true
     trackingData?: true
+    note?: true
     workspaceId?: true
     createdAt?: true
     updatedAt?: true
@@ -7133,6 +7139,7 @@ export namespace Prisma {
     paymentVoucher: string | null
     paymentVouchers: JsonValue | null
     trackingData: JsonValue | null
+    note: string | null
     workspaceId: string | null
     createdAt: Date
     updatedAt: Date
@@ -7168,6 +7175,7 @@ export namespace Prisma {
     paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
+    note?: boolean
     workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -7187,6 +7195,7 @@ export namespace Prisma {
     paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
+    note?: boolean
     workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -7204,6 +7213,7 @@ export namespace Prisma {
     paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
+    note?: boolean
     workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -7235,6 +7245,7 @@ export namespace Prisma {
       paymentVoucher: string | null
       paymentVouchers: Prisma.JsonValue | null
       trackingData: Prisma.JsonValue | null
+      note: string | null
       workspaceId: string | null
       createdAt: Date
       updatedAt: Date
@@ -7643,6 +7654,7 @@ export namespace Prisma {
     readonly paymentVoucher: FieldRef<"PurchaseOrder", 'String'>
     readonly paymentVouchers: FieldRef<"PurchaseOrder", 'Json'>
     readonly trackingData: FieldRef<"PurchaseOrder", 'Json'>
+    readonly note: FieldRef<"PurchaseOrder", 'String'>
     readonly workspaceId: FieldRef<"PurchaseOrder", 'String'>
     readonly createdAt: FieldRef<"PurchaseOrder", 'DateTime'>
     readonly updatedAt: FieldRef<"PurchaseOrder", 'DateTime'>
@@ -9069,18 +9081,8 @@ export namespace Prisma {
 
   export type AggregateOutboundOrder = {
     _count: OutboundOrderCountAggregateOutputType | null
-    _avg: OutboundOrderAvgAggregateOutputType | null
-    _sum: OutboundOrderSumAggregateOutputType | null
     _min: OutboundOrderMinAggregateOutputType | null
     _max: OutboundOrderMaxAggregateOutputType | null
-  }
-
-  export type OutboundOrderAvgAggregateOutputType = {
-    totalAmount: number | null
-  }
-
-  export type OutboundOrderSumAggregateOutputType = {
-    totalAmount: number | null
   }
 
   export type OutboundOrderMinAggregateOutputType = {
@@ -9088,7 +9090,7 @@ export namespace Prisma {
     type: string | null
     date: Date | null
     note: string | null
-    totalAmount: number | null
+    status: string | null
     workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -9099,7 +9101,7 @@ export namespace Prisma {
     type: string | null
     date: Date | null
     note: string | null
-    totalAmount: number | null
+    status: string | null
     workspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -9110,7 +9112,7 @@ export namespace Prisma {
     type: number
     date: number
     note: number
-    totalAmount: number
+    status: number
     workspaceId: number
     createdAt: number
     updatedAt: number
@@ -9118,20 +9120,12 @@ export namespace Prisma {
   }
 
 
-  export type OutboundOrderAvgAggregateInputType = {
-    totalAmount?: true
-  }
-
-  export type OutboundOrderSumAggregateInputType = {
-    totalAmount?: true
-  }
-
   export type OutboundOrderMinAggregateInputType = {
     id?: true
     type?: true
     date?: true
     note?: true
-    totalAmount?: true
+    status?: true
     workspaceId?: true
     createdAt?: true
     updatedAt?: true
@@ -9142,7 +9136,7 @@ export namespace Prisma {
     type?: true
     date?: true
     note?: true
-    totalAmount?: true
+    status?: true
     workspaceId?: true
     createdAt?: true
     updatedAt?: true
@@ -9153,7 +9147,7 @@ export namespace Prisma {
     type?: true
     date?: true
     note?: true
-    totalAmount?: true
+    status?: true
     workspaceId?: true
     createdAt?: true
     updatedAt?: true
@@ -9198,18 +9192,6 @@ export namespace Prisma {
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
-     * Select which fields to average
-    **/
-    _avg?: OutboundOrderAvgAggregateInputType
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
-     * Select which fields to sum
-    **/
-    _sum?: OutboundOrderSumAggregateInputType
-    /**
-     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-     * 
      * Select which fields to find the minimum value
     **/
     _min?: OutboundOrderMinAggregateInputType
@@ -9240,8 +9222,6 @@ export namespace Prisma {
     take?: number
     skip?: number
     _count?: OutboundOrderCountAggregateInputType | true
-    _avg?: OutboundOrderAvgAggregateInputType
-    _sum?: OutboundOrderSumAggregateInputType
     _min?: OutboundOrderMinAggregateInputType
     _max?: OutboundOrderMaxAggregateInputType
   }
@@ -9251,13 +9231,11 @@ export namespace Prisma {
     type: string
     date: Date
     note: string | null
-    totalAmount: number
+    status: string
     workspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: OutboundOrderCountAggregateOutputType | null
-    _avg: OutboundOrderAvgAggregateOutputType | null
-    _sum: OutboundOrderSumAggregateOutputType | null
     _min: OutboundOrderMinAggregateOutputType | null
     _max: OutboundOrderMaxAggregateOutputType | null
   }
@@ -9281,7 +9259,7 @@ export namespace Prisma {
     type?: boolean
     date?: boolean
     note?: boolean
-    totalAmount?: boolean
+    status?: boolean
     workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -9295,7 +9273,7 @@ export namespace Prisma {
     type?: boolean
     date?: boolean
     note?: boolean
-    totalAmount?: boolean
+    status?: boolean
     workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -9307,7 +9285,7 @@ export namespace Prisma {
     type?: boolean
     date?: boolean
     note?: boolean
-    totalAmount?: boolean
+    status?: boolean
     workspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -9333,7 +9311,7 @@ export namespace Prisma {
       type: string
       date: Date
       note: string | null
-      totalAmount: number
+      status: string
       workspaceId: string | null
       createdAt: Date
       updatedAt: Date
@@ -9736,7 +9714,7 @@ export namespace Prisma {
     readonly type: FieldRef<"OutboundOrder", 'String'>
     readonly date: FieldRef<"OutboundOrder", 'DateTime'>
     readonly note: FieldRef<"OutboundOrder", 'String'>
-    readonly totalAmount: FieldRef<"OutboundOrder", 'Float'>
+    readonly status: FieldRef<"OutboundOrder", 'String'>
     readonly workspaceId: FieldRef<"OutboundOrder", 'String'>
     readonly createdAt: FieldRef<"OutboundOrder", 'DateTime'>
     readonly updatedAt: FieldRef<"OutboundOrder", 'DateTime'>
@@ -19159,6 +19137,7 @@ export namespace Prisma {
     paymentVoucher: 'paymentVoucher',
     paymentVouchers: 'paymentVouchers',
     trackingData: 'trackingData',
+    note: 'note',
     workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
@@ -19187,7 +19166,7 @@ export namespace Prisma {
     type: 'type',
     date: 'date',
     note: 'note',
-    totalAmount: 'totalAmount',
+    status: 'status',
     workspaceId: 'workspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
@@ -19834,6 +19813,7 @@ export namespace Prisma {
     paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
+    note?: StringNullableFilter<"PurchaseOrder"> | string | null
     workspaceId?: StringNullableFilter<"PurchaseOrder"> | string | null
     createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
@@ -19852,6 +19832,7 @@ export namespace Prisma {
     paymentVoucher?: SortOrderInput | SortOrder
     paymentVouchers?: SortOrderInput | SortOrder
     trackingData?: SortOrderInput | SortOrder
+    note?: SortOrderInput | SortOrder
     workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -19873,6 +19854,7 @@ export namespace Prisma {
     paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
+    note?: StringNullableFilter<"PurchaseOrder"> | string | null
     workspaceId?: StringNullableFilter<"PurchaseOrder"> | string | null
     createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
@@ -19891,6 +19873,7 @@ export namespace Prisma {
     paymentVoucher?: SortOrderInput | SortOrder
     paymentVouchers?: SortOrderInput | SortOrder
     trackingData?: SortOrderInput | SortOrder
+    note?: SortOrderInput | SortOrder
     workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -19915,6 +19898,7 @@ export namespace Prisma {
     paymentVoucher?: StringNullableWithAggregatesFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableWithAggregatesFilter<"PurchaseOrder">
     trackingData?: JsonNullableWithAggregatesFilter<"PurchaseOrder">
+    note?: StringNullableWithAggregatesFilter<"PurchaseOrder"> | string | null
     workspaceId?: StringNullableWithAggregatesFilter<"PurchaseOrder"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"PurchaseOrder"> | Date | string
@@ -20011,7 +19995,7 @@ export namespace Prisma {
     type?: StringFilter<"OutboundOrder"> | string
     date?: DateTimeFilter<"OutboundOrder"> | Date | string
     note?: StringNullableFilter<"OutboundOrder"> | string | null
-    totalAmount?: FloatFilter<"OutboundOrder"> | number
+    status?: StringFilter<"OutboundOrder"> | string
     workspaceId?: StringNullableFilter<"OutboundOrder"> | string | null
     createdAt?: DateTimeFilter<"OutboundOrder"> | Date | string
     updatedAt?: DateTimeFilter<"OutboundOrder"> | Date | string
@@ -20024,7 +20008,7 @@ export namespace Prisma {
     type?: SortOrder
     date?: SortOrder
     note?: SortOrderInput | SortOrder
-    totalAmount?: SortOrder
+    status?: SortOrder
     workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -20040,7 +20024,7 @@ export namespace Prisma {
     type?: StringFilter<"OutboundOrder"> | string
     date?: DateTimeFilter<"OutboundOrder"> | Date | string
     note?: StringNullableFilter<"OutboundOrder"> | string | null
-    totalAmount?: FloatFilter<"OutboundOrder"> | number
+    status?: StringFilter<"OutboundOrder"> | string
     workspaceId?: StringNullableFilter<"OutboundOrder"> | string | null
     createdAt?: DateTimeFilter<"OutboundOrder"> | Date | string
     updatedAt?: DateTimeFilter<"OutboundOrder"> | Date | string
@@ -20053,15 +20037,13 @@ export namespace Prisma {
     type?: SortOrder
     date?: SortOrder
     note?: SortOrderInput | SortOrder
-    totalAmount?: SortOrder
+    status?: SortOrder
     workspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: OutboundOrderCountOrderByAggregateInput
-    _avg?: OutboundOrderAvgOrderByAggregateInput
     _max?: OutboundOrderMaxOrderByAggregateInput
     _min?: OutboundOrderMinOrderByAggregateInput
-    _sum?: OutboundOrderSumOrderByAggregateInput
   }
 
   export type OutboundOrderScalarWhereWithAggregatesInput = {
@@ -20072,7 +20054,7 @@ export namespace Prisma {
     type?: StringWithAggregatesFilter<"OutboundOrder"> | string
     date?: DateTimeWithAggregatesFilter<"OutboundOrder"> | Date | string
     note?: StringNullableWithAggregatesFilter<"OutboundOrder"> | string | null
-    totalAmount?: FloatWithAggregatesFilter<"OutboundOrder"> | number
+    status?: StringWithAggregatesFilter<"OutboundOrder"> | string
     workspaceId?: StringNullableWithAggregatesFilter<"OutboundOrder"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"OutboundOrder"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"OutboundOrder"> | Date | string
@@ -21156,6 +21138,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     workspace?: WorkspaceCreateNestedOneWithoutPurchaseOrdersInput
@@ -21173,6 +21156,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -21190,6 +21174,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     workspace?: WorkspaceUpdateOneWithoutPurchaseOrdersNestedInput
@@ -21207,6 +21192,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -21224,6 +21210,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -21240,6 +21227,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21255,6 +21243,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -21346,7 +21335,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     workspace?: WorkspaceCreateNestedOneWithoutOutboundOrdersInput
@@ -21358,7 +21347,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -21370,7 +21359,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     workspace?: WorkspaceUpdateOneWithoutOutboundOrdersNestedInput
@@ -21382,7 +21371,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -21394,7 +21383,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -21405,7 +21394,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21415,7 +21404,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -22665,6 +22654,7 @@ export namespace Prisma {
     paymentVoucher?: SortOrder
     paymentVouchers?: SortOrder
     trackingData?: SortOrder
+    note?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -22685,6 +22675,7 @@ export namespace Prisma {
     shippingFees?: SortOrder
     extraFees?: SortOrder
     paymentVoucher?: SortOrder
+    note?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -22699,6 +22690,7 @@ export namespace Prisma {
     shippingFees?: SortOrder
     extraFees?: SortOrder
     paymentVoucher?: SortOrder
+    note?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -22825,14 +22817,10 @@ export namespace Prisma {
     type?: SortOrder
     date?: SortOrder
     note?: SortOrder
-    totalAmount?: SortOrder
+    status?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-  }
-
-  export type OutboundOrderAvgOrderByAggregateInput = {
-    totalAmount?: SortOrder
   }
 
   export type OutboundOrderMaxOrderByAggregateInput = {
@@ -22840,7 +22828,7 @@ export namespace Prisma {
     type?: SortOrder
     date?: SortOrder
     note?: SortOrder
-    totalAmount?: SortOrder
+    status?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -22851,14 +22839,10 @@ export namespace Prisma {
     type?: SortOrder
     date?: SortOrder
     note?: SortOrder
-    totalAmount?: SortOrder
+    status?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-  }
-
-  export type OutboundOrderSumOrderByAggregateInput = {
-    totalAmount?: SortOrder
   }
 
   export type OutboundOrderRelationFilter = {
@@ -24989,7 +24973,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: OutboundOrderItemCreateNestedManyWithoutOutboundOrderInput
@@ -25000,7 +24984,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: OutboundOrderItemUncheckedCreateNestedManyWithoutOutboundOrderInput
@@ -25075,6 +25059,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: PurchaseOrderItemCreateNestedManyWithoutPurchaseOrderInput
@@ -25091,6 +25076,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: PurchaseOrderItemUncheckedCreateNestedManyWithoutPurchaseOrderInput
@@ -25403,7 +25389,7 @@ export namespace Prisma {
     type?: StringFilter<"OutboundOrder"> | string
     date?: DateTimeFilter<"OutboundOrder"> | Date | string
     note?: StringNullableFilter<"OutboundOrder"> | string | null
-    totalAmount?: FloatFilter<"OutboundOrder"> | number
+    status?: StringFilter<"OutboundOrder"> | string
     workspaceId?: StringNullableFilter<"OutboundOrder"> | string | null
     createdAt?: DateTimeFilter<"OutboundOrder"> | Date | string
     updatedAt?: DateTimeFilter<"OutboundOrder"> | Date | string
@@ -25474,6 +25460,7 @@ export namespace Prisma {
     paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
+    note?: StringNullableFilter<"PurchaseOrder"> | string | null
     workspaceId?: StringNullableFilter<"PurchaseOrder"> | string | null
     createdAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
     updatedAt?: DateTimeFilter<"PurchaseOrder"> | Date | string
@@ -26569,6 +26556,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     workspace?: WorkspaceCreateNestedOneWithoutPurchaseOrdersInput
@@ -26585,6 +26573,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -26699,6 +26688,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     workspace?: WorkspaceUpdateOneWithoutPurchaseOrdersNestedInput
@@ -26715,6 +26705,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -26888,7 +26879,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     workspace?: WorkspaceCreateNestedOneWithoutOutboundOrdersInput
@@ -26899,7 +26890,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     workspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -26969,7 +26960,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     workspace?: WorkspaceUpdateOneWithoutOutboundOrdersNestedInput
@@ -26980,7 +26971,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     workspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -27892,7 +27883,7 @@ export namespace Prisma {
     type?: string
     date?: Date | string
     note?: string | null
-    totalAmount?: number
+    status?: string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -27923,6 +27914,7 @@ export namespace Prisma {
     paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -28115,7 +28107,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: OutboundOrderItemUpdateManyWithoutOutboundOrderNestedInput
@@ -28126,7 +28118,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: OutboundOrderItemUncheckedUpdateManyWithoutOutboundOrderNestedInput
@@ -28137,7 +28129,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     note?: NullableStringFieldUpdateOperationsInput | string | null
-    totalAmount?: FloatFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -28206,6 +28198,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: PurchaseOrderItemUpdateManyWithoutPurchaseOrderNestedInput
@@ -28222,6 +28215,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: PurchaseOrderItemUncheckedUpdateManyWithoutPurchaseOrderNestedInput
@@ -28238,6 +28232,7 @@ export namespace Prisma {
     paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

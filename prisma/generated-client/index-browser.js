@@ -179,6 +179,7 @@ exports.Prisma.PurchaseOrderScalarFieldEnum = {
   paymentVoucher: 'paymentVoucher',
   paymentVouchers: 'paymentVouchers',
   trackingData: 'trackingData',
+  note: 'note',
   workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -201,7 +202,7 @@ exports.Prisma.OutboundOrderScalarFieldEnum = {
   type: 'type',
   date: 'date',
   note: 'note',
-  totalAmount: 'totalAmount',
+  status: 'status',
   workspaceId: 'workspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

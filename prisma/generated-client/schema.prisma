@@ -104,6 +104,7 @@ model PurchaseOrder {
   paymentVoucher  String?
   paymentVouchers Json?               @default("[]")
   trackingData    Json?               @default("[]")
+  note            String?
   workspaceId     String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -133,7 +134,7 @@ model OutboundOrder {
   type        String              @default("Sale")
   date        DateTime            @default(now())
   note        String?
-  totalAmount Float               @default(0)
+  status      String              @default("Normal")
   workspaceId String?
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt

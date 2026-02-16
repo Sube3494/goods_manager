@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink } from "lucide-react";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle } from "lucide-react";
 import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -41,6 +41,13 @@ interface PurchaseOrderModalProps {
 
 export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false }: PurchaseOrderModalProps) {
   const { showToast } = useToast();
+  
+  // A record is effectively read-only if explicitly set, or if it's a system-generated return
+  const isSystemGenerated = useMemo(() => {
+    return initialData?.type === "Return" || initialData?.type === "InternalReturn" || (initialData?.id?.startsWith("IN-") && initialData?.type !== "Purchase");
+  }, [initialData]);
+
+  const effectiveReadOnly = readOnly || isSystemGenerated;
   const [formData, setFormData] = useState<PurchaseOrder>(() => ({
     id: initialData?.id || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
     status: initialData?.status || "Draft",
@@ -119,16 +126,19 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
             setExtraFeeInput(initialData.extraFees?.toString() || "0");
         } else {
             const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
-            setFormData({
+            setFormData(prev => ({
                 id: newId,
                 status: "Draft",
                 date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
                 items: [],
+                type: prev.type === "Inbound" ? "Inbound" : "Purchase",
                 shippingFees: 0,
                 extraFees: 0,
                 totalAmount: 0,
-                trackingData: undefined
-            });
+                trackingData: undefined,
+                paymentVoucher: undefined,
+                paymentVouchers: []
+            }));
             setShippingFeeInput("0");
             setExtraFeeInput("0");
         }
@@ -243,7 +253,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (readOnly && formData.status !== "Confirmed" && formData.status !== "Shipped") return; // Prevent normal form submit if read-only, unless it's for tracking updates
+    if (effectiveReadOnly && formData.status !== "Confirmed" && formData.status !== "Shipped") return; // Prevent normal form submit if read-only, unless it's for tracking updates
     handleAction(formData.status === "Draft" ? "Confirmed" : formData.status);
   };
 
@@ -267,9 +277,26 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
             className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-              <h2 className="text-2xl font-bold text-foreground">
-                {formData.type === "Inbound" ? (readOnly ? "查看入库详情" : "编辑入库记录") : (readOnly ? "查看采购详情" : (initialData ? "编辑采购单" : "新建采购单"))}
-              </h2>
+              <div className="flex flex-col gap-1">
+                <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
+                  {formData.type === "Inbound" || formData.type === "Return" || formData.type === "InternalReturn" ? (
+                      <div className="flex items-center gap-2">
+                          <Package size={24} className="text-primary" />
+                          <span>{effectiveReadOnly ? "单据详情" : (initialData ? "编辑单据" : "新增入库")}</span>
+                      </div>
+                  ) : (
+                      <div className="flex items-center gap-2">
+                          <ShoppingBag size={24} className="text-secondary" />
+                          <span>{effectiveReadOnly ? "采购详情" : (initialData ? "编辑采购单" : "新建采购单")}</span>
+                      </div>
+                  )}
+                </h2>
+                {isSystemGenerated && (
+                  <p className="text-[10px] font-bold text-orange-500/80 tracking-wider flex items-center gap-1">
+                    <AlertCircle size={10} strokeWidth={3} /> 系统自动生成的退库记录，不支持手动修改
+                  </p>
+                )}
+              </div>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={24} />
               </button>
@@ -280,8 +307,24 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-muted/20 dark:bg-white/5 p-3 sm:p-6 rounded-2xl border border-border/50">
                         <div className="flex flex-col gap-2">
+                            <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center justify-between uppercase tracking-wider">
+                                <span className="flex items-center gap-1.5"><ListOrdered size={14} /> 业务类型</span>
+                                <span className="text-red-500">*</span>
+                            </label>
+                            <select 
+                                disabled={effectiveReadOnly}
+                                value={formData.type || "Purchase"}
+                                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                                className="w-full h-10 sm:h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold appearance-none cursor-pointer"
+                            >
+                                <option value="Purchase">采购入库 (常规进货)</option>
+                                <option value="Return">销售退回 (售后入库)</option>
+                                <option value="InternalReturn">领用退回 (物料归还)</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-col gap-2">
                             <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                                <FileText size={14} /> {formData.type === "Inbound" ? "入库单号" : "采购单号"}
+                                <FileText size={14} /> 单据编号
                             </label>
                             <input 
                                 disabled
@@ -479,8 +522,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
 
 
-                    {/* Payment Voucher Section - Only for Purchases and not in Draft status */}
-                    {formData.type !== "Inbound" && formData.status !== "Draft" && (
+                    {/* Payment Voucher Section - Only for Purchases and not in Draft status and NOT system generated (returns) */}
+                    {formData.type !== "Inbound" && formData.status !== "Draft" && !isSystemGenerated && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-2">
                             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-primary pl-2">
@@ -520,8 +563,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                     </div>
                     )}
                     
-                    {/* Tracking Info Section - Only visible if not in Draft and not Inbound */}
-                    {formData.type !== "Inbound" && formData.status !== "Draft" && (
+                    {/* Tracking Info Section - Only visible if not in Draft and not Inbound and NOT system generated */}
+                    {formData.type !== "Inbound" && formData.status !== "Draft" && !isSystemGenerated && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between px-2">
                                 <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/50 border-l-2 border-orange-500 pl-2">
@@ -694,7 +737,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                 {/* Footer Totals & Actions */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 sm:p-6 bg-white dark:bg-white/5 border-t border-border/10 shrink-0 z-10">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-                        {formData.type !== "Inbound" && (
+                        {formData.type !== "Inbound" && !isSystemGenerated && (
                         <>
                         <div className="flex items-center gap-2 min-w-fit pr-0 sm:pr-4 border-r-0 sm:border-r border-border/50">
                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-2">附加金额</span>

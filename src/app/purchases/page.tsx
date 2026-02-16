@@ -106,7 +106,7 @@ function PurchasesContent() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const pRes = await fetch("/api/purchases?type=Purchase");
+      const pRes = await fetch("/api/purchases");
       
       if (pRes.ok) {
         setPurchases(await pRes.json());
@@ -181,6 +181,24 @@ function PurchasesContent() {
       case "Confirmed":
       case "Ordered": return "已下单";
       default: return "草稿";
+    }
+  };
+  
+  const getTypeLabel = (type?: string) => {
+    switch (type) {
+      case "Return": return "销售退回";
+      case "InternalReturn": return "领用退回";
+      case "Inbound": return "补拨入库";
+      default: return "采购入库";
+    }
+  };
+
+  const getTypeColor = (type?: string) => {
+    switch (type) {
+      case "Return": return "text-orange-600 bg-orange-50 border-orange-100 dark:bg-orange-500/10 dark:border-orange-500/20";
+      case "InternalReturn": return "text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-500/10 dark:border-blue-500/20";
+      case "Inbound": return "text-indigo-600 bg-indigo-50 border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/20";
+      default: return "text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20";
     }
   };
 
@@ -404,10 +422,11 @@ function PurchasesContent() {
           <table className="w-full text-left border-collapse min-w-[800px] table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">采购单编号</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">单据编号</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">业务类型</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">交易金额</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">状态</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单时间</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单/入库时间</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">物流信息</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">操作</th>
               </tr>
@@ -425,6 +444,11 @@ function PurchasesContent() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="font-bold text-foreground font-mono text-xs">{po.id}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${getTypeColor(po.type)}`}>
+                        {getTypeLabel(po.type)}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center text-foreground font-bold">
@@ -639,11 +663,14 @@ function PurchasesContent() {
               >
                 {/* Card Header */}
                 <div className="flex items-center justify-between mb-4">
-                   <div className="flex flex-col">
-                      <span className="font-bold text-base leading-tight font-mono">
-                        {po.id}
-                      </span>
-                   </div>
+                       <div className="flex items-center gap-2">
+                          <span className="font-bold text-base leading-tight font-mono">
+                            {po.id}
+                          </span>
+                          <span className={`px-1.5 py-0 rounded text-[9px] font-bold border ${getTypeColor(po.type)}`}>
+                            {getTypeLabel(po.type)}
+                          </span>
+                       </div>
                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(po.status)}`}>
                       {getStatusLabel(po.status)}
                    </span>

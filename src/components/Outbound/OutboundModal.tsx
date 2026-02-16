@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Minus, Plus, Search } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -8,6 +8,7 @@ import { Product, OutboundOrder } from "@/lib/types";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface OutboundModalProps {
   isOpen: boolean;
@@ -18,40 +19,100 @@ interface OutboundModalProps {
 export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedItems, setSelectedItems] = useState<{ productId: string, name: string, sku: string, quantity: number, price: number, image: string, stock: number }[]>([]);
   const [type, setType] = useState("Sale");
   const [note, setNote] = useState("");
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isNextPageLoading, setIsNextPageLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const pageRef = useRef(1);
+  const observerTarget = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
   const [mobileView, setMobileView] = useState<"selection" | "review">("selection");
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchProducts();
+  const fetchProducts = useCallback(async (mode: 'initial' | 'search' | 'next' = 'initial') => {
+    if (mode === 'initial') {
+      setIsLoadingProducts(true);
+      pageRef.current = 1;
+    } else if (mode === 'search') {
+      setIsSearching(true);
+      pageRef.current = 1;
     } else {
-        // Reset state on close
-        setSelectedItems([]);
-        setSearchQuery("");
-        setNote("");
-        setType("Sale");
-        setMobileView("selection");
+      setIsNextPageLoading(true);
     }
-  }, [isOpen]);
 
-  const fetchProducts = async () => {
-    setIsLoadingProducts(true);
     try {
-      const res = await fetch("/api/products");
+      const targetPage = pageRef.current;
+      const queryParams = new URLSearchParams({
+        page: targetPage.toString(),
+        pageSize: "20",
+        search: debouncedSearch,
+      });
+
+      const res = await fetch(`/api/products?${queryParams.toString()}`);
       if (res.ok) {
-        setProducts(await res.json());
+        const data = await res.json();
+        const newItems = Array.isArray(data.items) ? data.items : [];
+        
+        if (mode === 'initial' || mode === 'search') {
+          setProducts(newItems);
+        } else {
+          setProducts(prev => {
+            const existingIds = new Set(prev.map(i => i.id));
+            return [...prev, ...newItems.filter((i: Product) => !existingIds.has(i.id))];
+          });
+        }
+        
+        setHasMore(data.hasMore);
+        pageRef.current = targetPage + 1;
       }
     } catch (error) {
       console.error("Failed to fetch products:", error);
     } finally {
       setIsLoadingProducts(false);
+      setIsSearching(false);
+      setIsNextPageLoading(false);
     }
-  };
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchProducts('initial');
+    } else {
+      setSelectedItems([]);
+      setSearchQuery("");
+      setNote("");
+      setType("Sale");
+      setMobileView("selection");
+    }
+  }, [isOpen, fetchProducts]);
+
+  useEffect(() => {
+    if (!isOpen || isLoadingProducts) return;
+    fetchProducts('search');
+  }, [debouncedSearch, isOpen, isLoadingProducts, fetchProducts]);
+
+  useEffect(() => {
+    if (!isOpen || !hasMore || isLoadingProducts || isSearching || isNextPageLoading) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting) {
+          fetchProducts('next');
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [isOpen, hasMore, isLoadingProducts, isSearching, isNextPageLoading, fetchProducts]);
 
   const addItem = (product: Product) => {
     const existing = selectedItems.find(item => item.productId === product.id);
@@ -134,10 +195,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     });
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const displayProducts = products;
 
   if (!isOpen) return null;
 
@@ -200,40 +258,62 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                   />
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {isLoadingProducts ? (
-                    <div className="py-10 text-center text-xs text-muted-foreground">加载中...</div>
-                ) : filteredProducts.length > 0 ? (
-                  filteredProducts.map(p => {
-                    const isSelected = selectedItems.some(item => item.productId === p.id);
-                    return (
-                        <button
-                          key={p.id}
-                          onClick={() => addItem(p)}
-                          className={`w-full text-left p-2 rounded-xl transition-all ${isSelected ? 'bg-primary/10 border-primary/20 ring-1 ring-primary/20 shadow-inner' : 'hover:bg-white dark:hover:bg-white/5 group'}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="relative h-10 w-10 rounded-lg overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
-                               {p.image ? <Image src={p.image} alt={p.name} fill className="object-cover" /> : <Package className="w-full h-full p-2 text-muted-foreground/40" />}
-                               {isSelected && (
-                                   <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                       <CheckCircle size={16} className="text-primary fill-white" />
-                                   </div>
-                               )}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1 relative">
+                {(isLoadingProducts || isSearching) ? (
+                    <div className="py-10 text-center flex flex-col items-center justify-center gap-3">
+                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs text-muted-foreground font-medium">
+                            {isSearching ? "正在搜索..." : "正在加载商品..."}
+                        </span>
+                    </div>
+                ) : displayProducts.length > 0 ? (
+                  <>
+                    {displayProducts.map(p => {
+                      const isSelected = selectedItems.some(item => item.productId === p.id);
+                      return (
+                          <button
+                            key={p.id}
+                            onClick={() => addItem(p)}
+                            className={`w-full text-left p-2 rounded-xl transition-all ${isSelected ? 'bg-primary/10 border-primary/20 ring-1 ring-primary/20 shadow-inner' : 'hover:bg-white dark:hover:bg-white/5 group'}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="relative h-10 w-10 rounded-lg overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
+                                 {p.image ? <Image src={p.image} alt={p.name} fill className="object-cover" /> : <Package className="w-full h-full p-2 text-muted-foreground/40" />}
+                                 {isSelected && (
+                                     <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                         <CheckCircle size={16} className="text-primary fill-white" />
+                                     </div>
+                                 )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs truncate ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`} title={p.name}>{p.name}</p>
+                                <p className="text-[10px] text-muted-foreground truncate font-mono uppercase tracking-tighter">{p.sku}</p>
+                              </div>
+                              <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}>
+                                  {isSelected ? "已选" : `库存 ${p.stock}`}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-xs truncate ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`} title={p.name}>{p.name}</p>
-                              <p className="text-[10px] text-muted-foreground truncate font-mono uppercase tracking-tighter">{p.sku}</p>
-                            </div>
-                            <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}>
-                                {isSelected ? "已选" : `库存 ${p.stock}`}
-                            </div>
-                          </div>
-                        </button>
-                    );
-                  })
+                          </button>
+                      );
+                    })}
+                    
+                    {/* Infinite scroll trigger */}
+                    <div ref={observerTarget} className="h-10 flex items-center justify-center">
+                      {isNextPageLoading && (
+                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      )}
+                    </div>
+                  </>
                 ) : (
-                    <div className="py-10 text-center text-xs text-muted-foreground italic">未找到匹配商品</div>
+                    <div className="py-20 text-center flex flex-col items-center justify-center gap-4">
+                        <div className="p-4 rounded-full bg-muted/20 text-muted-foreground/20 border border-dashed border-border">
+                            <Package size={32} />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm font-bold text-foreground">未找到匹配商品</p>
+                            <p className="text-xs text-muted-foreground italic">换个关键词试试？</p>
+                        </div>
+                    </div>
                 )}
               </div>
             </div>
@@ -276,9 +356,13 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                         <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
                                             {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-foreground truncate" title={item.name}>{item.name}</p>
-                                            <p className="text-[10px] text-muted-foreground font-mono truncate">{item.sku}</p>
+                                        <div className="flex-1 min-w-0 py-0.5">
+                                            <p className="text-sm font-medium text-foreground leading-snug line-clamp-2" title={item.name}>
+                                                {item.name}
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">
+                                                {item.sku}
+                                            </p>
                                         </div>
                                         <div className="flex items-center gap-1 bg-muted/50 rounded-full border border-white/10 p-1">
                                             <button 
