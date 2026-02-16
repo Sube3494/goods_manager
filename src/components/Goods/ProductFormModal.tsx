@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Eye, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import Link from "next/link";
@@ -11,7 +11,6 @@ import { twMerge } from "tailwind-merge";
 
 import { Product, GalleryItem, Supplier, Category, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { Switch } from "@/components/ui/Switch";
 import { useToast } from "@/components/ui/Toast";
 import { CategoryModal } from "@/components/Categories/CategoryModal";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
@@ -212,7 +211,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           headers: {
             "Content-Type": file.type || "application/octet-stream",
             "X-File-Name": encodeURIComponent(file.name),
-            "X-File-Type": file.type
+            "X-File-Type": file.type,
+            "x-folder": "gallery"
           },
           body: fileBuffer, // 发送 ArrayBuffer 而不是 File 对象
         });

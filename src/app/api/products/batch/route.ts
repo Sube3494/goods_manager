@@ -23,6 +23,15 @@ export async function DELETE(request: NextRequest) {
       }
     });
 
+    // 2. Delete gallery submissions
+    await prisma.gallerySubmission.deleteMany({
+        where: {
+            productId: {
+                in: ids
+            }
+        }
+    });
+
     // 2. Delete purchase order items
     await prisma.purchaseOrderItem.deleteMany({
       where: {

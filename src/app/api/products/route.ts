@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const categoryName = searchParams.get("category") || "all";
     const status = searchParams.get("status") || "all";
     const sortByParam = searchParams.get("sortBy") || "sku-asc";
+    const idsOnly = searchParams.get("idsOnly") === "true";
 
     const [field, order] = sortByParam.split("-") as [string, "asc" | "desc"];
 
@@ -22,7 +23,11 @@ export async function GET(request: Request) {
 
     // 构建查询条件
     const where: {
-      OR?: any[];
+      OR?: Array<{
+        name?: { contains: string; mode: "insensitive" };
+        sku?: { contains: string; mode: "insensitive" };
+        category?: { name: { contains: string; mode: "insensitive" } };
+      }>;
       category?: { name: string };
       stock?: { lt: number };
     } = {};
@@ -47,7 +52,7 @@ export async function GET(request: Request) {
     }
 
     // 构建排序
-    let orderBy: any[] = [];
+    let orderBy: Array<Record<string, "asc" | "desc" | { [key: string]: "asc" | "desc" }>> = [];
     if (field === "sku") {
       // 在 SQL 层面，我们无法直接用 Prisma 实现自然排序，
       // 但可以通过增加一个基于长度的排序规则来大幅改善 10 vs 100 的问题。
@@ -101,9 +106,28 @@ export async function GET(request: Request) {
       });
 
       // 5. 由于 in 并不保证顺序，我们需要按 pageIds 重新排序
-      products = pageIds.map(id => detailedProducts.find((d: any) => d.id === id)).filter(Boolean);
+      products = pageIds.map(id => detailedProducts.find((d) => d.id === id)).filter(Boolean);
+
+      if (idsOnly) {
+        return NextResponse.json({ 
+          ids: allProductIds.map(p => p.id),
+          total
+        });
+      }
     } else {
       // --- 原生数据库分页模式 (用于时间、库存等) ---
+      if (idsOnly) {
+        const allMatchingIds = await prisma.product.findMany({
+          where,
+          select: { id: true },
+          orderBy,
+        });
+        return NextResponse.json({ 
+          ids: allMatchingIds.map(p => p.id),
+          total: allMatchingIds.length
+        });
+      }
+
       [products, total] = await Promise.all([
         prisma.product.findMany({
           where,
@@ -118,6 +142,8 @@ export async function GET(request: Request) {
         prisma.product.count({ where })
       ]);
     }
+
+
 
     return NextResponse.json({
       items: products,
@@ -291,9 +317,10 @@ export async function DELETE(request: Request) {
       where: { productId: id }
     });
 
-    // 2. Delete purchase order items (Cascaded by purchaseOrder, but for safety in logical isolation)
-    // Actually, purchaseOrder itself has the workspaceId, so we just need to delete the product
-    // cascading takes care of the items if defined, but we need to ensure isolation.
+    // 2. Delete gallery submissions
+    await prisma.gallerySubmission.deleteMany({
+        where: { productId: id }
+    });
 
     // 3. Finally delete the product
     await prisma.product.delete({

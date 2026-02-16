@@ -238,6 +238,10 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
         const res = await fetch("/api/upload", {
           method: "POST",
           body: uploadData,
+          headers: {
+            "x-folder": "vouchers",
+            "x-use-timestamp": "true"
+          }
         });
         if (res.ok) {
           const { url } = await res.json();
@@ -278,7 +282,14 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
       formData.append("file", file);
       
       try {
-          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          const res = await fetch("/api/upload", { 
+            method: "POST", 
+            body: formData,
+            headers: {
+                "x-folder": type === 'payment' ? 'vouchers' : 'labels',
+                "x-use-timestamp": "true"
+            }
+          });
           if (res.ok) {
               const { url } = await res.json();
               if (url) {
@@ -526,7 +537,14 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                                       const formData = new FormData();
                                       formData.append("file", file);
                                       try {
-                                          const res = await fetch("/api/upload", { method: "POST", body: formData });
+                                          const res = await fetch("/api/upload", { 
+                                            method: "POST", 
+                                            body: formData,
+                                            headers: {
+                                                "x-folder": "labels",
+                                                "x-use-timestamp": "true"
+                                            }
+                                          });
                                           if (res.ok) {
                                               const { url } = await res.json();
                                               return url;

@@ -35,6 +35,7 @@ export default function GoodsPage() {
   const currentPageRef = useRef(1);
   const [hasMore, setHasMore] = useState(true);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
+  const [totalResults, setTotalResults] = useState(0);
   
   const [lowStockThreshold, setLowStockThreshold] = useState(10);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -111,6 +112,7 @@ export default function GoodsPage() {
       currentPageRef.current = targetPage;
       setPage(targetPage);
       setHasMore(data.hasMore);
+      setTotalResults(data.total || 0);
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
@@ -184,11 +186,13 @@ export default function GoodsPage() {
   };
 
   const handleCreate = () => {
+    setSelectedIds([]);
     setEditingProduct(undefined);
     setIsNewProductOpen(true);
   };
 
   const handleEdit = (product: Product) => {
+    setSelectedIds([]);
     setEditingProduct(product);
     setIsNewProductOpen(true);
   };
@@ -223,6 +227,38 @@ export default function GoodsPage() {
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   }, []);
+
+  const handleToggleSelectAll = useCallback(async () => {
+    // If all possible matches are already selected, clear all
+    if (selectedIds.length === totalResults && totalResults > 0) {
+      setSelectedIds([]);
+      return;
+    }
+
+    // Otherwise, fetch ALL matching IDs from the backend
+    try {
+      const queryParams = new URLSearchParams({
+        search: debouncedSearch,
+        category: selectedCategory,
+        status: selectedStatus,
+        sortBy: sortBy,
+        idsOnly: "true",
+      });
+
+      const res = await fetch(`/api/products?${queryParams.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ids) {
+          setSelectedIds(data.ids);
+        }
+      } else {
+        showToast("获取全选列表失败", "error");
+      }
+    } catch (error) {
+      console.error("Failed to fetch all IDs:", error);
+      showToast("网络请求失败", "error");
+    }
+  }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, sortBy, showToast]);
 
 
   const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string }) => {
@@ -584,14 +620,8 @@ export default function GoodsPage() {
 
       <ActionBar 
         selectedCount={selectedIds.length}
-        totalCount={filteredGoods.length}
-        onToggleSelectAll={() => {
-          if (selectedIds.length === filteredGoods.length) {
-            setSelectedIds([]);
-          } else {
-            setSelectedIds(filteredGoods.map(g => g.id));
-          }
-        }}
+        totalCount={totalResults}
+        onToggleSelectAll={handleToggleSelectAll}
         onClear={() => setSelectedIds([])}
         label="个商品"
         onDelete={handleBatchDelete}

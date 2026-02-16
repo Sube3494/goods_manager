@@ -368,7 +368,8 @@ function GalleryContent() {
               headers: {
                 "Content-Type": file.type,
                 "X-File-Name": encodeURIComponent(file.name),
-                "X-File-Type": file.type
+                "X-File-Type": file.type,
+                "x-folder": "gallery"
               },
               body: arrayBuffer,
           });

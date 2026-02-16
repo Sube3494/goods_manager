@@ -17,6 +17,8 @@ export interface UploadResult {
 export interface UploadOptions {
   name: string;
   type: string;
+  folder?: string;      // Optional sub-folder/prefix
+  useTimestamp?: boolean; // If true, rename file using timestamp
 }
 
 export interface StorageStrategy {
@@ -159,10 +161,21 @@ export class LocalStorageStrategy implements StorageStrategy {
 
 
   async upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult> {
-    const uploadDir = join(process.cwd(), "public", "uploads");
+    const baseDir = join(process.cwd(), "public", "uploads");
+    const subFolder = options?.folder || "";
+    const uploadDir = join(baseDir, subFolder);
     await mkdir(uploadDir, { recursive: true });
 
     let fileNameInput = options?.name || (file as File).name || `upload-${Date.now()}`;
+    
+    // Naming logic
+    if (options?.useTimestamp) {
+        const ext = fileNameInput.split(".").pop() || "";
+        const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0];
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const prefix = options.folder ? `${options.folder}_` : "file_";
+        fileNameInput = `${prefix}${timestamp}_${random}.${ext}`;
+    }
     // Remove unused fileType variable or use it if needed
     // const fileType = options?.type || (file as File).type || "application/octet-stream";
 
@@ -193,8 +206,8 @@ export class LocalStorageStrategy implements StorageStrategy {
 
     const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(fileName);
     const result: UploadResult = {
-      url: `/uploads/${fileName}`,
-      name: fileNameInput,
+      url: `/uploads/${subFolder ? subFolder + "/" : ""}${fileName}`,
+      name: fileName, // Use the resolved file name
       type: isVideo ? "video" : "image",
       skipped: skip
     };
@@ -242,8 +255,10 @@ export class LocalStorageStrategy implements StorageStrategy {
       const fileName = url.split("/").pop();
       if (!fileName) return;
 
-      const uploadDir = join(process.cwd(), "public", "uploads");
-      const filePath = join(uploadDir, fileName);
+      const uploadDir = join(process.cwd(), "public");
+      // url is like /uploads/vouchers/filename.ext
+      // We need to join with public to get absolute path
+      const filePath = join(uploadDir, url);
       
       await unlink(filePath);
     } catch (error) {
@@ -296,6 +311,18 @@ export class MinioStorageStrategy implements StorageStrategy {
     }
 
     let fileNameInput = options?.name || (file as File).name || `upload-${Date.now()}`;
+    
+    if (options?.useTimestamp) {
+        const ext = fileNameInput.split(".").pop() || "";
+        const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0];
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const prefix = options.folder ? `${options.folder}_` : "file_";
+        fileNameInput = `${prefix}${timestamp}_${random}.${ext}`;
+    }
+
+    const subFolder = options?.folder || "";
+    const objectName = subFolder ? `${subFolder}/${fileNameInput}` : fileNameInput;
+
     const fileType = options?.type || (file as File).type || "application/octet-stream";
 
     let usedStrategy = this.config.uploadConflictStrategy || "uuid";
@@ -310,8 +337,8 @@ export class MinioStorageStrategy implements StorageStrategy {
       cleanup = processed.cleanup;
     }
 
-    const { fileName, skip } = await resolveFileName(
-      fileNameInput,
+    const { fileName: resolvedFileName, skip } = await resolveFileName(
+      objectName,
       usedStrategy,
       async (name) => {
         try {
@@ -322,6 +349,8 @@ export class MinioStorageStrategy implements StorageStrategy {
         }
       }
     );
+
+    const fileName = resolvedFileName; // Full path in bucket
 
     const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(fileName);
     
@@ -337,7 +366,7 @@ export class MinioStorageStrategy implements StorageStrategy {
 
     const result: UploadResult = {
       url,
-      name: fileNameInput,
+      name: fileName.split('/').pop() || fileName,
       type: isVideo ? "video" : "image",
       skipped: skip
     };
@@ -398,11 +427,22 @@ export class MinioStorageStrategy implements StorageStrategy {
       
       // 从 URL 中提取对象名称。假设 URL 结尾是 /bucket/filename
       // 或者在配置了 PublicUrl 的情况下，是 /filename
-      const parts = url.split("/");
-      const fileName = parts.pop();
-      if (!fileName) return;
+      // From URL extract the object name. 
+      // Assumption: URL ends with /bucket/objectname or /objectname
+      // If bucket is in URL, we need to strip it.
+      // Easiest is to use the path after domain/bucket
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split("/").filter(Boolean);
+      
+      // If path starts with bucket name, remove it
+      if (pathParts[0] === bucketName) {
+          pathParts.shift();
+      }
+      
+      const objectName = pathParts.join("/");
+      if (!objectName) return;
 
-      await minioClient.removeObject(bucketName, fileName);
+      await minioClient.removeObject(bucketName, objectName);
     } catch (error) {
       console.error("Minio delete failed:", error);
     }

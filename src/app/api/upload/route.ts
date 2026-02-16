@@ -36,7 +36,15 @@ export async function POST(request: Request) {
       if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
 
       const storage = await getStorageStrategy();
-      const result = await storage.upload(file);
+      const folder = request.headers.get("x-folder") || undefined;
+      const useTimestamp = request.headers.get("x-use-timestamp") === "true";
+
+      const result = await storage.upload(file, {
+        name: file.name,
+        type: file.type,
+        folder,
+        useTimestamp
+      });
       return NextResponse.json(result);
     } 
     
@@ -53,9 +61,14 @@ export async function POST(request: Request) {
     }
 
     const storage = await getStorageStrategy();
+    const folder = request.headers.get("x-folder") || undefined;
+    const useTimestamp = request.headers.get("x-use-timestamp") === "true";
+
     const result = await storage.upload(request.body, {
       name: decodeURIComponent(fileName),
-      type: fileType
+      type: fileType,
+      folder,
+      useTimestamp
     });
 
     return NextResponse.json(result);

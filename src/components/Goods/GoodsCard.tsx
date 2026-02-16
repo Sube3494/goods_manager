@@ -115,7 +115,11 @@ export const GoodsCard = memo(function GoodsCard({
           <div className="text-right">
              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">进货单价</p>
              <p className="font-bold text-foreground">
-                <span className="text-base sm:text-lg">¥{Number(product.costPrice || 0).toLocaleString()}</span>
+                {Number(product.costPrice || 0) > 0 ? (
+                  <span className="text-base sm:text-lg">¥{Number(product.costPrice).toLocaleString()}</span>
+                ) : (
+                  <span className="text-xs sm:text-sm text-foreground font-bold">以实际为准</span>
+                )}
              </p>
           </div>
         </div>
