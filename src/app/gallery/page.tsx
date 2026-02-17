@@ -11,9 +11,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
-
-import Image from "next/image";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
@@ -272,12 +272,10 @@ function GalleryContent() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadForm, setUploadForm] = useState<{
     productId: string;
-    isPublic: boolean;
     urls: { url: string; type: 'image' | 'video' }[],
     tags: string
   }>({
     productId: "",
-    isPublic: true,
     urls: [],
     tags: ""
   });
@@ -447,7 +445,7 @@ function GalleryContent() {
 
         if (res.ok) {
           setIsUploadModalOpen(false);
-          setUploadForm({ productId: "", isPublic: true, urls: [], tags: "" });
+          setUploadForm({ productId: "", urls: [], tags: "" });
           showToast("发布成功", "success");
           fetchData();
         }
@@ -561,9 +559,9 @@ function GalleryContent() {
     });
     
     return Object.values(groups).sort((a, b) => {
-        const latestA = Math.max(...a.items.map(i => new Date(i.createdAt || 0).getTime()));
-        const latestB = Math.max(...b.items.map(i => new Date(i.createdAt || 0).getTime()));
-        return latestB - latestA;
+        const skuA = a.product?.sku || "";
+        const skuB = b.product?.sku || "";
+        return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
     });
   }, [filteredItems, productIdFilter]);
 
@@ -694,7 +692,7 @@ function GalleryContent() {
                        }
                      } else {
                         // Reset form if on main gallery page to avoid stale state from previous navigations
-                         setUploadForm({ productId: "", isPublic: true, urls: [], tags: "" });
+                         setUploadForm({ productId: "", urls: [], tags: "" });
                       }
                    }}
                    className="h-10 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
@@ -714,9 +712,8 @@ function GalleryContent() {
             </div>
           </div>
 
-          {!productIdFilter && (
-            <div className="flex flex-col sm:flex-row gap-3 mb-3">
-              <div className="h-10 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full shrink-0">
+          <div className="flex flex-col sm:flex-row gap-3 mb-6 sm:mb-8">
+              <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0">
                 <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
                     type="text" 
@@ -726,42 +723,22 @@ function GalleryContent() {
                     className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
                 />
               </div>
-            </div>
-          )}
 
-          {/* Filters */}
-          {!productIdFilter && (
-            <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide mb-6 md:mb-8">
-                <div className="flex items-center gap-2 pb-2">
-                  <button
-                      onClick={() => setSelectedCategory("All")}
-                      className={cn(
-                          "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
-                          selectedCategory === "All" 
-                          ? "bg-foreground text-background border-foreground shadow-sm" 
-                          : "bg-muted/50 dark:bg-white/5 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground hover:border-border transition-all"
-                      )}
-                  >
-                      全部展示
-                  </button>
-
-                  {categories.map(cat => (
-                      <button
-                          key={cat.id}
-                          onClick={() => setSelectedCategory(cat.name)}
-                          className={cn(
-                              "px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap border",
-                              selectedCategory === cat.name
-                              ? "bg-foreground text-background border-foreground shadow-sm" 
-                              : "bg-muted/50 dark:bg-white/5 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground hover:border-border transition-all"
-                          )}
-                      >
-                          {cat.name}
-                      </button>
-                  ))}
-              </div>
+              {!productIdFilter && (
+                <div className="w-full sm:w-48 h-10 sm:h-11 shrink-0">
+                   <CustomSelect 
+                        value={selectedCategory === "All" ? "all" : selectedCategory}
+                        onChange={(val) => setSelectedCategory(val === "all" ? "All" : val)}
+                        options={[
+                            { value: 'all', label: '全部展示' },
+                            ...categories.map(c => ({ value: c.name, label: c.name }))
+                        ]}
+                        className="h-full"
+                        triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
+                    />
+                </div>
+              )}
           </div>
-        )}
 
 
 
@@ -1215,6 +1192,8 @@ function GalleryContent() {
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Download button removed redundancy */}
                                 </div>
                             )}
                                 </div>

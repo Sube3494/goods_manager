@@ -18,10 +18,7 @@ export async function GET() {
 
     const suppliers = await prisma.supplier.findMany({
       where: {
-        OR: [
-          { workspaceId },
-          { products: { some: { isPublic: true } } }
-        ]
+        workspaceId
       },
       orderBy: { name: 'asc' },
       include: {

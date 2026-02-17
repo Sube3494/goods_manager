@@ -136,7 +136,6 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                 extraFees: 0,
                 totalAmount: 0,
                 trackingData: undefined,
-                paymentVoucher: undefined,
                 paymentVouchers: []
             }));
             setShippingFeeInput("0");
@@ -530,29 +529,23 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                 支付凭证
                             </label>
                         </div>
-                        {(formData.paymentVouchers && formData.paymentVouchers.length > 0) || formData.paymentVoucher ? (
+                        {formData.paymentVouchers && formData.paymentVouchers.length > 0 ? (
                             <div className="bg-muted/10 dark:bg-white/5 p-3 rounded-2xl border border-border/40 flex flex-wrap gap-3">
-                                {(() => {
-                                    const vouchers = formData.paymentVouchers && formData.paymentVouchers.length > 0 
-                                        ? formData.paymentVouchers 
-                                        : [formData.paymentVoucher!];
-                                    
-                                    return vouchers.map((url, idx) => (
-                                        <div key={url || idx} className="relative group w-28 sm:w-48 aspect-square sm:aspect-3/2 rounded-xl overflow-hidden border border-border/60 shadow-sm transition-all hover:ring-2 hover:ring-primary/20">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img 
-                                                src={url} 
-                                                alt={`payment voucher ${idx + 1}`} 
-                                                className="h-full w-full object-cover sm:object-contain bg-black/5 dark:bg-white/5 cursor-zoom-in"
-                                                onClick={() => setGalleryState({
-                                                    isOpen: true,
-                                                    images: vouchers,
-                                                    currentIndex: idx
-                                                })}
-                                            />
-                                        </div>
-                                    ));
-                                })()}
+                                {formData.paymentVouchers.map((url, idx) => (
+                                    <div key={url || idx} className="relative group w-28 sm:w-48 aspect-square sm:aspect-3/2 rounded-xl overflow-hidden border border-border/60 shadow-sm transition-all hover:ring-2 hover:ring-primary/20">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img 
+                                            src={url} 
+                                            alt={`payment voucher ${idx + 1}`} 
+                                            className="h-full w-full object-cover sm:object-contain bg-black/5 dark:bg-white/5 cursor-zoom-in"
+                                            onClick={() => setGalleryState({
+                                                isOpen: true,
+                                                images: formData.paymentVouchers || [],
+                                                currentIndex: idx
+                                            })}
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         ) : (
                             <div className="py-8 rounded-2xl border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-2 opacity-40">

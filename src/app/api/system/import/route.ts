@@ -133,8 +133,7 @@ export async function POST(request: Request) {
                 categoryId,
                 supplierId,
                 stock: Number(p["库存数量"] || 0),
-                costPrice: Number(p["成本价"] || 0),
-                isPublic: p["是否公开"] === "是"
+                costPrice: Number(p["成本价"] || 0)
               },
               create: {
                 sku,
@@ -143,7 +142,6 @@ export async function POST(request: Request) {
                 supplierId,
                 stock: Number(p["库存数量"] || 0),
                 costPrice: Number(p["成本价"] || 0),
-                isPublic: p["是否公开"] === "是",
                 workspaceId
               }
             });

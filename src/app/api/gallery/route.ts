@@ -19,7 +19,10 @@ export async function GET(request: Request) {
         ...(session ? {
           OR: [
             { workspaceId: session.workspaceId },
-            { isPublic: true }
+            { 
+              isPublic: true,
+              product: { isPublic: true }
+            }
           ]
         } : { 
           isPublic: true,

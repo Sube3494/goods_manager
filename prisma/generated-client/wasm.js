@@ -144,7 +144,6 @@ exports.Prisma.ProductScalarFieldEnum = {
   sku: 'sku',
   name: 'name',
   costPrice: 'costPrice',
-  hideCost: 'hideCost',
   stock: 'stock',
   image: 'image',
   isPublic: 'isPublic',
@@ -176,7 +175,6 @@ exports.Prisma.PurchaseOrderScalarFieldEnum = {
   date: 'date',
   shippingFees: 'shippingFees',
   extraFees: 'extraFees',
-  paymentVoucher: 'paymentVoucher',
   paymentVouchers: 'paymentVouchers',
   trackingData: 'trackingData',
   note: 'note',
@@ -259,6 +257,7 @@ exports.Prisma.EmailWhitelistScalarFieldEnum = {
   email: 'email',
   role: 'role',
   permissions: 'permissions',
+  targetWorkspaceId: 'targetWorkspaceId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

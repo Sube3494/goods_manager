@@ -65,9 +65,9 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
 
       setDropdownPosition({
         top: showAbove 
-          ? rect.top + window.scrollY - 8 
-          : rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX,
+          ? rect.top - 8 
+          : rect.bottom + 8,
+        left: rect.left,
         width: rect.width,
         showAbove
       });
@@ -108,18 +108,19 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              initial={{ opacity: 0, y: dropdownPosition.showAbove ? 5 : -5, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: dropdownPosition.showAbove ? 5 : -5, scale: 0.98 }}
+              initial={{ opacity: 0, y: dropdownPosition.showAbove ? 10 : -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: dropdownPosition.showAbove ? 10 : -10 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               style={{
-                position: 'absolute',
+                position: 'fixed',
                 top: `${dropdownPosition.top}px`,
                 left: `${dropdownPosition.left}px`,
                 width: `${dropdownPosition.width}px`,
-                transform: dropdownPosition.showAbove ? 'translateY(-100%)' : 'none'
+                transform: dropdownPosition.showAbove ? 'translateY(-100%)' : 'none',
+                pointerEvents: 'auto'
               }}
-              className="z-99999 max-h-60 overflow-auto rounded-2xl bg-white dark:bg-card/70 dark:backdrop-blur-xl border border-border dark:border-white/10 p-1 shadow-xl ring-1 ring-black/5 focus:outline-none"
+              className="z-[99999] rounded-2xl bg-white dark:bg-gray-900 border border-border dark:border-white/10 shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
             >
               <div className="max-h-60 overflow-auto p-1 py-1.5 scrollbar-hide">
                 {options.length > 0 ? (
@@ -132,13 +133,13 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
                         setIsOpen(false);
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer data-disabled:pointer-events-none data-disabled:opacity-50",
-                        option.value === value && "bg-black/10 dark:bg-white/10 font-medium"
+                        "relative flex w-full select-none items-center rounded-lg py-2.5 pl-3 pr-8 text-sm outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer",
+                        option.value === value && "bg-primary/10 text-primary font-medium"
                       )}
                     >
                       <span className="truncate">{option.label}</span>
                       {option.value === value && (
-                        <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center text-primary">
+                        <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center">
                           <Check size={14} />
                         </span>
                       )}

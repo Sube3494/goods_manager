@@ -48,20 +48,30 @@ export async function POST(request: Request) {
                     email: whitelisted.email,
                     role: whitelisted.role,
                     permissions: whitelisted.permissions || {},
+                    workspaceId: whitelisted.targetWorkspaceId || undefined
                 }
             });
 
-            const workspace = await tx.workspace.create({
-                data: {
-                    name: `${newUser.email}'s Workspace`,
-                    ownerId: newUser.id,
-                }
-            });
+            // If no target workspace, create a new one
+            if (!whitelisted.targetWorkspaceId) {
+                const workspace = await tx.workspace.create({
+                    data: {
+                        name: `${newUser.email}'s Workspace`,
+                        ownerId: newUser.id,
+                    }
+                });
 
-            // Update user with workspaceId
-            return await tx.user.update({
+                // Update user with workspaceId
+                return await tx.user.update({
+                    where: { id: newUser.id },
+                    data: { workspaceId: workspace.id },
+                    include: { workspace: true }
+                });
+            }
+
+            // If joined existing workspace, return user with included workspace
+            return await tx.user.findUnique({
                 where: { id: newUser.id },
-                data: { workspaceId: workspace.id },
                 include: { workspace: true }
             });
         });

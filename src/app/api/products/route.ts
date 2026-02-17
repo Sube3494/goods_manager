@@ -30,6 +30,7 @@ export async function GET(request: Request) {
       }>;
       category?: { name: string };
       stock?: { lt: number };
+      isPublic?: boolean;
     } = {};
 
     // 搜索词过滤 (支持 SKU、名称、分类)
@@ -46,9 +47,13 @@ export async function GET(request: Request) {
       where.category = { name: categoryName };
     }
 
-    // 状态过滤 (库存预警)
+    // 状态过滤 (库存预警、可见性)
     if (status === "low_stock") {
       where.stock = { lt: lowStockThreshold };
+    } else if (status === "public") {
+      where.isPublic = true;
+    } else if (status === "private") {
+      where.isPublic = false;
     }
 
     // 构建排序
@@ -171,7 +176,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
 
     const stockNum = Number(stock) || 0;
 
@@ -180,16 +185,16 @@ export async function POST(request: Request) {
         name,
         sku,
         costPrice: Number(costPrice) || 0,
-        hideCost: body.hideCost ?? false,
         stock: stockNum,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
-        isPublic: true, // Default to true
+        isPublic: isPublic ?? true,
         workspaceId: session.workspaceId,
       },
       include: {
         category: true,
+        supplier: true,
       }
     });
 
@@ -244,7 +249,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -264,15 +269,15 @@ export async function PUT(request: Request) {
         name,
         sku,
         costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
-        hideCost: body.hideCost !== undefined ? body.hideCost : undefined,
         stock: Number(stock) || 0,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
-        isPublic: true,
+        isPublic: isPublic ?? undefined
       },
       include: {
         category: true,
+        supplier: true,
       }
     });
 

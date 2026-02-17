@@ -1,10 +1,11 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { motion } from "framer-motion";
 import { Edit, Package, Truck, Trash2, Camera, Check } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Product } from "@/lib/types";
-import { getCategoryName } from "@/lib/utils";
+import { getCategoryName, cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/Toast";
 
 export const GoodsCard = memo(function GoodsCard({ 
   product, 
@@ -25,6 +26,18 @@ export const GoodsCard = memo(function GoodsCard({
   onToggleSelect?: (id: string) => void;
   priority?: boolean;
 }) {
+  const [isCopied, setIsCopied] = useState(false);
+  const { showToast } = useToast();
+
+  const handleCopyName = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(product.name).then(() => {
+      setIsCopied(true);
+      showToast("商品名称已复制", "success");
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
+
   const handleCardClick = () => {
     if (onToggleSelect) {
       onToggleSelect(product.id);
@@ -83,6 +96,18 @@ export const GoodsCard = memo(function GoodsCard({
         <div className="flex-1">
           <h3 className="font-bold text-sm sm:text-lg leading-tight text-foreground mb-2 sm:mb-4 group-hover:text-primary transition-colors">
             {product.name}
+            <button
+               onClick={handleCopyName}
+               className={cn(
+                 "ml-1.5 inline-flex items-center justify-center p-1 rounded-md transition-all active:scale-90 align-middle",
+                 isCopied 
+                  ? "bg-green-500/10 text-green-500" 
+                  : "bg-secondary/50 text-muted-foreground hover:bg-primary/10 hover:text-primary opacity-0 group-hover:opacity-100"
+               )}
+               title="复制名称"
+            >
+              {isCopied ? <Check size={12} strokeWidth={3} /> : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>}
+            </button>
           </h3>
           
           <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-4">

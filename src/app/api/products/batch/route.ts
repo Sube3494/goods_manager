@@ -66,7 +66,7 @@ export async function DELETE(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { ids, categoryId, supplierId } = await request.json();
+    const { ids, categoryId, supplierId, isPublic } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
@@ -75,9 +75,10 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const updateData: Record<string, string | number> = {};
+    const updateData: Record<string, string | number | boolean> = {};
     if (categoryId) updateData.categoryId = categoryId;
     if (supplierId) updateData.supplierId = supplierId;
+    if (isPublic !== undefined) updateData.isPublic = isPublic;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

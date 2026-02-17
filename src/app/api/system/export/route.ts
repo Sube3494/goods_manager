@@ -60,7 +60,6 @@ export async function GET() {
       '供应商': p.supplier?.name || '无',
       '库存数量': p.stock,
       '成本价': p.costPrice,
-      '是否公开': p.isPublic ? '是' : '否',
       '创建时间': formatDate(p.createdAt)
     }));
     const productSheet = XLSX.utils.json_to_sheet(productData);

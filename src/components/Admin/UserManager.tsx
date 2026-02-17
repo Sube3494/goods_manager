@@ -1,13 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Settings2, Loader2, Save, User as UserIcon, Mail, Plus, Trash2, AlertCircle, CheckCircle, X } from "lucide-react";
+import { Shield, Settings2, Loader2, Save, User as UserIcon, Mail, Plus, Trash2, AlertCircle, CheckCircle, X, LayoutGrid } from "lucide-react";
 import { clsx } from "clsx";
 import { motion } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
 import { PERMISSION_TREE } from "@/lib/permissions";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+
+interface Workspace {
+  id: string;
+  name: string;
+  owner: {
+    email: string;
+    name: string | null;
+  };
+}
 
 interface WhitelistEntry {
   id: string;
@@ -214,6 +224,8 @@ export function UserManager() {
   
   // Invite State
   const [newEmail, setNewEmail] = useState("");
+  const [targetWorkspaceId, setTargetWorkspaceId] = useState("");
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isInviting, setIsInviting] = useState(false);
   const [deleteEmail, setDeleteEmail] = useState<string | null>(null);
 
@@ -239,9 +251,22 @@ export function UserManager() {
     }
   }, [showToast]);
 
+  const fetchWorkspaces = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/workspaces");
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaces(data);
+      }
+    } catch {
+      console.error("Failed to fetch workspaces");
+    }
+  }, []);
+
   useEffect(() => {
     fetchEntries();
-  }, [fetchEntries]);
+    fetchWorkspaces();
+  }, [fetchEntries, fetchWorkspaces]);
 
   // --- Invite Logic ---
   const handleAdd = async (e: React.FormEvent) => {
@@ -253,12 +278,17 @@ export function UserManager() {
       const res = await fetch("/api/admin/whitelist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: newEmail, role: "USER" }),
+        body: JSON.stringify({ 
+          email: newEmail, 
+          role: "USER",
+          targetWorkspaceId: targetWorkspaceId || null
+        }),
       });
 
       if (res.ok) {
         showToast("已发送邀请", "success");
         setNewEmail("");
+        setTargetWorkspaceId("");
         fetchEntries();
       } else {
         const err = await res.json();
@@ -382,23 +412,44 @@ export function UserManager() {
           <Mail className="text-primary" size={20} />
           邀请新成员
         </h3>
-        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="email"
-            placeholder="输入受邀者邮箱..."
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            required
-            className="w-full sm:flex-1 h-10 px-4 rounded-full bg-muted/50 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono text-sm shrink-0"
-          />
-          <button
-            type="submit"
-            disabled={isInviting}
-            className="h-10 px-6 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center justify-center gap-2"
-          >
-            {isInviting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={18} />}
-            发送邀请
-          </button>
+        <form onSubmit={handleAdd} className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <input
+                type="email"
+                placeholder="输入受邀者邮箱..."
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                required
+                className="w-full h-11 px-4 rounded-full bg-muted/50 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono text-sm"
+              />
+            </div>
+            
+            <div className="w-full sm:w-64">
+              <CustomSelect 
+                value={targetWorkspaceId}
+                onChange={setTargetWorkspaceId}
+                options={[
+                  { value: "", label: "独立工作区 (新建)" },
+                  ...workspaces.map(w => ({
+                    value: w.id,
+                    label: `加入: ${w.name} (${w.owner.email})`
+                  }))
+                ]}
+                placeholder="选择目标工作区"
+                triggerClassName="w-full h-11 rounded-full bg-muted/50 border border-border px-4 text-sm"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isInviting}
+              className="h-11 px-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              {isInviting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={18} />}
+              发送邀请
+            </button>
+          </div>
         </form>
         <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1.5 px-1">
           <AlertCircle size={12} />

@@ -173,8 +173,7 @@ export async function POST(request: Request) {
                         costPrice: costPrice > 0 ? costPrice : 0,
                         stock: quantity > 0 ? quantity : 0,
                         image: finalImage,
-                        workspaceId,
-                        isPublic: true
+                        workspaceId
                     }
                 });
 

@@ -124,7 +124,10 @@ export default function GoodsPage() {
   // Fetch metadata once on mount
   useEffect(() => {
     // Categories
-    fetch("/api/categories").then(r => r.ok && r.json()).then(setCategories).catch(() => {});
+    fetch("/api/categories")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => Array.isArray(data) ? setCategories(data) : setCategories([]))
+      .catch(() => setCategories([]));
     
     // Suppliers (Permission based)
     const canReadSuppliers = user?.role === "SUPER_ADMIN" || user?.permissions?.["supplier:read"];
@@ -261,7 +264,7 @@ export default function GoodsPage() {
   }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, sortBy, showToast]);
 
 
-  const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string }) => {
+  const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string; isPublic?: boolean }) => {
     const count = selectedIds.length;
     try {
       const res = await fetch("/api/products/batch", {
@@ -338,8 +341,7 @@ export default function GoodsPage() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 productId: product.id,
-                urls: tempItems.map(item => ({ url: item.url, type: item.type })),
-                isPublic: product.isPublic // Match product visibility
+                urls: tempItems.map(item => ({ url: item.url, type: item.type }))
               })
             });
           }
@@ -347,7 +349,14 @@ export default function GoodsPage() {
 
         showToast(editingProduct ? "商品更新成功" : "商品创建成功", "success");
         setIsNewProductOpen(false);
-        fetchGoods(true);
+        
+        if (editingProduct) {
+          // 静默更新本地数据，避免页面滚动到顶部
+          setItems(prev => prev.map(item => item.id === product.id ? { ...item, ...product } : item));
+        } else {
+          // 新建商品还是维持刷新逻辑
+          fetchGoods(true);
+        }
       } else {
         showToast("操作失败", "error");
       }
@@ -470,32 +479,34 @@ export default function GoodsPage() {
             />
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto"> 
-             <div className="w-full sm:w-40 h-10 sm:h-11"> 
+          <div className="grid grid-cols-3 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto"> 
+             <div className="col-span-1 lg:w-40 h-10 sm:h-11"> 
                 <CustomSelect 
                     value={selectedStatus}
                     onChange={setSelectedStatus}
                     options={[
                         { value: 'all', label: '所有状态' },
+                        { value: 'public', label: '公开可见' },
+                        { value: 'private', label: '隐藏不公开' },
                         { value: 'low_stock', label: '库存预警' }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
                 />
              </div>
-             <div className="w-full sm:w-40 h-10 sm:h-11">
+             <div className="col-span-1 lg:w-40 h-10 sm:h-11">
                 <CustomSelect 
                     value={selectedCategory}
                     onChange={setSelectedCategory}
                     options={[
                         { value: 'all', label: '所有分类' },
-                        ...categories.map(c => ({ value: c.name, label: c.name }))
+                        ...(Array.isArray(categories) ? categories.map(c => ({ value: c.name, label: c.name })) : [])
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
                 />
              </div>
-             <div className="w-full sm:w-48 h-10 sm:h-11">
+             <div className="col-span-1 lg:w-48 h-10 sm:h-11">
                 <CustomSelect 
                     value={sortBy}
                     onChange={setSortBy}
@@ -509,7 +520,7 @@ export default function GoodsPage() {
                         { value: 'name-asc', label: '名称 A-Z' }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
                 />
               </div>
           </div>

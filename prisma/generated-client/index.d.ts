@@ -4671,7 +4671,6 @@ export namespace Prisma {
     sku: string | null
     name: string | null
     costPrice: number | null
-    hideCost: boolean | null
     stock: number | null
     image: string | null
     isPublic: boolean | null
@@ -4687,7 +4686,6 @@ export namespace Prisma {
     sku: string | null
     name: string | null
     costPrice: number | null
-    hideCost: boolean | null
     stock: number | null
     image: string | null
     isPublic: boolean | null
@@ -4703,7 +4701,6 @@ export namespace Prisma {
     sku: number
     name: number
     costPrice: number
-    hideCost: number
     stock: number
     image: number
     isPublic: number
@@ -4731,7 +4728,6 @@ export namespace Prisma {
     sku?: true
     name?: true
     costPrice?: true
-    hideCost?: true
     stock?: true
     image?: true
     isPublic?: true
@@ -4747,7 +4743,6 @@ export namespace Prisma {
     sku?: true
     name?: true
     costPrice?: true
-    hideCost?: true
     stock?: true
     image?: true
     isPublic?: true
@@ -4763,7 +4758,6 @@ export namespace Prisma {
     sku?: true
     name?: true
     costPrice?: true
-    hideCost?: true
     stock?: true
     image?: true
     isPublic?: true
@@ -4866,7 +4860,6 @@ export namespace Prisma {
     sku: string | null
     name: string
     costPrice: number
-    hideCost: boolean
     stock: number
     image: string | null
     isPublic: boolean
@@ -4901,7 +4894,6 @@ export namespace Prisma {
     sku?: boolean
     name?: boolean
     costPrice?: boolean
-    hideCost?: boolean
     stock?: boolean
     image?: boolean
     isPublic?: boolean
@@ -4925,7 +4917,6 @@ export namespace Prisma {
     sku?: boolean
     name?: boolean
     costPrice?: boolean
-    hideCost?: boolean
     stock?: boolean
     image?: boolean
     isPublic?: boolean
@@ -4944,7 +4935,6 @@ export namespace Prisma {
     sku?: boolean
     name?: boolean
     costPrice?: boolean
-    hideCost?: boolean
     stock?: boolean
     image?: boolean
     isPublic?: boolean
@@ -4987,7 +4977,6 @@ export namespace Prisma {
       sku: string | null
       name: string
       costPrice: number
-      hideCost: boolean
       stock: number
       image: string | null
       isPublic: boolean
@@ -5400,7 +5389,6 @@ export namespace Prisma {
     readonly sku: FieldRef<"Product", 'String'>
     readonly name: FieldRef<"Product", 'String'>
     readonly costPrice: FieldRef<"Product", 'Float'>
-    readonly hideCost: FieldRef<"Product", 'Boolean'>
     readonly stock: FieldRef<"Product", 'Int'>
     readonly image: FieldRef<"Product", 'String'>
     readonly isPublic: FieldRef<"Product", 'Boolean'>
@@ -6941,7 +6929,6 @@ export namespace Prisma {
     date: Date | null
     shippingFees: number | null
     extraFees: number | null
-    paymentVoucher: string | null
     note: string | null
     workspaceId: string | null
     createdAt: Date | null
@@ -6956,7 +6943,6 @@ export namespace Prisma {
     date: Date | null
     shippingFees: number | null
     extraFees: number | null
-    paymentVoucher: string | null
     note: string | null
     workspaceId: string | null
     createdAt: Date | null
@@ -6971,7 +6957,6 @@ export namespace Prisma {
     date: number
     shippingFees: number
     extraFees: number
-    paymentVoucher: number
     paymentVouchers: number
     trackingData: number
     note: number
@@ -7002,7 +6987,6 @@ export namespace Prisma {
     date?: true
     shippingFees?: true
     extraFees?: true
-    paymentVoucher?: true
     note?: true
     workspaceId?: true
     createdAt?: true
@@ -7017,7 +7001,6 @@ export namespace Prisma {
     date?: true
     shippingFees?: true
     extraFees?: true
-    paymentVoucher?: true
     note?: true
     workspaceId?: true
     createdAt?: true
@@ -7032,7 +7015,6 @@ export namespace Prisma {
     date?: true
     shippingFees?: true
     extraFees?: true
-    paymentVoucher?: true
     paymentVouchers?: true
     trackingData?: true
     note?: true
@@ -7136,7 +7118,6 @@ export namespace Prisma {
     date: Date
     shippingFees: number
     extraFees: number
-    paymentVoucher: string | null
     paymentVouchers: JsonValue | null
     trackingData: JsonValue | null
     note: string | null
@@ -7172,7 +7153,6 @@ export namespace Prisma {
     date?: boolean
     shippingFees?: boolean
     extraFees?: boolean
-    paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
     note?: boolean
@@ -7192,7 +7172,6 @@ export namespace Prisma {
     date?: boolean
     shippingFees?: boolean
     extraFees?: boolean
-    paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
     note?: boolean
@@ -7210,7 +7189,6 @@ export namespace Prisma {
     date?: boolean
     shippingFees?: boolean
     extraFees?: boolean
-    paymentVoucher?: boolean
     paymentVouchers?: boolean
     trackingData?: boolean
     note?: boolean
@@ -7242,7 +7220,6 @@ export namespace Prisma {
       date: Date
       shippingFees: number
       extraFees: number
-      paymentVoucher: string | null
       paymentVouchers: Prisma.JsonValue | null
       trackingData: Prisma.JsonValue | null
       note: string | null
@@ -7651,7 +7628,6 @@ export namespace Prisma {
     readonly date: FieldRef<"PurchaseOrder", 'DateTime'>
     readonly shippingFees: FieldRef<"PurchaseOrder", 'Float'>
     readonly extraFees: FieldRef<"PurchaseOrder", 'Float'>
-    readonly paymentVoucher: FieldRef<"PurchaseOrder", 'String'>
     readonly paymentVouchers: FieldRef<"PurchaseOrder", 'Json'>
     readonly trackingData: FieldRef<"PurchaseOrder", 'Json'>
     readonly note: FieldRef<"PurchaseOrder", 'String'>
@@ -14097,6 +14073,7 @@ export namespace Prisma {
     id: string | null
     email: string | null
     role: $Enums.Role | null
+    targetWorkspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -14105,6 +14082,7 @@ export namespace Prisma {
     id: string | null
     email: string | null
     role: $Enums.Role | null
+    targetWorkspaceId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -14114,6 +14092,7 @@ export namespace Prisma {
     email: number
     role: number
     permissions: number
+    targetWorkspaceId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -14124,6 +14103,7 @@ export namespace Prisma {
     id?: true
     email?: true
     role?: true
+    targetWorkspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -14132,6 +14112,7 @@ export namespace Prisma {
     id?: true
     email?: true
     role?: true
+    targetWorkspaceId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -14141,6 +14122,7 @@ export namespace Prisma {
     email?: true
     role?: true
     permissions?: true
+    targetWorkspaceId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -14223,6 +14205,7 @@ export namespace Prisma {
     email: string
     role: $Enums.Role
     permissions: JsonValue | null
+    targetWorkspaceId: string | null
     createdAt: Date
     updatedAt: Date
     _count: EmailWhitelistCountAggregateOutputType | null
@@ -14249,6 +14232,7 @@ export namespace Prisma {
     email?: boolean
     role?: boolean
     permissions?: boolean
+    targetWorkspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["emailWhitelist"]>
@@ -14258,6 +14242,7 @@ export namespace Prisma {
     email?: boolean
     role?: boolean
     permissions?: boolean
+    targetWorkspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["emailWhitelist"]>
@@ -14267,6 +14252,7 @@ export namespace Prisma {
     email?: boolean
     role?: boolean
     permissions?: boolean
+    targetWorkspaceId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
@@ -14280,6 +14266,7 @@ export namespace Prisma {
       email: string
       role: $Enums.Role
       permissions: Prisma.JsonValue | null
+      targetWorkspaceId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["emailWhitelist"]>
@@ -14679,6 +14666,7 @@ export namespace Prisma {
     readonly email: FieldRef<"EmailWhitelist", 'String'>
     readonly role: FieldRef<"EmailWhitelist", 'Role'>
     readonly permissions: FieldRef<"EmailWhitelist", 'Json'>
+    readonly targetWorkspaceId: FieldRef<"EmailWhitelist", 'String'>
     readonly createdAt: FieldRef<"EmailWhitelist", 'DateTime'>
     readonly updatedAt: FieldRef<"EmailWhitelist", 'DateTime'>
   }
@@ -19096,7 +19084,6 @@ export namespace Prisma {
     sku: 'sku',
     name: 'name',
     costPrice: 'costPrice',
-    hideCost: 'hideCost',
     stock: 'stock',
     image: 'image',
     isPublic: 'isPublic',
@@ -19134,7 +19121,6 @@ export namespace Prisma {
     date: 'date',
     shippingFees: 'shippingFees',
     extraFees: 'extraFees',
-    paymentVoucher: 'paymentVoucher',
     paymentVouchers: 'paymentVouchers',
     trackingData: 'trackingData',
     note: 'note',
@@ -19238,6 +19224,7 @@ export namespace Prisma {
     email: 'email',
     role: 'role',
     permissions: 'permissions',
+    targetWorkspaceId: 'targetWorkspaceId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -19404,13 +19391,6 @@ export namespace Prisma {
 
 
   /**
-   * Reference to a field of type 'Boolean'
-   */
-  export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
-    
-
-
-  /**
    * Reference to a field of type 'Int'
    */
   export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -19421,6 +19401,13 @@ export namespace Prisma {
    * Reference to a field of type 'Int[]'
    */
   export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'Boolean'
+   */
+  export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 
@@ -19605,7 +19592,6 @@ export namespace Prisma {
     sku?: StringNullableFilter<"Product"> | string | null
     name?: StringFilter<"Product"> | string
     costPrice?: FloatFilter<"Product"> | number
-    hideCost?: BoolFilter<"Product"> | boolean
     stock?: IntFilter<"Product"> | number
     image?: StringNullableFilter<"Product"> | string | null
     isPublic?: BoolFilter<"Product"> | boolean
@@ -19628,7 +19614,6 @@ export namespace Prisma {
     sku?: SortOrderInput | SortOrder
     name?: SortOrder
     costPrice?: SortOrder
-    hideCost?: SortOrder
     stock?: SortOrder
     image?: SortOrderInput | SortOrder
     isPublic?: SortOrder
@@ -19654,7 +19639,6 @@ export namespace Prisma {
     NOT?: ProductWhereInput | ProductWhereInput[]
     name?: StringFilter<"Product"> | string
     costPrice?: FloatFilter<"Product"> | number
-    hideCost?: BoolFilter<"Product"> | boolean
     stock?: IntFilter<"Product"> | number
     image?: StringNullableFilter<"Product"> | string | null
     isPublic?: BoolFilter<"Product"> | boolean
@@ -19677,7 +19661,6 @@ export namespace Prisma {
     sku?: SortOrderInput | SortOrder
     name?: SortOrder
     costPrice?: SortOrder
-    hideCost?: SortOrder
     stock?: SortOrder
     image?: SortOrderInput | SortOrder
     isPublic?: SortOrder
@@ -19701,7 +19684,6 @@ export namespace Prisma {
     sku?: StringNullableWithAggregatesFilter<"Product"> | string | null
     name?: StringWithAggregatesFilter<"Product"> | string
     costPrice?: FloatWithAggregatesFilter<"Product"> | number
-    hideCost?: BoolWithAggregatesFilter<"Product"> | boolean
     stock?: IntWithAggregatesFilter<"Product"> | number
     image?: StringNullableWithAggregatesFilter<"Product"> | string | null
     isPublic?: BoolWithAggregatesFilter<"Product"> | boolean
@@ -19810,7 +19792,6 @@ export namespace Prisma {
     date?: DateTimeFilter<"PurchaseOrder"> | Date | string
     shippingFees?: FloatFilter<"PurchaseOrder"> | number
     extraFees?: FloatFilter<"PurchaseOrder"> | number
-    paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
     note?: StringNullableFilter<"PurchaseOrder"> | string | null
@@ -19829,7 +19810,6 @@ export namespace Prisma {
     date?: SortOrder
     shippingFees?: SortOrder
     extraFees?: SortOrder
-    paymentVoucher?: SortOrderInput | SortOrder
     paymentVouchers?: SortOrderInput | SortOrder
     trackingData?: SortOrderInput | SortOrder
     note?: SortOrderInput | SortOrder
@@ -19851,7 +19831,6 @@ export namespace Prisma {
     date?: DateTimeFilter<"PurchaseOrder"> | Date | string
     shippingFees?: FloatFilter<"PurchaseOrder"> | number
     extraFees?: FloatFilter<"PurchaseOrder"> | number
-    paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
     note?: StringNullableFilter<"PurchaseOrder"> | string | null
@@ -19870,7 +19849,6 @@ export namespace Prisma {
     date?: SortOrder
     shippingFees?: SortOrder
     extraFees?: SortOrder
-    paymentVoucher?: SortOrderInput | SortOrder
     paymentVouchers?: SortOrderInput | SortOrder
     trackingData?: SortOrderInput | SortOrder
     note?: SortOrderInput | SortOrder
@@ -19895,7 +19873,6 @@ export namespace Prisma {
     date?: DateTimeWithAggregatesFilter<"PurchaseOrder"> | Date | string
     shippingFees?: FloatWithAggregatesFilter<"PurchaseOrder"> | number
     extraFees?: FloatWithAggregatesFilter<"PurchaseOrder"> | number
-    paymentVoucher?: StringNullableWithAggregatesFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableWithAggregatesFilter<"PurchaseOrder">
     trackingData?: JsonNullableWithAggregatesFilter<"PurchaseOrder">
     note?: StringNullableWithAggregatesFilter<"PurchaseOrder"> | string | null
@@ -20369,6 +20346,7 @@ export namespace Prisma {
     email?: StringFilter<"EmailWhitelist"> | string
     role?: EnumRoleFilter<"EmailWhitelist"> | $Enums.Role
     permissions?: JsonNullableFilter<"EmailWhitelist">
+    targetWorkspaceId?: StringNullableFilter<"EmailWhitelist"> | string | null
     createdAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
     updatedAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
   }
@@ -20378,6 +20356,7 @@ export namespace Prisma {
     email?: SortOrder
     role?: SortOrder
     permissions?: SortOrderInput | SortOrder
+    targetWorkspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -20390,6 +20369,7 @@ export namespace Prisma {
     NOT?: EmailWhitelistWhereInput | EmailWhitelistWhereInput[]
     role?: EnumRoleFilter<"EmailWhitelist"> | $Enums.Role
     permissions?: JsonNullableFilter<"EmailWhitelist">
+    targetWorkspaceId?: StringNullableFilter<"EmailWhitelist"> | string | null
     createdAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
     updatedAt?: DateTimeFilter<"EmailWhitelist"> | Date | string
   }, "id" | "email">
@@ -20399,6 +20379,7 @@ export namespace Prisma {
     email?: SortOrder
     role?: SortOrder
     permissions?: SortOrderInput | SortOrder
+    targetWorkspaceId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: EmailWhitelistCountOrderByAggregateInput
@@ -20414,6 +20395,7 @@ export namespace Prisma {
     email?: StringWithAggregatesFilter<"EmailWhitelist"> | string
     role?: EnumRoleWithAggregatesFilter<"EmailWhitelist"> | $Enums.Role
     permissions?: JsonNullableWithAggregatesFilter<"EmailWhitelist">
+    targetWorkspaceId?: StringNullableWithAggregatesFilter<"EmailWhitelist"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"EmailWhitelist"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"EmailWhitelist"> | Date | string
   }
@@ -20909,7 +20891,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -20929,7 +20910,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -20949,7 +20929,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -20969,7 +20948,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -20989,7 +20967,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -21005,7 +20982,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -21018,7 +20994,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -21135,7 +21110,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -21153,7 +21127,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -21171,7 +21144,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -21189,7 +21161,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -21207,7 +21178,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -21224,7 +21194,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -21240,7 +21209,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -21735,6 +21703,7 @@ export namespace Prisma {
     email: string
     role?: $Enums.Role
     permissions?: NullableJsonNullValueInput | InputJsonValue
+    targetWorkspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21744,6 +21713,7 @@ export namespace Prisma {
     email: string
     role?: $Enums.Role
     permissions?: NullableJsonNullValueInput | InputJsonValue
+    targetWorkspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21753,6 +21723,7 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
     permissions?: NullableJsonNullValueInput | InputJsonValue
+    targetWorkspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21762,6 +21733,7 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
     permissions?: NullableJsonNullValueInput | InputJsonValue
+    targetWorkspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21771,6 +21743,7 @@ export namespace Prisma {
     email: string
     role?: $Enums.Role
     permissions?: NullableJsonNullValueInput | InputJsonValue
+    targetWorkspaceId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21780,6 +21753,7 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
     permissions?: NullableJsonNullValueInput | InputJsonValue
+    targetWorkspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21789,6 +21763,7 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
     permissions?: NullableJsonNullValueInput | InputJsonValue
+    targetWorkspaceId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -22423,11 +22398,6 @@ export namespace Prisma {
     not?: NestedFloatFilter<$PrismaModel> | number
   }
 
-  export type BoolFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolFilter<$PrismaModel> | boolean
-  }
-
   export type IntFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -22437,6 +22407,11 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type BoolFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
   export type BrushOrderItemListRelationFilter = {
@@ -22484,7 +22459,6 @@ export namespace Prisma {
     sku?: SortOrder
     name?: SortOrder
     costPrice?: SortOrder
-    hideCost?: SortOrder
     stock?: SortOrder
     image?: SortOrder
     isPublic?: SortOrder
@@ -22505,7 +22479,6 @@ export namespace Prisma {
     sku?: SortOrder
     name?: SortOrder
     costPrice?: SortOrder
-    hideCost?: SortOrder
     stock?: SortOrder
     image?: SortOrder
     isPublic?: SortOrder
@@ -22521,7 +22494,6 @@ export namespace Prisma {
     sku?: SortOrder
     name?: SortOrder
     costPrice?: SortOrder
-    hideCost?: SortOrder
     stock?: SortOrder
     image?: SortOrder
     isPublic?: SortOrder
@@ -22553,14 +22525,6 @@ export namespace Prisma {
     _max?: NestedFloatFilter<$PrismaModel>
   }
 
-  export type BoolWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBoolFilter<$PrismaModel>
-    _max?: NestedBoolFilter<$PrismaModel>
-  }
-
   export type IntWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -22575,6 +22539,14 @@ export namespace Prisma {
     _sum?: NestedIntFilter<$PrismaModel>
     _min?: NestedIntFilter<$PrismaModel>
     _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type BoolWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBoolFilter<$PrismaModel>
+    _max?: NestedBoolFilter<$PrismaModel>
   }
 
   export type SupplierCodeWorkspaceIdCompoundUniqueInput = {
@@ -22651,7 +22623,6 @@ export namespace Prisma {
     date?: SortOrder
     shippingFees?: SortOrder
     extraFees?: SortOrder
-    paymentVoucher?: SortOrder
     paymentVouchers?: SortOrder
     trackingData?: SortOrder
     note?: SortOrder
@@ -22674,7 +22645,6 @@ export namespace Prisma {
     date?: SortOrder
     shippingFees?: SortOrder
     extraFees?: SortOrder
-    paymentVoucher?: SortOrder
     note?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
@@ -22689,7 +22659,6 @@ export namespace Prisma {
     date?: SortOrder
     shippingFees?: SortOrder
     extraFees?: SortOrder
-    paymentVoucher?: SortOrder
     note?: SortOrder
     workspaceId?: SortOrder
     createdAt?: SortOrder
@@ -23067,6 +23036,7 @@ export namespace Prisma {
     email?: SortOrder
     role?: SortOrder
     permissions?: SortOrder
+    targetWorkspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -23075,6 +23045,7 @@ export namespace Prisma {
     id?: SortOrder
     email?: SortOrder
     role?: SortOrder
+    targetWorkspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -23083,6 +23054,7 @@ export namespace Prisma {
     id?: SortOrder
     email?: SortOrder
     role?: SortOrder
+    targetWorkspaceId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -23893,16 +23865,16 @@ export namespace Prisma {
     divide?: number
   }
 
-  export type BoolFieldUpdateOperationsInput = {
-    set?: boolean
-  }
-
   export type IntFieldUpdateOperationsInput = {
     set?: number
     increment?: number
     decrement?: number
     multiply?: number
     divide?: number
+  }
+
+  export type BoolFieldUpdateOperationsInput = {
+    set?: boolean
   }
 
   export type BrushOrderItemUpdateManyWithoutProductNestedInput = {
@@ -24695,14 +24667,6 @@ export namespace Prisma {
     _max?: NestedFloatFilter<$PrismaModel>
   }
 
-  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBoolFilter<$PrismaModel>
-    _max?: NestedBoolFilter<$PrismaModel>
-  }
-
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -24717,6 +24681,14 @@ export namespace Prisma {
     _sum?: NestedIntFilter<$PrismaModel>
     _min?: NestedIntFilter<$PrismaModel>
     _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBoolFilter<$PrismaModel>
+    _max?: NestedBoolFilter<$PrismaModel>
   }
   export type NestedJsonNullableFilter<$PrismaModel = never> = 
     | PatchUndefined<
@@ -25005,7 +24977,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -25024,7 +24995,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -25056,7 +25026,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -25073,7 +25042,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -25419,7 +25387,6 @@ export namespace Prisma {
     sku?: StringNullableFilter<"Product"> | string | null
     name?: StringFilter<"Product"> | string
     costPrice?: FloatFilter<"Product"> | number
-    hideCost?: BoolFilter<"Product"> | boolean
     stock?: IntFilter<"Product"> | number
     image?: StringNullableFilter<"Product"> | string | null
     isPublic?: BoolFilter<"Product"> | boolean
@@ -25457,7 +25424,6 @@ export namespace Prisma {
     date?: DateTimeFilter<"PurchaseOrder"> | Date | string
     shippingFees?: FloatFilter<"PurchaseOrder"> | number
     extraFees?: FloatFilter<"PurchaseOrder"> | number
-    paymentVoucher?: StringNullableFilter<"PurchaseOrder"> | string | null
     paymentVouchers?: JsonNullableFilter<"PurchaseOrder">
     trackingData?: JsonNullableFilter<"PurchaseOrder">
     note?: StringNullableFilter<"PurchaseOrder"> | string | null
@@ -25646,7 +25612,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -25665,7 +25630,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -26179,7 +26143,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -26198,7 +26161,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -26507,7 +26469,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -26526,7 +26487,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -26553,7 +26513,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -26570,7 +26529,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -26633,7 +26591,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -26652,7 +26609,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -26685,7 +26641,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -26702,7 +26657,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -26906,7 +26860,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -26925,7 +26878,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -26993,7 +26945,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -27012,7 +26963,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -27031,7 +26981,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -27050,7 +26999,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -27124,7 +27072,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -27143,7 +27090,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -27704,7 +27650,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -27723,7 +27668,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -27799,7 +27743,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -27818,7 +27761,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -27893,7 +27835,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -27911,7 +27852,6 @@ export namespace Prisma {
     date?: Date | string
     shippingFees?: number
     extraFees?: number
-    paymentVoucher?: string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: string | null
@@ -28139,7 +28079,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28158,7 +28097,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28177,7 +28115,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28195,7 +28132,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28212,7 +28148,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28229,7 +28164,6 @@ export namespace Prisma {
     date?: DateTimeFieldUpdateOperationsInput | Date | string
     shippingFees?: FloatFieldUpdateOperationsInput | number
     extraFees?: FloatFieldUpdateOperationsInput | number
-    paymentVoucher?: NullableStringFieldUpdateOperationsInput | string | null
     paymentVouchers?: NullableJsonNullValueInput | InputJsonValue
     trackingData?: NullableJsonNullValueInput | InputJsonValue
     note?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28371,7 +28305,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -28386,7 +28319,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28405,7 +28337,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28424,7 +28355,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28587,7 +28517,6 @@ export namespace Prisma {
     sku?: string | null
     name: string
     costPrice?: number
-    hideCost?: boolean
     stock?: number
     image?: string | null
     isPublic?: boolean
@@ -28613,7 +28542,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28632,7 +28560,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean
@@ -28651,7 +28578,6 @@ export namespace Prisma {
     sku?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
     costPrice?: FloatFieldUpdateOperationsInput | number
-    hideCost?: BoolFieldUpdateOperationsInput | boolean
     stock?: IntFieldUpdateOperationsInput | number
     image?: NullableStringFieldUpdateOperationsInput | string | null
     isPublic?: BoolFieldUpdateOperationsInput | boolean

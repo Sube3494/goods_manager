@@ -23,10 +23,9 @@ export interface Product {
   costPrice: number;
   stock: number;
   image?: string;
+  isPublic?: boolean;
   supplierId?: string;
   supplier?: Supplier;
-  isPublic?: boolean;
-  hideCost?: boolean;
   workspaceId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -53,7 +52,6 @@ export interface PurchaseOrder {
   shippingFees: number;
   extraFees: number;
   workspaceId?: string;
-  paymentVoucher?: string;
   paymentVouchers?: string[];
   trackingData?: TrackingInfo[];
   createdAt?: string;

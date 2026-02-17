@@ -56,7 +56,7 @@ export async function PUT(
         categoryId,
         supplierId,
         image,
-        isPublic,
+        isPublic
       }
     });
 

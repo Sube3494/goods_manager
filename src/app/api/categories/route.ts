@@ -10,13 +10,8 @@ export async function GET() {
   try {
     const categories = await prisma.category.findMany({
       where: session ? {
-        OR: [
-          { workspaceId },
-          { products: { some: { isPublic: true } } }
-        ]
-      } : { 
-        products: { some: { isPublic: true } } 
-      },
+        workspaceId
+      } : {},
       include: {
         _count: {
           select: { products: true }

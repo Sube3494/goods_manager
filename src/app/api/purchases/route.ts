@@ -90,7 +90,6 @@ export async function POST(request: Request) {
       shippingFees, 
       extraFees,
       trackingData,
-      paymentVoucher,
       paymentVouchers
     } = body;
 
@@ -111,7 +110,6 @@ export async function POST(request: Request) {
         totalAmount: Number(totalAmount) || 0,
         shippingFees: Number(shippingFees) || 0,
         extraFees: Number(extraFees) || 0,
-        paymentVoucher: paymentVoucher || null,
         paymentVouchers: paymentVouchers || [],
         trackingData: trackingData || [],
         workspaceId: session.workspaceId,

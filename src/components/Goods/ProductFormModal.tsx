@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { Switch } from "@/components/ui/Switch";
 import Link from "next/link";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -15,6 +16,7 @@ import { useToast } from "@/components/ui/Toast";
 import { CategoryModal } from "@/components/Categories/CategoryModal";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
 
+import { useUser } from "@/hooks/useUser";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -30,6 +32,7 @@ interface ProductFormModalProps {
 import { createPortal } from "react-dom";
 
 export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: ProductFormModalProps) {
+  const { user } = useUser();
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
     categoryId: initialData?.categoryId || "",
@@ -38,7 +41,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     image: initialData?.image || "",
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
-    hideCost: initialData?.hideCost ?? false
+    isPublic: initialData?.isPublic ?? true
   });
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -69,6 +72,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   // 批量管理状态 (Batch manage state)
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const enterBatchMode = () => {
     setIsBatchMode(true);
@@ -164,7 +168,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: initialData.categoryId || "",
           supplierId: initialData.supplierId || "",
           image: initialData.image || "",
-          hideCost: initialData.hideCost ?? false,
+          isPublic: initialData.isPublic ?? true
         });
         fetchGallery(initialData.id);
       } else {
@@ -176,7 +180,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: "",
           supplierId: "",
           image: "",
-          hideCost: false,
+          isPublic: true
         });
       }
     }
@@ -296,8 +300,35 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     } finally {
       setIsUploading(false);
       // 重置 input 以允许再次选择相同文件
-      e.target.value = "";
+      if (e.target) e.target.value = "";
     }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    
+    if (isUploading) return;
+    
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    // Simulate the change event for handleFileUpload
+    const mockEvent = {
+        target: { files, value: "" }
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
+    
+    await handleFileUpload(mockEvent);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isUploading) setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
   };
 
   const setAsMainImage = (url: string) => {
@@ -746,61 +777,88 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
                     {/* Real Photos Management */}
                     <div className="space-y-4 pt-4 border-t border-border/50">
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm font-bold text-foreground flex items-center gap-2">
-                                <Camera size={18} className="text-primary" /> 实拍相册管理
-                            </label>
-                            {initialData?.id && (
-                                <div className="flex items-center gap-4">
-                                    {isBatchMode ? (
-                                        <div className="flex items-center gap-3">
-                                            <button 
-                                                type="button"
-                                                onClick={toggleSelectAll}
-                                                className="text-[11px] font-semibold text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-tighter"
-                                            >
-                                                {selectedIds.size === galleryImages.length + (formData.image && !galleryImages.find(i => i.url === formData.image) ? 1 : 0) ? "全不选" : "全选"}
-                                            </button>
-                                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-tight border-l border-white/10 pl-3">已选 {selectedIds.size} 项</span>
-                                            <button 
-                                                type="button"
-                                                onClick={handleBatchDelete}
-                                                disabled={selectedIds.size === 0}
-                                                className="text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-30 flex items-center gap-1 uppercase tracking-tighter"
-                                            >
-                                                删除选中
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                onClick={() => {
-                                                    setIsBatchMode(false);
-                                                    setSelectedIds(new Set());
-                                                }}
-                                                className="text-[11px] font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1 uppercase tracking-tighter"
-                                            >
-                                                取消
-                                            </button>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                <label className="text-sm font-bold text-foreground flex items-center gap-2 whitespace-nowrap">
+                                    <Camera size={18} className="text-primary shrink-0" /> <span className="hidden xs:inline">实拍</span>相册管理
+                                </label>
+
+                                {/* Inline Visibility Toggle for Admin */}
+                                {user?.role === "SUPER_ADMIN" && (
+                                    <div className={cn(
+                                        "flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full transition-all border scale-[0.9] sm:scale-100 origin-left",
+                                        formData.isPublic 
+                                            ? "bg-emerald-500/5 text-emerald-600 border-emerald-500/20" 
+                                            : "bg-amber-500/5 text-amber-600 border-amber-500/20"
+                                    )}>
+                                        {formData.isPublic ? <Eye size={10} /> : <EyeOff size={10} />}
+                                        <span className="text-[9px] font-bold whitespace-nowrap uppercase tracking-wider">
+                                            {formData.isPublic ? "公开" : "私密"}
+                                        </span>
+                                        <div className="scale-[0.6] sm:scale-[0.65] origin-right ml-[-2px]">
+                                            <Switch 
+                                                checked={formData.isPublic} 
+                                                onChange={(val) => setFormData(prev => ({ ...prev, isPublic: val }))} 
+                                            />
                                         </div>
-                                    ) : (
-                                        <>
-                                            <button 
-                                                type="button"
-                                                onClick={enterBatchMode}
-                                                className="text-[11px] font-semibold text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-tighter"
-                                            >
-                                                批量管理
-                                            </button>
-                                            <Link 
-                                                href={`/gallery?productId=${initialData.id}`}
-                                                className="text-[11px] font-semibold text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-tighter border-l border-white/10 pl-4"
-                                            >
-                                                管理全部实拍 <ExternalLink size={10} />
-                                            </Link>
-                                        </>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                                {initialData?.id && (
+                                    <>
+                                        {isBatchMode ? (
+                                            <div className="flex items-center gap-3 whitespace-nowrap">
+                                                <button 
+                                                    type="button"
+                                                    onClick={toggleSelectAll}
+                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter"
+                                                >
+                                                    {selectedIds.size === galleryImages.length + (formData.image && !galleryImages.find(i => i.url === formData.image) ? 1 : 0) ? "全不选" : "全选"}
+                                                </button>
+                                                <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-tight border-l border-white/10 pl-3">已选 {selectedIds.size}</span>
+                                                <button 
+                                                    type="button"
+                                                    onClick={handleBatchDelete}
+                                                    disabled={selectedIds.size === 0}
+                                                    className="text-[10px] sm:text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-30 uppercase tracking-tighter"
+                                                >
+                                                    删除
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsBatchMode(false);
+                                                        setSelectedIds(new Set());
+                                                    }}
+                                                    className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground hover:text-foreground uppercase tracking-tighter"
+                                                >
+                                                    取消
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-3 sm:gap-4 whitespace-nowrap">
+                                                <button 
+                                                    type="button"
+                                                    onClick={enterBatchMode}
+                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter"
+                                                >
+                                                    批量管理
+                                                </button>
+                                                <Link 
+                                                    href={`/gallery?productId=${initialData.id}`}
+                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-tighter border-l border-white/10 pl-3 sm:pl-4"
+                                                >
+                                                    全部实拍 <ExternalLink size={10} />
+                                                </Link>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         </div>
+                    </div>
                         
                         <motion.div layout className="grid grid-cols-4 gap-3">
                             <AnimatePresence mode="popLayout">
@@ -929,7 +987,17 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         exit={{ opacity: 0, scale: 0.8 }}
                                         className="h-full"
                                     >
-                                        <label className="aspect-square rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-inner transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer h-full">
+                                        <label 
+                                            onDragOver={handleDragOver}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={handleDrop}
+                                            className={cn(
+                                                "aspect-square rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer h-full",
+                                                isDraggingOver 
+                                                    ? "border-primary bg-primary/10 shadow-lg scale-[1.02]" 
+                                                    : "border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-inner"
+                                            )}
+                                        >
                                             <input 
                                                 type="file" 
                                                 className="hidden" 
@@ -938,22 +1006,31 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 onChange={(e) => handleFileUpload(e)}
                                                 disabled={isUploading}
                                             />
-                                            <div className="p-3 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
-                                                <Plus size={24} className={cn("text-muted-foreground group-hover:text-primary transition-all duration-300 group-hover:rotate-90", isUploading && "animate-spin")} />
+                                            <div className={cn(
+                                                "p-3 rounded-full transition-colors",
+                                                isDraggingOver ? "bg-primary/20" : "bg-muted group-hover:bg-primary/10"
+                                            )}>
+                                                <Plus size={24} className={cn(
+                                                    "transition-all duration-300", 
+                                                    isDraggingOver ? "text-primary scale-110" : "text-muted-foreground group-hover:text-primary group-hover:rotate-90",
+                                                    isUploading && "animate-spin"
+                                                )} />
                                             </div>
-                                            <span className="hidden sm:block text-[11px] font-medium text-muted-foreground group-hover:text-primary tracking-tighter uppercase text-center px-2">
-                                                {isUploading ? "正在上传..." : "添加实拍"}
+                                            <span className={cn(
+                                                "hidden sm:block text-[11px] font-medium tracking-tighter uppercase text-center px-2 transition-colors",
+                                                isDraggingOver ? "text-primary font-bold" : "text-muted-foreground group-hover:text-primary"
+                                            )}>
+                                                {isUploading ? "正在上传..." : (isDraggingOver ? "松开即可上传" : "添加或拖入实拍")}
                                             </span>
+                                            {isDraggingOver && (
+                                                <div className="absolute inset-0 pointer-events-none border-2 border-primary rounded-2xl animate-pulse" />
+                                            )}
                                         </label>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
                         </motion.div>
-
                     </div>
-
-
-                </div>
 
                 <div className="flex justify-end gap-4 border-t border-white/10 p-8 shrink-0">
                     <button

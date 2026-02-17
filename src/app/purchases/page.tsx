@@ -79,7 +79,6 @@ function PurchasesContent() {
     purchaseId: null,
     initialValue: [],
     paymentVouchers: [],
-    paymentVoucher: undefined,
     lockPackages: false,
     mode: "all",
   });
@@ -533,7 +532,7 @@ function PurchasesContent() {
                                     const tracking = po.trackingData || [];
                                     const hasTracking = tracking.length > 0;
                                     const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
-                                    const hasPayment = po.paymentVoucher || (po.paymentVouchers && po.paymentVouchers.length > 0);
+                                    const hasPayment = po.paymentVouchers && po.paymentVouchers.length > 0;
                                     
                                     if (!(hasTracking && hasAllWaybills && hasPayment)) {
                                         let label = "补全资料";
@@ -767,7 +766,7 @@ function PurchasesContent() {
                                 const tracking = po.trackingData || [];
                                 const hasTracking = tracking.length > 0;
                                 const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
-                                const hasPayment = po.paymentVoucher || (po.paymentVouchers && po.paymentVouchers.length > 0);
+                                const hasPayment = po.paymentVouchers && po.paymentVouchers.length > 0;
                                 
                                 if (!(hasTracking && hasAllWaybills && hasPayment)) {
                                     let label = "补全资料";
@@ -799,7 +798,6 @@ function PurchasesContent() {
                                                 isOpen: true,
                                                 purchaseId: po.id,
                                                 initialValue: po.trackingData || [],
-                                                paymentVoucher: po.paymentVoucher,
                                                 paymentVouchers: po.paymentVouchers || [],
                                                 lockPackages: false,
                                                 mode: mode as NonNullable<TrackingNumberModalProps['mode']>

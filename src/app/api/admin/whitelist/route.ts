@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { email, role, permissions } = await request.json();
+    const { email, role, permissions, targetWorkspaceId } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -64,11 +64,13 @@ export async function POST(request: Request) {
       update: {
         role: role || "USER",
         permissions: permissions || {},
+        targetWorkspaceId: targetWorkspaceId || null,
       },
       create: {
         email,
         role: role || "USER",
         permissions: permissions || {},
+        targetWorkspaceId: targetWorkspaceId || null,
       },
     });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Tag, Truck, CheckCircle } from "lucide-react";
+import { X, Tag, Truck, CheckCircle, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Category, Supplier } from "@/lib/types";
@@ -10,7 +10,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 interface BatchEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (data: { categoryId?: string; supplierId?: string }) => void;
+  onConfirm: (data: { categoryId?: string; supplierId?: string; isPublic?: boolean }) => void;
   categories: Category[];
   suppliers: Supplier[];
   selectedCount: number;
@@ -26,12 +26,14 @@ export function BatchEditModal({
 }: BatchEditModalProps) {
   const [categoryId, setCategoryId] = useState<string>("keep");
   const [supplierId, setSupplierId] = useState<string>("keep");
+  const [visibility, setVisibility] = useState<string>("keep");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data: { categoryId?: string; supplierId?: string } = {};
+    const data: { categoryId?: string; supplierId?: string; isPublic?: boolean } = {};
     if (categoryId !== "keep") data.categoryId = categoryId;
     if (supplierId !== "keep") data.supplierId = supplierId;
+    if (visibility !== "keep") data.isPublic = visibility === "public";
     
     onConfirm(data);
     onClose();
@@ -101,6 +103,23 @@ export function BatchEditModal({
               />
             </div>
 
+            {/* Visibility Select */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Eye size={16} /> 可见性
+              </label>
+              <CustomSelect
+                value={visibility}
+                onChange={setVisibility}
+                options={[
+                  { value: "keep", label: "保持当前状态" },
+                  { value: "public", label: "设为公开可见" },
+                  { value: "private", label: "设为隐藏不公开" }
+                ]}
+                triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
+              />
+            </div>
+
             <div className="pt-4 flex gap-3">
               <button
                 type="button"
@@ -111,7 +130,7 @@ export function BatchEditModal({
               </button>
               <button
                 type="submit"
-                disabled={categoryId === "keep" && supplierId === "keep"}
+                disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep"}
                 className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
               >
                 <CheckCircle size={18} />
