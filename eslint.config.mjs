@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-07 00:08:33
+ * @Author: Sube
+ * @FilePath: eslint.config.mjs
+ * @LastEditTime: 2026-02-16 22:03:56
+ * @Description: 
+ */
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";

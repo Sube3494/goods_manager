@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/data-processing
 
 # next.js
 /.next/

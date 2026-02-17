@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-16 21:45:58
+ * @Author: Sube
+ * @FilePath: proxy.ts
+ * @LastEditTime: 2026-02-16 22:01:16
+ * @Description: 
+ */
 
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
