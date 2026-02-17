@@ -201,11 +201,21 @@ function GalleryContent() {
 
   // Scroll listener for Back to Top button
   useEffect(() => {
-    const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 400);
+    const handleScroll = (e: Event) => {
+      const target = e.target;
+      let st = 0;
+      
+      if (target === document || target === window) {
+        st = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      } else if (target instanceof HTMLElement) {
+        st = target.scrollTop;
+      }
+        
+      setShowBackToTop(st > 10);
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
   }, []);
   const { showToast } = useToast();
   const canUpload = isAdmin ? hasPermission(user as SessionUser | null, "gallery:upload") : isUploadAllowed;
@@ -1519,20 +1529,26 @@ function GalleryContent() {
     )}
 
     {/* Back to Top Button */}
-    <AnimatePresence>
-      {showBackToTop && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.5, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.5, y: 20 }}
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-6 right-6 sm:bottom-10 sm:right-10 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-2xl shadow-primary/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-          title="返回顶部"
-        >
-          <ArrowUp size={24} strokeWidth={3} />
-        </motion.button>
-      )}
-    </AnimatePresence>
+    {typeof document !== "undefined" && createPortal(
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.5, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 20 }}
+            onClick={() => {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+                document.body.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"
+          >
+            <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
+          </motion.button>
+        )}
+      </AnimatePresence>,
+      document.body
+    )}
 
     </div>
   );

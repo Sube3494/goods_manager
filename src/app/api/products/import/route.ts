@@ -90,6 +90,21 @@ export async function POST(request: Request) {
                         } catch { }
                     }
                     updateData.image = finalImage;
+
+                    // Sync to Gallery
+                    const existingGallery = await prisma.galleryItem.findFirst({
+                        where: { productId: product.id, url: finalImage }
+                    });
+                    if (!existingGallery) {
+                        await prisma.galleryItem.create({
+                            data: {
+                                url: finalImage,
+                                productId: product.id,
+                                workspaceId,
+                                isPublic: true
+                            }
+                        });
+                    }
                 }
 
                 await prisma.product.update({
@@ -162,6 +177,18 @@ export async function POST(request: Request) {
                         isPublic: true
                     }
                 });
+
+                // Automatically create gallery item for new product if image exists
+                if (finalImage) {
+                    await prisma.galleryItem.create({
+                        data: {
+                            url: finalImage,
+                            productId: newProduct.id,
+                            workspaceId,
+                            isPublic: true
+                        }
+                    });
+                }
 
                 if (quantity > 0) {
                     importedItems.push({
