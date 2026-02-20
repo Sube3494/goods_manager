@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Settings2, Loader2, Save, User as UserIcon, Mail, Plus, Trash2, AlertCircle, CheckCircle, X, LayoutGrid } from "lucide-react";
+import { Shield, Settings2, Loader2, Save, User as UserIcon, Mail, Plus, Trash2, AlertCircle, CheckCircle, X } from "lucide-react";
 import { clsx } from "clsx";
 import { motion } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";

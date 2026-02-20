@@ -14,12 +14,16 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useUser();
 
   const isAuthorized = useMemo(() => {
-    if (isLoading) return null;
-    
-    // Auto-allow static verification files at root
-    if (pathname.endsWith('.txt')) {
+    // 1. Instant allow for public entry points to prevent flickering while loading user session
+    const publicPaths = ["/login", "/gallery"];
+    const isPublicPath = publicPaths.some(p => pathname === p || pathname.startsWith(p + "/"));
+    const isStaticFile = pathname.endsWith('.txt');
+
+    if (isPublicPath || isStaticFile) {
         return true;
     }
+
+    if (isLoading) return null;
 
     // Check if the current path is in navItems and requires permission
     // Sort by path length descending to ensure the most specific match is found first
