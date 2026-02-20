@@ -370,29 +370,52 @@ export default function GoodsPage() {
   // No local sorting needed anymore, we trust server-side globally-sorted pagination
   const filteredGoods = items;
 
-  const handleExport = useCallback(() => {
-    if (filteredGoods.length === 0) {
-      showToast("没有可导出的商品", "error");
-      return;
+  const handleExport = useCallback(async () => {
+    showToast("正在准备导出数据...", "info");
+    try {
+      // 使用与当前筛选一致的参数，但 pageSize 设为极大值以获取全部数据
+      const queryParams = new URLSearchParams({
+        page: "1",
+        pageSize: "99999",
+        search: debouncedSearch,
+        category: selectedCategory,
+        status: selectedStatus,
+        sortBy: sortBy,
+      });
+
+      const res = await fetch(`/api/products?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Export fetch failed");
+
+      const data = await res.json();
+      const allGoods: Product[] = data.items || [];
+
+      if (allGoods.length === 0) {
+        showToast("没有可导出的商品", "error");
+        return;
+      }
+
+      const exportData = allGoods.map(g => ({
+        "商品名称": g.name,
+        "SKU/店内码": g.sku || "",
+        "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
+        "进货单价": g.costPrice,
+        "当前库存": g.stock,
+        "供应商": g.supplier?.name || "未知供应商",
+        "商品图片": g.image || "暂无图片",
+        "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "商品列表");
+      XLSX.writeFile(workbook, `商品库导出_${new Date().toISOString().split('T')[0]}.xlsx`);
+      showToast(`已导出 ${allGoods.length} 条商品数据`, "success");
+    } catch (error) {
+      console.error("Export failed:", error);
+      showToast("导出失败，请重试", "error");
     }
+  }, [debouncedSearch, selectedCategory, selectedStatus, sortBy, showToast]);
 
-    const exportData = filteredGoods.map(g => ({
-      "商品名称": g.name,
-      "SKU/店内码": g.sku || "",
-      "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
-      "进货单价": g.costPrice,
-      "当前库存": g.stock,
-      "供应商": g.supplier?.name || "未知供应商",
-      "商品图片": g.image || "暂无图片",
-      "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "商品列表");
-    XLSX.writeFile(workbook, `商品库导出_${new Date().toISOString().split('T')[0]}.xlsx`);
-    showToast("已开始下载 Excel 文件", "success");
-  }, [filteredGoods, showToast]);
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
     if (!Array.isArray(data)) return;

@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goods-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      # 本地存储模式下的上传文件持久化（使用 MinIO 则可移除）
+      - uploads_data:/app/public/uploads
+
+volumes:
+  uploads_data:

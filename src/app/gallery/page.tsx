@@ -658,7 +658,7 @@ function GalleryContent() {
           if (a.url === mainUrl) return -1;
           if (b.url === mainUrl) return 1;
       }
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
   }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 
