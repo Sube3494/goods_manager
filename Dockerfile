@@ -50,6 +50,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Prisma Client（自定义输出路径：prisma/generated-client）
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/pg ./node_modules/pg
+COPY --from=builder /app/node_modules/pg-connection-string ./node_modules/pg-connection-string
+
+# Prisma CLI（用于启动时自动执行 migrate deploy）
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+
+# 自动建库脚本
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 # 上传文件持久化目录
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
@@ -60,4 +69,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+# 启动时自动执行数据库迁移，再启动应用
+# 启动顺序：自动建库 → 数据库迁移 → 启动应用
+CMD ["sh", "-c", "node scripts/init-db.cjs && node node_modules/prisma/build/index.js migrate deploy && node server.js"]

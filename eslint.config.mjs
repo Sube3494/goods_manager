@@ -19,6 +19,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Docker 启动脚本，无需 ESLint 检查
+    "scripts/**",
   ]),
 ]);
 
