@@ -1,0 +1,26 @@
+# 依赖与构建产物（Docker 镜像内重新安装）
+node_modules
+.next
+.pnpm-store
+
+# 本地环境与敏感信息
+.env
+.env.local
+.env.*.local
+
+# 开发工具
+.git
+.gitignore
+.vscode
+.idea
+*.md
+
+# 数据与临时文件
+/public/uploads/*
+data-processing
+/prisma/*.db
+/prisma/*.db-journal
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+.pnpm-debug.log*
