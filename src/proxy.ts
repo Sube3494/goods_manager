@@ -75,6 +75,6 @@ export const config = {
      * - images/ (public images if any)
      * - uploads/ (uploaded content)
      */
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|uploads).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|uploads|.*\\.txt$).*)",
   ],
 };
