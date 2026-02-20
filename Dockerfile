@@ -51,7 +51,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/pg ./node_modules/pg
-COPY --from=builder /app/node_modules/pg-connection-string ./node_modules/pg-connection-string
 
 # Prisma CLI（用于启动时自动执行 migrate deploy）
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
