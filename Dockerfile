@@ -54,6 +54,7 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Prisma CLI（用于启动时自动执行 migrate deploy）
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
 COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
 # 自动建库脚本（shell 脚本，不依赖 npm 包）
