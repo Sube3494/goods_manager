@@ -36,7 +36,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [isZoomed, setIsZoomed] = useState(false);
 
-    const softSpringConfig = { stiffness: 300, damping: 30, mass: 0.5 };
+    const softSpringConfig = { stiffness: 180, damping: 20, mass: 0.4 };
     const hardSpringConfig = { stiffness: 5000, damping: 200, mass: 0.05 };
 
     const smoothScale = useSpring(scaleValue, softSpringConfig);
@@ -102,7 +102,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
         setIsDragging(false);
         if (scaleValue.get() <= 1) {
             const currentX = xValue.get();
-            const threshold = 80;
+            const threshold = 50;
             if (currentX > threshold) {
                 onNavigate(-1);
             } else if (currentX < -threshold) {
@@ -605,7 +605,13 @@ function GalleryContent() {
   }, [filteredItems]);
 
   const handleOpenProductPreview = (group: { product: Product; items: GalleryItem[] }) => {
-    const firstItem = group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) || group.items[0];
+    // Prefer the product's main image item; fall back to first non-video, then first item
+    const mainImageItem = group.product.image
+      ? group.items.find(item => item.url === group.product.image)
+      : null;
+    const firstItem = mainImageItem ||
+      group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) ||
+      group.items[0];
     if (firstItem) {
       setSelectedImage(firstItem);
     }
@@ -640,11 +646,19 @@ function GalleryContent() {
   };
 
 
-  // Navigation logic
+  // Navigation logic: match the same order as ProductFormModal gallery
+  // (main cover image first, then by createdAt ascending)
   const relatedImages = selectedImage ? items.filter(img => {
       const isCorrectProduct = img.productId === selectedImage.productId;
       const isVisible = isAdmin || img.isPublic;
       return isCorrectProduct && isVisible;
+  }).sort((a, b) => {
+      const mainUrl = selectedImage.product?.image;
+      if (mainUrl) {
+          if (a.url === mainUrl) return -1;
+          if (b.url === mainUrl) return 1;
+      }
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 
