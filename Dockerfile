@@ -32,8 +32,8 @@ RUN pnpm build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Prisma 在 Alpine 上需要 openssl；Next.js standalone 推荐 libc6-compat
-RUN apk add --no-cache openssl libc6-compat
+# Prisma 在 Alpine 上需要 openssl；postgresql-client 提供 psql 用于自动建库
+RUN apk add --no-cache openssl libc6-compat postgresql-client
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -50,14 +50,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Prisma Client（自定义输出路径：prisma/generated-client）
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/pg ./node_modules/pg
+
 
 # Prisma CLI（用于启动时自动执行 migrate deploy）
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
-# 自动建库脚本
-COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+# 自动建库脚本（shell 脚本，不依赖 npm 包）
+COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
 
 # 上传文件持久化目录
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
@@ -70,4 +70,4 @@ ENV HOSTNAME="0.0.0.0"
 
 # 启动时自动执行数据库迁移，再启动应用
 # 启动顺序：自动建库 → 数据库迁移 → 启动应用
-CMD ["sh", "-c", "node scripts/init-db.cjs && node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+CMD ["sh", "-c", "sh scripts/init-db.sh && node node_modules/prisma/build/index.js migrate deploy && node server.js"]
