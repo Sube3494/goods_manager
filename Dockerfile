@@ -31,6 +31,9 @@ RUN pnpm build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+# Prisma 在 Alpine 上需要 openssl；Next.js standalone 推荐 libc6-compat
+RUN apk add --no-cache openssl libc6-compat
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
