@@ -46,10 +46,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma Client（运行时需要）
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Prisma Client（自定义输出路径：prisma/generated-client）
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/prisma ./prisma
 
 # 上传文件持久化目录
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
