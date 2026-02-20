@@ -118,16 +118,21 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
             custom={direction}
             variants={{
                 enter: (dir: number) => ({
-                    x: dir === 0 ? 0 : (dir > 0 ? "100%" : "-100%"),
-                    opacity: 1,
-                    scale: 1,
+                    x: dir === 0 ? 0 : (dir > 0 ? 500 : -500),
+                    opacity: 0,
+                    scale: 0.95,
                     zIndex: 1
                 }),
-                center: { x: 0, opacity: 1, scale: 1, zIndex: 10 },
+                center: { 
+                    x: 0, 
+                    opacity: 1, 
+                    scale: 1, 
+                    zIndex: 10 
+                },
                 exit: (dir: number) => ({
-                    x: dir === 0 ? 0 : (dir < 0 ? "100%" : "-100%"),
-                    opacity: 1,
-                    scale: 1,
+                    x: dir === 0 ? 0 : (dir < 0 ? 500 : -500),
+                    opacity: 0,
+                    scale: 0.95,
                     zIndex: 1
                 })
             }}
@@ -135,8 +140,9 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
             animate="center"
             exit="exit"
             transition={{ 
-                x: { type: "spring", stiffness: 400, damping: 40, mass: 1 },
-                opacity: { duration: 0.25 }
+                x: { type: "spring", stiffness: 350, damping: 35 },
+                opacity: { duration: 0.2 },
+                scale: { duration: 0.2 }
             }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
@@ -835,6 +841,16 @@ function GalleryContent() {
                     <div className="w-2.5 h-2.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
                     <div className="w-2.5 h-2.5 bg-primary/80 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
                 </div>
+            </div>
+        )}
+
+        {/* Load Complete State */}
+        {!hasMore && !isLoading && !isNextPageLoading && items.length > 0 && (
+            <div className="py-12 w-full flex flex-col items-center justify-center animate-in fade-in duration-1000">
+                <div className="h-px w-12 bg-linear-to-r from-transparent via-border to-transparent mb-4" />
+                <p className="text-xs sm:text-sm text-muted-foreground/50 font-medium tracking-widest uppercase italic">
+                    —— 已显示全部内容 ——
+                </p>
             </div>
         )}
 

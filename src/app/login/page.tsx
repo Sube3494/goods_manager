@@ -122,7 +122,7 @@ export default function LoginPage() {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.5, duration: 0.4 }}
-        className="absolute top-8 left-8 z-20"
+        className="absolute top-6 left-4 sm:top-8 sm:left-8 z-20"
       >
         <Link 
             href="/gallery" 
@@ -134,7 +134,7 @@ export default function LoginPage() {
       </motion.div>
 
       {/* Theme Toggle */}
-      <div className="absolute top-8 right-8 z-20">
+      <div className="absolute top-6 right-4 sm:top-8 sm:right-8 z-20">
         <ThemeToggle />
       </div>
 
