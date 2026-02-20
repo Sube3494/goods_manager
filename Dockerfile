@@ -6,7 +6,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile && pnpm store prune
+RUN pnpm install --frozen-lockfile && pnpm store prune && pnpm add sharp
 
 # ================================
 # Stage 2: 构建
