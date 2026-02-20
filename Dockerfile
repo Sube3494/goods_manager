@@ -12,7 +12,8 @@ RUN pnpm install --frozen-lockfile && pnpm store prune
 # Stage 2: 构建
 # ================================
 FROM node:20-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@latest --activate && \
+    apk add --no-cache openssl
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
