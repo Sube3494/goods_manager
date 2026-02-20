@@ -1262,7 +1262,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {selectedPreviewImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedPreviewImage.url) ? (
                         <video 
                             src={selectedPreviewImage.url} 
-                            className="max-w-[100%] max-h-[100%] object-contain rounded-2xl shadow-2xl"
+                            className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
                             controls
                             autoPlay
                         />
@@ -1271,7 +1271,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         <img 
                             src={selectedPreviewImage.url} 
                             alt="Preview" 
-                            className="max-w-[100%] max-h-[100%] object-contain rounded-2xl shadow-2xl"
+                            className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
                             draggable={false}
                         />
                     )}
