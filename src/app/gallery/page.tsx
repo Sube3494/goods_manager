@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
-import { Camera, ChevronRight, ArrowLeft, X, Download, Plus, CheckCircle, Package, Search, Check, PlayCircle, Info, ArrowUp, Trash2 } from "lucide-react";
+import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2 } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
-import { useSearchParams, useRouter } from "next/navigation";
 
 import { ActionBar } from "@/components/ui/ActionBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -184,16 +183,27 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
 function GalleryContent() {
   const { user } = useUser();
   const isAdmin = !!user;
-  const searchParams = useSearchParams();
-  const router = useRouter();  
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Pagination State
+  const [hasMore, setHasMore] = useState(true);
+  const [isNextPageLoading, setIsNextPageLoading] = useState(false);
+  const itemsRef = useRef<GalleryItem[]>([]);
+  const currentPageRef = useRef(1);
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isUploadAllowed, setIsUploadAllowed] = useState(false);
+
+  // Sync ref with items
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -281,53 +291,93 @@ function GalleryContent() {
   });
   const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<number[]>([]);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isFirstPage = true) => {
     try {
-      const productId = searchParams.get("productId");
-      const galleryUrl = productId ? `/api/gallery?productId=${productId}` : "/api/gallery";
+      const targetPage = isFirstPage ? 1 : currentPageRef.current + 1;
       
-      const [galleryRes, categoriesRes, productsRes] = await Promise.all([
+      if (isFirstPage && itemsRef.current.length === 0) {
+        setIsLoading(true);
+      } else if (!isFirstPage) {
+        setIsNextPageLoading(true);
+      }
+
+      const galleryUrl = `/api/gallery?page=${targetPage}&pageSize=20`;
+      
+      const [galleryRes, categoriesRes] = await Promise.all([
         fetch(galleryUrl),
-        fetch("/api/categories"),
-        fetch("/api/products")
+        fetch("/api/categories") // We fetch categories again but we only strictly need them on first load, keeping to minimize changes
       ]);
 
-      if (galleryRes.ok && categoriesRes.ok && productsRes.ok) {
-        const galleryData = await galleryRes.json();
+      if (galleryRes.ok && categoriesRes.ok) {
+        const galleryResponse = await galleryRes.json();
+        const galleryData = galleryResponse.items || [];
         const categoriesData = await categoriesRes.json();
-        const productsData = await productsRes.json();
         
-        // Handle both Array and Paginated Object responses
-        const productsArray = Array.isArray(productsData) ? productsData : (productsData.items || []);
-        
-        const sortedGalleryData = galleryData.sort((a: GalleryItem, b: GalleryItem) => {
-          const productA = productsArray.find((p: Product) => p.id === a.productId);
-          const productB = productsArray.find((p: Product) => p.id === b.productId);
-          
-          const isACover = productA?.image === a.url;
-          const isBCover = productB?.image === b.url;
-          
-          if (isACover && !isBCover) return -1;
-          if (!isACover && isBCover) return 1;
-          
-          const dateA = a.createdAt || a.uploadDate || new Date(0).toISOString();
-          const dateB = b.createdAt || b.uploadDate || new Date(0).toISOString();
-          return new Date(dateA).getTime() - new Date(dateB).getTime();
+        // Extract products directly from gallery items (they are populated by Prisma include)
+        const uniqueProductsMap = new Map<string, Product>();
+        galleryData.forEach((item: GalleryItem) => {
+          if (item.product && item.productId && !uniqueProductsMap.has(item.productId)) {
+            uniqueProductsMap.set(item.productId, item.product);
+          }
         });
+        const productsArray = Array.from(uniqueProductsMap.values());
         
-        setItems(sortedGalleryData);
+        if (isFirstPage) {
+            setItems(galleryData);
+        } else {
+            setItems(prev => {
+                const existingIds = new Set(prev.map(i => i.id));
+                const newItems = galleryData.filter((i: GalleryItem) => !existingIds.has(i.id));
+                return [...prev, ...newItems];
+            });
+        }
+        
+        currentPageRef.current = targetPage;
+        setHasMore(galleryResponse.hasMore ?? false);
+        
+        // Update auxiliary state
         setCategories(categoriesData);
-        setProducts(productsArray);
+        
+        // Append unique products to the unified store
+        setProducts(prev => {
+            const existingProductIds = new Set(prev.map(p => p.id));
+            const newProducts = productsArray.filter(p => !existingProductIds.has(p.id));
+            return [...prev, ...newProducts];
+        });
       }
     } catch (error) {
       console.error("Gallery fetch failed:", error);
+    } finally {
+      setIsLoading(false);
+      setIsNextPageLoading(false);
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     setMounted(true);
-    fetchData();
+    fetchData(true);
   }, [fetchData]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    if (!hasMore || isLoading || isNextPageLoading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchData(false);
+        }
+      },
+      { rootMargin: "200px" } // Load a bit before reaching bottom
+    );
+
+    const target = document.querySelector("#gallery-scroll-anchor");
+    if (target) {
+      observer.observe(target);
+    }
+
+    return () => observer.disconnect();
+  }, [fetchData, hasMore, isLoading, isNextPageLoading]);
 
   useEffect(() => {
     if (selectedImage || isUploadModalOpen) {
@@ -475,7 +525,7 @@ function GalleryContent() {
 
       if (res.ok) {
         setIsUploadModalOpen(false);
-        setUploadForm({ productId: "", isPublic: true, urls: [], tags: "" });
+        setUploadForm({ productId: "", urls: [], tags: "" });
         showToast("已提交审核，请耐心等待管理员处理", "success");
       } else {
         const data = await res.json();
@@ -501,28 +551,19 @@ function GalleryContent() {
     return map;
   }, [products]);
 
-  // Helper logic
-  const productIdFilter = searchParams.get("productId");
-
   const filteredItems = items.filter(item => {
     const product = item.product;
     if (!isAdmin && !item.isPublic) return false;
     if (!item.productId) return false; // Safety: must have productId
-
-    // If we are looking at a specific product, only filter by that ID
-    if (productIdFilter && productIdFilter !== 'undefined') {
-        return item.productId === productIdFilter;
-    }
 
     const searchLower = searchQuery.toLowerCase().replace(/\s+/g, '');
     
     // Safety check if product exists
     if (!product) return false;
 
-    // Match Name or SKU
-    const matchesNameOrSku = 
-      (product.name?.toLowerCase()?.includes(searchLower) ?? false) || 
-      (product.sku?.toLowerCase()?.includes(searchLower) ?? false);
+    // Match Name only (SKU removed)
+    const matchesName = 
+      (product.name?.toLowerCase()?.includes(searchLower) ?? false);
 
     // Match Pinyin
     const pinyinData = productPinyinMap[product.id];
@@ -531,7 +572,7 @@ function GalleryContent() {
         pinyinData.first.includes(searchLower)
     ) : false;
 
-    const matchesSearch = matchesNameOrSku || matchesPinyin;
+    const matchesSearch = matchesName || matchesPinyin;
 
     const matchesCategory = selectedCategory === "All" || item.product?.category?.name === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -539,8 +580,6 @@ function GalleryContent() {
 
   // Grouped logic: unique products with items
   const groupedProducts = useMemo(() => {
-    if (productIdFilter && productIdFilter !== 'undefined') return [];
-    
     const groups: Record<string, { product: Product, items: GalleryItem[] }> = {};
     
     filteredItems.forEach(item => {
@@ -563,19 +602,13 @@ function GalleryContent() {
         const skuB = b.product?.sku || "";
         return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
     });
-  }, [filteredItems, productIdFilter]);
+  }, [filteredItems]);
 
-  const filteredProduct = items.length > 0 ? items[0].product : null;
-
-  const handleOpenImage = (item: GalleryItem) => {
-    setSelectedImage(item);
-  };
-
-  const toggleSelect = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+  const handleOpenProductPreview = (group: { product: Product; items: GalleryItem[] }) => {
+    const firstItem = group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) || group.items[0];
+    if (firstItem) {
+      setSelectedImage(firstItem);
+    }
   };
 
   const handleBatchDelete = () => {
@@ -650,209 +683,86 @@ function GalleryContent() {
     <div className="w-full space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header */}
         {/* Header section with unified style */}
-        <div className="flex flex-row items-center justify-between gap-4 mb-8 transition-all">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              {productIdFilter ? (
-                <div className="flex items-start gap-2 min-w-0 max-w-full">
-                  <span className="shrink-0 mt-0.5 sm:mt-1">实物相册</span>
-                  <span className="text-muted-foreground/30 font-light mt-0.5 sm:mt-1">/</span>
-                  <span 
-                    className="text-base sm:text-2xl font-bold text-muted-foreground/60 wrap-break-word line-clamp-2 sm:line-clamp-none"
-                    title={filteredProduct?.name}
-                  >
-                    {filteredProduct?.name || "加载中..."}
-                  </span>
-                </div>
-              ) : (
+        <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-2">
                 <span>实物<span className="text-primary">相册</span></span>
-              )}
             </h1>
-            {!productIdFilter && (
-              <p className="text-muted-foreground mt-2 text-sm sm:text-lg">
+            <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
                 {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
-              </p>
-            )}
+            </p>
           </div>
 
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                {/* Removed redundant Review Submissions button */}
-                
-
                {(isUploadAllowed || isAdmin) && canUpload && (
                  <button 
                    onClick={() => {
                      setIsUploadModalOpen(true);
-                     if (productIdFilter && productIdFilter !== 'undefined') {
-                       setUploadForm(prev => ({ ...prev, productId: productIdFilter }));
-                       // Pre-fill tags for guests so they don't have to type it manually if product is known
-                       const p = products.find(prod => prod.id === productIdFilter);
-                       if (p && !isAdmin) {
-                          setUploadForm(prev => ({ ...prev, tags: `${p.sku || ''},${p.name || ''}` }));
-                       }
-                     } else {
-                        // Reset form if on main gallery page to avoid stale state from previous navigations
-                         setUploadForm({ productId: "", urls: [], tags: "" });
-                      }
+                     // Reset form if on main gallery page to avoid stale state
+                     setUploadForm({ productId: "", urls: [], tags: "" });
                    }}
                    className="h-10 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
                  >
                    <Plus size={18} /> <span className="hidden xs:inline">上传实拍</span><span className="xs:hidden">上传</span>
                  </button>
                )}
-               
-               {productIdFilter && (
-                   <button 
-                      onClick={() => router.back()}
-                      className="h-10 px-4 sm:px-6 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-foreground flex items-center justify-center gap-2 transition-all font-bold whitespace-nowrap shadow-sm hover:bg-muted"
-                   >
-                      <ArrowLeft size={18} /> <span>返回</span>
-                   </button>
-               )}
-            </div>
+             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mb-6 sm:mb-8">
-              <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0">
+          <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
+              <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1 shrink-0 relative">
                 <Search size={18} className="text-muted-foreground shrink-0" />
                 <input 
                     type="text" 
-                    placeholder="搜索商品名或 SKU..." 
+                    placeholder="搜索商品名..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+                    className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
                 />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
 
-              {!productIdFilter && (
-                <div className="w-full sm:w-48 h-10 sm:h-11 shrink-0">
-                   <CustomSelect 
-                        value={selectedCategory === "All" ? "all" : selectedCategory}
-                        onChange={(val) => setSelectedCategory(val === "all" ? "All" : val)}
-                        options={[
-                            { value: 'all', label: '全部展示' },
-                            ...categories.map(c => ({ value: c.name, label: c.name }))
-                        ]}
-                        className="h-full"
-                        triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm py-0 px-5 transition-all hover:bg-white/5"
-                    />
-                </div>
-              )}
+              <div className="grid grid-cols-1 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto">
+                  <div className="col-span-1 lg:w-40 h-10 sm:h-11">
+                       <CustomSelect 
+                            value={selectedCategory === "All" ? "all" : selectedCategory}
+                            onChange={(val) => setSelectedCategory(val === "all" ? "All" : val)}
+                            options={[
+                                { value: 'all', label: '全部展示' },
+                                ...categories.map(c => ({ value: c.name, label: c.name }))
+                            ]}
+                            className="h-full"
+                            triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                        />
+                  </div>
+              </div>
           </div>
 
 
 
         {/* Responsive Grid / Waterfall */}
-        <div className={cn(
-            "w-full grid gap-3 sm:gap-6",
-            productIdFilter && productIdFilter !== 'undefined'
-                ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8"
-                : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-        )}>
+        <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
            <AnimatePresence mode="popLayout">
-            {productIdFilter && productIdFilter !== 'undefined' ? (
-                filteredItems.map((item, index) => {
-                    const product = item.product;
-                    return (
-                        <motion.div
-                            key={item.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ duration: 0.4, delay: index * 0.05 }}
-                            className="break-inside-avoid mb-3 sm:mb-6"
-                        >
-                            <div className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 cursor-pointer"
-                                 onClick={() => {
-                                     if (selectedIds.length > 0) {
-                                         toggleSelect(item.id);
-                                     } else {
-                                         handleOpenImage(item);
-                                     }
-                                 }}
-                            >
-                                {/* Media Container */}
-                                <div className="relative overflow-hidden bg-muted">
-                                    {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
-                                        <div className="relative w-full bg-black flex items-center justify-center">
-                                            <video 
-                                                src={item.url} 
-                                                className="w-full h-auto object-contain pointer-events-none"
-                                                muted
-                                                preload="metadata"
-                                            />
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <PlayCircle size={40} className="text-white/80 drop-shadow-lg scale-90 group-hover:scale-100 transition-transform" />
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        /* eslint-disable-next-line @next/next/no-img-element */
-                                        <img 
-                                            src={item.url} 
-                                            alt={item.product?.name || "Product image"} 
-                                            className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105" 
-                                        />
-                                    )}
-                                    
-                                    {/* 元数据浮层 - SKU + 快速发图引导 */}
-                                    <div className="absolute top-2 left-2 z-10 flex flex-col gap-1.5">
-                                        <span className="px-2 py-0.5 bg-black/70 backdrop-blur-md rounded-md text-[9px] font-black text-white border border-white/10 tracking-widest uppercase">
-                                            {product?.sku}
-                                        </span>
-                                        {!item.isPublic && isAdmin && (
-                                            <span className="px-1.5 py-0.5 bg-yellow-500/90 text-black text-[8px] font-bold rounded-md shadow-sm w-fit whitespace-nowrap">
-                                                内部可见
-                                            </span>
-                                        )}
-                                    </div>
-    
-                                    {/* Selection Checkbox (Hover or Selected) */}
-                                    {isAdmin && (
-                                        <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${
-                                            selectedIds.includes(item.id) || selectedIds.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                        }`}>
-                                            <button 
-                                                onClick={(e) => toggleSelect(item.id, e)}
-                                                className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
-                                                    selectedIds.includes(item.id)
-                                                    ? "bg-foreground border-foreground text-background scale-110" 
-                                                    : "bg-black/40 border-white/40 backdrop-blur hover:border-white"
-                                                }`}
-                                            >
-                                                {selectedIds.includes(item.id) && (
-                                                    <Check size={14} strokeWidth={4} />
-                                                )}
-                                            </button>
-                                        </div>
-                                    )}
-    
-                                    <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-3 sm:p-6">
-                                        <div className="flex flex-col gap-1">
-                                            <p className="text-white font-bold text-xs sm:text-base line-clamp-1">{product?.name}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    );
-                })
-            ) : (
-                groupedProducts.map((group, index) => {
+              {groupedProducts.map((group) => {
                     // Find first image for cover, or fallback to first item
                     const coverItem = group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) || group.items[0];
                     const isVideoCover = coverItem.type === 'video' || /\.(mp4|mov|webm)$/i.test(coverItem.url);
 
                     return (
-                    <motion.div
+                    <div
                         key={group.product.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ duration: 0.4, delay: index * 0.05 }}
+                        className="break-inside-avoid mb-3 sm:mb-6"
                     >
                         <div 
                             className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
-                            onClick={() => router.push(`/gallery?productId=${group.product.id}`)}
+                            onClick={() => handleOpenProductPreview(group)}
                         >
                             <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
                                 {isVideoCover ? (
@@ -879,37 +789,49 @@ function GalleryContent() {
                                     />
                                 )}
                                 
-                                {/* Image Count Badge */}
-                                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
-                                    <span className="px-2 py-0.5 sm:px-3 sm:py-1 bg-black/60 backdrop-blur-md rounded-full text-[9px] sm:text-[10px] font-black text-white border border-white/10 tracking-widest">
-                                        {group.items.length} 个
-                                    </span>
-                                </div>
+                                {/* Removed SKU badge from card top right */}
 
-                                <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-3 sm:p-6">
+                                <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/95 via-black/40 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-2.5 sm:p-5 pt-12 sm:pt-16">
                                     <div className="flex flex-col gap-0.5 sm:gap-1">
-                                        <p className="text-white font-bold text-xs sm:text-lg line-clamp-1">{group.product.name}</p>
-                                        <p className="text-white/60 text-[10px] sm:text-xs font-mono tracking-wider">{group.product.sku}</p>
+                                        <p className="text-white font-bold text-[11px] sm:text-xs line-clamp-2 leading-relaxed" style={{ fontFamily: 'ui-rounded, "SF Pro Rounded", "PingFang SC", "Hiragino Maru Gothic ProN", sans-serif' }}>{group.product.name}</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
                 )})
-            )}
-
-            {filteredItems.length === 0 && productIdFilter && (
-                <div className="col-span-full py-24 text-center glass border-dashed border-2 border-border/50 rounded-3xl">
-                <Camera size={48} className="mx-auto text-black/30 dark:text-white/30 mb-4" />
-                <h3 className="text-xl font-bold text-foreground">该商品暂无实拍内容</h3>
-                <p className="text-muted-foreground mt-1">您可以尝试上传第一个实拍内容</p>
-                </div>
-            )}
+              }
            </AnimatePresence>
         </div>
 
+        {/* Infinite Scroll Anchor */}
+        <div id="gallery-scroll-anchor" className="h-[2px] w-full" />
+
+        {/* Next Page Loading State */}
+        {isNextPageLoading && (
+            <div className="py-8 w-full flex justify-center">
+                <div className="flex space-x-2">
+                    <div className="w-2.5 h-2.5 bg-primary/40 rounded-full animate-bounce" />
+                    <div className="w-2.5 h-2.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                    <div className="w-2.5 h-2.5 bg-primary/80 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                </div>
+            </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+            <div className="py-32 flex flex-col items-center justify-center text-center space-y-4">
+                <div className="flex space-x-2">
+                    <div className="w-2.5 h-2.5 bg-primary/40 rounded-full animate-bounce" />
+                    <div className="w-2.5 h-2.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                    <div className="w-2.5 h-2.5 bg-primary/80 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                </div>
+                <p className="text-muted-foreground animate-pulse text-sm">正在加载相册...</p>
+            </div>
+        )}
+
         {/* Empty State */}
-        {filteredItems.length === 0 && !productIdFilter && (
+        {!isLoading && filteredItems.length === 0 && (
             <div className="py-32 flex flex-col items-center justify-center text-center space-y-6">
                 <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center text-black/30 dark:text-white/30">
                     <Camera size={48} />
@@ -1293,7 +1215,15 @@ function GalleryContent() {
                                         )}
                                         title="显示商品详情"
                                     >
-                                        {showInfo ? <X size={20} /> : <Info size={20} className="group-hover:scale-110 transition-transform" />}
+                                        <motion.div
+                                            animate={{ 
+                                                scale: showInfo ? 1.15 : 1,
+                                                opacity: showInfo ? 1 : 0.9
+                                            }}
+                                            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                                        >
+                                            <Info size={20} />
+                                        </motion.div>
                                     </button>
                                 </div>
 
@@ -1312,30 +1242,50 @@ function GalleryContent() {
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                                 transition={{ duration: 0.2 }}
-                                                className="absolute top-16 left-4 right-4 md:left-6 md:right-auto z-50 bg-black/80 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/10 shadow-2xl flex flex-col gap-2 max-w-full md:max-w-md pointer-events-auto"
+                                                className="absolute top-16 md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/80 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/10 shadow-2xl flex flex-col gap-2 max-w-full md:max-w-md pointer-events-auto"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">商品信息</span>
-                                                    <h3 className="text-white font-bold text-sm md:text-lg leading-snug">
-                                                        {selectedImage.product?.name}
-                                                    </h3>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-white/60 font-mono text-[10px] md:text-xs bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
-                                                            {selectedImage.product?.sku}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                {isAdmin && selectedImage.product?.stock !== undefined && (
-                                                    <>
-                                                        <div className="h-px w-full bg-white/10 my-1" />
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <span className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-black">当前库存</span>
-                                                            <span className="text-white font-bold text-sm">
-                                                                {selectedImage.product?.stock} <span className="text-[10px] opacity-40">件</span>
+                                                <div className="flex flex-col gap-1.5 font-rounded">
+                                                    <span className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-black">商品信息</span>
+                                                    <h3 className="text-white font-bold text-sm md:text-xl leading-snug tracking-tight">
+                                                        <span>{selectedImage.product?.name}</span>
+                                                        {selectedImage.product?.sku && (
+                                                            <span className="ml-2 inline-flex items-center justify-center bg-white/10 px-2.5 py-1 rounded-full border border-white/10 text-[10px] md:text-xs font-bold leading-none align-middle -translate-y-[1.5px]">
+                                                                {selectedImage.product?.sku}
                                                             </span>
+                                                        )}
+                                                    </h3>
+                                                    {/* Removed SKU pill from lightbox info panel */}
+                                                </div>
+                                                
+                                                {/* Specifications */}
+                                                {selectedImage.product?.specs && Object.keys(selectedImage.product.specs).length > 0 && (
+                                                    <div className="mt-10 space-y-5 font-rounded">
+                                                        <div className="flex items-center">
+                                                            <span className="text-[10px] text-white/70 uppercase tracking-[0.3em] font-black">商品参数</span>
                                                         </div>
-                                                    </>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            {Object.entries(selectedImage.product.specs).map(([key, value], index) => {
+                                                                const isLongValue = String(value).length > 20;
+                                                                return (
+                                                                    <div 
+                                                                        key={index} 
+                                                                        className={cn(
+                                                                            "group/item relative bg-white/4 hover:bg-white/8 border-white/6 hover:border-white/12 p-4 rounded-2xl transition-all duration-300",
+                                                                            isLongValue ? "col-span-2" : "col-span-1"
+                                                                        )}
+                                                                    >
+                                                                        <div className="flex flex-col gap-1.5">
+                                                                            <span className="text-[10px] text-white/60 font-bold uppercase tracking-widest">{key}</span>
+                                                                            <div className="text-white text-sm font-bold tracking-tight group-hover/item:text-primary transition-colors whitespace-pre-wrap wrap-break-word leading-relaxed">
+                                                                                {value as React.ReactNode}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </motion.div>
                                         </>

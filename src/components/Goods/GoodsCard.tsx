@@ -1,8 +1,7 @@
 import { memo, useState } from "react";
 import { motion } from "framer-motion";
-import { Edit, Package, Truck, Trash2, Camera, Check } from "lucide-react";
+import { Edit, Package, Truck, Trash2, Check } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { Product } from "@/lib/types";
 import { getCategoryName, cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
@@ -111,9 +110,11 @@ export const GoodsCard = memo(function GoodsCard({
           </h3>
           
           <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-4">
+            {product.sku && (
               <span className="text-[10px] bg-secondary border border-border/50 px-2 py-0.5 rounded text-muted-foreground font-mono shrink-0">
-                {product.sku ? product.sku : `REF__${product.id.slice(0, 6)}`}
+                {product.sku}
               </span>
+            )}
               <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
                 <Package size={12} strokeWidth={2.5} />
                 {getCategoryName(product.category)}
@@ -150,15 +151,7 @@ export const GoodsCard = memo(function GoodsCard({
         </div>
 
         {/* Mobile Actions Bar */}
-        <div className="mt-4 flex sm:hidden items-center justify-between pt-3 border-t border-border/50">
-            <Link
-              href={`/gallery?productId=${product.id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[10px] font-bold text-primary hover:opacity-80 transition-opacity"
-            >
-              <Camera size={14} />
-              <span>实拍图库</span>
-            </Link>
+        <div className="mt-4 flex sm:hidden items-center justify-end pt-3 border-t border-border/50">
             <div className="flex gap-3">
               {onEdit && (
                 <button 
@@ -190,14 +183,6 @@ export const GoodsCard = memo(function GoodsCard({
       
       {/* Quick Actions Overlay (PC only) */}
       <div className="hidden sm:flex absolute top-3 right-3 flex-col gap-2 translate-x-0 opacity-100 lg:translate-x-10 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100 transition-all duration-300">
-           <Link
-              href={`/gallery?productId=${product.id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-primary p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn flex items-center justify-center"
-              title="查看实拍图库"
-           >
-             <Camera size={16} className="group-hover/btn:scale-110 transition-transform" />
-           </Link>
            {onEdit && (
              <button 
                 onClick={(e) => {

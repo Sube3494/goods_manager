@@ -41,7 +41,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     image: initialData?.image || "",
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
-    isPublic: initialData?.isPublic ?? true
+    isPublic: initialData?.isPublic ?? true,
+    specs: (initialData?.specs as Record<string, string>) || {}
   });
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -81,11 +82,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === galleryImages.length + (formData.image && !galleryImages.find(i => i.url === formData.image) ? 1 : 0)) {
+    const images = galleryImages || [];
+    if (selectedIds.size === images.length + (formData.image && !images.find(i => i.url === formData.image) ? 1 : 0)) {
         setSelectedIds(new Set());
     } else {
-        const allIds = galleryImages.map(img => img.id);
-        if (formData.image && !galleryImages.find(i => i.url === formData.image)) {
+        const allIds = images.map(img => img.id);
+        if (formData.image && !images.find(i => i.url === formData.image)) {
             allIds.push('cover-virtual');
         }
         setSelectedIds(new Set(allIds));
@@ -140,9 +142,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
     const fetchGallery = async (productId: string) => {
       try {
-        const res = await fetch(`/api/gallery?productId=${productId}`);
+        // Fetch a large page size to ensure we get all/most images for the product form
+        const res = await fetch(`/api/gallery?productId=${productId}&pageSize=100`);
         if (res.ok) {
-          setGalleryImages(await res.json());
+          const data = await res.json();
+          // The API returns paginated structure: { items: [...] }
+          setGalleryImages(data.items || []);
         } else {
           console.error("Failed to fetch gallery images");
           setGalleryImages([]);
@@ -168,7 +173,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: initialData.categoryId || "",
           supplierId: initialData.supplierId || "",
           image: initialData.image || "",
-          isPublic: initialData.isPublic ?? true
+          isPublic: initialData.isPublic ?? true,
+          specs: initialData.specs as Record<string, string> || {}
         });
         fetchGallery(initialData.id);
       } else {
@@ -180,7 +186,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: "",
           supplierId: "",
           image: "",
-          isPublic: true
+          isPublic: true,
+          specs: {}
         });
       }
     }
@@ -474,10 +481,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   };
 
   // 提取所有图片的 URL 以便查重 (Extract all image URLs to check for duplicates)
-  const galleryUrls = new Set(galleryImages.map(img => img.url));
+  const galleryUrls = new Set((galleryImages || []).map(img => img.url));
   
   // 构建最终显示的列表 (Build the final display list)
-  const displayList = [...galleryImages];
+  const displayList = [...(galleryImages || [])];
   
   // 排序：封面图置顶，其他按时间升序 (Sort: Cover image on top, others in ascending time order)
   displayList.sort((a, b) => {
@@ -506,10 +513,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     e.preventDefault();
     
     // Validation for mandatory fields
-    if (!formData.sku.trim()) {
-        showToast("请输入商品编号 (SKU)", "error");
-        return;
-    }
     if (!formData.name.trim()) {
         showToast("请输入商品名称", "error");
         return;
@@ -521,10 +524,21 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
 
 
+    // Clean up empty specs before stringifying/submitting
+    const cleanedSpecs: Record<string, string> = {};
+    if (formData.specs) {
+        Object.entries(formData.specs as Record<string, string>).forEach(([k, v]) => {
+            if (k.trim() !== '') {
+                cleanedSpecs[k.trim()] = String(v).trim();
+            }
+        });
+    }
+
     onSubmit({
         ...formData,
         costPrice: Number(formData.costPrice),
         stock: Number(formData.stock),
+        specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
         id: initialData?.id
     }, galleryImages);
     onClose();
@@ -593,6 +607,52 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
   if (!mounted) return null;
 
+  // Helper for specs
+  const handleAddSpec = () => {
+    setFormData(prev => ({
+      ...prev,
+      specs: { ...(prev.specs || {}), "": "" }
+    }));
+  };
+
+  const handleUpdateSpecKey = (oldKey: string, newKey: string, index: number) => {
+    setFormData(prev => {
+      const specs = { ...((prev.specs as Record<string, string>) || {}) };
+      const entries = Object.entries(specs);
+      if (oldKey === newKey) return prev;
+      
+      // Reconstruct to maintain order
+      const newSpecs: Record<string, string> = {};
+      entries.forEach(([k, v], i) => {
+        if (i === index) {
+          newSpecs[newKey] = v;
+        } else {
+          newSpecs[k] = v;
+        }
+      });
+      return { ...prev, specs: newSpecs };
+    });
+  };
+
+  const handleUpdateSpecValue = (key: string, newValue: string) => {
+    setFormData(prev => ({
+      ...prev,
+      specs: { ...((prev.specs as Record<string, string>) || {}), [key]: newValue }
+    }));
+  };
+
+  const handleRemoveSpec = (keyToRemove: string, index: number) => {
+    setFormData(prev => {
+      const specs = { ...((prev.specs as Record<string, string>) || {}) };
+      const entries = Object.entries(specs);
+      const newSpecs: Record<string, string> = {};
+      entries.forEach(([k, v], i) => {
+        if (i !== index) newSpecs[k] = v;
+      });
+      return { ...prev, specs: newSpecs };
+    });
+  };
+
   return createPortal(
     <>
     <AnimatePresence>
@@ -623,10 +683,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {/* SKU */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <FileText size={16} /> 商品编号 (SKU) <span className="text-red-500">*</span>
+                            <FileText size={16} /> 商品编号 (SKU)
                         </label>
                         <input 
-                            required
                             type="text" 
                             value={formData.sku}
                             onChange={(e) => setFormData({...formData, sku: e.target.value})}
@@ -770,6 +829,57 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             <div className="py-2 text-center text-[10px] text-muted-foreground">暂无历史记录</div>
                                         )}
                                     </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Specifications */}
+                    <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Tag size={16} /> 商品参数 (Specs)
+                            </label>
+                            <button
+                                type="button"
+                                onClick={handleAddSpec}
+                                className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-md transition-colors"
+                            >
+                                <Plus size={14} /> 添加参数
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            {Object.entries((formData.specs as Record<string, string>) || {}).map(([key, value], index) => (
+                                <div key={index} className="flex items-center gap-2 group">
+                                    <input
+                                        type="text"
+                                        value={key}
+                                        onChange={(e) => handleUpdateSpecKey(key, e.target.value, index)}
+                                        placeholder="参数名 (如: 材质)"
+                                        className="w-1/3 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3 py-2 text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                                    />
+                                    <span className="text-muted-foreground/50">:</span>
+                                    <input
+                                        type="text"
+                                        value={value}
+                                        onChange={(e) => handleUpdateSpecValue(key, e.target.value)}
+                                        placeholder="参数值 (如: 头层牛皮)"
+                                        className="flex-1 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3 py-2 text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveSpec(key, index)}
+                                        className="p-2 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
+                                        title="删除此参数"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                            {Object.keys((formData.specs as Record<string, string>) || {}).length === 0 && (
+                                <div className="text-center py-4 bg-muted/20 rounded-xl border border-dashed border-border/50">
+                                    <span className="text-xs text-muted-foreground">暂无自定义参数</span>
                                 </div>
                             )}
                         </div>

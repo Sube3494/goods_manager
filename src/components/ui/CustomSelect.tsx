@@ -120,7 +120,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
                 transform: dropdownPosition.showAbove ? 'translateY(-100%)' : 'none',
                 pointerEvents: 'auto'
               }}
-              className="z-[99999] rounded-2xl bg-white dark:bg-gray-900 border border-border dark:border-white/10 shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
+              className="z-99999 rounded-2xl bg-white dark:bg-gray-900 border border-border dark:border-white/10 shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
             >
               <div className="max-h-60 overflow-auto p-1 py-1.5 scrollbar-hide">
                 {options.length > 0 ? (

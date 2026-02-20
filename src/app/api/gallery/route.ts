@@ -8,26 +8,67 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");
+    const page = parseInt(searchParams.get("page") || "1");
+    const pageSize = parseInt(searchParams.get("pageSize") || "20"); // Default 20 for gallery view
 
     const session = await getFreshSession() as SessionUser | null;
     
+    const where = {
+      ...(productId ? { productId } : {}),
+      ...(session ? {
+        OR: [
+          { workspaceId: session.workspaceId },
+          { 
+            isPublic: true,
+            product: { isPublic: true }
+          }
+        ]
+      } : { 
+        isPublic: true,
+        product: { isPublic: true }
+      }),
+    };
 
+    const skip = (page - 1) * pageSize;
 
-    const galleryItems = await prisma.galleryItem.findMany({
+    // 1. Fetch all matching IDs and their associated product SKUs
+    const allGalleryItems = await prisma.galleryItem.findMany({
+      where,
+      select: {
+        id: true,
+        createdAt: true,
+        product: {
+          select: {
+            sku: true
+          }
+        }
+      }
+    });
+
+    const total = allGalleryItems.length;
+
+    // 2. Perform natural sort by SKU in JavaScript
+    allGalleryItems.sort((a, b) => {
+      const skuA = a.product?.sku || "";
+      const skuB = b.product?.sku || "";
+      
+      const skuCompare = skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
+      
+      if (skuCompare !== 0) {
+        return skuCompare;
+      }
+      
+      // Fallback to createdAt desc if SKUs are identical
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    // 3. Slice the paginated IDs
+    const pageIds = allGalleryItems.slice(skip, skip + pageSize).map(item => item.id);
+
+    // 4. Fetch the detailed paginated items
+    const detailedItems = await prisma.galleryItem.findMany({
       where: {
-        ...(productId ? { productId } : {}),
-        ...(session ? {
-          OR: [
-            { workspaceId: session.workspaceId },
-            { 
-              isPublic: true,
-              product: { isPublic: true }
-            }
-          ]
-        } : { 
-          isPublic: true,
-          product: { isPublic: true }
-        }),
+        id: { in: pageIds }
       },
       include: {
         product: {
@@ -36,6 +77,7 @@ export async function GET(request: Request) {
             name: true,
             sku: true,
             stock: true,
+            specs: true,
             category: {
               select: {
                 name: true
@@ -43,13 +85,19 @@ export async function GET(request: Request) {
             }
           }
         }
-      },
-      orderBy: {
-        createdAt: 'asc'
       }
     });
+    
+    // 5. Restore the sorted order mapping
+    const galleryItems = pageIds.map(id => detailedItems.find(item => item.id === id)).filter(Boolean);
 
-    return NextResponse.json(galleryItems);
+    return NextResponse.json({
+      items: galleryItems,
+      total,
+      page,
+      pageSize,
+      hasMore: skip + galleryItems.length < total
+    });
   } catch (error) {
     console.error("Failed to fetch gallery items:", error);
     return NextResponse.json({ error: "Failed to fetch gallery items" }, { status: 500 });

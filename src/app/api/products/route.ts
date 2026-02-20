@@ -176,20 +176,21 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, specs } = body;
 
     const stockNum = Number(stock) || 0;
 
     const product = await prisma.product.create({
       data: {
         name,
-        sku,
+        sku: sku?.trim() || null,
         costPrice: Number(costPrice) || 0,
         stock: stockNum,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
         isPublic: isPublic ?? true,
+        specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         workspaceId: session.workspaceId,
       },
       include: {
@@ -249,7 +250,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, specs } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -267,13 +268,17 @@ export async function PUT(request: Request) {
       where: { id },
       data: {
         name,
-        sku,
+        sku: sku?.trim() || null,
         costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
         stock: Number(stock) || 0,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
-        isPublic: isPublic ?? undefined
+        isPublic: isPublic ?? undefined,
+        // Using Prisma Json values correctly. If specs is explicitly sent (even empty object), save it. 
+        // If undefined entirely, don't update it to avoid wiping out accidently.
+        // It accepts `null` to clear it, or the object to save.
+        specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined
       },
       include: {
         category: true,

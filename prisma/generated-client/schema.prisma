@@ -54,6 +54,7 @@ model Product {
   stock           Int                 @default(0)
   image           String?
   isPublic        Boolean             @default(true)
+  specs           Json?
   categoryId      String
   supplierId      String?
   workspaceId     String?

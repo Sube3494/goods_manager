@@ -98,11 +98,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             )}            
             <main className={cn(
                 "flex-1 w-full",
-                !isLoginPage && (pathname.includes("/gallery") ? "pb-10 pt-16 lg:pt-0" : "px-4 sm:px-6 lg:px-10 pb-10 pt-16 lg:pt-0")
+                !isLoginPage && "px-4 sm:px-6 lg:px-10 pb-10 pt-16 lg:pt-0"
             )}>
                 <div className={cn(
                     "h-full animate-fade-in",
-                    !isLoginPage && (pathname.includes("/gallery") ? "w-full max-w-none px-4 sm:px-6 lg:px-10" : "mx-auto max-w-7xl")
+                    !isLoginPage && "mx-auto max-w-7xl"
                 )}>
                     <PageGuard>
                         {children}

@@ -106,7 +106,26 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
           </div>
           
 
-          <div className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar scroll-smooth">
+          <div className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar scroll-smooth relative">
+            {/* Background highlight pill that physically translates within the container */}
+            <div 
+              className={cn(
+                  "absolute inset-x-1 lg:inset-x-0 bg-primary z-0 rounded-xl transition-all duration-300 ease-out",
+                  isCollapsed ? "w-10 left-1/2 -translate-x-1/2" : "left-1 right-1"
+              )}
+              style={{
+                  height: isCollapsed ? '40px' : '40px',
+                  // 1.5 spacing is 6px. Item height is 40px (10) or 44px (py-2.5 = 10*2 + 20 = 40).
+                  // We'll calculate top offset based on active index.
+                  // (40px height + 6px gap) * index.
+                  // For collapsed: 40px height. For expanded: py-2.5 (20px) + text (20px) = 40px.
+                  // The offset calculation needs to account for the exact layout space.
+                  top: `calc(${navItems.findIndex((item) => pathname === item.href) * (40 + 6)}px)`
+              }}
+              // Hide if no active match
+              hidden={navItems.findIndex((item) => pathname === item.href) === -1}
+            />
+
             {navItems.map((item: NavItem) => {
               // 1. Super Admin Only Check
               if (item.superAdminOnly && user?.role !== "SUPER_ADMIN") return null;
@@ -126,20 +145,14 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                   onClick={onClose}
                   title={isCollapsed ? item.name : undefined}
                   className={cn(
-                    "relative group flex items-center rounded-xl transition-all duration-300 outline-none focus:outline-none",
-                    isCollapsed ? "justify-center h-10 w-10 mx-auto" : "px-3 py-2.5 mx-1 text-sm font-medium",
+                    "relative z-10 group flex items-center rounded-xl transition-all duration-300 outline-none focus:outline-none",
+                    // Lock height to exactly 40px (h-10) for calculations to be perfect
+                    isCollapsed ? "justify-center h-10 w-10 mx-auto" : "px-3 h-10 mx-1 text-sm font-medium",
                     isActive
                       ? "text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   )}
                 >
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeNav"
-                      className="absolute inset-0 bg-primary z-[-1] rounded-xl"
-                      transition={{ type: "spring", stiffness: 350, damping: 35 }}
-                    />
-                  )}
                   <item.icon
                     className={cn(
                       "h-5 w-5 transition-colors shrink-0",
@@ -151,7 +164,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                     <motion.span 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="relative z-10 whitespace-nowrap"
+                        className="relative whitespace-nowrap"
                     >
                         {item.name}
                     </motion.span>

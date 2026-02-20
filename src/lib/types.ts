@@ -24,6 +24,7 @@ export interface Product {
   stock: number;
   image?: string;
   isPublic?: boolean;
+  specs?: Record<string, string>;
   supplierId?: string;
   supplier?: Supplier;
   workspaceId?: string;

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download, ArrowUp } from "lucide-react";
+import { Search, Plus, Download, ArrowUp, X } from "lucide-react";
 import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -466,17 +466,24 @@ export default function GoodsPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
       <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
-          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1 shrink-0">
+          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1 shrink-0 relative">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
               type="text"
               placeholder="搜索商品..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
             />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery("")}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           
           <div className="grid grid-cols-3 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto"> 
