@@ -66,5 +66,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# 启动顺序：自动建库 → 数据库迁移 → 启动应用
-CMD ["sh", "-c", "sh scripts/init-db.sh && prisma migrate deploy && node server.js"]
+# 启动顺序：自动建库 → 数据库同步 → 启动应用
+CMD ["sh", "-c", "sh scripts/init-db.sh && prisma db push --skip-generate --accept-data-loss && node server.js"]
