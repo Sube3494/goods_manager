@@ -138,7 +138,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
                 x: { type: "spring", stiffness: 400, damping: 40, mass: 1 },
                 opacity: { duration: 0.25 }
             }}
-            className="absolute inset-0 flex items-center justify-center pb-24 sm:pb-32 pointer-events-none"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
             <motion.div 
                 className={cn(
@@ -149,8 +149,8 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
                     x: smoothX,
                     y: smoothY,
                     scale: smoothScale,
-                    width: '100vw',
-                    height: '100vh',
+                    width: '100%',
+                    height: '100%',
                     willChange: "transform"
                 }}
                 onPointerDown={handlePointerDown}
@@ -1185,7 +1185,7 @@ function GalleryContent() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.25, ease: "easeInOut" }}
-                            className="fixed inset-0 z-9999 bg-black overflow-hidden touch-none pointer-events-auto flex flex-col"
+                            className="fixed inset-0 z-12000 bg-black overflow-hidden touch-none pointer-events-auto flex flex-col"
                         >
                             {/* Layer 0: Ambient Background */}
                             <AnimatePresence mode="wait">
@@ -1361,7 +1361,7 @@ function GalleryContent() {
                                     </motion.div>
                                 )}
 
-                                <AnimatePresence initial={false} custom={previewDirection} mode="popLayout">
+                                <AnimatePresence initial={false} custom={previewDirection}>
                                     <LightboxMediaItem 
                                         key={selectedImage.id}
                                         item={selectedImage}
