@@ -1265,17 +1265,18 @@ function GalleryContent() {
                                                 className="absolute top-16 md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/80 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/10 shadow-2xl flex flex-col gap-2 max-w-full md:max-w-md pointer-events-auto"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                <div className="flex flex-col gap-1.5 font-rounded">
-                                                    <span className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-black">商品信息</span>
-                                                    <h3 className="text-white font-bold text-sm md:text-xl leading-snug tracking-tight">
-                                                        <span>{selectedImage.product?.name}</span>
+                                                <div className="flex flex-col gap-1 font-rounded">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-black shrink-0">商品信息</span>
                                                         {selectedImage.product?.sku && (
-                                                            <span className="ml-2 inline-flex items-center justify-center bg-white/10 px-2.5 py-1 rounded-full border border-white/10 text-[10px] md:text-xs font-bold leading-none align-middle -translate-y-[1.5px]">
+                                                            <span className="inline-flex items-center justify-center bg-white/10 px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-bold leading-none text-white/90">
                                                                 {selectedImage.product?.sku}
                                                             </span>
                                                         )}
+                                                    </div>
+                                                    <h3 className="text-white font-bold text-sm md:text-xl leading-snug tracking-tight">
+                                                        {selectedImage.product?.name}
                                                     </h3>
-                                                    {/* Removed SKU pill from lightbox info panel */}
                                                 </div>
                                                 
                                                 {/* Specifications */}
