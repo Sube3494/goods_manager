@@ -51,11 +51,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-
-# Prisma CLI（用于启动时自动执行 migrate deploy）
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
-COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+# 安装 Prisma CLI（用于启动时自动执行 migrate deploy）
+RUN npm install -g prisma@5.22.0
 
 # 自动建库脚本（shell 脚本，不依赖 npm 包）
 COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
@@ -69,6 +66,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# 启动时自动执行数据库迁移，再启动应用
 # 启动顺序：自动建库 → 数据库迁移 → 启动应用
-CMD ["sh", "-c", "sh scripts/init-db.sh && node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+CMD ["sh", "-c", "sh scripts/init-db.sh && prisma migrate deploy && node server.js"]
