@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       data: { lastBackup: new Date() }
     });
 
-    return new Response(encryptedBuffer, {
+    return new Response(new Uint8Array(encryptedBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',

@@ -563,7 +563,6 @@ function PurchasesContent() {
                                                         isOpen: true,
                                                         purchaseId: po.id,
                                                         initialValue: po.trackingData || [],
-                                                        paymentVoucher: po.paymentVoucher,
                                                         paymentVouchers: po.paymentVouchers || [],
                                                         lockPackages: false,
                                                         mode: (!hasPayment ? "payment" : !hasTracking ? "tracking" : !hasAllWaybills ? "waybill" : "all") as NonNullable<TrackingNumberModalProps['mode']>

@@ -50,12 +50,10 @@ export async function POST(req: NextRequest) {
         // Try to find product in CURRENT workspace
         let product = null;
         if (sku) {
-          product = await prisma.product.findUnique({ 
+          product = await prisma.product.findFirst({ 
               where: { 
-                  sku_workspaceId: { 
-                      sku: String(sku), 
-                      workspaceId 
-                  } 
+                  sku: String(sku), 
+                  workspaceId 
               } 
           });
         }

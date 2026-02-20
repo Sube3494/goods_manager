@@ -127,7 +127,7 @@ export async function POST(request: Request) {
             }
 
             await tx.product.upsert({
-              where: { sku_workspaceId: { sku, workspaceId } },
+              where: { sku },
               update: {
                 name,
                 categoryId,
