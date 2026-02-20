@@ -76,6 +76,7 @@ export async function GET(request: Request) {
             id: true,
             name: true,
             sku: true,
+            image: true,
             stock: true,
             specs: true,
             category: {

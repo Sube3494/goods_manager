@@ -750,10 +750,16 @@ function GalleryContent() {
         {/* Responsive Grid / Waterfall */}
         <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
            <AnimatePresence mode="popLayout">
-              {groupedProducts.map((group) => {
-                    // Find first image for cover, or fallback to first item
-                    const coverItem = group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) || group.items[0];
-                    const isVideoCover = coverItem.type === 'video' || /\.(mp4|mov|webm)$/i.test(coverItem.url);
+               {groupedProducts.map((group) => {
+                    // Use product.image as cover URL directly (it may not be a gallery item)
+                    // then fall back to the first non-video item, then to any first item
+                    const fallbackItem =
+                      group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) ||
+                      group.items[0];
+                    const coverUrl = group.product.image || fallbackItem?.url || '';
+                    const isVideoCover = !group.product.image && (
+                      fallbackItem?.type === 'video' || /\.(mp4|mov|webm)$/i.test(fallbackItem?.url || '')
+                    );
 
                     return (
                     <div
@@ -767,7 +773,7 @@ function GalleryContent() {
                             <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
                                 {isVideoCover ? (
                                     <video 
-                                        src={coverItem.url} 
+                                        src={coverUrl} 
                                         className="w-full h-full object-cover pointer-events-none"
                                         muted
                                         loop
@@ -781,7 +787,7 @@ function GalleryContent() {
                                     />
                                 ) : (
                                     <Image 
-                                        src={coverItem.url} 
+                                        src={coverUrl} 
                                         alt={group.product.name} 
                                         fill 
                                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"

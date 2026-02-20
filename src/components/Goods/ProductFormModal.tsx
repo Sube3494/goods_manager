@@ -970,8 +970,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
                         
-                        <motion.div layout className="grid grid-cols-4 gap-3">
-                            <AnimatePresence mode="popLayout">
+                        <div className="grid grid-cols-4 gap-3">
                                 {/* Display current photos (Including the main cover image if not in gallery) */}
                                 {displayList.map(img => {
                                     const isMain = formData.image === img.url;
@@ -980,12 +979,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                     const isVirtual = img.id === 'cover-virtual';
                                     
                                     return (
-                                        <motion.div 
+                                        <div 
                                           key={img.id} 
-                                          layout
-                                          initial={{ opacity: 0, scale: 0.8 }}
-                                          animate={{ opacity: 1, scale: 1 }}
-                                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
                                           onClick={() => {
                                             if (isBatchMode) {
                                                 toggleSelectImage(img.id);
@@ -1083,18 +1078,14 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                     Video
                                                 </div>
                                             )}
-                                        </motion.div>
+                                        </div>
                                     );
                                 })}
                                 
                                 {/* Add Photo Action - participating in AnimatePresence */}
                                 {!isBatchMode && (
-                                    <motion.div 
+                                    <div 
                                         key="add-button"
-                                        layout
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.8 }}
                                         className="h-full"
                                     >
                                         <label 
@@ -1136,10 +1127,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 <div className="absolute inset-0 pointer-events-none border-2 border-primary rounded-2xl animate-pulse" />
                                             )}
                                         </label>
-                                    </motion.div>
+                                    </div>
                                 )}
-                            </AnimatePresence>
-                        </motion.div>
+                        </div>
                     </div>
 
                 <div className="flex justify-end gap-4 border-t border-white/10 p-8 shrink-0">
@@ -1189,16 +1179,17 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
       {/* 图片预览 (Image Preview Lightbox) */}
       <AnimatePresence>
         {selectedPreviewImage && (
-          <div 
-            className="fixed inset-0 z-200 flex items-center justify-center p-4 overflow-hidden touch-none"
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-12000 flex items-center justify-center p-4 overflow-hidden touch-none"
             onWheel={handleWheel}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
           >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               className="fixed inset-0 bg-black/95 backdrop-blur-md"
               onClick={() => setSelectedPreviewImage(null)}
             />
@@ -1309,7 +1300,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </>,
