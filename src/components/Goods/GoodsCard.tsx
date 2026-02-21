@@ -92,7 +92,7 @@ export const GoodsCard = memo(function GoodsCard({
 
       {/* Content */}
       <div className="flex flex-1 flex-col p-3 sm:p-5">
-        <div className="flex-1">
+        <div>
           <h3 className="font-bold text-sm sm:text-lg leading-tight text-foreground mb-2 sm:mb-4 group-hover:text-primary transition-colors">
             {product.name}
             <button
@@ -130,6 +130,9 @@ export const GoodsCard = memo(function GoodsCard({
               </div>
           )}
         </div>
+
+        {/* 弹性空隙，将底部栏推到卡片底部 */}
+        <div className="flex-1" />
         
         <div className="mt-2 flex items-center justify-between pt-4 border-t border-white/10">
           <div>

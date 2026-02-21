@@ -58,19 +58,14 @@ RUN npm install -g prisma@5.22.0 --registry=https://registry.npmmirror.com
 # 自动建库脚本（shell 脚本，不依赖 npm 包）
 COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
 
-# 上传文件持久化目录
+# 上传文件持久化目录（chmod 777 确保 volume 挂载时也能正常写入）
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
 
-# 复制 entrypoint 脚本
-COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
-
-# 注释掉 USER nextjs，保留 root 权限在启动容器时修复上传目录权限，最后通过 su-exec 在脚本内降权
-# USER nextjs
+USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # 启动顺序：自动建库 → 数据库同步 → 启动应用
-ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["sh", "-c", "sh scripts/init-db.sh && prisma db push --skip-generate --accept-data-loss && node server.js"]

@@ -15,13 +15,13 @@ interface SupplierModalProps {
 
 export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: SupplierModalProps) {
   const [formData, setFormData] = useState<Omit<Supplier, "id"> & { id?: string }>({
-    name: initialData?.name || "",
-    contact: initialData?.contact || "",
-    phone: initialData?.phone || "",
-    email: initialData?.email || "",
-    address: initialData?.address || "",
-    id: initialData?.id,
-    code: initialData?.code || ""
+    name: "",
+    contact: "",
+    phone: "",
+    email: "",
+    address: "",
+    id: undefined,
+    code: ""
   });
 
   const [mounted, setMounted] = useState(false);
@@ -30,6 +30,21 @@ export function SupplierModal({ isOpen, onClose, onSubmit, initialData }: Suppli
     const handle = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(handle);
   }, []);
+
+  // 每次弹窗打开时，重置 formData（新建清空，编辑填入数据）
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        name: initialData?.name || "",
+        contact: initialData?.contact || "",
+        phone: initialData?.phone || "",
+        email: initialData?.email || "",
+        address: initialData?.address || "",
+        id: initialData?.id,
+        code: initialData?.code || ""
+      });
+    }
+  }, [isOpen, initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
