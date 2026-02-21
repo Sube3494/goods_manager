@@ -82,14 +82,16 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
-        if (item.type === 'video') return;
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        // 视频可以滑动导航，但不拖动内容
+        if (item.type !== 'video') {
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        }
         setIsDragging(true);
-        setDragStart({ x: e.clientX - xValue.get(), y: e.clientY - yValue.get() });
+        setDragStart({ x: e.clientX - (item.type === 'video' ? 0 : xValue.get()), y: e.clientY - (item.type === 'video' ? 0 : yValue.get()) });
     };
 
     const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isDragging) return;
+        if (!isDragging || item.type === 'video') return;
         const newX = e.clientX - dragStart.x;
         if (scaleValue.get() <= 1) {
             xValue.set(newX);
@@ -101,8 +103,23 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
 
     const handlePointerUp = (e: React.PointerEvent) => {
         if (!isDragging) return;
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        if (item.type !== 'video') {
+            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        }
         setIsDragging(false);
+
+        if (item.type === 'video') {
+            // 视频：只模拟滑动导航，不移动内容
+            const swipeX = e.clientX - dragStart.x;
+            const threshold = 50;
+            if (totalItems > 1 && swipeX > threshold) {
+                onNavigate(-1);
+            } else if (totalItems > 1 && swipeX < -threshold) {
+                onNavigate(1);
+            }
+            return;
+        }
+
         if (scaleValue.get() < 1.05) {
             const currentX = xValue.get();
             const threshold = 50;
@@ -176,6 +193,8 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
                         className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
                         controls
                         autoPlay
+                        muted
+                        playsInline
                     />
                 ) : (
                     /* eslint-disable-next-line @next/next/no-img-element */
