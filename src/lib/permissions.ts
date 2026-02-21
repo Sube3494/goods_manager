@@ -8,7 +8,7 @@ export type Permission =
   | "inbound:read" | "inbound:create"
   | "outbound:read" | "outbound:create"
   | "brush:read" | "brush:create"
-  | "gallery:upload" | "gallery:delete" | "gallery:audit"
+  | "gallery:upload" | "gallery:delete" | "gallery:audit" | "gallery:manage"
   | "system:manage"
   | "whitelist:manage" // Only for SUPER_ADMIN
   | "all";

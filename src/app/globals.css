@@ -59,6 +59,7 @@
     /* Light: Clean White & Zinc */
     --background: hsl(0 0% 100%);
     --foreground: hsl(240 10% 4%); /* Zinc 950 */
+    color-scheme: light;
 
     --card: hsl(0 0% 100%);
     --card-foreground: hsl(240 10% 4%);
@@ -93,6 +94,7 @@
     /* Dark: Deep Navy (MinPic Style) */
     --background: hsl(223 47% 6%); /* #080c16 */
     --foreground: hsl(210 40% 98%); /* #f8fafc */
+    color-scheme: dark;
  
     --card: hsl(221 45% 8%); /* #0b111e */
     --card-foreground: hsl(210 40% 98%);
@@ -153,6 +155,9 @@
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+  /* Force GPU acceleration during transition */
+  transform: translateZ(0);
+  will-change: clip-path, transform;
 }
 
 @layer utilities {

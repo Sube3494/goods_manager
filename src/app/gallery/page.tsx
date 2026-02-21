@@ -19,7 +19,7 @@ import { hasPermission } from "@/lib/permissions";
 import { Product, GalleryItem, Category } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
-import { pinyin } from 'pinyin-pro';
+
 
 interface LightboxMediaItemProps {
     item: GalleryItem;
@@ -211,6 +211,15 @@ function GalleryContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isUploadAllowed, setIsUploadAllowed] = useState(false);
 
+  // Debouncing search
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Sync ref with items
   useEffect(() => {
     itemsRef.current = items;
@@ -308,15 +317,23 @@ function GalleryContent() {
       
       if (isFirstPage && itemsRef.current.length === 0) {
         setIsLoading(true);
-      } else if (!isFirstPage) {
+      }
+      if (!isFirstPage) {
         setIsNextPageLoading(true);
       }
 
-      const galleryUrl = `/api/gallery?page=${targetPage}&pageSize=20`;
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        pageSize: "20",
+        ...(debouncedSearchQuery ? { query: debouncedSearchQuery } : {}),
+        ...(selectedCategory !== "All" ? { category: selectedCategory } : {})
+      });
+
+      const galleryUrl = `/api/gallery?${params.toString()}`;
       
       const [galleryRes, categoriesRes] = await Promise.all([
         fetch(galleryUrl),
-        fetch("/api/categories") // We fetch categories again but we only strictly need them on first load, keeping to minimize changes
+        fetch("/api/categories") 
       ]);
 
       if (galleryRes.ok && categoriesRes.ok) {
@@ -362,12 +379,12 @@ function GalleryContent() {
       setIsLoading(false);
       setIsNextPageLoading(false);
     }
-  }, []);
+  }, [debouncedSearchQuery, selectedCategory]);
 
   useEffect(() => {
     setMounted(true);
     fetchData(true);
-  }, [fetchData]);
+  }, [debouncedSearchQuery, selectedCategory, fetchData]);
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -548,46 +565,9 @@ function GalleryContent() {
     }
   };
 
-  // Pre-calculate pinyin for products to optimize search
-  const productPinyinMap = useMemo(() => {
-    const map: Record<string, { full: string, first: string }> = {};
-    if (Array.isArray(products)) {
-        products.forEach(p => {
-          if (!p.name) return;
-          const full = pinyin(p.name, { toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
-          const first = pinyin(p.name, { pattern: 'first', toneType: 'none', type: 'string' }).replace(/\s+/g, '').toLowerCase();
-          map[p.id] = { full, first };
-        });
-    }
-    return map;
-  }, [products]);
 
-  const filteredItems = items.filter(item => {
-    const product = item.product;
-    if (!isAdmin && !item.isPublic) return false;
-    if (!item.productId) return false; // Safety: must have productId
-
-    const searchLower = searchQuery.toLowerCase().replace(/\s+/g, '');
-    
-    // Safety check if product exists
-    if (!product) return false;
-
-    // Match Name only (SKU removed)
-    const matchesName = 
-      (product.name?.toLowerCase()?.includes(searchLower) ?? false);
-
-    // Match Pinyin
-    const pinyinData = productPinyinMap[product.id];
-    const matchesPinyin = pinyinData ? (
-        pinyinData.full.includes(searchLower) || 
-        pinyinData.first.includes(searchLower)
-    ) : false;
-
-    const matchesSearch = matchesName || matchesPinyin;
-
-    const matchesCategory = selectedCategory === "All" || item.product?.category?.name === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Server-side filtered items
+  const filteredItems = items;
 
   // Grouped logic: unique products with items
   const groupedProducts = useMemo(() => {
@@ -710,10 +690,10 @@ function GalleryContent() {
         {/* Header section with unified style */}
         <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-2">
                 <span>实物<span className="text-primary">相册</span></span>
             </h1>
-            <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
+            <p className="text-muted-foreground mt-2 text-sm sm:text-lg truncate">
                 {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
             </p>
           </div>

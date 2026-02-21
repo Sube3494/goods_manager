@@ -22,12 +22,12 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
-  const { theme, setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
 
   const toggleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
     // 1. Check if View Transitions API is supported
     if (!(document as unknown as DocumentWithViewTransition).startViewTransition) {
-      setTheme(theme === "light" ? "dark" : "light");
+      setTheme(resolvedTheme === "light" ? "dark" : "light");
       return;
     }
 
@@ -40,7 +40,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
 
     // 2. Start the transition
     const transition = (document as unknown as DocumentWithViewTransition).startViewTransition(() => {
-      setTheme(theme === "light" ? "dark" : "light");
+      setTheme(resolvedTheme === "light" ? "dark" : "light");
     });
 
     // 3. Animate the circular clip path
@@ -55,7 +55,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           clipPath: clipPath,
         },
         {
-          duration: 750,
+          duration: 400,
           easing: "cubic-bezier(0.4, 0, 0.2, 1)",
           // The new view (next theme) renders on top, effectively "revealing" it
           pseudoElement: "::view-transition-new(root)",
