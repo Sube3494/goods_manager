@@ -10,5 +10,8 @@ services:
     env_file:
       - .env
     volumes:
-      # 直接挂载宿主机本地目录，确保已有图片可见
-      - ./public/uploads:/app/public/uploads
+      # 本地存储模式下的上传文件持久化（使用 MinIO 则可移除）
+      - uploads_data:/app/public/uploads
+
+volumes:
+  uploads_data:
