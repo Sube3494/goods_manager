@@ -33,8 +33,8 @@ RUN pnpm build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Prisma 在 Alpine 上需要 openssl；postgresql-client 提供 psql 用于自动建库
-RUN apk add --no-cache openssl libc6-compat postgresql-client
+# Prisma 在 Alpine 上需要 openssl；postgresql-client 提供 psql 用于自动建库；su-exec 用于降权
+RUN apk add --no-cache openssl libc6-compat postgresql-client su-exec
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -61,11 +61,16 @@ COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
 # 上传文件持久化目录
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
 
-USER nextjs
+# 复制 entrypoint 脚本
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/
+
+# 注释掉 USER nextjs，保留 root 权限在启动容器时修复上传目录权限，最后通过 su-exec 在脚本内降权
+# USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # 启动顺序：自动建库 → 数据库同步 → 启动应用
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["sh", "-c", "sh scripts/init-db.sh && prisma db push --skip-generate --accept-data-loss && node server.js"]

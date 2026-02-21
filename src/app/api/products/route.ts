@@ -30,41 +30,40 @@ export async function GET(request: Request) {
     const lowStockThreshold = settings?.lowStockThreshold || 10;
 
     // 构建查询条件
-    const where: {
-      OR?: Array<{
-        name?: { contains: string; mode: "insensitive" };
-        sku?: { contains: string; mode: "insensitive" };
-        category?: { name: { contains: string; mode: "insensitive" } };
-        pinyin?: { contains: string; mode: "insensitive" };
-      }>;
-      category?: { name: string };
-      stock?: { lt: number };
-      isPublic?: boolean;
-    } = {};
+    const andConditions: any[] = [];
+
+    // 工作区过滤
+    if (session?.workspaceId) {
+      andConditions.push({ workspaceId: session.workspaceId });
+    }
 
     // 搜索词过滤 (支持 SKU、名称、分类、拼音)
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { sku: { contains: search, mode: "insensitive" } },
-        { category: { name: { contains: search, mode: "insensitive" } } },
-        { pinyin: { contains: search, mode: "insensitive" } }
-      ];
+      andConditions.push({
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { sku: { contains: search, mode: "insensitive" } },
+          { category: { name: { contains: search, mode: "insensitive" } } },
+          { pinyin: { contains: search, mode: "insensitive" } }
+        ]
+      });
     }
 
     // 分类过滤
     if (categoryName !== "all") {
-      where.category = { name: categoryName };
+      andConditions.push({ category: { name: categoryName } });
     }
 
     // 状态过滤 (库存预警、可见性)
     if (status === "low_stock") {
-      where.stock = { lt: lowStockThreshold };
+      andConditions.push({ stock: { lt: lowStockThreshold } });
     } else if (status === "public") {
-      where.isPublic = true;
+      andConditions.push({ isPublic: true });
     } else if (status === "private") {
-      where.isPublic = false;
+      andConditions.push({ isPublic: false });
     }
+
+    const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
     // 构建排序
     let orderBy: Array<Record<string, "asc" | "desc" | { [key: string]: "asc" | "desc" }>> = [];
@@ -235,8 +234,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(product);
   } catch (error: unknown) {
-    console.error("Failed to create product:", error);
-    
     // Handle Prisma Foreign Key Constraint Violated error
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
       return NextResponse.json({ 
@@ -250,6 +247,8 @@ export async function POST(request: Request) {
         error: "商品编码 (SKU) 已存在，请使用其他编码" 
       }, { status: 400 });
     }
+
+    console.error("Failed to create product:", error);
 
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
   }
@@ -307,14 +306,14 @@ export async function PUT(request: Request) {
 
     return NextResponse.json(updatedProduct);
   } catch (error: unknown) {
-    console.error("Failed to update product:", error);
-
     // Handle Prisma Unique Constraint Violated error (SKU already exists)
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json({ 
         error: "商品编码 (SKU) 已存在，请使用其他编码" 
       }, { status: 400 });
     }
+
+    console.error("Failed to update product:", error);
 
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
