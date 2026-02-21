@@ -36,6 +36,15 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [isZoomed, setIsZoomed] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    // 当切换到视频时强制播放
+    useEffect(() => {
+        if (item.type === 'video' && videoRef.current) {
+            videoRef.current.currentTime = 0;
+            videoRef.current.play().catch(() => {});
+        }
+    }, [item.type, item.url]);
 
     const softSpringConfig = { stiffness: 180, damping: 20, mass: 0.4 };
     const hardSpringConfig = { stiffness: 5000, damping: 200, mass: 0.05 };
@@ -189,10 +198,10 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
             >
                 {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
                     <video 
+                        ref={videoRef}
                         src={item.url} 
                         className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
                         controls
-                        autoPlay
                         muted
                         playsInline
                     />
