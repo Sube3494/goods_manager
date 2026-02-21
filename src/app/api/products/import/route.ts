@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { SessionUser } from "@/lib/permissions";
+import { pinyin } from "pinyin-pro";
+
+function generatePinyinSearchText(name: string): string {
+  if (!name) return "";
+  const fullPinyin = pinyin(name, { toneType: 'none', type: 'string', v: true }).replace(/\s+/g, '');
+  const firstLetters = pinyin(name, { pattern: 'first', toneType: 'none', type: 'string' }).replace(/\s+/g, '');
+  return `${fullPinyin} ${firstLetters}`.toLowerCase();
+}
 
 export async function POST(request: Request) {
   try {
@@ -69,7 +77,8 @@ export async function POST(request: Request) {
                 }
 
                 const updateData: Record<string, unknown> = {
-                    costPrice: newCostPrice
+                    costPrice: newCostPrice,
+                    pinyin: name ? generatePinyinSearchText(name) : undefined
                 };
 
                 if (quantity > 0) {
@@ -173,6 +182,7 @@ export async function POST(request: Request) {
                         costPrice: costPrice > 0 ? costPrice : 0,
                         stock: quantity > 0 ? quantity : 0,
                         image: finalImage,
+                        pinyin: generatePinyinSearchText(name),
                         workspaceId
                     }
                 });

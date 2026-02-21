@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { pinyin } from "pinyin-pro";
+
+function generatePinyinSearchText(name: string): string {
+  if (!name) return "";
+  const fullPinyin = pinyin(name, { toneType: 'none', type: 'string', v: true }).replace(/\s+/g, '');
+  const firstLetters = pinyin(name, { pattern: 'first', toneType: 'none', type: 'string' }).replace(/\s+/g, '');
+  return `${fullPinyin} ${firstLetters}`.toLowerCase();
+}
 
 // 获取所有商品 (支持分页、筛选、排序)
 export async function GET(request: Request) {
@@ -27,18 +35,20 @@ export async function GET(request: Request) {
         name?: { contains: string; mode: "insensitive" };
         sku?: { contains: string; mode: "insensitive" };
         category?: { name: { contains: string; mode: "insensitive" } };
+        pinyin?: { contains: string; mode: "insensitive" };
       }>;
       category?: { name: string };
       stock?: { lt: number };
       isPublic?: boolean;
     } = {};
 
-    // 搜索词过滤 (支持 SKU、名称、分类)
+    // 搜索词过滤 (支持 SKU、名称、分类、拼音)
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
         { sku: { contains: search, mode: "insensitive" } },
-        { category: { name: { contains: search, mode: "insensitive" } } }
+        { category: { name: { contains: search, mode: "insensitive" } } },
+        { pinyin: { contains: search, mode: "insensitive" } }
       ];
     }
 
@@ -189,6 +199,7 @@ export async function POST(request: Request) {
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
+        pinyin: generatePinyinSearchText(name),
         isPublic: isPublic ?? true,
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         workspaceId: session.workspaceId,
@@ -281,6 +292,7 @@ export async function PUT(request: Request) {
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image,
+        pinyin: name ? generatePinyinSearchText(name) : undefined,
         isPublic: isPublic ?? undefined,
         // Using Prisma Json values correctly. If specs is explicitly sent (even empty object), save it. 
         // If undefined entirely, don't update it to avoid wiping out accidently.

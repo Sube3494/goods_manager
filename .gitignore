@@ -52,3 +52,13 @@ next-env.d.ts
 /public/uploads/*
 !/public/uploads/.gitkeep
 
+
+
+# Prisma Generated Client
+/prisma/generated-client
+
+
+# Generated Prisma client
+/prisma/generated-client
+
+/prisma/generated-client
