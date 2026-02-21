@@ -19,7 +19,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 生成 Prisma Client
+# 生成 Prisma Client (使用淘宝源加速二进制下载)
+ENV PRISMA_ENGINES_MIRROR="https://npmmirror.com/mirrors/prisma"
 RUN pnpm exec prisma generate
 
 # 构建 Next.js（standalone 模式减小镜像体积）
