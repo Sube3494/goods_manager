@@ -9,11 +9,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  USER
-  SUPER_ADMIN
-}
-
 model Workspace {
   id                 String              @id @default(cuid())
   name               String              @default("My Workspace")
@@ -49,19 +44,19 @@ model Category {
 
 model Product {
   id              String              @id @default(cuid())
-  sku             String?
+  sku             String?             @unique
   name            String
   costPrice       Float               @default(0)
   stock           Int                 @default(0)
   image           String?
-  pinyin          String?
-  isPublic        Boolean             @default(true)
-  specs           Json?
   categoryId      String
   supplierId      String?
   workspaceId     String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+  isPublic        Boolean             @default(true)
+  specs           Json?
+  pinyin          String?
   brushOrderItems BrushOrderItem[]
   gallery         GalleryItem[]
   outboundItems   OutboundOrderItem[]
@@ -70,7 +65,6 @@ model Product {
   workspace       Workspace?          @relation(fields: [workspaceId], references: [id])
   orderItems      PurchaseOrderItem[]
 
-  @@unique([sku])
   @@index([categoryId])
   @@index([supplierId])
   @@index([workspaceId])
@@ -105,10 +99,10 @@ model PurchaseOrder {
   extraFees       Float               @default(0)
   paymentVouchers Json?               @default("[]")
   trackingData    Json?               @default("[]")
-  note            String?
   workspaceId     String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+  note            String?
   workspace       Workspace?          @relation(fields: [workspaceId], references: [id])
   items           PurchaseOrderItem[]
 
@@ -135,10 +129,10 @@ model OutboundOrder {
   type        String              @default("Sale")
   date        DateTime            @default(now())
   note        String?
-  status      String              @default("Normal")
   workspaceId String?
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
+  status      String              @default("Normal")
   workspace   Workspace?          @relation(fields: [workspaceId], references: [id])
   items       OutboundOrderItem[]
 
@@ -195,7 +189,7 @@ model User {
   email          String     @unique
   name           String?
   role           Role       @default(USER)
-  status         String     @default("ACTIVE") // ACTIVE, DISABLED
+  status         String     @default("ACTIVE")
   permissions    Json?      @default("{}")
   workspaceId    String?
   createdAt      DateTime   @default(now())
@@ -205,13 +199,13 @@ model User {
 }
 
 model EmailWhitelist {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  role        Role     @default(USER)
+  id                String   @id @default(cuid())
+  email             String   @unique
+  role              Role     @default(USER)
   permissions       Json?    @default("{}")
-  targetWorkspaceId String?
   createdAt         DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt         DateTime @updatedAt
+  targetWorkspaceId String?
 }
 
 model VerificationCode {
@@ -274,4 +268,9 @@ model BrushOrderItem {
   updatedAt    DateTime   @updatedAt
   brushOrder   BrushOrder @relation(fields: [brushOrderId], references: [id], onDelete: Cascade)
   product      Product    @relation(fields: [productId], references: [id])
+}
+
+enum Role {
+  USER
+  SUPER_ADMIN
 }

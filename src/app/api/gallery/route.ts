@@ -32,6 +32,7 @@ export async function GET(request: Request) {
         OR: [
           { product: { name: { contains: query } } },
           { product: { sku: { contains: query } } },
+          { product: { pinyin: { contains: query } } },
           { tags: { has: query } }
         ]
       } : {}),
