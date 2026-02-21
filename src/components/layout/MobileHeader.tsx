@@ -15,30 +15,30 @@ export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: Mobil
   const { user, isLoading } = useUser();
 
   return (
-    <header className="lg:hidden fixed top-0 left-0 right-0 z-50 px-4 pt-4 flex items-start justify-between pointer-events-none">
+    <header className="lg:hidden relative px-4 py-2 flex items-center justify-between">
       <div className="flex items-center gap-3 pointer-events-auto">
         {showMenu && (
           <button
             onClick={onToggleSidebar}
-            className="p-2 text-foreground/80 hover:text-foreground transition-colors active:scale-95"
+            className="p-2 text-foreground/80 hover:text-foreground transition-colors active:scale-95 bg-white/10 dark:bg-white/5 rounded-full border border-white/10"
             aria-label={isOpen ? "Close menu" : "Open menu"}
           >
-            {isOpen ? <X size={24} /> : <Menu size={24} />}
+            {isOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         )}
       </div>
       
-      <div className="flex items-center gap-2 pointer-events-auto">
+      <div className="flex items-center gap-3 pointer-events-auto">
         {!user && !isLoading && (
             <Link 
                 href="/login"
-                className="flex items-center gap-2 px-4 h-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-2 px-4 h-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-all shadow-sm active:scale-95"
             >
                 <LogIn size={16} />
                 登录
             </Link>
         )}
-        <ThemeToggle className="bg-transparent border-none shadow-none text-foreground/80 hover:text-foreground" />
+        <ThemeToggle />
       </div>
     </header>
   );

@@ -94,8 +94,8 @@ export default function LoginPage() {
                     opacity: [0.3, 0.5, 0.3],
                     rotate: [0, 90, 0]
                 }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="absolute -top-[20%] -left-[10%] w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px]" 
+                transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
+                className="absolute -top-[20%] -left-[10%] w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] transform-gpu will-change-transform" 
             />
             <motion.div 
                 animate={{ 
@@ -104,16 +104,16 @@ export default function LoginPage() {
                     x: [0, 50, 0],
                     y: [0, -50, 0]
                 }}
-                transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-[40%] right-[10%] w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[100px]" 
+                transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[40%] right-[10%] w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[100px] transform-gpu will-change-transform" 
             />
             <motion.div 
                  animate={{ 
                     opacity: [0.1, 0.3, 0.1],
                     scale: [1, 1.3, 1]
                 }}
-                transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -bottom-[20%] left-[20%] w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[120px]" 
+                transition={{ duration: 40, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute -bottom-[20%] left-[20%] w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[120px] transform-gpu will-change-transform hidden md:block" 
             />
         </div>
 

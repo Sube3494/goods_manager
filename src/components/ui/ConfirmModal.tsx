@@ -20,6 +20,7 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "warning" | "info" | "success";
+  className?: string;
 }
 
 export function ConfirmModal({
@@ -30,7 +31,8 @@ export function ConfirmModal({
   message,
   confirmLabel = "确定",
   cancelLabel = "取消",
-  variant = "warning"
+  variant = "warning",
+  className
 }: ConfirmModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -80,7 +82,7 @@ export function ConfirmModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-20000 flex items-center justify-center p-4">
+        <div className={cn("fixed inset-0 z-20000 flex items-center justify-center p-4", className)}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -26,9 +26,10 @@ interface LightboxMediaItemProps {
     direction: number;
     onNavigate: (dir: number) => void;
     onScaleChange: (v: number) => void;
+    totalItems: number;
 }
 
-const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: LightboxMediaItemProps) => {
+const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalItems }: LightboxMediaItemProps) => {
     const scaleValue = useMotionValue(1);
     const xValue = useMotionValue(0);
     const yValue = useMotionValue(0);
@@ -82,6 +83,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
 
     const handlePointerDown = (e: React.PointerEvent) => {
         if (item.type === 'video') return;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         setIsDragging(true);
         setDragStart({ x: e.clientX - xValue.get(), y: e.clientY - yValue.get() });
     };
@@ -97,18 +99,20 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
         }
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (e: React.PointerEvent) => {
         if (!isDragging) return;
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
         setIsDragging(false);
-        if (scaleValue.get() <= 1) {
+        if (scaleValue.get() < 1.05) {
             const currentX = xValue.get();
             const threshold = 50;
-            if (currentX > threshold) {
+            if (totalItems > 1 && currentX > threshold) {
                 onNavigate(-1);
-            } else if (currentX < -threshold) {
+            } else if (totalItems > 1 && currentX < -threshold) {
                 onNavigate(1);
             } else {
                 animate(xValue, 0, { type: "spring", ...softSpringConfig });
+                animate(yValue, 0, { type: "spring", ...softSpringConfig });
             }
         }
     };
@@ -157,7 +161,8 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange }: Light
                     scale: smoothScale,
                     width: '100%',
                     height: '100%',
-                    willChange: "transform"
+                    willChange: "transform",
+                    touchAction: 'none'
                 }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -721,17 +726,18 @@ function GalleryContent() {
                      // Reset form if on main gallery page to avoid stale state
                      setUploadForm({ productId: "", urls: [], tags: "" });
                    }}
-                   className="h-10 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
+                   className="h-9 w-9 sm:h-10 sm:w-auto sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center sm:gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap shrink-0"
                  >
-                   <Plus size={18} /> <span className="hidden xs:inline">上传实拍</span><span className="xs:hidden">上传</span>
+                   <Plus size={20} className="shrink-0" />
+                   <span className="hidden sm:inline">上传实物</span>
                  </button>
                )}
              </div>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
-              <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1 shrink-0 relative">
-                <Search size={18} className="text-muted-foreground shrink-0" />
+          <div className="flex flex-row gap-2 mb-6 md:mb-8 items-center w-full">
+              <div className="h-10 sm:h-11 px-3 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
+                <Search size={16} className="text-muted-foreground shrink-0 sm:w-[18px] sm:h-[18px]" />
                 <input 
                     type="text" 
                     placeholder="搜索商品名..." 
@@ -749,19 +755,17 @@ function GalleryContent() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto">
-                  <div className="col-span-1 lg:w-40 h-10 sm:h-11">
-                       <CustomSelect 
-                            value={selectedCategory === "All" ? "all" : selectedCategory}
-                            onChange={(val) => setSelectedCategory(val === "all" ? "All" : val)}
-                            options={[
-                                { value: 'all', label: '全部展示' },
-                                ...categories.map(c => ({ value: c.name, label: c.name }))
-                            ]}
-                            className="h-full"
-                            triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
-                        />
-                  </div>
+              <div className="shrink-0 w-28 sm:w-40 h-10 sm:h-11">
+                   <CustomSelect 
+                        value={selectedCategory === "All" ? "all" : selectedCategory}
+                        onChange={(val) => setSelectedCategory(val === "all" ? "All" : val)}
+                        options={[
+                            { value: 'all', label: '全部' },
+                            ...categories.map(c => ({ value: c.name, label: c.name }))
+                        ]}
+                        className="h-full"
+                        triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                    />
               </div>
           </div>
 
@@ -883,7 +887,7 @@ function GalleryContent() {
         {mounted && createPortal(
             <AnimatePresence>
                 {isUploadModalOpen && (
-                    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-50000 flex items-center justify-center p-4">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -1330,6 +1334,23 @@ function GalleryContent() {
                                 </AnimatePresence>
 
                                 <div className="flex items-center gap-2 pointer-events-auto">
+                                    {(isUploadAllowed || isAdmin) && canUpload && (
+                                        <button 
+                                            onClick={() => {
+                                                const product = selectedImage?.product;
+                                                setUploadForm({ 
+                                                    productId: product?.id || "", 
+                                                    urls: [], 
+                                                    tags: "" 
+                                                });
+                                                setIsUploadModalOpen(true);
+                                            }}
+                                            className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
+                                            title="为此商品上传新实拍"
+                                        >
+                                            <Plus size={20} strokeWidth={2.5} />
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={() => {
                                             const product = selectedImage.product;
@@ -1385,6 +1406,7 @@ function GalleryContent() {
                                         direction={previewDirection}
                                         onNavigate={navigate}
                                         onScaleChange={(v) => activeScale.set(v)}
+                                        totalItems={relatedImages.length}
                                     />
                                 </AnimatePresence>
                             </div>
@@ -1475,6 +1497,7 @@ function GalleryContent() {
             title={confirmConfig.title}
             confirmLabel="确认删除"
             variant="danger"
+            className="z-31000"
         />
 
         <ActionBar 

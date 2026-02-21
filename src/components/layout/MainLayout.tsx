@@ -83,22 +83,24 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               />
             )}
             {!isLoginPage && (
-                <header className="hidden lg:flex sticky top-0 z-50 h-20 px-10 items-center justify-end gap-4">
-                    {!user && !isLoading && (
-                        <Link 
-                            href="/login"
-                            className="flex items-center gap-2 px-5 h-10 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm active:scale-95"
-                        >
-                            <LogIn size={18} />
-                            登录
-                        </Link>
-                    )}
-                    <ThemeToggle />
+                <header className="hidden lg:flex h-14 px-6 items-center justify-end gap-3">
+                    <div className="flex items-center gap-3">
+                        {!user && !isLoading && (
+                            <Link 
+                                href="/login"
+                                className="flex items-center gap-2 px-4 h-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm active:scale-95"
+                            >
+                                <LogIn size={16} />
+                                登录
+                            </Link>
+                        )}
+                        <ThemeToggle className="h-9 w-9" />
+                    </div>
                 </header>
             )}            
             <main className={cn(
                 "flex-1 w-full",
-                !isLoginPage && "px-4 sm:px-6 lg:px-10 pb-10 pt-16 lg:pt-0"
+                !isLoginPage && "px-4 sm:px-6 lg:px-10 pb-10 pt-4"
             )}>
                 <div className={cn(
                     "h-full animate-fade-in",
