@@ -49,9 +49,10 @@ export async function GET(request: Request) {
       where,
       skip,
       take: pageSize,
-      orderBy: {
-        createdAt: 'desc'
-      },
+      orderBy: [
+        { product: { sku: 'asc' } },
+        { createdAt: 'desc' }
+      ],
       include: {
         product: {
           select: {

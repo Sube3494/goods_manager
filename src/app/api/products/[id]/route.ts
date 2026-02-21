@@ -61,7 +61,12 @@ export async function PUT(
     });
 
     return NextResponse.json(product);
-  } catch {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json({ 
+        error: "商品编码 (SKU) 已存在，请使用其他编码" 
+      }, { status: 400 });
+    }
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
 }

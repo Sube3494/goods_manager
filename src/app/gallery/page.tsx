@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
-import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2 } from "lucide-react";
+import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -685,15 +685,18 @@ function GalleryContent() {
   };
 
   return (
-    <div className="w-full space-y-8 pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+    <div className="w-full pb-12 animate-in fade-in slide-in-from-top-4 duration-700">
         {/* Header */}
         {/* Header section with unified style */}
-        <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
+        <div className={cn(
+          "flex items-center justify-between transition-all relative z-10 gap-4",
+          canUpload ? "mb-6 sm:mb-8" : "mb-2 sm:mb-4"
+        )}>
           <div className="min-w-0 flex-1">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
                 <span>实物<span className="text-primary">相册</span></span>
             </h1>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-lg truncate">
+            <p className="text-muted-foreground mt-0.5 sm:mt-1.5 text-[10px] sm:text-lg truncate opacity-80 font-medium">
                 {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
             </p>
           </div>
@@ -715,7 +718,10 @@ function GalleryContent() {
              </div>
           </div>
 
-          <div className="flex flex-row gap-2 mb-6 md:mb-8 items-center w-full">
+        <div className={cn(
+            "flex flex-row gap-2 items-center w-full transition-all",
+            canUpload ? "mb-6 md:mb-10" : "mb-6 sm:mb-10"
+        )}>
               <div className="h-10 sm:h-11 px-3 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
                 <Search size={16} className="text-muted-foreground shrink-0 sm:w-[18px] sm:h-[18px]" />
                 <input 
@@ -748,8 +754,6 @@ function GalleryContent() {
                     />
               </div>
           </div>
-
-
 
         {/* Responsive Grid / Waterfall */}
         <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -790,13 +794,25 @@ function GalleryContent() {
                                         }}
                                     />
                                 ) : (
-                                    <Image 
-                                        src={coverUrl} 
-                                        alt={group.product.name} 
-                                        fill 
-                                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                        className="object-cover transition-transform duration-700 group-hover:scale-105" 
-                                    />
+                                    <>
+                                        <div className="absolute inset-0 bg-muted animate-pulse" />
+                                        <Image 
+                                            src={coverUrl} 
+                                            alt={group.product.name} 
+                                            fill 
+                                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                            className="object-cover transition-all duration-700 opacity-0 group-hover:scale-105" 
+                                            onLoadingComplete={(img) => {
+                                                img.classList.remove('opacity-0');
+                                                img.classList.add('opacity-100');
+                                                // Find the closest sibling with animate-pulse and hide it
+                                                const skeleton = img.parentElement?.querySelector('.animate-pulse');
+                                                if (skeleton) {
+                                                    (skeleton as HTMLElement).style.display = 'none';
+                                                }
+                                            }}
+                                        />
+                                    </>
                                 )}
                                 
                                 {/* Removed SKU badge from card top right */}
@@ -838,28 +854,57 @@ function GalleryContent() {
             </div>
         )}
 
-        {/* Loading State */}
+        {/* Skeleton Grid for Initial Loading */}
         {isLoading && (
-            <div className="py-32 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="flex space-x-2">
-                    <div className="w-2.5 h-2.5 bg-primary/40 rounded-full animate-bounce" />
-                    <div className="w-2.5 h-2.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
-                    <div className="w-2.5 h-2.5 bg-primary/80 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
-                </div>
-                <p className="text-muted-foreground animate-pulse text-sm">正在加载相册...</p>
+            <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {[...Array(8)].map((_, i) => (
+                    <div key={i} className="rounded-2xl sm:rounded-3xl overflow-hidden border border-border/50 bg-white dark:bg-zinc-900/50 flex flex-col h-full animate-pulse">
+                        <div className="aspect-4/5 sm:aspect-square bg-muted relative overflow-hidden">
+                             <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/10 to-transparent skew-x-12 -translate-x-full animate-[shimmer_2s_infinite]" />
+                        </div>
+                        <div className="p-4 space-y-3">
+                            <div className="h-4 bg-muted rounded-md w-3/4" />
+                            <div className="h-3 bg-muted rounded-md w-1/2" />
+                            <div className="flex justify-between items-center pt-2">
+                                <div className="h-5 bg-muted rounded-full w-20" />
+                                <div className="h-5 bg-muted rounded-full w-12" />
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
         )}
 
-        {/* Empty State */}
+        {/* Enhanced Empty State */}
         {!isLoading && filteredItems.length === 0 && (
-            <div className="py-32 flex flex-col items-center justify-center text-center space-y-6">
-                <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center text-black/30 dark:text-white/30">
-                    <Camera size={48} />
+            <div className="py-24 sm:py-32 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
+                <div className="relative">
+                    <div className="h-28 w-28 rounded-full bg-primary/5 flex items-center justify-center text-primary/20 dark:text-primary/10">
+                        <Camera size={56} strokeWidth={1.5} />
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 h-10 w-10 rounded-full bg-background border border-border flex items-center justify-center text-muted-foreground shadow-sm">
+                        <Search size={20} />
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-foreground">暂无符合条件的媒体内容</h3>
-                    <p className="text-muted-foreground">尝试更换搜索词或选择其他分类</p>
+                <div className="space-y-3 max-w-xs mx-auto">
+                    <h3 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">找不到对应的实拍</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                        没有找到与 {searchQuery ? `"${searchQuery}"` : "当前筛选"} 匹配的内容。您可以尝试清理过滤条件再次搜索。
+                    </p>
                 </div>
+                
+                {(searchQuery || selectedCategory !== "All") && (
+                    <button 
+                        onClick={() => {
+                            setSearchQuery("");
+                            setSelectedCategory("All");
+                        }}
+                        className="px-6 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground text-sm font-bold transition-all flex items-center gap-2 group border border-border/50"
+                    >
+                        <RefreshCcw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
+                        清除所有筛选
+                    </button>
+                )}
             </div>
         )}
 
@@ -1033,9 +1078,9 @@ function GalleryContent() {
                                                         if (!p) return null;
                                                         return (
                                                             <div className="h-10 w-10 rounded-lg overflow-hidden bg-background border border-border/50 shrink-0 flex items-center justify-center">
-                                                                {p?.image ? (
+                                                                {p.image ? (
                                                                     /* eslint-disable-next-line @next/next/no-img-element */
-                                                                    <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                                                                    <img src={p.image as string} alt={p.name} className="h-full w-full object-cover" />
                                                                 ) : (
                                                                     <Package size={18} className="text-muted-foreground/50" />
                                                                 )}
@@ -1268,25 +1313,25 @@ function GalleryContent() {
                                                 <div className="flex flex-col gap-1 font-rounded">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-black shrink-0">商品信息</span>
-                                                        {selectedImage.product?.sku && (
+                                                        {selectedImage!.product?.sku && (
                                                             <span className="inline-flex items-center justify-center bg-white/10 px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-bold leading-none text-white/90">
-                                                                {selectedImage.product?.sku}
+                                                                {selectedImage!.product?.sku}
                                                             </span>
                                                         )}
                                                     </div>
                                                     <h3 className="text-white font-bold text-sm md:text-xl leading-snug tracking-tight">
-                                                        {selectedImage.product?.name}
+                                                        {selectedImage!.product?.name}
                                                     </h3>
                                                 </div>
                                                 
                                                 {/* Specifications */}
-                                                {selectedImage.product?.specs && Object.keys(selectedImage.product.specs).length > 0 && (
+                                                {selectedImage!.product?.specs && Object.keys(selectedImage!.product!.specs as object).length > 0 && (
                                                     <div className="mt-10 space-y-5 font-rounded">
                                                         <div className="flex items-center">
                                                             <span className="text-[10px] text-white/70 uppercase tracking-[0.3em] font-black">商品参数</span>
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-3">
-                                                            {Object.entries(selectedImage.product.specs).map(([key, value], index) => {
+                                                            {Object.entries(selectedImage!.product!.specs as Record<string, string>).map(([key, value], index) => {
                                                                 const isLongValue = String(value).length > 20;
                                                                 return (
                                                                     <div 
@@ -1381,8 +1426,8 @@ function GalleryContent() {
 
                                 <AnimatePresence initial={false} custom={previewDirection}>
                                     <LightboxMediaItem 
-                                        key={selectedImage.id}
-                                        item={selectedImage}
+                                        key={selectedImage!.id}
+                                        item={selectedImage!}
                                         direction={previewDirection}
                                         onNavigate={navigate}
                                         onScaleChange={(v) => activeScale.set(v)}
@@ -1403,7 +1448,7 @@ function GalleryContent() {
                             >
                                 <div className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-full py-2 px-4">
                                 {relatedImages.map((img, idx) => {
-                                    const isSelected = img.id === selectedImage.id;
+                                    const isSelected = img.id === selectedImage!.id;
                                     return (
                                         <div key={img.id} className="flex flex-col items-center gap-2 shrink-0">
                                             <motion.div 

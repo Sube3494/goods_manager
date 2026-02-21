@@ -233,6 +233,13 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    // Handle Prisma Unique Constraint Violated error (SKU already exists)
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json({ 
+        error: "商品编码 (SKU) 已存在，请使用其他编码" 
+      }, { status: 400 });
+    }
+
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
   }
 }
@@ -287,8 +294,16 @@ export async function PUT(request: Request) {
     });
 
     return NextResponse.json(updatedProduct);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to update product:", error);
+
+    // Handle Prisma Unique Constraint Violated error (SKU already exists)
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json({ 
+        error: "商品编码 (SKU) 已存在，请使用其他编码" 
+      }, { status: 400 });
+    }
+
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
 }
