@@ -4,7 +4,7 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
 
-type ProductWhereInput = NonNullable<Parameters<typeof import("@/lib/prisma").default.product.findMany>[0]>["where"];
+type ProductWhereInput = NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"];
 
 function generatePinyinSearchText(name: string): string {
   if (!name) return "";
