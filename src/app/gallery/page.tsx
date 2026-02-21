@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
-import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw } from "lucide-react";
+import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2 } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -1404,6 +1404,20 @@ function GalleryContent() {
                                             <Plus size={20} strokeWidth={2.5} />
                                         </button>
                                     )}
+                                    <button 
+                                        onClick={() => {
+                                            const url = new URL(selectedImage.url, window.location.origin).href;
+                                            navigator.clipboard.writeText(url).then(() => {
+                                                showToast("链接已复制", "success");
+                                            }).catch(() => {
+                                                showToast("复制失败", "error");
+                                            });
+                                        }}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl shadow-xl"
+                                        title="复制媒体链接"
+                                    >
+                                        <Link2 size={18} />
+                                    </button>
                                     <button 
                                         onClick={() => {
                                             const product = selectedImage.product;
