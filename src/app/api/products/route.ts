@@ -4,6 +4,8 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
 
+type ProductWhereInput = NonNullable<Parameters<typeof import("@/lib/prisma").default.product.findMany>[0]>["where"];
+
 function generatePinyinSearchText(name: string): string {
   if (!name) return "";
   const fullPinyin = pinyin(name, { toneType: 'none', type: 'string', v: true }).replace(/\s+/g, '');
@@ -14,6 +16,7 @@ function generatePinyinSearchText(name: string): string {
 // 获取所有商品 (支持分页、筛选、排序)
 export async function GET(request: Request) {
   try {
+    const session = await getFreshSession() as SessionUser | null;
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "20");
@@ -30,7 +33,7 @@ export async function GET(request: Request) {
     const lowStockThreshold = settings?.lowStockThreshold || 10;
 
     // 构建查询条件
-    const andConditions: any[] = [];
+    const andConditions: NonNullable<ProductWhereInput>[] = [];
 
     // 工作区过滤
     if (session?.workspaceId) {
