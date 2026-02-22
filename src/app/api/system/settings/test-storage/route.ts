@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-10 17:43:27
+ * @Author: Sube
+ * @FilePath: route.ts
+ * @LastEditTime: 2026-02-23 02:27:30
+ * @Description: 
+ */
 import { NextResponse } from "next/server";
 import * as Minio from "minio";
 
@@ -12,9 +19,10 @@ export async function POST(request: Request) {
     if (!config.minioEndpoint || !config.minioAccessKey || !config.minioSecretKey) {
       return NextResponse.json({ error: "配置信息不完整" }, { status: 400 });
     }
+    const endPoint = config.minioEndpoint.replace(/^\[|\]$/g, '');
 
     const minioClient = new Minio.Client({
-      endPoint: config.minioEndpoint,
+      endPoint: endPoint,
       port: config.minioPort ? Number(config.minioPort) : undefined,
       useSSL: config.minioUseSSL ?? true,
       accessKey: config.minioAccessKey,

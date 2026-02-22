@@ -320,8 +320,9 @@ export class MinioStorageStrategy implements StorageStrategy {
   }
 
   async upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult> {
+    const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
     const minioClient = new Minio.Client({
-      endPoint: this.config.minioEndpoint,
+      endPoint: endPoint,
       port: this.config.minioPort ? Number(this.config.minioPort) : undefined,
       useSSL: this.config.minioUseSSL,
       accessKey: this.config.minioAccessKey,
@@ -457,14 +458,20 @@ export class MinioStorageStrategy implements StorageStrategy {
     const publicUrl = this.config.minioPublicUrl ? this.config.minioPublicUrl.replace(/\/$/, "") : null;
     const protocol = this.config.minioUseSSL ? "https" : "http";
     const portPart = this.config.minioPort ? `:${this.config.minioPort}` : "";
-    const baseUrl = publicUrl ? `${publicUrl}/${bucketName}` : `${protocol}://${this.config.minioEndpoint}${portPart}/${bucketName}`;
+    
+    // Check if endpoint is IPv6 and wrap with brackets if not using public url
+    const rawEndpoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
+    const host = rawEndpoint.includes(':') ? `[${rawEndpoint}]` : rawEndpoint;
+    
+    const baseUrl = publicUrl ? `${publicUrl}/${bucketName}` : `${protocol}://${host}${portPart}/${bucketName}`;
     return `${baseUrl}/${path.replace(/^\//, '')}`;
   }
 
   async getPresignedUrl(options: UploadOptions): Promise<{ url: string; fileName: string; publicUrl: string } | null> {
     try {
+      const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
       const minioClient = new Minio.Client({
-        endPoint: this.config.minioEndpoint,
+        endPoint: endPoint,
         port: this.config.minioPort ? Number(this.config.minioPort) : undefined,
         useSSL: this.config.minioUseSSL,
         accessKey: this.config.minioAccessKey,
@@ -543,8 +550,9 @@ export class MinioStorageStrategy implements StorageStrategy {
 
   async delete(url: string): Promise<void> {
     try {
+      const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
       const minioClient = new Minio.Client({
-        endPoint: this.config.minioEndpoint,
+        endPoint: endPoint,
         port: this.config.minioPort ? Number(this.config.minioPort) : undefined,
         useSSL: this.config.minioUseSSL,
         accessKey: this.config.minioAccessKey,
