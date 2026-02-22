@@ -24,6 +24,7 @@ export interface UploadOptions {
 export interface StorageStrategy {
   upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult>;
   delete(url: string): Promise<void>;
+  resolveUrl(path: string): string; // Add resolveUrl to strategy
 }
 
 export interface MinioConfig {
@@ -157,6 +158,10 @@ export class LocalStorageStrategy implements StorageStrategy {
   private strategy: string;
   constructor(strategy: string = "uuid") {
     this.strategy = strategy;
+  }
+
+  resolveUrl(path: string): string {
+    return path; // Local already returns /uploads/... which is relative to root
   }
 
 
@@ -366,18 +371,8 @@ export class MinioStorageStrategy implements StorageStrategy {
 
     const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(fileName);
     
-    // 构造访问链接
-    let url = "";
-    if (this.config.minioPublicUrl) {
-      url = `${this.config.minioPublicUrl.replace(/\/$/, "")}/${bucketName}/${fileName}`;
-    } else {
-      const protocol = this.config.minioUseSSL ? "https" : "http";
-      const portPart = this.config.minioPort ? `:${this.config.minioPort}` : "";
-      url = `${protocol}://${this.config.minioEndpoint}${portPart}/${bucketName}/${fileName}`;
-    }
-
     const result: UploadResult = {
-      url,
+      url: fileName, // Store relative object name in DB
       name: fileName.split('/').pop() || fileName,
       type: isVideo ? "video" : "image",
       skipped: skip
@@ -425,6 +420,16 @@ export class MinioStorageStrategy implements StorageStrategy {
     return result;
   }
 
+  resolveUrl(path: string): string {
+    if (!path || path.startsWith('http')) return path;
+    const bucketName = this.config.minioBucket || "goods-manager";
+    const publicUrl = this.config.minioPublicUrl ? this.config.minioPublicUrl.replace(/\/$/, "") : null;
+    const protocol = this.config.minioUseSSL ? "https" : "http";
+    const portPart = this.config.minioPort ? `:${this.config.minioPort}` : "";
+    const baseUrl = publicUrl ? `${publicUrl}/${bucketName}` : `${protocol}://${this.config.minioEndpoint}${portPart}/${bucketName}`;
+    return `${baseUrl}/${path.replace(/^\//, '')}`;
+  }
+
   async delete(url: string): Promise<void> {
     try {
       const minioClient = new Minio.Client({
@@ -436,22 +441,20 @@ export class MinioStorageStrategy implements StorageStrategy {
       });
 
       const bucketName = this.config.minioBucket || "goods-manager";
-      
-      // 从 URL 中提取对象名称。假设 URL 结尾是 /bucket/filename
-      // 或者在配置了 PublicUrl 的情况下，是 /filename
-      // From URL extract the object name. 
-      // Assumption: URL ends with /bucket/objectname or /objectname
-      // If bucket is in URL, we need to strip it.
-      // Easiest is to use the path after domain/bucket
-      const urlObj = new URL(url);
-      const pathParts = urlObj.pathname.split("/").filter(Boolean);
-      
-      // If path starts with bucket name, remove it
-      if (pathParts[0] === bucketName) {
-          pathParts.shift();
+      let objectName = "";
+
+      if (url.startsWith('http')) {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split("/").filter(Boolean);
+        if (pathParts[0] === bucketName) {
+            pathParts.shift();
+        }
+        objectName = pathParts.join("/");
+      } else {
+        // Assume it is already a relative path/object name
+        objectName = url;
       }
-      
-      const objectName = pathParts.join("/");
+
       if (!objectName) return;
 
       await minioClient.removeObject(bucketName, objectName);

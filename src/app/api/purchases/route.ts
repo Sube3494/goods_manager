@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { PurchaseOrderItem } from "@/lib/types";
+import { getStorageStrategy } from "@/lib/storage";
+import { PurchaseOrderItem, TrackingInfo } from "@/lib/types";
 import { Prisma } from "../../../../prisma/generated-client";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
@@ -58,7 +59,26 @@ export async function GET(request: Request) {
         date: 'desc'
       }
     });
-    return NextResponse.json(purchases);
+    const storage = await getStorageStrategy();
+    const resolvedPurchases = purchases.map(po => ({
+      ...po,
+      paymentVouchers: Array.isArray(po.paymentVouchers) ? po.paymentVouchers.map(v => typeof v === 'string' ? storage.resolveUrl(v) : v) : po.paymentVouchers,
+      trackingData: Array.isArray(po.trackingData) ? (po.trackingData as unknown as (TrackingInfo & { url?: string })[]).map(t => ({ 
+        ...t, 
+        url: t.url ? storage.resolveUrl(t.url) : t.url,
+        waybillImage: t.waybillImage ? storage.resolveUrl(t.waybillImage) : t.waybillImage,
+        waybillImages: Array.isArray(t.waybillImages) ? t.waybillImages.map(img => storage.resolveUrl(img)) : t.waybillImages
+      })) : po.trackingData,
+      items: po.items.map(item => ({
+        ...item,
+        product: item.product ? {
+          ...item.product,
+          image: item.product.image ? storage.resolveUrl(item.product.image) : null
+        } : null
+      }))
+    }));
+
+    return NextResponse.json(resolvedPurchases);
   } catch (error) {
     console.error("Failed to fetch purchases:", error);
     return NextResponse.json({ error: "Failed to fetch purchases" }, { status: 500 });

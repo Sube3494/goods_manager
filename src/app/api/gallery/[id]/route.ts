@@ -27,7 +27,11 @@ export async function PATCH(
       data: { isPublic },
     });
 
-    return NextResponse.json(updated);
+    const storage = await getStorageStrategy();
+    return NextResponse.json({
+      ...updated,
+      url: storage.resolveUrl(updated.url)
+    });
   } catch (error) {
     console.error("Failed to update gallery item:", error);
     return NextResponse.json({ error: "Failed to update gallery item" }, { status: 500 });

@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
+import { getStorageStrategy } from "@/lib/storage";
 
 type ProductWhereInput = NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"];
 
@@ -162,8 +163,14 @@ export async function GET(request: Request) {
 
 
 
+    const storage = await getStorageStrategy();
+    const resolvedProducts = products.map(p => ({
+      ...p,
+      image: p.image ? storage.resolveUrl(p.image) : null
+    }));
+
     return NextResponse.json({
-      items: products,
+      items: resolvedProducts,
       total,
       page,
       pageSize,
@@ -235,7 +242,11 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json(product);
+    const storage = await getStorageStrategy();
+    return NextResponse.json({
+      ...product,
+      image: product.image ? storage.resolveUrl(product.image) : null
+    });
   } catch (error: unknown) {
     // Handle Prisma Foreign Key Constraint Violated error
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
@@ -307,7 +318,11 @@ export async function PUT(request: Request) {
       }
     });
 
-    return NextResponse.json(updatedProduct);
+    const storage = await getStorageStrategy();
+    return NextResponse.json({
+      ...updatedProduct,
+      image: updatedProduct.image ? storage.resolveUrl(updatedProduct.image) : null
+    });
   } catch (error: unknown) {
     // Handle Prisma Unique Constraint Violated error (SKU already exists)
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {

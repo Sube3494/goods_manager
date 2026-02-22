@@ -45,7 +45,10 @@ export async function POST(request: Request) {
         folder,
         useTimestamp
       });
-      return NextResponse.json(result);
+      return NextResponse.json({
+        ...result,
+        url: storage.resolveUrl(result.url)
+      });
     } 
     
     // Handle Raw Body (Large files - Streaming)
@@ -71,7 +74,10 @@ export async function POST(request: Request) {
       useTimestamp
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      url: storage.resolveUrl(result.url)
+    });
 
   } catch (error) {
     console.error("Upload Error:", error);

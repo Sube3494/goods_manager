@@ -27,7 +27,17 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    return NextResponse.json(product);
+    const storage = await getStorageStrategy();
+    const resolvedProduct = {
+      ...product,
+      image: product.image ? storage.resolveUrl(product.image) : null,
+      gallery: product.gallery.map(item => ({
+        ...item,
+        url: storage.resolveUrl(item.url)
+      }))
+    };
+
+    return NextResponse.json(resolvedProduct);
   } catch {
     return NextResponse.json({ error: "Failed to fetch product" }, { status: 500 });
   }
@@ -60,7 +70,11 @@ export async function PUT(
       }
     });
 
-    return NextResponse.json(product);
+    const storage = await getStorageStrategy();
+    return NextResponse.json({
+      ...product,
+      image: product.image ? storage.resolveUrl(product.image) : null
+    });
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json({ 

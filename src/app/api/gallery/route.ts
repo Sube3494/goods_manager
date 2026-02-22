@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getStorageStrategy } from "@/lib/storage";
 
 // 获取相册图片
 export async function GET(request: Request) {
@@ -41,12 +42,13 @@ export async function GET(request: Request) {
     };
 
     const skip = (page - 1) * pageSize;
+    const storage = await getStorageStrategy();
 
     // 1. Get total count for pagination metadata
     const total = await prisma.galleryItem.count({ where });
 
     // 2. Fetch only the needed slice, ordered by creation date
-    const items = await prisma.galleryItem.findMany({
+    const itemsRaw = await prisma.galleryItem.findMany({
       where,
       skip,
       take: pageSize,
@@ -72,6 +74,15 @@ export async function GET(request: Request) {
         }
       }
     });
+
+    const items = itemsRaw.map(item => ({
+      ...item,
+      url: storage.resolveUrl(item.url),
+      product: item.product ? {
+        ...item.product,
+        image: item.product.image ? storage.resolveUrl(item.product.image) : null
+      } : null
+    }));
 
     return NextResponse.json({
       items,
@@ -131,7 +142,11 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json(item);
+    const storage = await getStorageStrategy();
+    return NextResponse.json({
+      ...item,
+      url: storage.resolveUrl(item.url)
+    });
   } catch (error) {
     console.error("Failed to create gallery item:", error);
     return NextResponse.json({ error: "Failed to create gallery item" }, { status: 500 });
