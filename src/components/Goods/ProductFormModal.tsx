@@ -1034,6 +1034,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                   src={img.url} 
                                                   alt={img.product?.name || "Gallery image"} 
                                                   fill
+                                                  unoptimized
                                                   sizes="(max-width: 768px) 25vw, (max-width: 1200px) 20vw, 15vw"
                                                   className="object-cover transition-transform duration-500 group-hover/img:scale-105" 
                                                 />
@@ -1271,6 +1272,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             src={selectedPreviewImage.url} 
                             alt="Preview" 
                             fill
+                            unoptimized
                             sizes="100vw"
                             className="object-contain rounded-2xl shadow-2xl"
                             draggable={false}
