@@ -12,3 +12,10 @@ services:
     volumes:
       # 直接挂载宿主机本地目录，确保已有图片可见
       - ./public/uploads:/app/public/uploads
+
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:0:0:1::/64
