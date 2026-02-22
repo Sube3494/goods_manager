@@ -200,6 +200,16 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     return () => cancelAnimationFrame(handle);
   }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isMain: boolean = false) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -523,22 +533,27 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     }
   };
 
-  // 提取所有图片的 URL 以便查重 (Extract all image URLs to check for duplicates)
-  const galleryUrls = new Set((galleryImages || []).map(img => img.url));
-  
   // 构建最终显示的列表 (Build the final display list)
-  const displayList = [...(galleryImages || [])];
+  let displayList = [...(galleryImages || [])];
   
-  // 如果封面图不在相册里且存在 URL，将其作为一个虚拟项添加进去并置顶
-  // (If cover image is not in gallery but exists, add it as a virtual item and put it on top)
-  if (formData.image && !galleryUrls.has(formData.image)) {
-    displayList.unshift({
-      id: 'cover-virtual',
-      url: formData.image,
-      productId: initialData?.id || '',
-      uploadDate: new Date().toISOString(),
-      tags: []
-    } as GalleryItem);
+  // 封面图处理：如果已在相册中则移动到第一位，否则作为虚拟项置顶
+  // (Main image handling: move to front if in gallery, otherwise unshift as virtual item)
+  if (formData.image) {
+    const mainIndex = displayList.findIndex(img => img.url === formData.image);
+    if (mainIndex !== -1) {
+      // 在相册中，移动到第一位 (In gallery, move to first position)
+      const [mainItem] = displayList.splice(mainIndex, 1);
+      displayList = [mainItem, ...displayList];
+    } else {
+      // 不在相册中，添加虚拟项 (Not in gallery, add virtual item)
+      displayList.unshift({
+        id: 'cover-virtual',
+        url: formData.image,
+        productId: initialData?.id || '',
+        uploadDate: new Date().toISOString(),
+        tags: []
+      } as GalleryItem);
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1071,6 +1086,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                   unoptimized
                                                   sizes="(max-width: 768px) 25vw, (max-width: 1200px) 20vw, 15vw"
                                                   className="object-cover transition-transform duration-500 group-hover/img:scale-105" 
+                                                  draggable={false}
                                                 />
                                             )}
                                             
