@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
-import Image from "next/image";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
+import Image from "next/image";
 import Link from "next/link";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -1032,9 +1032,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             ) : (
                                                 <Image 
                                                   src={img.url} 
-                                                  alt="preview" 
-                                                  fill 
-                                                  sizes="(max-width: 640px) 25vw, (max-width: 1024px) 20vw, 150px"
+                                                  alt={img.product?.name || "Gallery image"} 
+                                                  fill
+                                                  sizes="(max-width: 768px) 25vw, (max-width: 1200px) 20vw, 15vw"
                                                   className="object-cover transition-transform duration-500 group-hover/img:scale-105" 
                                                 />
                                             )}
@@ -1267,11 +1267,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             autoPlay
                         />
                     ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img 
+                        <Image 
                             src={selectedPreviewImage.url} 
                             alt="Preview" 
-                            className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+                            fill
+                            sizes="100vw"
+                            className="object-contain rounded-2xl shadow-2xl"
                             draggable={false}
                         />
                     )}

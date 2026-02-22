@@ -176,8 +176,6 @@ export class LocalStorageStrategy implements StorageStrategy {
     const subFolder = options?.folder || "";
     const uploadDir = join(baseDir, subFolder);
     
-    console.log(`[Storage] Uploading to: ${uploadDir} (CWD: ${process.cwd()})`);
-    
     await mkdir(uploadDir, { recursive: true });
 
     let fileNameInput = options?.name || (file as File).name || `upload-${Date.now()}`;
@@ -232,7 +230,6 @@ export class LocalStorageStrategy implements StorageStrategy {
     }
 
     const fullPath = join(uploadDir, fileName);
-    console.log(`[Storage] Final file path: ${fullPath}`);
 
     if (this.strategy === "hash") {
         if (typeof uploadSource === "string") {

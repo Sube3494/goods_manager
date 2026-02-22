@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-08 22:12:17
+ * @Author: Sube
+ * @FilePath: route.ts
+ * @LastEditTime: 2026-02-22 23:37:07
+ * @Description: 
+ */
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -6,18 +13,13 @@ import { getStorageStrategy } from "@/lib/storage";
 export async function DELETE(request: Request) {
   try {
     const session = await getSession();
-    console.log("[Gallery Batch Delete] Session:", JSON.stringify(session));
-    
     if (!session) {
-      console.error("[Gallery Batch Delete] Unauthorized access attempt");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { ids } = await request.json();
-    console.log("[Gallery Batch Delete] Target IDs:", ids);
 
     if (!ids || !Array.isArray(ids)) {
-      console.error("[Gallery Batch Delete] Invalid IDs provided:", ids);
       return NextResponse.json({ error: "Invalid item IDs" }, { status: 400 });
     }
 
@@ -29,19 +31,16 @@ export async function DELETE(request: Request) {
       select: { url: true, id: true }
     });
     
-    console.log(`[Gallery Batch Delete] Found ${items.length} of ${ids.length} items in database`);
 
     // 执行物理清理
     if (items.length > 0) {
       try {
         const storage = await getStorageStrategy();
-        console.log("[Gallery Batch Delete] Using storage strategy to clean up files");
-        const results = await Promise.allSettled(
+        await Promise.allSettled(
           items.map((item: { url: string }) => storage.delete(item.url))
         );
-        console.log("[Gallery Batch Delete] Physical deletion results:", JSON.stringify(results));
       } catch (storageError) {
-        console.error("[Gallery Batch Delete] Physical deletion failed:", storageError);
+        console.error("Batch physical deletion failed:", storageError);
       }
     }
 
@@ -51,11 +50,9 @@ export async function DELETE(request: Request) {
       }
     });
     
-    console.log("[Gallery Batch Delete] Prisma delete result:", deleteResult);
-
     return NextResponse.json({ success: true, count: deleteResult.count });
   } catch (error) {
-    console.error("[Gallery Batch Delete] Fatal error:", error);
+    console.error("Failed to batch delete gallery items:", error);
     return NextResponse.json({ error: "Failed to batch delete gallery items" }, { status: 500 });
   }
 }
