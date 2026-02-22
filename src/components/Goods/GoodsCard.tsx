@@ -215,6 +215,8 @@ export const GoodsCard = memo(function GoodsCard({
 }, (prev, next) => {
   // Precision check to minimize re-renders in huge lists
   return (
+    prev.onEdit === next.onEdit &&
+    prev.onDelete === next.onDelete &&
     prev.isSelected === next.isSelected &&
     prev.anySelected === next.anySelected &&
     prev.lowStockThreshold === next.lowStockThreshold &&
