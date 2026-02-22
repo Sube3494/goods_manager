@@ -80,6 +80,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  // 移动端排序模式 (Mobile reorder mode)
+  const [isReorderMode, setIsReorderMode] = useState(false);
 
   const enterBatchMode = () => {
     setIsBatchMode(true);
@@ -146,7 +148,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
       }
     };
 
-    const fetchGallery = async (productId: string) => {
+    const fetchGallery = async (productId: string, coverImage: string) => {
       try {
         const res = await fetch(`/api/gallery?productId=${productId}&pageSize=100`);
         if (res.ok) {
@@ -154,15 +156,15 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           let items: GalleryItem[] = data.items || [];
           
           // 如果有封面图，确保它在第一位 (Ensure cover is at index 0)
-          if (formData.image) {
-            const mainIndex = items.findIndex(img => img.url === formData.image);
+          if (coverImage) {
+            const mainIndex = items.findIndex(img => img.url === coverImage);
             if (mainIndex !== -1) {
               const [mainItem] = items.splice(mainIndex, 1);
               items = [mainItem, ...items];
             } else {
               items.unshift({
                 id: 'cover-virtual',
-                url: formData.image,
+                url: coverImage,
                 productId: productId,
                 uploadDate: new Date().toISOString(),
                 tags: []
@@ -194,7 +196,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           isPublic: initialData.isPublic ?? true,
           specs: initialData.specs as Record<string, string> || {}
         });
-        fetchGallery(initialData.id);
+        fetchGallery(initialData.id, initialData.image || "");
       } else {
         setFormData({
           sku: "",
@@ -209,7 +211,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         });
       }
     }
-  }, [isOpen, initialData, formData.image]);
+  }, [isOpen, initialData]);
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
@@ -521,6 +523,20 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         console.error("Failed to save gallery order", error);
       }
     }, 1000);
+  };
+
+  // 移动端：将指定图片左移或右移一格（跳过封面位置 index=0）
+  const handleMoveImage = (imgId: string, direction: -1 | 1) => {
+    setGalleryImages(prev => {
+      const idx = prev.findIndex(i => i.id === imgId);
+      const targetIdx = idx + direction;
+      // 不能移出范围，也不能移到 index=0（封面位）
+      if (idx === -1 || targetIdx < 1 || targetIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[targetIdx]] = [next[targetIdx], next[idx]];
+      handleReorder(next);
+      return next;
+    });
   };
 
   const handleCreateCategory = async (data: Partial<Category>) => {
@@ -1000,6 +1016,17 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                     取消
                                                 </button>
                                             </div>
+                                        ) : isReorderMode ? (
+                                            <div className="flex items-center gap-3 whitespace-nowrap">
+                                                <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-tight">拖动箭头调整顺序</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsReorderMode(false)}
+                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter border-l border-white/10 pl-3"
+                                                >
+                                                    完成
+                                                </button>
+                                            </div>
                                         ) : (
                                             <div className="flex items-center gap-3 sm:gap-4 whitespace-nowrap">
                                                 <button 
@@ -1009,6 +1036,15 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 >
                                                     批量管理
                                                 </button>
+                                                {galleryImages.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsReorderMode(true)}
+                                                        className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter sm:hidden border-l border-white/10 pl-3"
+                                                    >
+                                                        排序
+                                                    </button>
+                                                )}
                                                 <Link 
                                                     href={`/gallery?productId=${initialData.id}`}
                                                     className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-tighter border-l border-white/10 pl-3 sm:pl-4"
@@ -1138,25 +1174,43 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 />
                                             )}
 
-                                            {/* Hover overlay */}
-                                            {!isBatchMode && (
-                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 pointer-events-none">
-                                                    <div className="absolute top-2 right-2 flex flex-col gap-2 pointer-events-auto">
+                                            {/* Hover/Touch overlay：桌面 hover 显示，移动端排序模式时隐藏 */}
+                                            {!isBatchMode && !isReorderMode && (
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-300 pointer-events-none">
+                                                    <div className="absolute top-1.5 right-1.5 flex flex-col gap-1.5 pointer-events-auto">
                                                         <button
                                                             type="button"
                                                             onClick={(e) => { e.stopPropagation(); handleDeletePhoto(img); }}
-                                                            className="p-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
+                                                            className="p-1.5 bg-zinc-900/70 hover:bg-zinc-800 active:bg-zinc-700 text-white rounded-full shadow-xl backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-colors"
                                                             title="移除实拍内容"
                                                         ><X size={14} strokeWidth={2.5} /></button>
                                                         {!isMain && !isVideo && !isCover && (
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => { e.stopPropagation(); setAsMainImage(img.url); }}
-                                                                className="p-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
+                                                                className="p-1.5 bg-zinc-900/70 hover:bg-zinc-800 active:bg-zinc-700 text-white rounded-full shadow-xl backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-colors"
                                                                 title="设为主图"
                                                             ><Crown size={14} strokeWidth={2.5} /></button>
                                                         )}
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {/* 移动端排序模式：左右箭头 */}
+                                            {isReorderMode && !isCover && (
+                                                <div className="absolute inset-0 bg-black/50 flex items-center justify-between px-1 pointer-events-auto">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); handleMoveImage(img.id, -1); }}
+                                                        disabled={index <= 1}
+                                                        className="p-1 bg-white/20 hover:bg-white/40 active:bg-white/50 disabled:opacity-20 text-white rounded-full backdrop-blur-md border border-white/20 transition-colors"
+                                                    ><ChevronLeft size={16} strokeWidth={2.5} /></button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); handleMoveImage(img.id, 1); }}
+                                                        disabled={index >= galleryImages.length - 1}
+                                                        className="p-1 bg-white/20 hover:bg-white/40 active:bg-white/50 disabled:opacity-20 text-white rounded-full backdrop-blur-md border border-white/20 transition-colors"
+                                                    ><ChevronRight size={16} strokeWidth={2.5} /></button>
                                                 </div>
                                             )}
 
