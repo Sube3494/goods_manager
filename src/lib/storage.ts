@@ -1,6 +1,6 @@
 import * as Minio from "minio";
 import { writeFile, mkdir, access, unlink, copyFile } from "fs/promises";
-import { createWriteStream } from "fs";
+import { createWriteStream, existsSync } from "fs";
 import { Readable } from "stream";
 import { finished } from "stream/promises";
 import { join } from "path";
@@ -161,9 +161,23 @@ export class LocalStorageStrategy implements StorageStrategy {
 
 
   async upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult> {
-    const baseDir = join(process.cwd(), "public", "uploads");
+    // 确保在 Docker standalone 环境下也能准备找到上传目录
+    // standalone 模式下 process.cwd() 可能在 .next/standalone，需要向上回退
+    let baseDir = join(process.cwd(), "public", "uploads");
+    
+    // 如果在 standalone 目录下运行，尝试定位正确的 public 目录
+    if (process.env.NEXT_RUNTIME === 'nodejs' && !existsSync(baseDir)) {
+        const altDir = join(process.cwd(), ".next", "standalone", "public", "uploads");
+        if (existsSync(altDir)) {
+            baseDir = altDir;
+        }
+    }
+
     const subFolder = options?.folder || "";
     const uploadDir = join(baseDir, subFolder);
+    
+    console.log(`[Storage] Uploading to: ${uploadDir} (CWD: ${process.cwd()})`);
+    
     await mkdir(uploadDir, { recursive: true });
 
     let fileNameInput = options?.name || (file as File).name || `upload-${Date.now()}`;
@@ -218,6 +232,7 @@ export class LocalStorageStrategy implements StorageStrategy {
     }
 
     const fullPath = join(uploadDir, fileName);
+    console.log(`[Storage] Final file path: ${fullPath}`);
 
     if (this.strategy === "hash") {
         if (typeof uploadSource === "string") {
