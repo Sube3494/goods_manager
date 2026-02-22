@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Star } from "lucide-react";
+import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Star, Crown } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
@@ -1100,10 +1100,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                                 e.stopPropagation();
                                                                 handleDeletePhoto(img);
                                                             }}
-                                                            className="p-1.5 bg-black/40 hover:bg-destructive text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-500 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:scale-110 active:scale-95"
+                                                            className="p-1.5 bg-zinc-900/60 hover:bg-destructive text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
                                                             title="移除实拍内容"
                                                         >
-                                                            <X size={12} strokeWidth={3} />
+                                                            <X size={14} strokeWidth={2.5} />
                                                         </button>
                                                         {!isMain && !isVideo && (
                                                             <button 
@@ -1112,10 +1112,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                                     e.stopPropagation();
                                                                     setAsMainImage(img.url);
                                                                 }}
-                                                                className="p-1.5 bg-black/40 hover:bg-primary text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-500 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:scale-110 active:scale-95 delay-75"
+                                                                className="p-1.5 bg-zinc-900/60 hover:bg-primary text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
                                                                 title="设为主图"
                                                             >
-                                                                <Star size={12} strokeWidth={3} />
+                                                                <Crown size={14} strokeWidth={2.5} />
                                                             </button>
                                                         )}
                                                     </div>
