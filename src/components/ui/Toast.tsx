@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Info, AlertCircle } from "lucide-react";
-import { useState, createContext, useContext, useEffect, ReactNode } from "react";
+import { useState, createContext, useContext, useEffect, ReactNode, useCallback } from "react";
 
 export type ToastType = "success" | "info" | "error" | "warning";
 
@@ -52,14 +52,14 @@ function Toast({ id, message, type, onClose }: ToastProps) {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<{ id: string; message: string; type: ToastType }[]>([]);
 
-  const showToast = (message: string, type: ToastType = "info") => {
+  const showToast = useCallback((message: string, type: ToastType = "info") => {
     const id = Math.random().toString(36).substring(7);
     setToasts((prev) => [...prev, { id, message, type }]);
-  };
+  }, []);
 
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+  }, []);
 
   return (
     <ToastContext.Provider value={{ showToast }}>

@@ -41,21 +41,41 @@ export async function GET(request: Request) {
       ...(!session ? { isPublic: true } : {})
     };
 
-    const skip = (page - 1) * pageSize;
     const storage = await getStorageStrategy();
 
-    // 1. Get total count for pagination metadata
-    const total = await prisma.galleryItem.count({ where });
-
-    // 2. Fetch only the needed slice, ordered by creation date
-    const itemsRaw = await prisma.galleryItem.findMany({
+    // 1. Get all IDs and SKUs for global natural sort
+    const allMatchingItems = await prisma.galleryItem.findMany({
       where,
-      skip,
-      take: pageSize,
-      orderBy: [
-        { product: { sku: 'asc' } },
-        { createdAt: 'desc' }
-      ],
+      select: {
+        id: true,
+        createdAt: true,
+        product: {
+          select: {
+            sku: true
+          }
+        }
+      }
+    });
+
+    // 2. Perform natural sort in memory
+    allMatchingItems.sort((a, b) => {
+      const skuA = a.product?.sku || "";
+      const skuB = b.product?.sku || "";
+      if (skuA !== skuB) {
+        return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    const total = allMatchingItems.length;
+    const skip = (page - 1) * pageSize;
+    const pageIds = allMatchingItems.slice(skip, skip + pageSize).map(i => i.id);
+
+    // 3. Fetch full data for the current page IDs
+    const itemsRaw = await prisma.galleryItem.findMany({
+      where: {
+        id: { in: pageIds }
+      },
       include: {
         product: {
           select: {
@@ -75,12 +95,15 @@ export async function GET(request: Request) {
       }
     });
 
-    const items = itemsRaw.map(item => ({
+    // 4. Re-order results to match pageIds sorting
+    const sortedItems = pageIds.map(id => itemsRaw.find(item => item.id === id)).filter(Boolean);
+
+    const items = sortedItems.map(item => ({
       ...item,
-      url: storage.resolveUrl(item.url),
-      product: item.product ? {
-        ...item.product,
-        image: item.product.image ? storage.resolveUrl(item.product.image) : null
+      url: storage.resolveUrl(item!.url),
+      product: item!.product ? {
+        ...item!.product,
+        image: item!.product.image ? storage.resolveUrl(item!.product.image) : null
       } : null
     }));
 

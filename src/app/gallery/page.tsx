@@ -473,48 +473,44 @@ function GalleryContent() {
     setIsUploading(true);
 
     try {
-      const uploadPromises = filesToUpload.map(async (file) => {
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          
-          const res = await fetch("/api/upload", {
-              method: "POST",
-              headers: {
-                "Content-Type": file.type,
-                "X-File-Name": encodeURIComponent(file.name),
-                "X-File-Type": file.type,
-                "x-folder": "gallery"
-              },
-              body: arrayBuffer,
-          });
+      const results = await Promise.allSettled(filesToUpload.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        
+        const res = await fetch("/api/upload", {
+            method: "POST",
+            headers: {
+              "Content-Type": file.type,
+              "X-File-Name": encodeURIComponent(file.name),
+              "X-File-Type": file.type,
+              "x-folder": "gallery"
+            },
+            body: arrayBuffer,
+        });
 
-          if (res.ok) {
-              const data = await res.json();
-              return {
-                  url: data.url,
-                  type: data.type
-              };
-          } else {
-              const errData = await res.json().catch(() => ({}));
-              throw new Error(errData.error || "服务器上传失败");
-          }
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          console.error(`File ${file.name} upload failed:`, errorMessage);
-          throw err;
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || "服务器上传失败");
         }
-      });
+        
+        return await res.json();
+      }));
 
-      const results = await Promise.all(uploadPromises);
-      const successfulFiles = results.filter((res): res is { url: string; type: 'image' | 'video' } => res !== null);
+      const successfulFiles = results
+        .filter((r): r is PromiseFulfilledResult<{ url: string; type: 'image' | 'video' }> => r.status === 'fulfilled')
+        .map(r => r.value);
       
-      // 3. De-duplicate based on URL
+      const failedCount = results.filter(r => r.status === 'rejected').length;
+      
       setUploadForm(prev => {
         const existingUrls = new Set(prev.urls.map(u => u.url));
         const uniqueNewFiles = successfulFiles.filter(f => !existingUrls.has(f.url));
         
-        if (uniqueNewFiles.length < successfulFiles.length) {
-             showToast("部分文件已存在，已自动过滤重复项", "success");
+        if (uniqueNewFiles.length > 0) {
+          showToast(`成功上传 ${uniqueNewFiles.length} 个文件${failedCount > 0 ? `，${failedCount} 个失败` : ''}`, "success");
+        } else if (failedCount > 0) {
+          showToast(`${failedCount} 个文件上传失败`, "error");
+        } else if (successfulFiles.length > 0) {
+          showToast("所选文件已全部存在于列表中", "info");
         }
         
         return { 
@@ -524,9 +520,8 @@ function GalleryContent() {
       });
       
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "上传失败，请检查网络或文件大小";
-      console.error("Upload failed:", error);
-      showToast(errorMessage, "error");
+      console.error("Critical upload error:", error);
+      showToast("操作失败，请重试", "error");
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -599,28 +594,26 @@ function GalleryContent() {
 
   // Grouped logic: unique products with items
   const groupedProducts = useMemo(() => {
-    const groups: Record<string, { product: Product, items: GalleryItem[] }> = {};
+    const groups: Map<string, { product: Product, items: GalleryItem[] }> = new Map();
+    const productOrder: string[] = [];
     
     filteredItems.forEach(item => {
       const pid = item.productId;
       if (!pid) return; // Safety
       
-      if (!groups[pid]) {
+      if (!groups.has(pid)) {
         // Prepare a robust product object for display
         const productData = item.product || { id: pid, name: '未知商品', sku: 'N/A' };
         // Ensure id is present in the object used for grouping
         if (!productData.id) productData.id = pid;
         
-        groups[pid] = { product: productData as Product, items: [] };
+        groups.set(pid, { product: productData as Product, items: [] });
+        productOrder.push(pid);
       }
-      groups[pid].items.push(item);
+      groups.get(pid)?.items.push(item);
     });
     
-    return Object.values(groups).sort((a, b) => {
-        const skuA = a.product?.sku || "";
-        const skuB = b.product?.sku || "";
-        return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
-    });
+    return productOrder.map(pid => groups.get(pid)!);
   }, [filteredItems]);
 
   const handleOpenProductPreview = (group: { product: Product; items: GalleryItem[] }) => {
@@ -785,7 +778,7 @@ function GalleryContent() {
 
         {/* Responsive Grid / Waterfall */}
         <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-           <AnimatePresence mode="popLayout">
+           <AnimatePresence>
                {groupedProducts.map((group) => {
                     // Use product.image as cover URL directly (it may not be a gallery item)
                     // then fall back to the first non-video item, then to any first item
