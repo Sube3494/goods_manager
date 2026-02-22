@@ -327,7 +327,8 @@ function GalleryContent() {
   // Upload States
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  // 修改 isUploading 为 string | boolean 以便呈现进度
+  const [isUploading, setIsUploading] = useState<boolean | string>(false);
   const [uploadForm, setUploadForm] = useState<{
     productId: string;
     urls: { url: string; type: 'image' | 'video' }[],
@@ -470,30 +471,61 @@ function GalleryContent() {
       filesToUpload = filesArray.slice(0, remainingSlots);
     }
 
-    setIsUploading(true);
+    setIsUploading(`准备上传 0/${filesToUpload.length}...`);
 
     try {
-      const results = await Promise.allSettled(filesToUpload.map(async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        
-        const res = await fetch("/api/upload", {
-            method: "POST",
-            headers: {
-              "Content-Type": file.type,
-              "X-File-Name": encodeURIComponent(file.name),
-              "X-File-Type": file.type,
-              "x-folder": "gallery"
-            },
-            body: arrayBuffer,
+      // -- 并发控制逻辑 (Concurrency Control) --
+      const CONCURRENCY_LIMIT = 3;
+      const results: PromiseSettledResult<{ url: string; type: 'image' | 'video' }>[] = [];
+      let completedCount = 0;
+      let activePromises: Promise<void>[] = [];
+
+      for (const file of filesToUpload) {
+        const uploadTask = async () => {
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                headers: {
+                  "Content-Type": file.type,
+                  "X-File-Name": encodeURIComponent(file.name),
+                  "X-File-Type": file.type,
+                  "x-folder": "gallery"
+                },
+                body: arrayBuffer,
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || "服务器上传失败");
+            }
+            const data = await res.json();
+            results.push({ status: 'fulfilled', value: data });
+          } catch (err) {
+            results.push({ status: 'rejected', reason: err });
+          } finally {
+            completedCount++;
+            setIsUploading(`正在上传 ${completedCount}/${filesToUpload.length}...`);
+          }
+        };
+
+        const p = uploadTask();
+        activePromises.push(p);
+
+        // Remove from active block when done
+        p.then(() => {
+          activePromises = activePromises.filter(curr => curr !== p);
         });
 
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || "服务器上传失败");
+        // Block if we hit the limit
+        if (activePromises.length >= CONCURRENCY_LIMIT) {
+          await Promise.race(activePromises);
         }
-        
-        return await res.json();
-      }));
+      }
+
+      // Wait for all remaining
+      await Promise.all(activePromises);
+      // -- 并发控制结束 --
 
       const successfulFiles = results
         .filter((r): r is PromiseFulfilledResult<{ url: string; type: 'image' | 'video' }> => r.status === 'fulfilled')
@@ -1210,7 +1242,7 @@ function GalleryContent() {
                                     <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">取消</button>
                                     <button 
                                         type="submit" 
-                                        disabled={uploadForm.urls.length === 0 || (isAdmin && !uploadForm.productId) || (!isAdmin && !uploadForm.productId && !uploadForm.tags.split(",")[0] && !uploadForm.tags.split(",")[1]) || isUploading}
+                                        disabled={uploadForm.urls.length === 0 || (isAdmin && !uploadForm.productId) || (!isAdmin && !uploadForm.productId && !uploadForm.tags.split(",")[0] && !uploadForm.tags.split(",")[1]) || !!isUploading}
                                         className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all"
                                     >
                                         <CheckCircle size={18} />

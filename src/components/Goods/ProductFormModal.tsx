@@ -50,7 +50,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const [mounted, setMounted] = useState(false);
   const { showToast } = useToast();
   const [galleryImages, setGalleryImages] = useState<GalleryItem[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState<boolean | string>(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     onConfirm: () => void;
@@ -202,105 +202,140 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    setIsUploading(true);
-    showToast(`正在上传 ${files.length} 个文件...`, "info");
+    setIsUploading(`准备上传 0/${files.length}...`);
     
     try {
-      // 循环处理每一个选中的文件 (Loop through each selected file)
-      for (const file of Array.from(files)) {
-        // 前端大小校验 (Frontend size validation - 50MB)
-        if (file.size > 50 * 1024 * 1024) {
-          showToast(`文件 "${file.name}" 超过 50MB 限制, 无法上传`, "error");
-          continue;
-        }
+      // -- 并发控制逻辑 (Concurrency Control) --
+      const CONCURRENCY_LIMIT = 3;
+      const filesArray = Array.from(files);
+      let completedCount = 0;
+      let activePromises: Promise<void>[] = [];
 
-        // 使用 arrayBuffer 确保完整传输,特别是对于视频文件
-        const fileBuffer = await file.arrayBuffer();
-        
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-            "X-File-Name": encodeURIComponent(file.name),
-            "X-File-Type": file.type,
-            "x-folder": "gallery"
-          },
-          body: fileBuffer, // 发送 ArrayBuffer 而不是 File 对象
+      for (const file of filesArray) {
+        const uploadTask = async () => {
+          try {
+            // 前端大小校验 (Frontend size validation - 50MB)
+            if (file.size > 50 * 1024 * 1024) {
+              showToast(`文件 "${file.name}" 超过 50MB 限制, 无法上传`, "error");
+              return;
+            }
+
+            // 使用 arrayBuffer 确保完整传输,特别是对于视频文件
+            const fileBuffer = await file.arrayBuffer();
+            
+            const res = await fetch("/api/upload", {
+              method: "POST",
+              headers: {
+                "Content-Type": file.type || "application/octet-stream",
+                "X-File-Name": encodeURIComponent(file.name),
+                "X-File-Type": file.type,
+                "x-folder": "gallery"
+              },
+              body: fileBuffer, 
+            });
+
+            if (!res.ok) {
+              let errorMessage = "上传失败";
+              try {
+                 const errorData = await res.json();
+                 errorMessage = errorData.error || `上传失败 (${res.status})`;
+              } catch {
+                 errorMessage = `上传失败 (${res.status}: ${res.statusText})`;
+              }
+              
+              if (res.status === 413 || errorMessage.includes("exceeded") || errorMessage.includes("too large")) {
+                errorMessage = "文件过大, 请上传较小的文件 (建议<50MB)。";
+              }
+
+              showToast(errorMessage, "error");
+              return;
+            }
+
+            const { url, type, skipped } = await res.json();
+            
+            // 使用函数式状态更新，避免闭包中的陈旧依赖导致重复或遗漏
+            let isDuplicate = false;
+            setGalleryImages(prev => {
+              const currentUrls = new Set([...prev.map(img => img.url), formData.image]);
+              if (currentUrls.has(url)) {
+                isDuplicate = true;
+                return prev;
+              }
+              return prev;
+            });
+
+            if (isDuplicate) {
+              showToast(`该媒体 "${file.name}" 已在相册中`, "info");
+              return;
+            }
+
+            if (skipped) {
+              showToast(`文件 "${file.name}" 已存在, 已复用现有文件`, "success");
+            }
+            
+            const isVideoType = type === 'video';
+              
+            if (isMain) {
+              setFormData(prev => ({ ...prev, image: url }));
+            } else {
+              setFormData(prev => {
+                if (!prev.image) {
+                   return { ...prev, image: url };
+                }
+                return prev;
+              });
+
+              if (initialData?.id) {
+                const gRes = await fetch("/api/gallery", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    url,
+                    productId: initialData.id,
+                    type: isVideoType ? 'video' : 'image'
+                  })
+                });
+                if (gRes.ok) {
+                  const newItem = await gRes.json();
+                  setGalleryImages(prev => [...prev, newItem]);
+                } else {
+                   showToast("保存图片记录失败", "error");
+                }
+              } else {
+                const tempImg: GalleryItem = {
+                  id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                  url,
+                  productId: "", 
+                  uploadDate: new Date().toISOString(),
+                  tags: [],
+                  type: isVideoType ? 'video' : 'image'
+                };
+                setGalleryImages(prev => [...prev, tempImg]);
+              }
+            }
+          } catch (error) {
+            console.error("Upload process error for file", file.name, error);
+          } finally {
+            completedCount++;
+            setIsUploading(`正在上传 ${completedCount}/${filesArray.length}...`);
+          }
+        };
+
+        const p = uploadTask();
+        activePromises.push(p);
+
+        p.then(() => {
+          activePromises = activePromises.filter(curr => curr !== p);
         });
 
-        if (!res.ok) {
-          let errorMessage = "上传失败";
-          try {
-             const errorData = await res.json();
-             errorMessage = errorData.error || `上传失败 (${res.status})`;
-          } catch {
-             errorMessage = `上传失败 (${res.status}: ${res.statusText})`;
-          }
-          
-          if (res.status === 413 || errorMessage.includes("exceeded") || errorMessage.includes("too large")) {
-            errorMessage = "文件过大, 请上传较小的文件 (建议<50MB)。";
-          }
-
-          showToast(errorMessage, "error");
-          continue; // Skip valid logic and continue to next file (or just stop)
-        }
-
-        const { url, type, skipped } = await res.json();
-        
-        // 检查该 URL 是否已经在相册中或已是封面 (Check if URL is already in gallery or cover)
-        const currentUrls = new Set([...galleryImages.map(img => img.url), formData.image]);
-        if (currentUrls.has(url)) {
-          showToast(`该媒体 "${file.name}" 已在相册中`, "info");
-          continue;
-        }
-
-        // 如果文件是物理跳过的 (hash 相同)，但在当前商品中没有记录，则继续添加记录
-        if (skipped) {
-          showToast(`文件 "${file.name}" 已存在, 已复用现有文件`, "success");
-        }
-        
-        // Base logic continues...
-        const isVideoType = type === 'video';
-          
-        if (isMain) {
-          setFormData(prev => ({ ...prev, image: url }));
-        } else {
-          // 如果是新增商品且还没有主图,自动将第一张上传的图设为主图
-          if (!formData.image) {
-            setFormData(prev => ({ ...prev, image: url }));
-          }
-
-          // 如果已有商品 ID,则直接保存到相册表
-          if (initialData?.id) {
-            const gRes = await fetch("/api/gallery", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                url,
-                productId: initialData.id,
-                type: isVideoType ? 'video' : 'image'
-              })
-            });
-            if (gRes.ok) {
-              const newItem = await gRes.json();
-              setGalleryImages(prev => [...prev, newItem]);
-            } else {
-               showToast("保存图片记录失败", "error");
-            }
-          } else {
-            // 临时保存,提交时再处理
-            const tempImg: GalleryItem = {
-              id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-              url,
-              productId: "", // 临时 ID 为空
-              uploadDate: new Date().toISOString(),
-              tags: [],
-              type: isVideoType ? 'video' : 'image'
-            };
-            setGalleryImages(prev => [...prev, tempImg]);
-          }
+        if (activePromises.length >= CONCURRENCY_LIMIT) {
+          await Promise.race(activePromises);
         }
       }
+
+      await Promise.all(activePromises);
+      // -- 并发控制结束 --
+
     } catch (error) {
       console.error("Upload failed:", error);
       showToast("上传过程中发生错误", "error");
@@ -1107,7 +1142,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 accept="image/*,video/*"
                                                 multiple
                                                 onChange={(e) => handleFileUpload(e)}
-                                                disabled={isUploading}
+                                                disabled={!!isUploading}
                                             />
                                             <div className={cn(
                                                 "p-3 rounded-full transition-colors",
@@ -1123,7 +1158,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 "hidden sm:block text-[11px] font-medium tracking-tighter uppercase text-center px-2 transition-colors",
                                                 isDraggingOver ? "text-primary font-bold" : "text-muted-foreground group-hover:text-primary"
                                             )}>
-                                                {isUploading ? "正在上传..." : (isDraggingOver ? "松开即可上传" : "添加或拖入实拍")}
+                                                {isUploading ? `${isUploading}` : (isDraggingOver ? "松开即可上传" : "添加或拖入实拍")}
                                             </span>
                                             {isDraggingOver && (
                                                 <div className="absolute inset-0 pointer-events-none border-2 border-primary rounded-2xl animate-pulse" />

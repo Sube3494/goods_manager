@@ -465,16 +465,30 @@ export class MinioStorageStrategy implements StorageStrategy {
       let objectName = "";
 
       if (url.startsWith('http')) {
-        const urlObj = new URL(url);
-        const pathParts = urlObj.pathname.split("/").filter(Boolean);
-        if (pathParts[0] === bucketName) {
-            pathParts.shift();
+        const publicUrlStr = this.config.minioPublicUrl ? this.config.minioPublicUrl.replace(/\/$/, "") : null;
+        if (publicUrlStr && url.startsWith(publicUrlStr)) {
+          const remaining = url.substring(publicUrlStr.length).replace(/^\//, '');
+          const pathParts = remaining.split("/");
+          if (pathParts[0] === bucketName) {
+              pathParts.shift();
+          }
+          objectName = pathParts.join("/");
+        } else {
+          const urlObj = new URL(url);
+          const pathParts = urlObj.pathname.split("/").filter(Boolean);
+          if (pathParts[0] === bucketName) {
+              pathParts.shift();
+          }
+          objectName = pathParts.join("/");
         }
-        objectName = pathParts.join("/");
       } else {
-        // Assume it is already a relative path/object name
         objectName = url;
       }
+
+      // 如果旧数据从本地迁移过来带有 /uploads/，由于 MinIO 中没有该顶级目录（通常配置策略），尝试剥离以防删不掉
+      if (objectName.startsWith('/uploads/')) objectName = objectName.substring(9);
+      if (objectName.startsWith('uploads/')) objectName = objectName.substring(8);
+      objectName = objectName.replace(/^\//, '');
 
       if (!objectName) return;
 
