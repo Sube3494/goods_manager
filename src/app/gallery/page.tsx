@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
+import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
 import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2 } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
@@ -480,32 +481,20 @@ function GalleryContent() {
       let completedCount = 0;
       let activePromises: Promise<void>[] = [];
 
-      for (const file of filesToUpload) {
+      for (let index = 0; index < filesToUpload.length; index++) {
+        const file = filesToUpload[index];
         const uploadTask = async () => {
           try {
-            const arrayBuffer = await file.arrayBuffer();
-            const res = await fetch("/api/upload", {
-                method: "POST",
-                headers: {
-                  "Content-Type": file.type,
-                  "X-File-Name": encodeURIComponent(file.name),
-                  "X-File-Type": file.type,
-                  "x-folder": "gallery"
-                },
-                body: arrayBuffer,
+            const data = await uploadFileWithChunking(file, "gallery", (pct) => {
+              setIsUploading(`文件 ${index + 1}/${filesToUpload.length} : ${pct}%`);
             });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || "服务器上传失败");
-            }
-            const data = await res.json();
-            results.push({ status: 'fulfilled', value: data });
+            
+            results.push({ status: 'fulfilled', value: data as { url: string; type: 'image'|'video' } });
           } catch (err) {
             results.push({ status: 'rejected', reason: err });
           } finally {
             completedCount++;
-            setIsUploading(`正在上传 ${completedCount}/${filesToUpload.length}...`);
+            setIsUploading(`已完成 ${completedCount}/${filesToUpload.length}`);
           }
         };
 

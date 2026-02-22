@@ -30,6 +30,7 @@ interface ProductFormModalProps {
 }
 
 import { createPortal } from "react-dom";
+import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
 
 export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: ProductFormModalProps) {
   const { user } = useUser();
@@ -220,38 +221,11 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
               return;
             }
 
-            // 使用 arrayBuffer 确保完整传输,特别是对于视频文件
-            const fileBuffer = await file.arrayBuffer();
-            
-            const res = await fetch("/api/upload", {
-              method: "POST",
-              headers: {
-                "Content-Type": file.type || "application/octet-stream",
-                "X-File-Name": encodeURIComponent(file.name),
-                "X-File-Type": file.type,
-                "x-folder": "gallery"
-              },
-              body: fileBuffer, 
+            // 使用基于切片与断点续传的流通道优化处理
+            const data = await uploadFileWithChunking(file, "gallery", (pct) => {
+               setIsUploading(`文件 ${completedCount + 1}/${filesArray.length} : ${pct}%`);
             });
-
-            if (!res.ok) {
-              let errorMessage = "上传失败";
-              try {
-                 const errorData = await res.json();
-                 errorMessage = errorData.error || `上传失败 (${res.status})`;
-              } catch {
-                 errorMessage = `上传失败 (${res.status}: ${res.statusText})`;
-              }
-              
-              if (res.status === 413 || errorMessage.includes("exceeded") || errorMessage.includes("too large")) {
-                errorMessage = "文件过大, 请上传较小的文件 (建议<50MB)。";
-              }
-
-              showToast(errorMessage, "error");
-              return;
-            }
-
-            const { url, type, skipped } = await res.json();
+            const { url, type, skipped } = data;
             
             // 使用函数式状态更新，避免闭包中的陈旧依赖导致重复或遗漏
             let isDuplicate = false;
@@ -315,9 +289,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             }
           } catch (error) {
             console.error("Upload process error for file", file.name, error);
+            showToast(error instanceof Error ? error.message : "上传处理失败", "error");
           } finally {
             completedCount++;
-            setIsUploading(`正在上传 ${completedCount}/${filesArray.length}...`);
+            setIsUploading(`已完成 ${completedCount}/${filesArray.length}`);
           }
         };
 

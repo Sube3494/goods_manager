@@ -19,6 +19,7 @@ export interface UploadOptions {
   type: string;
   folder?: string;      // Optional sub-folder/prefix
   useTimestamp?: boolean; // If true, rename file using timestamp
+  skipHash?: boolean;   // If true, bypass hash generation for streams (useful for chunk merging)
 }
 
 export interface StorageStrategy {
@@ -201,11 +202,15 @@ export class LocalStorageStrategy implements StorageStrategy {
     let cleanup: (() => Promise<void>) | undefined;
 
     if (this.strategy === "hash") {
-      const processed = await processFileForUpload(file, fileNameInput);
-      fileNameInput = `${processed.hash}.${processed.ext}`;
-      usedStrategy = "skip"; // Hash strategy implies skipping duplicates
-      uploadSource = processed.source;
-      cleanup = processed.cleanup;
+      if (!options?.skipHash) {
+        const processed = await processFileForUpload(file, fileNameInput);
+        fileNameInput = `${processed.hash}.${processed.ext}`;
+        usedStrategy = "skip"; // Hash strategy implies skipping duplicates
+        uploadSource = processed.source;
+        cleanup = processed.cleanup;
+      } else {
+        usedStrategy = "rename"; 
+      }
     }
 
     const { fileName, skip } = await resolveFileName(
@@ -368,11 +373,15 @@ export class MinioStorageStrategy implements StorageStrategy {
     let cleanup: (() => Promise<void>) | undefined;
 
     if (usedStrategy === "hash") {
-      const processed = await processFileForUpload(file, fileNameInput);
-      fileNameInput = `${processed.hash}.${processed.ext}`;
-      usedStrategy = "skip"; 
-      uploadSource = processed.source;
-      cleanup = processed.cleanup;
+      if (!options?.skipHash) {
+        const processed = await processFileForUpload(file, fileNameInput);
+        fileNameInput = `${processed.hash}.${processed.ext}`;
+        usedStrategy = "skip"; 
+        uploadSource = processed.source;
+        cleanup = processed.cleanup;
+      } else {
+        usedStrategy = "rename";
+      }
     }
 
     const { fileName: resolvedFileName, skip } = await resolveFileName(
@@ -404,7 +413,7 @@ export class MinioStorageStrategy implements StorageStrategy {
       return result;
     }
 
-    if (this.config.uploadConflictStrategy === "hash") {
+    if (this.config.uploadConflictStrategy === "hash" && !options?.skipHash) {
         // Hash strategy: source is Buffer or Temp File Path
         if (typeof uploadSource === "string") {
             const stream = createReadStream(uploadSource);
