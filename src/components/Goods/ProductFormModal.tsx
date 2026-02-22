@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Star } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
@@ -981,7 +981,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
                         
-                        <div className="grid grid-cols-4 gap-3">
+                        <Reorder.Group axis="y" values={displayList} onReorder={(newOrder) => setGalleryImages(newOrder.filter(img => img.id !== 'cover-virtual'))} className="grid grid-cols-4 gap-3">
                                 {/* Display current photos (Including the main cover image if not in gallery) */}
                                 {displayList.map(img => {
                                     const isMain = formData.image === img.url;
@@ -990,8 +990,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                     const isVirtual = img.id === 'cover-virtual';
                                     
                                     return (
-                                        <div 
+                                        <Reorder.Item 
+                                          value={img}
                                           key={img.id} 
+                                          drag={!isBatchMode}
                                           onClick={() => {
                                             if (isBatchMode) {
                                                 toggleSelectImage(img.id);
@@ -1000,7 +1002,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             }
                                           }}
                                           className={cn(
-                                            "relative aspect-square rounded-2xl overflow-hidden border transition-shadow group/img bg-muted shadow-sm hover:shadow-md cursor-pointer",
+                                            "relative aspect-square rounded-2xl overflow-hidden border transition-shadow group/img bg-muted shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing",
                                             isMain ? "border-primary ring-2 ring-primary/20" : "border-border",
                                             isSelected && "ring-4 ring-primary ring-offset-2 dark:ring-offset-gray-900 border-primary scale-[0.98]",
                                             isBatchMode && isVirtual && "brightness-75"
@@ -1053,30 +1055,33 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             
                                             {/* Simplified Overlay on Hover - only show if not in batch mode */}
                                             {!isBatchMode && (
-                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2">
-                                                    {!isMain && !isVideo && (
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 pointer-events-none">
+                                                    <div className="absolute top-2 right-2 flex flex-col gap-2 pointer-events-auto">
                                                         <button 
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setAsMainImage(img.url);
+                                                                handleDeletePhoto(img);
                                                             }}
-                                                            className="px-3 py-1.5 bg-primary text-primary-foreground text-[10px] font-medium rounded-lg shadow-xl translate-y-2 group-hover/img:translate-y-0 transition-all duration-300"
+                                                            className="p-1.5 bg-black/40 hover:bg-destructive text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-500 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:scale-110 active:scale-95"
+                                                            title="移除实拍内容"
                                                         >
-                                                            设为主图
+                                                            <X size={12} strokeWidth={3} />
                                                         </button>
-                                                    )}
-                                                    <button 
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDeletePhoto(img);
-                                                        }}
-                                                        className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-destructive text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-500 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:scale-110 active:scale-95"
-                                                        title="移除实拍内容"
-                                                    >
-                                                        <X size={12} strokeWidth={3} />
-                                                    </button>
+                                                        {!isMain && !isVideo && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setAsMainImage(img.url);
+                                                                }}
+                                                                className="p-1.5 bg-black/40 hover:bg-primary text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-500 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:scale-110 active:scale-95 delay-75"
+                                                                title="设为主图"
+                                                            >
+                                                                <Star size={12} strokeWidth={3} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
      
@@ -1090,7 +1095,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                     Video
                                                 </div>
                                             )}
-                                        </div>
+                                        </Reorder.Item>
                                     );
                                 })}
                                 
@@ -1141,7 +1146,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         </label>
                                     </div>
                                 )}
-                        </div>
+                        </Reorder.Group>
                     </div>
 
                 <div className="flex justify-end gap-4 border-t border-white/10 p-8 shrink-0">
