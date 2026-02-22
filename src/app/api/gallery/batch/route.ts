@@ -7,14 +7,19 @@
  */
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 import { getStorageStrategy } from "@/lib/storage";
 
 export async function DELETE(request: Request) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!hasPermission(session, "gallery:delete")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     const { ids } = await request.json();
@@ -42,6 +47,15 @@ export async function DELETE(request: Request) {
       } catch (storageError) {
         console.error("Batch physical deletion failed:", storageError);
       }
+    }
+
+    // 清除引用了这些URL为封面的商品信息，防止幽灵缓存
+    const urls = items.map((item: { url: string }) => item.url);
+    if (urls.length > 0) {
+      await prisma.product.updateMany({
+        where: { image: { in: urls } },
+        data: { image: null }
+      });
     }
 
     const deleteResult = await prisma.galleryItem.deleteMany({

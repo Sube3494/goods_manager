@@ -382,7 +382,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
           if (deleteVirtualCover) {
             setFormData(prev => ({ ...prev, image: "" }));
-            showToast("已移除封面引用", "success");
+            showToast("⚠️ 已移除封面引用，请记得【点击保存商品】以使更改生效", "warning");
           }
           
           // 检查正常删除项中是否包含当前封面关联的 ID (Check if regular deletes include current cover)
@@ -420,6 +420,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
         // 如果只是虚拟封面项，直接从 UI 移除即可（上面已处理 formData）
         if (isVirtual) {
+          showToast("⚠️ 封面引用已剥离，请记得【点击保存商品】生效", "warning");
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           return;
         }
@@ -1263,18 +1264,16 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {selectedPreviewImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedPreviewImage.url) ? (
                         <video 
                             src={selectedPreviewImage.url} 
-                            className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+                            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
                             controls
                             autoPlay
                         />
                     ) : (
-                        <Image 
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img 
                             src={selectedPreviewImage.url} 
                             alt="Preview" 
-                            fill
-                            unoptimized
-                            sizes="100vw"
-                            className="object-contain rounded-2xl shadow-2xl"
+                            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
                             draggable={false}
                         />
                     )}

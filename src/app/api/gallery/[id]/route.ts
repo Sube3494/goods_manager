@@ -71,6 +71,12 @@ export async function DELETE(
       console.error("Failed to delete physical file:", storageError);
     }
 
+    // Clean up product cover images relying on this url 
+    await prisma.product.updateMany({
+      where: { image: item.url },
+      data: { image: null }
+    });
+
     await prisma.galleryItem.delete({
       where: { id }
     });

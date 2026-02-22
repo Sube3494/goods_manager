@@ -273,13 +273,34 @@ export class LocalStorageStrategy implements StorageStrategy {
       if (!fileName) return;
 
       const uploadDir = join(process.cwd(), "public");
+      
+      let relativePath = url;
+      // 处理全路径情况
+      if (relativePath.startsWith('http')) {
+        try {
+          const urlObj = new URL(relativePath);
+          relativePath = urlObj.pathname;
+        } catch {
+          // invalid url
+        }
+      }
+
+      // 如果旧数据遗留的是 'gallery/xxx.jpg' 而非 '/uploads/...'，则补齐 uploads 前缀以便寻找真实物理路径
+      if (!relativePath.startsWith('/uploads/') && !relativePath.startsWith('uploads/')) {
+        // 先去掉可能存在的前导斜杠
+        relativePath = '/uploads/' + relativePath.replace(/^\//, '');
+      }
+
       // url is like /uploads/vouchers/filename.ext
       // We need to join with public to get absolute path
-      const filePath = join(uploadDir, url);
+      const filePath = join(uploadDir, relativePath);
       
       await unlink(filePath);
     } catch (error) {
-      console.error("Local delete failed:", error);
+      // Ignore ENOENT (file already deleted)
+      if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+        console.error("Local delete failed:", error);
+      }
     }
   }
 }
