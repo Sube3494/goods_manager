@@ -72,7 +72,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const [isLoadingBatches, setIsLoadingBatches] = useState(false);
   const reorderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDraggingTask = useRef(false);
-  const gridRef = useRef<HTMLDivElement>(null);
+  const dragSrcId = useRef<string | null>(null);
+  const dragOverId = useRef<string | null>(null);
+  const [dragOverImageId, setDragOverImageId] = useState<string | null>(null);
   
   // 批量管理状态 (Batch manage state)
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -146,19 +148,31 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
     const fetchGallery = async (productId: string) => {
       try {
-        // Fetch a large page size to ensure we get all/most images for the product form
         const res = await fetch(`/api/gallery?productId=${productId}&pageSize=100`);
         if (res.ok) {
           const data = await res.json();
-          // The API returns paginated structure: { items: [...] }
-          setGalleryImages(data.items || []);
-        } else {
-          console.error("Failed to fetch gallery images");
-          setGalleryImages([]);
+          let items: GalleryItem[] = data.items || [];
+          
+          // 如果有封面图，确保它在第一位 (Ensure cover is at index 0)
+          if (formData.image) {
+            const mainIndex = items.findIndex(img => img.url === formData.image);
+            if (mainIndex !== -1) {
+              const [mainItem] = items.splice(mainIndex, 1);
+              items = [mainItem, ...items];
+            } else {
+              items.unshift({
+                id: 'cover-virtual',
+                url: formData.image,
+                productId: productId,
+                uploadDate: new Date().toISOString(),
+                tags: []
+              } as GalleryItem);
+            }
+          }
+          setGalleryImages(items);
         }
       } catch (error) {
         console.error("Failed to fetch gallery images:", error);
-        setGalleryImages([]);
       }
     };
 
@@ -195,7 +209,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         });
       }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, formData.image]);
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
@@ -363,6 +377,18 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
   const setAsMainImage = (url: string) => {
     setFormData(prev => ({ ...prev, image: url }));
+    
+    // 同时更新 galleryImages 顺序，将选中的移动到第一位 (Move chosen covered to index 0)
+    setGalleryImages(prev => {
+        const newList = [...prev];
+        const index = newList.findIndex(img => img.url === url);
+        if (index !== -1) {
+            const [item] = newList.splice(index, 1);
+            return [item, ...newList];
+        }
+        return newList;
+    });
+    
     showToast("已设为商品封面", "success");
   };
 
@@ -468,17 +494,16 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     });
   };
 
-  const handleReorder = (newOrder: GalleryItem[]) => {
-    // 1. Optimistic Update
-    const filteredOrder = newOrder.filter(img => img.id !== 'cover-virtual');
-    setGalleryImages(filteredOrder);
-
-    // 2. Debounced API Call
+  const handleReorder = (currentList: GalleryItem[]) => {
+    // DB 仅保存真实存在的画册项 (DB only saves real gallery items)
+    const realItems = currentList.filter(img => img.id !== 'cover-virtual' && !img.id.startsWith('temp-'));
+    
+    // 异步排队更新 (Debounced API Call)
     if (reorderTimeoutRef.current) clearTimeout(reorderTimeoutRef.current);
     
     reorderTimeoutRef.current = setTimeout(async () => {
       try {
-        const items = filteredOrder.map((img, index) => ({
+        const items = realItems.map((img, index) => ({
           id: img.id,
           sortOrder: index
         }));
@@ -490,13 +515,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         });
         
         if (!res.ok) {
-          showToast("拖拽排序保存失败，请刷新重试", "error");
+          showToast("排序保存失败", "error");
         }
       } catch (error) {
         console.error("Failed to save gallery order", error);
-        showToast("排序保存网络错误", "error");
       }
-    }, 1000); // Wait 1 second after last drag before saving
+    }, 1000);
   };
 
   const handleCreateCategory = async (data: Partial<Category>) => {
@@ -535,28 +559,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     }
   };
 
-  // 构建最终显示的列表 (Build the final display list)
-  let displayList = [...(galleryImages || [])];
-  
-  // 封面图处理：如果已在相册中则移动到第一位，否则作为虚拟项置顶
-  // (Main image handling: move to front if in gallery, otherwise unshift as virtual item)
-  if (formData.image) {
-    const mainIndex = displayList.findIndex(img => img.url === formData.image);
-    if (mainIndex !== -1) {
-      // 在相册中，移动到第一位 (In gallery, move to first position)
-      const [mainItem] = displayList.splice(mainIndex, 1);
-      displayList = [mainItem, ...displayList];
-    } else {
-      // 不在相册中，添加虚拟项 (Not in gallery, add virtual item)
-      displayList.unshift({
-        id: 'cover-virtual',
-        url: formData.image,
-        productId: initialData?.id || '',
-        uploadDate: new Date().toISOString(),
-        tags: []
-      } as GalleryItem);
-    }
-  }
+  // 使用 galleryImages 作为唯一数据源 (Use galleryImages as single source of truth)
+  const displayList = galleryImages || [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1019,54 +1023,62 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
                         
-                        <div ref={gridRef} className="grid grid-cols-4 gap-3 relative">
-                                {/* Display current photos (Including the main cover image if not in gallery) */}
+                        <div className="grid grid-cols-4 gap-3">
                                 {displayList.map((img, index) => {
                                     const isMain = formData.image === img.url;
                                     const isVideo = img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url);
                                     const isSelected = selectedIds.has(img.id);
                                     const isVirtual = img.id === 'cover-virtual';
-                                    
+                                    const isCover = index === 0;
+                                    const isDragTarget = dragOverImageId === img.id && !isCover;
+
                                     return (
-                                        <motion.div 
-                                          layout
-                                          key={img.id} 
-                                          drag={!isBatchMode}
-                                          dragSnapToOrigin
-                                          dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
-                                          onDragStart={() => { isDraggingTask.current = true; }}
-                                          onDrag={(event, info) => {
-                                            if (!gridRef.current) return;
-                                            
-                                            const rect = gridRef.current.getBoundingClientRect();
-                                            const colWidth = rect.width / 4;
-                                            const rowHeight = colWidth; // Aspect square
-                                            
-                                            const x = info.point.x - rect.left;
-                                            const y = info.point.y - rect.top;
-                                            
-                                            const col = Math.floor(x / colWidth);
-                                            const row = Math.floor(y / rowHeight);
-                                            
-                                            if (col < 0 || col >= 4 || row < 0) return;
-                                            
-                                            const targetIndex = col + row * 4;
-                                            if (targetIndex >= 0 && targetIndex < displayList.length && targetIndex !== index) {
-                                                // 交换逻辑 (Swap logic)
-                                                const newList = [...displayList];
-                                                const [movedItem] = newList.splice(index, 1);
-                                                newList.splice(targetIndex, 0, movedItem);
-                                                
-                                                // 这里调用 handleReorder 会频繁触发，内部更新状态即可 (Internal state update only here)
-                                                // 剔除虚拟项后更新 galleryImages (Filter virtual and update)
-                                                const filtered = newList.filter(i => i.id !== 'cover-virtual');
-                                                setGalleryImages(filtered);
-                                            }
+                                        <div
+                                          key={img.id}
+                                          draggable={!isBatchMode && !isCover}
+                                          onDragStart={(e) => {
+                                            if (isCover) { e.preventDefault(); return; }
+                                            dragSrcId.current = img.id;
+                                            isDraggingTask.current = true;
+                                            e.dataTransfer.effectAllowed = 'move';
+                                            // 生成带圆角的拖拽预览 (Create rounded drag ghost)
+                                            const el = e.currentTarget as HTMLElement;
+                                            const clone = el.cloneNode(true) as HTMLElement;
+                                            clone.style.position = 'fixed';
+                                            clone.style.top = '-9999px';
+                                            clone.style.left = '-9999px';
+                                            clone.style.width = `${el.offsetWidth}px`;
+                                            clone.style.height = `${el.offsetHeight}px`;
+                                            clone.style.borderRadius = '16px';
+                                            clone.style.overflow = 'hidden';
+                                            clone.style.opacity = '0.95';
+                                            clone.style.pointerEvents = 'none';
+                                            document.body.appendChild(clone);
+                                            e.dataTransfer.setDragImage(clone, el.offsetWidth / 2, el.offsetHeight / 2);
+                                            requestAnimationFrame(() => document.body.removeChild(clone));
                                           }}
-                                          onDragEnd={() => { 
-                                            // 触发后端保存 (Trigger backend save)
-                                            handleReorder([...displayList]);
-                                            setTimeout(() => { isDraggingTask.current = false; }, 100); 
+                                          onDragOver={(e) => {
+                                            e.preventDefault();
+                                            if (!dragSrcId.current || dragSrcId.current === img.id || isCover) return;
+                                            dragOverId.current = img.id;
+                                            setDragOverImageId(img.id);
+                                            // 实时交换 (Live swap preview)
+                                            setGalleryImages(prev => {
+                                              const srcIdx = prev.findIndex(i => i.id === dragSrcId.current);
+                                              const dstIdx = prev.findIndex(i => i.id === img.id);
+                                              if (srcIdx === -1 || dstIdx === -1 || srcIdx === dstIdx || dstIdx === 0) return prev;
+                                              const next = [...prev];
+                                              const [moved] = next.splice(srcIdx, 1);
+                                              next.splice(dstIdx, 0, moved);
+                                              return next;
+                                            });
+                                          }}
+                                          onDragEnd={() => {
+                                            setDragOverImageId(null);
+                                            dragSrcId.current = null;
+                                            dragOverId.current = null;
+                                            handleReorder(galleryImages);
+                                            setTimeout(() => { isDraggingTask.current = false; }, 100);
                                           }}
                                           onClick={() => {
                                             if (isDraggingTask.current) return;
@@ -1077,14 +1089,17 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             }
                                           }}
                                           className={cn(
-                                            "relative aspect-square rounded-2xl overflow-hidden border transition-shadow group/img bg-muted shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing",
-                                            isMain ? "border-primary ring-2 ring-primary/20" : "border-border",
+                                            "relative aspect-square rounded-2xl overflow-hidden border transition-all group/img bg-muted shadow-sm hover:shadow-md",
+                                            isCover
+                                              ? "cursor-pointer border-primary ring-2 ring-primary/20"
+                                              : "cursor-grab active:cursor-grabbing border-border",
+                                            isMain && !isCover && "border-primary ring-2 ring-primary/20",
                                             isSelected && "ring-4 ring-primary ring-offset-2 dark:ring-offset-gray-900 border-primary scale-[0.98]",
                                             isBatchMode && isVirtual && "brightness-75",
-                                            isDraggingTask.current && "z-50 shadow-2xl scale-105"
+                                            isDragTarget && "ring-2 ring-primary/60 scale-[0.97] opacity-70"
                                           )}
                                         >
-                                            {/* Selection Overlay for Batch Mode */}
+                                            {/* Batch selection overlay */}
                                             {isBatchMode && (
                                                 <div className={cn(
                                                     "absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
@@ -1094,108 +1109,85 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 </div>
                                             )}
 
+                                            {/* Media */}
                                             {isVideo ? (
                                                 <div className="w-full h-full relative group/video">
-                                                    <video 
-                                                        src={img.url} 
+                                                    <video
+                                                        src={img.url}
                                                         className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
-                                                        muted
-                                                        playsInline
+                                                        muted playsInline
                                                         onMouseOver={(e) => (e.target as HTMLVideoElement).play()}
-                                                        onMouseOut={(e) => {
-                                                            const video = e.target as HTMLVideoElement;
-                                                            video.pause();
-                                                            video.currentTime = 0;
-                                                        }}
+                                                        onMouseOut={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
                                                     />
                                                     {!isBatchMode && (
                                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover/video:opacity-0 transition-opacity">
                                                             <div className="bg-black/40 backdrop-blur-md p-2 rounded-full border border-white/20">
-                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                                                                    <path d="M8 5v14l11-7z" />
-                                                                </svg>
+                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z" /></svg>
                                                             </div>
                                                         </div>
                                                     )}
                                                 </div>
                                             ) : (
-                                                <Image 
-                                                  src={img.url} 
-                                                  alt={img.product?.name || "Gallery image"} 
-                                                  fill
-                                                  unoptimized
+                                                <Image
+                                                  src={img.url}
+                                                  alt={img.product?.name || "Gallery image"}
+                                                  fill unoptimized
                                                   sizes="(max-width: 768px) 25vw, (max-width: 1200px) 20vw, 15vw"
-                                                  className="object-cover transition-transform duration-500 group-hover/img:scale-105" 
+                                                  className="object-cover transition-transform duration-500 group-hover/img:scale-105"
                                                   draggable={false}
                                                 />
                                             )}
-                                            
-                                            {/* Simplified Overlay on Hover - only show if not in batch mode */}
+
+                                            {/* Hover overlay */}
                                             {!isBatchMode && (
                                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 pointer-events-none">
                                                     <div className="absolute top-2 right-2 flex flex-col gap-2 pointer-events-auto">
-                                                        <button 
+                                                        <button
                                                             type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDeletePhoto(img);
-                                                            }}
+                                                            onClick={(e) => { e.stopPropagation(); handleDeletePhoto(img); }}
                                                             className="p-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
                                                             title="移除实拍内容"
-                                                        >
-                                                            <X size={14} strokeWidth={2.5} />
-                                                        </button>
-                                                        {!isMain && !isVideo && (
-                                                            <button 
+                                                        ><X size={14} strokeWidth={2.5} /></button>
+                                                        {!isMain && !isVideo && !isCover && (
+                                                            <button
                                                                 type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setAsMainImage(img.url);
-                                                                }}
+                                                                onClick={(e) => { e.stopPropagation(); setAsMainImage(img.url); }}
                                                                 className="p-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
                                                                 title="设为主图"
-                                                            >
-                                                                <Crown size={14} strokeWidth={2.5} />
-                                                            </button>
+                                                            ><Crown size={14} strokeWidth={2.5} /></button>
                                                         )}
                                                     </div>
                                                 </div>
                                             )}
-     
+
+                                            {/* Labels */}
                                             {isMain && (
-                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-primary-foreground text-[9px] font-medium rounded-md shadow-lg">
-                                                    封面
-                                                </div>
+                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-primary-foreground text-[9px] font-medium rounded-md shadow-lg">封面</div>
                                             )}
                                             {isVideo && (
-                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-medium rounded-md shadow-lg uppercase tracking-tighter">
-                                                    Video
-                                                </div>
+                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-medium rounded-md shadow-lg uppercase tracking-tighter">Video</div>
                                             )}
-                                        </motion.div>
+                                        </div>
                                     );
                                 })}
-                                
-                                {/* Add Photo Action - participating in AnimatePresence */}
+
+                                {/* Add Photo Button */}
                                 {!isBatchMode && (
-                                    <div 
-                                        key="add-button"
-                                        className="h-full"
-                                    >
-                                        <label 
+                                    <div className="h-full">
+                                        <label
                                             onDragOver={handleDragOver}
                                             onDragLeave={handleDragLeave}
                                             onDrop={handleDrop}
                                             className={cn(
                                                 "aspect-square rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer h-full",
-                                                isDraggingOver 
-                                                    ? "border-primary bg-primary/10 shadow-lg scale-[1.02]" 
+                                                isDraggingOver
+                                                    ? "border-primary bg-primary/10 shadow-lg scale-[1.02]"
                                                     : "border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-inner"
                                             )}
                                         >
-                                            <input 
-                                                type="file" 
-                                                className="hidden" 
+                                            <input
+                                                type="file"
+                                                className="hidden"
                                                 accept="image/*,video/*"
                                                 multiple
                                                 onChange={(e) => handleFileUpload(e)}
@@ -1206,7 +1198,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 isDraggingOver ? "bg-primary/20" : "bg-muted group-hover:bg-primary/10"
                                             )}>
                                                 <Plus size={24} className={cn(
-                                                    "transition-all duration-300", 
+                                                    "transition-all duration-300",
                                                     isDraggingOver ? "text-primary scale-110" : "text-muted-foreground group-hover:text-primary group-hover:rotate-90",
                                                     isUploading && "animate-spin"
                                                 )} />
