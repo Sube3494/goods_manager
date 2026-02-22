@@ -45,7 +45,7 @@ export async function POST(request: Request) {
           const chunkPath = join(TEMP_DIR, `${fileId}_${i}`);
           const stream = createReadStream(chunkPath);
           await new Promise((resolve, reject) => {
-            stream.on("data", (chunk) => passThrough.write(chunk));
+            stream.pipe(passThrough, { end: false });
             stream.on("end", () => resolve(undefined));
             stream.on("error", reject);
           });

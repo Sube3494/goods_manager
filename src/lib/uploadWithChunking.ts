@@ -99,19 +99,18 @@ export async function uploadFileWithChunking(
 }
 
 async function normalUpload(file: File, folder?: string, onProgress?: (percent: number) => void) {
-  const arrayBuffer = await file.arrayBuffer();
-  
-  if (onProgress) onProgress(50);
+  const formData = new FormData();
+  formData.append("file", file);
+
+  if (onProgress) onProgress(30);
 
   const res = await fetch("/api/upload", {
     method: "POST",
     headers: {
-      "Content-Type": file.type || "application/octet-stream",
-      "X-File-Name": encodeURIComponent(file.name),
-      "X-File-Type": file.type,
-      "x-folder": folder || ""
+      "x-folder": folder || "",
+      "x-use-timestamp": "true"
     },
-    body: arrayBuffer,
+    body: formData,
   });
 
   if (!res.ok) {
