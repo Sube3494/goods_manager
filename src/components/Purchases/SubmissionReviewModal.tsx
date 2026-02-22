@@ -450,9 +450,14 @@ export function SubmissionReviewModal({
                                         <video 
                                             src={previewMedia.url} 
                                             controls 
-                                            autoPlay 
-                                            className="max-h-[85vh] rounded-2xl shadow-2xl" 
+                                            className="max-h-[85vh] rounded-2xl shadow-2xl"
+                                            ref={(el) => {
+                                                if (el && el.paused) {
+                                                    el.play().catch(() => {});
+                                                }
+                                            }}
                                         />
+
                                     ) : (
                                         <div className="relative w-[90vw] h-[85vh] flex items-center justify-center">
                                             <Image 

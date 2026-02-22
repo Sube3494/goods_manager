@@ -1272,12 +1272,17 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     onPointerMove={handlePointerMove}
                   >
                     {selectedPreviewImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedPreviewImage.url) ? (
-                        <video 
-                            src={selectedPreviewImage.url} 
-                            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
-                            controls
-                            autoPlay
-                        />
+                            <video 
+                                src={selectedPreviewImage.url} 
+                                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+                                controls
+                                ref={(el) => {
+                                    if (el && el.paused) {
+                                        el.play().catch(() => {});
+                                    }
+                                }}
+                            />
+
                     ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
