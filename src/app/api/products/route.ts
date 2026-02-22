@@ -4,6 +4,12 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
 import { getStorageStrategy } from "@/lib/storage";
+import { Product, Category, Supplier } from "@/lib/types";
+
+type ProductWithRelations = Product & {
+  category: Category;
+  supplier: Supplier | null;
+};
 
 type ProductWhereInput = NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"];
 
@@ -89,7 +95,7 @@ export async function GET(request: Request) {
 
     // 执行分页查询
     const skip = (page - 1) * pageSize;
-    let products = [];
+    let products: ProductWithRelations[] = [];
     let total = 0;
 
     if (field === "sku") {
@@ -124,7 +130,7 @@ export async function GET(request: Request) {
       });
 
       // 5. 由于 in 并不保证顺序，我们需要按 pageIds 重新排序
-      products = pageIds.map(id => detailedProducts.find((d) => d.id === id)).filter(Boolean);
+      products = pageIds.map(id => detailedProducts.find((d) => d.id === id)).filter((p): p is NonNullable<typeof p> => !!p) as unknown as ProductWithRelations[];
 
       if (idsOnly) {
         return NextResponse.json({ 
@@ -146,7 +152,7 @@ export async function GET(request: Request) {
         });
       }
 
-      [products, total] = await Promise.all([
+      const [pData, pTotal] = await Promise.all([
         prisma.product.findMany({
           where,
           include: {
@@ -159,12 +165,14 @@ export async function GET(request: Request) {
         }),
         prisma.product.count({ where })
       ]);
+      products = pData as unknown as ProductWithRelations[];
+      total = pTotal;
     }
 
 
 
     const storage = await getStorageStrategy();
-    const resolvedProducts = products.map(p => ({
+    const resolvedProducts = products.filter((p): p is NonNullable<typeof p> => !!p).map(p => ({
       ...p,
       image: p.image ? storage.resolveUrl(p.image) : null
     }));
