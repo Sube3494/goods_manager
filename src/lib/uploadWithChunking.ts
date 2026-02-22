@@ -4,7 +4,63 @@ export async function uploadFileWithChunking(
   file: File,
   folder?: string,
   onProgress?: (percent: number) => void
-): Promise<{ url: string; type: string; skipped?: boolean }> {
+): Promise<{ url: string; type: string; skipped?: boolean; name?: string }> {
+
+  // 1. Fetch Presign URL to determine upload strategy
+  const presignRes = await fetch("/api/upload/presign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      fileType: file.type || "application/octet-stream",
+      folder,
+      useTimestamp: true
+    })
+  });
+  
+  if (!presignRes.ok) {
+     throw new Error("Failed to request upload configuration");
+  }
+  
+  const presignData = await presignRes.json();
+  
+  // 2. Direct MinIO Upload using Presigned URL
+  if (presignData.provider === "minio") {
+      return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", presignData.url, true);
+          xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+          
+          if (onProgress) {
+             xhr.upload.onprogress = (e) => {
+                 if (e.lengthComputable) {
+                     onProgress(Math.round((e.loaded / e.total) * 100));
+                 }
+             };
+          }
+          
+          xhr.onload = () => {
+             if (xhr.status >= 200 && xhr.status < 300) {
+                 const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(presignData.fileName);
+                 if (onProgress) onProgress(100);
+                 resolve({
+                     url: presignData.publicUrl,
+                     type: isVideo ? "video" : "image",
+                     name: presignData.name 
+                 });
+             } else {
+                 reject(new Error(`MinIO upload failed with status ${xhr.status}`));
+             }
+          };
+          
+          xhr.onerror = () => reject(new Error("Network error during MinIO upload"));
+          
+          xhr.send(file);
+      });
+  }
+
+  // 3. Fallback to Local Storage
+
   // If small file, fallback to normal upload
   if (file.size <= CHUNK_SIZE) {
     return normalUpload(file, folder, onProgress);

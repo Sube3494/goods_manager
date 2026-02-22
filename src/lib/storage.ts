@@ -26,6 +26,7 @@ export interface StorageStrategy {
   upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult>;
   delete(url: string): Promise<void>;
   resolveUrl(path: string): string; // Add resolveUrl to strategy
+  getPresignedUrl?(options: UploadOptions): Promise<{ url: string; fileName: string; publicUrl: string } | null>;
 }
 
 export interface MinioConfig {
@@ -458,6 +459,86 @@ export class MinioStorageStrategy implements StorageStrategy {
     const portPart = this.config.minioPort ? `:${this.config.minioPort}` : "";
     const baseUrl = publicUrl ? `${publicUrl}/${bucketName}` : `${protocol}://${this.config.minioEndpoint}${portPart}/${bucketName}`;
     return `${baseUrl}/${path.replace(/^\//, '')}`;
+  }
+
+  async getPresignedUrl(options: UploadOptions): Promise<{ url: string; fileName: string; publicUrl: string } | null> {
+    try {
+      const minioClient = new Minio.Client({
+        endPoint: this.config.minioEndpoint,
+        port: this.config.minioPort ? Number(this.config.minioPort) : undefined,
+        useSSL: this.config.minioUseSSL,
+        accessKey: this.config.minioAccessKey,
+        secretKey: this.config.minioSecretKey,
+      });
+
+      const bucketName = this.config.minioBucket || "goods-manager";
+      
+      const bucketExists = await minioClient.bucketExists(bucketName);
+      if (!bucketExists) {
+        await minioClient.makeBucket(bucketName);
+        const policy = {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { AWS: ["*"] },
+              Action: ["s3:GetBucketLocation", "s3:ListBucket"],
+              Resource: [`arn:aws:s3:::${bucketName}`],
+            },
+            {
+              Effect: "Allow",
+              Principal: { AWS: ["*"] },
+              Action: ["s3:GetObject"],
+              Resource: [`arn:aws:s3:::${bucketName}/*`],
+            },
+          ],
+        };
+        await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy));
+      }
+
+      let fileNameInput = options.name || `upload-${Date.now()}`;
+      
+      if (options.useTimestamp) {
+        const ext = fileNameInput.split(".").pop() || "";
+        const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0];
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const prefix = options.folder ? `${options.folder}_` : "file_";
+        fileNameInput = `${prefix}${timestamp}_${random}.${ext}`;
+      }
+
+      const subFolder = options.folder || "";
+      const objectName = subFolder ? `${subFolder}/${fileNameInput}` : fileNameInput;
+
+      const usedStrategy = this.config.uploadConflictStrategy || "uuid";
+
+      const { fileName: resolvedFileName } = await resolveFileName(
+        objectName,
+        usedStrategy,
+        async (name) => {
+          try {
+            await minioClient.statObject(bucketName, name);
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      );
+
+      const fileName = resolvedFileName;
+      
+      // Presign URL for PUT operation, valid for 1 hour
+      // Expiry time is in seconds
+      const presignedUrl = await minioClient.presignedPutObject(bucketName, fileName, 3600);
+
+      return {
+        url: presignedUrl,
+        fileName: fileName,
+        publicUrl: this.resolveUrl(fileName)
+      };
+    } catch (error) {
+      console.error("Failed to generate presigned URL:", error);
+      return null;
+    }
   }
 
   async delete(url: string): Promise<void> {
