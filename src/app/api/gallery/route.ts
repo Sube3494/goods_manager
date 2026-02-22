@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       where,
       select: {
         id: true,
+        sortOrder: true,
         createdAt: true,
         product: {
           select: {
@@ -64,6 +65,13 @@ export async function GET(request: Request) {
       if (skuA !== skuB) {
         return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
       }
+      
+      // Secondary sort: sortOrder ASC
+      if (a.sortOrder !== b.sortOrder) {
+        return a.sortOrder - b.sortOrder;
+      }
+
+      // Tertiary sort: createdAt DESC
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 

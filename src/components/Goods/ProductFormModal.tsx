@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Star } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -70,6 +70,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   
   const [inboundHistory, setInboundHistory] = useState<PurchaseOrder[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(false);
+  const reorderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // 批量管理状态 (Batch manage state)
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -455,6 +456,37 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     });
   };
 
+  const handleReorder = (newOrder: GalleryItem[]) => {
+    // 1. Optimistic Update
+    const filteredOrder = newOrder.filter(img => img.id !== 'cover-virtual');
+    setGalleryImages(filteredOrder);
+
+    // 2. Debounced API Call
+    if (reorderTimeoutRef.current) clearTimeout(reorderTimeoutRef.current);
+    
+    reorderTimeoutRef.current = setTimeout(async () => {
+      try {
+        const items = filteredOrder.map((img, index) => ({
+          id: img.id,
+          sortOrder: index
+        }));
+
+        const res = await fetch("/api/gallery/reorder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items })
+        });
+        
+        if (!res.ok) {
+          showToast("拖拽排序保存失败，请刷新重试", "error");
+        }
+      } catch (error) {
+        console.error("Failed to save gallery order", error);
+        showToast("排序保存网络错误", "error");
+      }
+    }, 1000); // Wait 1 second after last drag before saving
+  };
+
   const handleCreateCategory = async (data: Partial<Category>) => {
     try {
       const res = await fetch("/api/categories", {
@@ -497,17 +529,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   // 构建最终显示的列表 (Build the final display list)
   const displayList = [...(galleryImages || [])];
   
-  // 排序：封面图置顶，其他按时间升序 (Sort: Cover image on top, others in ascending time order)
-  displayList.sort((a, b) => {
-    const isACover = formData.image === a.url;
-    const isBCover = formData.image === b.url;
-    if (isACover && !isBCover) return -1;
-    if (!isACover && isBCover) return 1;
-    const dateA = new Date((a as GalleryItem).createdAt || a.uploadDate).getTime();
-    const dateB = new Date((b as GalleryItem).createdAt || b.uploadDate).getTime();
-    return dateA - dateB;
-  });
-
   // 如果封面图不在相册里且存在 URL，将其作为一个虚拟项添加进去并置顶
   // (If cover image is not in gallery but exists, add it as a virtual item and put it on top)
   if (formData.image && !galleryUrls.has(formData.image)) {
@@ -981,7 +1002,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
                         
-                        <Reorder.Group axis="y" values={displayList} onReorder={(newOrder) => setGalleryImages(newOrder.filter(img => img.id !== 'cover-virtual'))} className="grid grid-cols-4 gap-3">
+                        <Reorder.Group axis="y" values={displayList} onReorder={handleReorder} className="grid grid-cols-4 gap-3">
                                 {/* Display current photos (Including the main cover image if not in gallery) */}
                                 {displayList.map(img => {
                                     const isMain = formData.image === img.url;
