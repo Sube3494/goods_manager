@@ -10,7 +10,10 @@ export async function uploadFileWithChunking(
     return normalUpload(file, folder, onProgress);
   }
 
-  const fileId = `${encodeURIComponent(file.name)}-${file.size}-${file.lastModified}`;
+  // Create a concise fileId to avoid ENAMETOOLONG errors on OS level
+  // We use a simplified base64-like string from char codes of the name
+  const nameStrs = Array.from(file.name).map(c => c.charCodeAt(0).toString(36)).join('').substring(0, 30);
+  const fileId = `chunk_${nameStrs}_${file.size}_${file.lastModified}`;
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
   // 1. Check uploaded chunks (Resume capability)
