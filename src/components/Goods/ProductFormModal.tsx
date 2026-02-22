@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Star, Crown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Crown } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
@@ -71,6 +71,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const [inboundHistory, setInboundHistory] = useState<PurchaseOrder[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(false);
   const reorderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isDraggingTask = useRef(false);
+  const gridRef = useRef<HTMLDivElement>(null);
   
   // 批量管理状态 (Batch manage state)
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -1017,20 +1019,57 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
                         
-                        <Reorder.Group axis="y" values={displayList} onReorder={handleReorder} className="grid grid-cols-4 gap-3">
+                        <div ref={gridRef} className="grid grid-cols-4 gap-3 relative">
                                 {/* Display current photos (Including the main cover image if not in gallery) */}
-                                {displayList.map(img => {
+                                {displayList.map((img, index) => {
                                     const isMain = formData.image === img.url;
                                     const isVideo = img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url);
                                     const isSelected = selectedIds.has(img.id);
                                     const isVirtual = img.id === 'cover-virtual';
                                     
                                     return (
-                                        <Reorder.Item 
-                                          value={img}
+                                        <motion.div 
+                                          layout
                                           key={img.id} 
                                           drag={!isBatchMode}
+                                          dragSnapToOrigin
+                                          dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
+                                          onDragStart={() => { isDraggingTask.current = true; }}
+                                          onDrag={(event, info) => {
+                                            if (!gridRef.current) return;
+                                            
+                                            const rect = gridRef.current.getBoundingClientRect();
+                                            const colWidth = rect.width / 4;
+                                            const rowHeight = colWidth; // Aspect square
+                                            
+                                            const x = info.point.x - rect.left;
+                                            const y = info.point.y - rect.top;
+                                            
+                                            const col = Math.floor(x / colWidth);
+                                            const row = Math.floor(y / rowHeight);
+                                            
+                                            if (col < 0 || col >= 4 || row < 0) return;
+                                            
+                                            const targetIndex = col + row * 4;
+                                            if (targetIndex >= 0 && targetIndex < displayList.length && targetIndex !== index) {
+                                                // 交换逻辑 (Swap logic)
+                                                const newList = [...displayList];
+                                                const [movedItem] = newList.splice(index, 1);
+                                                newList.splice(targetIndex, 0, movedItem);
+                                                
+                                                // 这里调用 handleReorder 会频繁触发，内部更新状态即可 (Internal state update only here)
+                                                // 剔除虚拟项后更新 galleryImages (Filter virtual and update)
+                                                const filtered = newList.filter(i => i.id !== 'cover-virtual');
+                                                setGalleryImages(filtered);
+                                            }
+                                          }}
+                                          onDragEnd={() => { 
+                                            // 触发后端保存 (Trigger backend save)
+                                            handleReorder([...displayList]);
+                                            setTimeout(() => { isDraggingTask.current = false; }, 100); 
+                                          }}
                                           onClick={() => {
+                                            if (isDraggingTask.current) return;
                                             if (isBatchMode) {
                                                 toggleSelectImage(img.id);
                                             } else {
@@ -1041,7 +1080,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             "relative aspect-square rounded-2xl overflow-hidden border transition-shadow group/img bg-muted shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing",
                                             isMain ? "border-primary ring-2 ring-primary/20" : "border-border",
                                             isSelected && "ring-4 ring-primary ring-offset-2 dark:ring-offset-gray-900 border-primary scale-[0.98]",
-                                            isBatchMode && isVirtual && "brightness-75"
+                                            isBatchMode && isVirtual && "brightness-75",
+                                            isDraggingTask.current && "z-50 shadow-2xl scale-105"
                                           )}
                                         >
                                             {/* Selection Overlay for Batch Mode */}
@@ -1100,7 +1140,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                                 e.stopPropagation();
                                                                 handleDeletePhoto(img);
                                                             }}
-                                                            className="p-1.5 bg-zinc-900/60 hover:bg-destructive text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
+                                                            className="p-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
                                                             title="移除实拍内容"
                                                         >
                                                             <X size={14} strokeWidth={2.5} />
@@ -1112,7 +1152,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                                     e.stopPropagation();
                                                                     setAsMainImage(img.url);
                                                                 }}
-                                                                className="p-1.5 bg-zinc-900/60 hover:bg-primary text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
+                                                                className="p-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-white rounded-full shadow-xl transform translate-y-[-8px] group-hover/img:translate-y-0 transition-all duration-300 backdrop-blur-md border border-white/10 flex items-center justify-center hover:scale-110 active:scale-95"
                                                                 title="设为主图"
                                                             >
                                                                 <Crown size={14} strokeWidth={2.5} />
@@ -1132,7 +1172,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                     Video
                                                 </div>
                                             )}
-                                        </Reorder.Item>
+                                        </motion.div>
                                     );
                                 })}
                                 
@@ -1183,7 +1223,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         </label>
                                     </div>
                                 )}
-                        </Reorder.Group>
+                        </div>
                     </div>
 
                 <div className="flex justify-end gap-4 border-t border-white/10 p-8 shrink-0">
