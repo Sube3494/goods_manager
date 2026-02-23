@@ -166,8 +166,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
     if (selectedItems.length === 0) {
       showToast("请至少选择一个商品", "error");
       return;
@@ -245,20 +246,25 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
           <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
             {/* Left/Selection: Product Selection */}
-            <div className={`w-full md:w-80 border-r border-white/5 flex flex-col bg-muted/20 ${mobileView === "review" ? "hidden md:flex" : "flex"}`}>
-              <div className="p-4 bg-muted/30">
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="搜索商品..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-border dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
+            <div className={`w-full md:w-80 border-r border-border dark:border-white/5 flex flex-col justify-between bg-muted/10 ${mobileView === "review" ? "hidden md:flex" : "flex"}`}>
+              <div className="p-4 sm:p-5">
+                <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">快速查找</label>
+                    <div className="relative">
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="输入名称或 SKU..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-border dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
+                    </div>
                 </div>
               </div>
+
               <div className="flex-1 overflow-y-auto p-2 space-y-1 relative">
+
                 {(isLoadingProducts || isSearching) ? (
                     <div className="py-10 text-center flex flex-col items-center justify-center gap-3">
                         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -316,14 +322,25 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                     </div>
                 )}
               </div>
+
+              {/* Left Side Footer - only visible on desktop */}
+              <div className="p-4 sm:p-5 shrink-0 md:flex flex-col gap-0.5 hidden">
+                  <span className="text-xs sm:text-sm font-bold text-foreground">共选择 {selectedItems.length} 项商品</span>
+                  <span className="text-[10px] text-muted-foreground">已选清单实时汇总</span>
+              </div>
+
+
             </div>
 
             {/* Right: Selected List & Meta */}
-            <div className={`flex-1 flex flex-col h-full bg-white dark:bg-gray-900 ${mobileView === "selection" ? "hidden md:flex" : "flex"}`}>
-                <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
-                    <div className="p-4 border-b border-white/5 grid grid-cols-2 gap-4 shrink-0">
+            <div className={`flex-1 flex flex-col bg-white dark:bg-gray-900 ${mobileView === "selection" ? "hidden md:flex" : "flex"}`}>
+                <div className="flex flex-col h-full overflow-hidden">
+
+                    <div className="p-4 sm:p-5 grid grid-cols-2 gap-4 shrink-0">
+
+
                         <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground px-1">出库类型</label>
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">出库业务类型</label>
                             <CustomSelect 
                                 value={type}
                                 onChange={(val) => setType(val)}
@@ -333,20 +350,21 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                     { value: "Loss", label: "库存损耗" },
                                     { value: "Return", label: "退货出库" }
                                 ]}
-                                triggerClassName="bg-muted/50 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
+                                triggerClassName="bg-white dark:bg-gray-800 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground px-1">备注</label>
+                            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">备注信息</label>
                             <input 
                                 type="text"
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
                                 placeholder="选填..."
-                                className="w-full bg-muted/50 border border-border dark:border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                className="w-full bg-white dark:bg-gray-800 border border-border dark:border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                             />
                         </div>
                     </div>
+
 
                     <div className="flex-1 overflow-y-auto p-4 bg-muted/5">
                         <div className="space-y-3">
@@ -408,33 +426,40 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                         </div>
                     </div>
 
-                    <div className="p-4 sm:p-6 border-t border-white/5 bg-muted/10 shrink-0">
-                        <div className="flex items-center justify-between mb-4 sm:mb-6">
-                            <div className="flex flex-col gap-1">
-                                <span className="text-xs sm:text-sm text-muted-foreground">共选择 {selectedItems.length} 项商品</span>
-                            </div>
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={selectedItems.length === 0}
-                            className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-                        >
-                            {mobileView === "selection" && window.innerWidth < 768 ? (
-                                <>
-                                    <span>以此为基础并下一步</span>
-                                    <CheckCircle size={20} className="ml-1" />
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle size={20} />
-                                    <span>确认并减扣库存</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </form>
+                  {/* Right Side Footer Area */}
+                  <div className="p-4 sm:p-5 border-t border-border dark:border-white/5 shrink-0">
+
+                      {/* Mobile Stats: shown only on mobile because the left panel is hidden in review mode */}
+                      <div className="flex items-center justify-between mb-4 md:hidden">
+                          <div className="flex flex-col gap-0.5">
+                              <span className="text-xs sm:text-sm font-bold text-foreground">共选择 {selectedItems.length} 项商品</span>
+                              <span className="text-[10px] text-muted-foreground">已选清单实时汇总</span>
+                          </div>
+                      </div>
+                      
+                      <button
+                          onClick={handleSubmit}
+                          disabled={selectedItems.length === 0}
+                          className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                          {mobileView === "selection" && window.innerWidth < 768 ? (
+                              <>
+                                  <span>以此为基础并下一步</span>
+                                  <CheckCircle size={20} className="ml-1" />
+                              </>
+                          ) : (
+                              <>
+                                  <CheckCircle size={20} />
+                                  <span>确认并减扣库存</span>
+                              </>
+                          )}
+                      </button>
+                  </div>
+                </div>
             </div>
           </div>
+
+
         </motion.div>
       </div>
     </AnimatePresence>,

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle } from "lucide-react";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle, RotateCcw } from "lucide-react";
 import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -42,23 +42,26 @@ interface PurchaseOrderModalProps {
 export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false }: PurchaseOrderModalProps) {
   const { showToast } = useToast();
   
-  // A record is effectively read-only if explicitly set, or if it's a system-generated return
-  const isSystemGenerated = useMemo(() => {
-    return initialData?.type === "Return" || initialData?.type === "InternalReturn" || (initialData?.id?.startsWith("IN-") && initialData?.type !== "Purchase");
-  }, [initialData]);
-
-  const effectiveReadOnly = readOnly || isSystemGenerated;
   const [formData, setFormData] = useState<PurchaseOrder>(() => ({
     id: initialData?.id || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
     status: initialData?.status || "Draft",
+    // New orders are always 'Purchase'; only existing records can have other types
+    type: initialData?.type || "Purchase",
     date: initialData?.date || new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
     items: initialData?.items || [],
     shippingFees: initialData?.shippingFees || 0,
     extraFees: initialData?.extraFees || 0,
     totalAmount: initialData?.totalAmount || 0,
-
     trackingData: initialData?.trackingData
   }));
+
+
+  const effectiveReadOnly = readOnly || (initialData?.status !== "Draft" && !!initialData);
+  // Derived: system-generated records (auto-created from outbound returns) are always locked
+  const isSystemGenerated = formData.type === "Return" || formData.type === "InternalReturn";
+
+
+
   
   // Local state for fee inputs to allow typing "0." or decimals comfortably
   const [shippingFeeInput, setShippingFeeInput] = useState(initialData?.shippingFees?.toString() || "0");
@@ -305,22 +308,34 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                 <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-8">
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-muted/20 dark:bg-white/5 p-3 sm:p-6 rounded-2xl border border-border/50">
+                        {/* 业务类型：仅在查看已有单据时显示（新建时默认为采购入库，无需展示） */}
+                        {initialData && (
                         <div className="flex flex-col gap-2">
                             <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center justify-between uppercase tracking-wider">
                                 <span className="flex items-center gap-1.5"><ListOrdered size={14} /> 业务类型</span>
-                                <span className="text-red-500">*</span>
                             </label>
-                            <select 
-                                disabled={effectiveReadOnly}
-                                value={formData.type || "Purchase"}
-                                onChange={(e) => setFormData({...formData, type: e.target.value})}
-                                className="w-full h-10 sm:h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold appearance-none cursor-pointer"
-                            >
-                                <option value="Purchase">采购入库 (常规进货)</option>
-                                <option value="Return">销售退回 (售后入库)</option>
-                                <option value="InternalReturn">领用退回 (物料归还)</option>
-                            </select>
+                            <div className="relative">
+                                <select 
+                                    disabled={effectiveReadOnly || isSystemGenerated}
+                                    value={formData.type || "Purchase"}
+                                    onChange={(e) => setFormData({...formData, type: e.target.value})}
+                                    className={`w-full h-10 sm:h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold appearance-none ${effectiveReadOnly || isSystemGenerated ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                                >
+                                    <option value="Purchase">采购入库 (常规进货)</option>
+                                    <option value="Return">销售退回 (系统自动生成)</option>
+                                    <option value="InternalReturn">领用退回 (系统自动生成)</option>
+                                    <option value="Inbound">补拨入库 (库存修正)</option>
+                                </select>
+                                {isSystemGenerated && (
+                                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-orange-500 font-bold bg-orange-500/5 px-2 py-0.5 rounded-md border border-orange-500/10 w-fit">
+                                        <RotateCcw size={10} />
+                                        系统自动生成，关联出库单对冲
+                                    </div>
+                                )}
+                            </div>
                         </div>
+                        )}
+
                         <div className="flex flex-col gap-2">
                             <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
                                 <FileText size={14} /> 单据编号
@@ -408,13 +423,21 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                     {item.product?.name || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.name || "加载中..."}
                                                 </span>
                                                  <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                                        #{item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku || "..."}
-                                                    </span>
-                                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                                        • {suppliers.find(s => s.id === (item.product?.supplierId || item.supplierId))?.name || "未知供应商"}
-                                                    </span>
-                                                </div>
+                                                    {(item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku) && (
+                                                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                                          #{item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku}
+                                                      </span>
+                                                    )}
+                                                    {(() => {
+                                                      const supplierId = item.product?.supplierId || item.supplierId;
+                                                      const supplierName = suppliers.find(s => s.id === supplierId)?.name;
+                                                      return supplierName ? (
+                                                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                                            • {supplierName}
+                                                        </span>
+                                                      ) : null;
+                                                    })()}
+                                                 </div>
                                             </div>
                                         </div>
                                         {!readOnly && (

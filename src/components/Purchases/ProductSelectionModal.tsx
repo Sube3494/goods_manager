@@ -284,7 +284,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col p-5 sm:p-8 space-y-4">
-              <div className="flex flex-col gap-3 shrink-0">
+              <div className="flex items-center gap-3 shrink-0">
                  <div className="relative flex-1 group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
                   <input 
@@ -296,7 +296,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                   />
                 </div>
 
-                <div className="w-full sm:w-56 shrink-0">
+                <div className="w-36 sm:w-44 shrink-0">
                   <CustomSelect
                     options={[
                       { value: "", label: "所有供应商" },
@@ -309,6 +309,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                   />
                 </div>
               </div>
+
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar min-h-0 relative">
                  {isLoading ? (
@@ -358,16 +359,21 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                                <span className={`text-[15px] font-medium truncate leading-snug ${isSelected ? "text-primary" : "text-foreground"}`}>{product.name}</span>
                             </div>
                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                                <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
-                                  {product.sku ? product.sku : `REF__${product.id.slice(0, 6)}`}
-                                </span>
+                                {product.sku && (
+                                  <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
+                                    {product.sku}
+                                  </span>
+                                )}
                                 <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
                                     <Tag size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{getCategoryName(product.category)}</span>
                                 </span>
-                                <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
-                                    <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name || "未知供应商"}</span>
-                                </span>
-                            </div>
+                                {product.supplierId && suppliers.find(s => s.id === product.supplierId) && (
+                                  <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
+                                      <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name}</span>
+                                  </span>
+                                )}
+                             </div>
+
                              {showPrice && (
                                 <div className="mt-1.5">
                                 <span className="text-sm font-medium text-primary">
