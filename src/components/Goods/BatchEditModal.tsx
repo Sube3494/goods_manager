@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Tag, Truck, CheckCircle, Eye } from "lucide-react";
+import { X, Tag, Truck, CheckCircle, Eye, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Category, Supplier } from "@/lib/types";
@@ -10,7 +10,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 interface BatchEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (data: { categoryId?: string; supplierId?: string; isPublic?: boolean }) => void;
+  onConfirm: (data: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean }) => void;
   categories: Category[];
   suppliers: Supplier[];
   selectedCount: number;
@@ -27,13 +27,15 @@ export function BatchEditModal({
   const [categoryId, setCategoryId] = useState<string>("keep");
   const [supplierId, setSupplierId] = useState<string>("keep");
   const [visibility, setVisibility] = useState<string>("keep");
+  const [productionStatus, setProductionStatus] = useState<string>("keep");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data: { categoryId?: string; supplierId?: string; isPublic?: boolean } = {};
+    const data: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean } = {};
     if (categoryId !== "keep") data.categoryId = categoryId;
     if (supplierId !== "keep") data.supplierId = supplierId;
     if (visibility !== "keep") data.isPublic = visibility === "public";
+    if (productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
     
     onConfirm(data);
     onClose();
@@ -55,7 +57,7 @@ export function BatchEditModal({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-white dark:bg-gray-900 shadow-2xl"
+          className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 shadow-2xl bg-white dark:bg-gray-900/70 backdrop-blur-xl"
         >
           <div className="flex items-center justify-between border-b border-white/5 p-6">
             <div>
@@ -112,9 +114,26 @@ export function BatchEditModal({
                 value={visibility}
                 onChange={setVisibility}
                 options={[
-                  { value: "keep", label: "保持当前状态" },
+                  { value: "keep", label: "保持当前状态 (不修改)" },
                   { value: "public", label: "设为公开可见" },
                   { value: "private", label: "设为隐藏不公开" }
+                ]}
+                triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
+              />
+            </div>
+
+            {/* Production Status Select */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Activity size={16} /> 生产状态
+              </label>
+              <CustomSelect
+                value={productionStatus}
+                onChange={setProductionStatus}
+                options={[
+                  { value: "keep", label: "保持当前状态 (不修改)" },
+                  { value: "active", label: "正常生产中" },
+                  { value: "discontinued", label: "标记为已停产" }
                 ]}
                 triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
               />
@@ -130,7 +149,7 @@ export function BatchEditModal({
               </button>
               <button
                 type="submit"
-                disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep"}
+                disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep"}
                 className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
               >
                 <CheckCircle size={18} />

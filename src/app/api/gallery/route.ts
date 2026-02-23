@@ -93,6 +93,7 @@ export async function GET(request: Request) {
             image: true,
             stock: true,
             specs: true,
+            isDiscontinued: true,
             category: {
               select: {
                 name: true

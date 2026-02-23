@@ -46,10 +46,27 @@ export const GoodsCard = memo(function GoodsCard({
   return (
     <motion.div
       onClick={handleCardClick}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer transform-gpu will-change-transform translate-z-0 ${
-        isSelected ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''
-      }`}
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all hover:-translate-y-2 cursor-pointer transform-gpu will-change-transform translate-z-0",
+        isSelected ? "ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5" : "hover:shadow-2xl hover:shadow-primary/10",
+        product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20" : ""
+      )}
     >
+      {/* Full Card Discontinued Overlay */}
+      {product.isDiscontinued && (
+        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden">
+          {/* Grayscale/Faded backdrop mask that sits behind the red text but covers the whole card */}
+          <div className="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-grayscale-[0.8]"></div>
+          
+          <div 
+             className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-7xl sm:text-8xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
+             style={{ WebkitTextStroke: '2px rgba(255, 255, 255, 0.5)' }}
+          >
+            已停产
+          </div>
+        </div>
+      )}
+
       {/* Image Container - with subtle loading optimization */}
       <div className="relative aspect-4/3 w-full overflow-hidden bg-secondary/30">
         {/* Selection Checkbox (Hover or Selected) */}
@@ -87,6 +104,7 @@ export const GoodsCard = memo(function GoodsCard({
             <Package size={32} strokeWidth={1.5} />
           </div>
         )}
+
       </div>
 
       {/* Content */}
@@ -227,6 +245,7 @@ export const GoodsCard = memo(function GoodsCard({
     prev.product.image === next.product.image &&
     prev.product.sku === next.product.sku &&
     prev.product.supplierId === next.product.supplierId &&
-    prev.product.categoryId === next.product.categoryId
+    prev.product.categoryId === next.product.categoryId &&
+    prev.product.isDiscontinued === next.product.isDiscontinued
   );
 });

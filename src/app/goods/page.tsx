@@ -270,7 +270,7 @@ export default function GoodsPage() {
   }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
 
 
-  const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string; isPublic?: boolean }) => {
+  const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean }) => {
     const count = selectedIds.length;
     try {
       const res = await fetch("/api/products/batch", {
@@ -411,7 +411,8 @@ export default function GoodsPage() {
           "供应商": g.supplier?.name || "未知供应商",
           "商品图片": g.image || "暂无图片",
           "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
-          "公开状态": g.isPublic ? "公开" : "私有",
+          "公开状态": g.isPublic ? "公开" : "私密",
+          "生产状态": g.isDiscontinued ? "已停产" : "正常经营",
           "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
         };
 
@@ -541,7 +542,8 @@ export default function GoodsPage() {
                         { value: 'all', label: '所有状态' },
                         { value: 'public', label: '公开可见' },
                         { value: 'private', label: '隐藏不公开' },
-                        { value: 'low_stock', label: '库存预警' }
+                        { value: 'low_stock', label: '库存预警告' },
+                        { value: 'discontinued', label: '已停产商品' }
                     ]}
                     className="h-full"
                     triggerClassName={cn(

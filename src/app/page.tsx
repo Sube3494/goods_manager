@@ -18,10 +18,12 @@ import { format } from "date-fns";
 import { StatsData } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/Toast";
 
 export default function Home() {
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
+  const { showToast } = useToast();
   const [statsData, setStatsData] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
@@ -32,7 +34,7 @@ export default function Home() {
     }
   }, [user, isUserLoading, router]);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (quiet = false) => {
     if (!user) return; // Don't fetch if not logged in
     
     setIsLoading(true);
@@ -42,16 +44,22 @@ export default function Home() {
         const data = await res.json();
         setStatsData(data);
         setLastSynced(new Date());
+        if (!quiet) {
+          showToast("系统同步完成", "success");
+        }
+      } else {
+        if (!quiet) showToast("同步失败，请重试", "error");
       }
     } catch (error) {
       console.error("Dashboard data fetch failed:", error);
+      if (!quiet) showToast("网络请求失败", "error");
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, showToast]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
   }, [fetchData]);
 
   if (isUserLoading) {
@@ -67,28 +75,22 @@ export default function Home() {
   }
 
   return (
-    <div className="relative isolate">
-      {/* Dynamic Background Decorative Elements */}
-      <div className="pointer-events-none absolute -top-24 -left-20 h-96 w-96 rounded-full bg-primary/10 blur-[100px] animate-pulse duration-10000" />
-      <div className="pointer-events-none absolute top-1/2 -right-20 h-96 w-96 rounded-full bg-blue-500/5 blur-[120px] animate-pulse duration-15000" />
+    <div className="relative isolate px-1">
 
       <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Header */}
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between mb-8">
-          <div className="space-y-2">
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-linear-to-b from-foreground to-foreground/60">
-              库存概览
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">
+              概览
             </h1>
-            <div className="flex items-center gap-3">
-              <span className="h-0.5 w-12 bg-primary rounded-full" />
-              <p className="text-muted-foreground font-medium text-sm sm:text-base">
-                实时监控仓库状态与资产总值
-              </p>
-            </div>
+            <p className="text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
+              实时监控仓库状态与资产总值
+            </p>
           </div>
           
           <button 
-            onClick={fetchData}
+            onClick={() => fetchData(false)}
             disabled={isLoading}
             className="group relative flex items-center gap-3 h-11 px-5 rounded-2xl bg-black/3 dark:bg-white/5 border border-black/8 dark:border-white/10 hover:bg-black/6 dark:hover:bg-white/10 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs dark:shadow-none"
           >

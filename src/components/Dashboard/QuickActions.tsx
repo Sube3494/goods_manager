@@ -34,7 +34,7 @@ export function QuickActions() {
     { label: "采购单管理", icon: ShoppingBag, path: "/purchases", color: "text-blue-500", bg: "bg-blue-500/10 dark:bg-blue-500/5" },
     { label: "供应商名录", icon: ArrowDownRight, path: "/suppliers", color: "text-purple-500", bg: "bg-purple-500/10 dark:bg-purple-500/5" },
     { label: "商品实物图库", icon: ImageIcon, path: "/gallery", color: "text-orange-500", bg: "bg-orange-500/10 dark:bg-orange-500/5" },
-    { label: "系统数据备份", icon: Database, path: "/settings", color: "text-indigo-500", bg: "bg-indigo-500/10 dark:bg-indigo-500/5" },
+    { label: "系统数据备份", icon: Database, path: "/settings?tab=data", color: "text-indigo-500", bg: "bg-indigo-500/10 dark:bg-indigo-500/5" },
   ];
 
   return (

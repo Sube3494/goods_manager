@@ -131,9 +131,11 @@ export default function SuppliersPage() {
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
       {/* Header section with unified style */}
       <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">供应商管理</h1>
-          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理供应链合作伙伴与联系信息。</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">供应商管理</h1>
+          <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
+            管理供应链合作伙伴与联系信息
+          </p>
         </div>
         
         {canManage && (

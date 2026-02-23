@@ -9,6 +9,16 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ActionBar } from "@/components/ui/ActionBar";
 
 import { useUser } from "@/hooks/useUser";
+import { cn } from "@/lib/utils";
+
+const CATEGORY_COLOR = { 
+  id: 'blue', 
+  text: 'text-blue-500', 
+  bg: 'bg-blue-500/10', 
+  ring: 'group-hover:ring-blue-500/30', 
+  border: 'border-blue-500/20', 
+  hoverBorder: 'hover:border-blue-500/30' 
+};
 
 export default function CategoriesPage() {
   const { user } = useUser();
@@ -117,6 +127,7 @@ export default function CategoriesPage() {
     );
   };
   
+
   const filteredCategories = categories.filter((c: Category) => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -163,21 +174,35 @@ export default function CategoriesPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {filteredCategories.map((category) => {
                 const isSelected = selectedIds.includes(category.id);
+                const color = CATEGORY_COLOR;
                 return (
-                    <div key={category.id} className={`group relative overflow-hidden rounded-2xl glass-card border p-4 transition-all duration-300 ${isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"}`}>
+                    <div 
+                      key={category.id} 
+                      className={cn(
+                        "group relative overflow-hidden rounded-2xl glass-card border p-4 transition-all duration-300",
+                        isSelected ? "border-primary bg-primary/5 shadow-lg shadow-primary/5" : cn("border-border", color.hoverBorder)
+                      )}
+                    >
                         <div className="flex items-start justify-between mb-3 relative z-10">
-                            <div className={`h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shadow-sm transition-transform duration-300 group-hover:scale-110`}>
-                                <Layers className="opacity-90 drop-shadow-sm" size={18} />
+                            <div className={cn(
+                              "h-10 w-10 rounded-xl flex items-center justify-center shadow-sm transition-all duration-300",
+                              color.bg, color.text
+                            )}>
+                                <Layers className="opacity-90 drop-shadow-sm" size={20} />
                             </div>
                             {user && (
-                                <div className={`relative transition-all duration-300 ${isSelected || selectedIds.length > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                                <div className={cn(
+                                  "relative transition-all duration-300",
+                                  isSelected || selectedIds.length > 0 ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                )}>
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); toggleSelect(category.id); }}
-                                        className={`relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
-                                            isSelected 
+                                        className={cn(
+                                          "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
+                                          isSelected 
                                             ? "bg-foreground border-foreground text-background scale-110" 
                                             : "border-muted-foreground/30 hover:border-foreground/50"
-                                        }`}
+                                        )}
                                     >
                                         {isSelected && (
                                             <Check size={12} strokeWidth={4} />
@@ -187,25 +212,30 @@ export default function CategoriesPage() {
                             )}
                         </div>
                         
-                        <h3 className="text-lg font-bold text-foreground mb-3">{category.name}</h3>
+                        <h3 className="text-lg font-bold text-foreground mb-4 group-hover:text-primary transition-colors duration-300">{category.name}</h3>
                         
-                        <div className="flex justify-between items-center w-full">
-                              <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground bg-secondary/50 px-2.5 py-1 rounded-md">
-                                  <Tag size={13} />
-                                  {category.count || 0}
+                        <div className="flex justify-between items-center w-full mt-auto">
+                              <div className={cn(
+                                "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg transition-colors border",
+                                color.bg, color.text, color.border
+                              )}>
+                                  <Tag size={12} strokeWidth={2.5} />
+                                  <span>{category.count || 0} ITEMS</span>
                               </div>
                               
                               {user && (
                                 <div className="flex gap-1 opacity-100 translate-y-0 lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 transition-all duration-300">
                                     <button 
                                         onClick={() => handleOpenEdit(category)} 
-                                        className="p-1.5 rounded-lg hover:bg-blue-500/10 hover:text-blue-500 transition-colors"
+                                        className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 hover:text-primary transition-colors"
+                                        title="编辑"
                                     >
                                         <Edit2 size={14} />
                                     </button>
                                     <button 
                                         onClick={() => handleDelete(category.id, category.name)} 
-                                        className="p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors"
+                                        className="p-1.5 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                        title="删除"
                                     >
                                         <Trash2 size={14} />
                                     </button>

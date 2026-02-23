@@ -78,6 +78,8 @@ export async function GET(request: Request) {
       andConditions.push({ isPublic: true });
     } else if (status === "private") {
       andConditions.push({ isPublic: false });
+    } else if (status === "discontinued") {
+      andConditions.push({ isDiscontinued: true });
     }
 
     const where = andConditions.length > 0 ? { AND: andConditions } : {};
@@ -215,7 +217,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, specs } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs } = body;
 
     const stockNum = Number(stock) || 0;
 
@@ -230,6 +232,7 @@ export async function POST(request: Request) {
         image,
         pinyin: generatePinyinSearchText(name),
         isPublic: isPublic ?? true,
+        isDiscontinued: isDiscontinued ?? false,
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         workspaceId: session.workspaceId,
       },
@@ -301,7 +304,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, specs } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -327,6 +330,7 @@ export async function PUT(request: Request) {
         image,
         pinyin: name ? generatePinyinSearchText(name) : undefined,
         isPublic: isPublic ?? undefined,
+        isDiscontinued: isDiscontinued ?? undefined,
         // Using Prisma Json values correctly. If specs is explicitly sent (even empty object), save it. 
         // If undefined entirely, don't update it to avoid wiping out accidently.
         // It accepts `null` to clear it, or the object to save.

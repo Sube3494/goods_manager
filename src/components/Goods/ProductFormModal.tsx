@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Crown } from "lucide-react";
+import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
@@ -44,6 +44,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
     isPublic: initialData?.isPublic ?? true,
+    isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {}
   });
   
@@ -208,6 +209,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           supplierId: initialData.supplierId || "",
           image: initialData.image || "",
           isPublic: initialData.isPublic ?? true,
+          isDiscontinued: initialData.isDiscontinued ?? false,
           specs: initialData.specs as Record<string, string> || {}
         });
         fetchGallery(initialData.id, initialData.image || "");
@@ -221,6 +223,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           supplierId: "",
           image: "",
           isPublic: true,
+          isDiscontinued: false,
           specs: {}
         });
       }
@@ -809,37 +812,91 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         />
                     </div>
 
-                    {/* Category */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Tag size={16} /> 分类 <span className="text-red-500">*</span>
-                        </label>
-                        <CustomSelect 
-                            value={formData.categoryId}
-                            onChange={(value) => setFormData({...formData, categoryId: value})}
-                            options={categories.map(c => ({ value: c.id, label: c.name }))}
-                            placeholder="选择分类"
-                            triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
-                            onAddNew={() => setIsCategoryModalOpen(true)}
-                            addNewLabel="新增分类"
-                        />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Category */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Tag size={16} /> 分类 <span className="text-red-500">*</span>
+                            </label>
+                            <CustomSelect 
+                                value={formData.categoryId}
+                                onChange={(value) => setFormData({...formData, categoryId: value})}
+                                options={categories.map(c => ({ value: c.id, label: c.name }))}
+                                placeholder="选择分类"
+                                triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                                onAddNew={() => setIsCategoryModalOpen(true)}
+                                addNewLabel="新增分类"
+                            />
+                        </div>
+
+                        {/* Supplier */}
+                        <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                    <Truck size={16} /> 供应商
+                                </label>
+                            <CustomSelect 
+                                value={formData.supplierId || ""}
+                                onChange={(value) => setFormData({...formData, supplierId: value})}
+                                options={suppliers.map(s => ({ value: s.id, label: s.name }))}
+                                placeholder="选择供应商"
+                                triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                                onAddNew={() => setIsSupplierModalOpen(true)}
+                                addNewLabel="新增供应商"
+                            />
+                        </div>
                     </div>
 
-                    {/* Supplier */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Truck size={16} /> 供应商
-                        </label>
-                        <CustomSelect 
-                            value={formData.supplierId || ""}
-                            onChange={(value) => setFormData({...formData, supplierId: value})}
-                            options={suppliers.map(s => ({ value: s.id, label: s.name }))}
-                            placeholder="选择供应商"
-                            triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
-                            onAddNew={() => setIsSupplierModalOpen(true)}
-                            addNewLabel="新增供应商"
-                        />
-                    </div>
+                    {user?.role === "SUPER_ADMIN" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Production Condition Box */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                    <Activity size={16} /> 生产状态
+                                </label>
+                                <div className={cn(
+                                    "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
+                                    formData.isDiscontinued 
+                                        ? "bg-red-500/5 border-red-500/20" 
+                                        : "bg-emerald-500/5 border-emerald-500/20"
+                                )}>
+                                    <span className={cn(
+                                        "text-xs tracking-wider",
+                                        formData.isDiscontinued ? "text-red-500" : "text-emerald-500"
+                                    )}>
+                                        {formData.isDiscontinued ? "已暂停生产" : "正在正常经营"}
+                                    </span>
+                                    <Switch 
+                                        checked={!formData.isDiscontinued} 
+                                        onChange={(val) => setFormData(prev => ({ ...prev, isDiscontinued: !val }))} 
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Visibility Box */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                    <Eye size={16} /> 展示权限
+                                </label>
+                                <div className={cn(
+                                    "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
+                                    formData.isPublic 
+                                        ? "bg-emerald-500/5 border-emerald-500/20" 
+                                        : "bg-amber-500/5 border-amber-500/10"
+                                )}>
+                                    <span className={cn(
+                                        "text-xs tracking-wider",
+                                        formData.isPublic ? "text-emerald-500" : "text-amber-600"
+                                    )}>
+                                        {formData.isPublic ? "全体公开可见" : "私密列表 (仅管理)"}
+                                    </span>
+                                    <Switch 
+                                        checked={formData.isPublic} 
+                                        onChange={(val) => setFormData(prev => ({ ...prev, isPublic: val }))} 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                         {/* Cost Price */}
@@ -966,9 +1023,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             <button
                                 type="button"
                                 onClick={handleAddSpec}
-                                className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-md transition-colors"
+                                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary px-3 py-1.5 rounded-full border border-primary/20 transition-all duration-300 active:scale-95 shadow-sm"
                             >
-                                <Plus size={14} /> 添加参数
+                                <Plus size={12} strokeWidth={3} /> 添加参数
                             </button>
                         </div>
                         
@@ -979,16 +1036,16 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         type="text"
                                         value={key}
                                         onChange={(e) => handleUpdateSpecKey(key, e.target.value, index)}
-                                        placeholder="参数名 (如: 材质)"
-                                        className="w-1/3 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3 py-2 text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                                        placeholder="参数名"
+                                        className="w-1/3 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold tracking-tight"
                                     />
-                                    <span className="text-muted-foreground/50">:</span>
+                                    <span className="text-muted-foreground/30 font-medium">/</span>
                                     <input
                                         type="text"
                                         value={value}
                                         onChange={(e) => handleUpdateSpecValue(key, e.target.value)}
-                                        placeholder="参数值 (如: 头层牛皮)"
-                                        className="flex-1 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3 py-2 text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                        placeholder="参数值"
+                                        className="flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
                                     />
                                     <button
                                         type="button"
@@ -1015,27 +1072,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 <label className="text-sm font-bold text-foreground flex items-center gap-2 whitespace-nowrap">
                                     <Camera size={18} className="text-primary shrink-0" /> <span className="hidden xs:inline">实拍</span>相册管理
                                 </label>
-
-                                {/* Inline Visibility Toggle for Admin */}
-                                {user?.role === "SUPER_ADMIN" && (
-                                    <div className={cn(
-                                        "flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full transition-all border scale-[0.9] sm:scale-100 origin-left",
-                                        formData.isPublic 
-                                            ? "bg-emerald-500/5 text-emerald-600 border-emerald-500/20" 
-                                            : "bg-amber-500/5 text-amber-600 border-amber-500/20"
-                                    )}>
-                                        {formData.isPublic ? <Eye size={10} /> : <EyeOff size={10} />}
-                                        <span className="text-[9px] font-bold whitespace-nowrap uppercase tracking-wider">
-                                            {formData.isPublic ? "公开" : "私密"}
-                                        </span>
-                                        <div className="scale-[0.6] sm:scale-[0.65] origin-right ml-[-2px]">
-                                            <Switch 
-                                                checked={formData.isPublic} 
-                                                onChange={(val) => setFormData(prev => ({ ...prev, isPublic: val }))} 
-                                            />
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                             
                             <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
@@ -1336,10 +1372,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     </button>
                     <button
                         type="submit"
-                        className="flex items-center gap-2 rounded-full bg-primary px-8 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/40 active:scale-[0.98]"
+                        className="group flex items-center gap-2 rounded-full bg-primary px-10 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_20px_-4px_rgba(var(--primary-rgb),0.5)] transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_12px_24px_-4px_rgba(var(--primary-rgb),0.6)] hover:-translate-y-0.5 active:scale-[0.97]"
                     >
-                        <CheckCircle size={18} />
-                        保存商品
+                        <CheckCircle size={18} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" />
+                        保存商品数据
                     </button>
                 </div>
             </form>

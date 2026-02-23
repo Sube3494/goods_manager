@@ -8,6 +8,8 @@ import { useTheme } from "next-themes";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import { BackupModal } from "@/components/Settings/BackupModal";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { cn } from "@/lib/utils";
 
 interface SystemInfo {
@@ -20,6 +22,19 @@ interface SystemInfo {
 // View transitions types are built into modern TS versions, but we'll use a safer approach for the animation logic below.
 
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="animate-pulse text-muted-foreground font-medium">准备配置中心...</div>
+      </div>
+    }>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+function SettingsContent() {
+  const searchParams = useSearchParams();
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
   const [allowDataImport, setAllowDataImport] = useState<boolean>(true);
@@ -27,7 +42,10 @@ export default function SettingsPage() {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "storage" | "data" | "system">("general");
+  
+  // Initialize tab based on search params
+  const initialTab = (searchParams.get("tab") as "general" | "storage" | "data" | "system") || "general";
+  const [activeTab, setActiveTab] = useState<"general" | "storage" | "data" | "system">(initialTab);
 
   const [backupConfig, setBackupConfig] = useState<{
       isOpen: boolean;
@@ -211,6 +229,14 @@ export default function SettingsPage() {
 
     return () => clearTimeout(timer);
   }, [lowStockThreshold, saveSettings]);
+
+  // Sync tab from URL if it changes while on page
+  useEffect(() => {
+    const tab = searchParams.get("tab") as "general" | "storage" | "data" | "system";
+    if (tab && ["general", "storage", "data", "system"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // Immediate save for toggle
   const toggleGalleryUpload = () => {

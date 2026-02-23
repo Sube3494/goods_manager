@@ -56,9 +56,11 @@ export async function POST(request: Request) {
             const image = String(item['商品图片'] || item.image || item['图片'] || "");
             const categoryName = String(item['分类'] || item.category || "");
             const supplierName = String(item['供应商'] || item['supplier'] || "");
-            const isPublicText = String(item['公开状态'] || "");
+            const isPublicText = String(item['公开状态'] || item.isPublic || "");
+            const isPublic = isPublicText === "私有" || isPublicText === "否" || isPublicText === "false" ? false : true;
 
-            const isPublic = isPublicText === "私有" ? false : true;
+            const isDiscontinuedText = String(item['生产状态'] || item.isDiscontinued || "");
+            const isDiscontinued = isDiscontinuedText === "已停产" || isDiscontinuedText === "是" || isDiscontinuedText === "true" ? true : false;
 
             // 2. 解析规格参数 (specs)
             const specs: Record<string, string> = {};
@@ -126,6 +128,7 @@ export async function POST(request: Request) {
                     costPrice: newCostPrice,
                     pinyin: name ? generatePinyinSearchText(name) : undefined,
                     isPublic,
+                    isDiscontinued,
                     specs: Object.keys(specs).length > 0 ? specs : undefined
                 };
 
@@ -304,6 +307,7 @@ export async function POST(request: Request) {
                         pinyin: generatePinyinSearchText(name),
                         workspaceId,
                         isPublic,
+                        isDiscontinued,
                         specs: Object.keys(specs).length > 0 ? specs : undefined
                     }
                 });

@@ -817,9 +817,25 @@ function GalleryContent() {
                         className="break-inside-avoid mb-3 sm:mb-6"
                     >
                         <div 
-                            className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
-                            onClick={() => handleOpenProductPreview(group)}
+                            className={cn(
+                                "group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 flex flex-col h-full",
+                                group.product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20 cursor-not-allowed" : "hover:shadow-2xl hover:shadow-primary/5 cursor-pointer"
+                            )}
+                            onClick={() => !group.product.isDiscontinued && handleOpenProductPreview(group)}
                         >
+                            {/* Full Card Discontinued Overlay */}
+                            {group.product.isDiscontinued && (
+                                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden">
+                                    <div className="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-grayscale-[0.8]"></div>
+                                    <div 
+                                        className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-4xl sm:text-6xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
+                                        style={{ WebkitTextStroke: '2px rgba(255, 255, 255, 0.5)' }}
+                                    >
+                                        已停产
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
                                 {isVideoCover ? (
                                     <video 
