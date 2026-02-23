@@ -4,7 +4,7 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
 import { getStorageStrategy } from "@/lib/storage";
-import { Product, Category, Supplier } from "@/lib/types";
+import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
 
 type ProductWithRelations = Product & {
   category: Category;
@@ -124,10 +124,18 @@ export async function GET(request: Request) {
           : bVal.localeCompare(aVal, undefined, { numeric: true, sensitivity: 'base' });
       });
 
-      // 3. 截取当前页的 ID
+      // 3. If idsOnly requested, return all sorted IDs now
+      if (idsOnly) {
+        return NextResponse.json({ 
+          ids: allProductIds.map(p => p.id),
+          total: allProductIds.length
+        });
+      }
+
+      // 4. Slice current page IDs
       const pageIds = allProductIds.slice(skip, skip + pageSize).map(p => p.id);
 
-      // 4. 获取详细数据（保持顺序）
+      // 5. Fetch detailed data for this page (keeping order)
       const detailedProducts = await prisma.product.findMany({
         where: { id: { in: pageIds } },
         include: {
@@ -137,8 +145,9 @@ export async function GET(request: Request) {
         },
       });
 
-      // 5. 由于 in 并不保证顺序，我们需要按 pageIds 重新排序
+      // 6. Map back to maintain sorting order
       products = pageIds.map(id => detailedProducts.find((d) => d.id === id)).filter((p): p is NonNullable<typeof p> => !!p) as unknown as ProductWithRelations[];
+
     } else {
       // --- 原生数据库分页模式 (用于时间、库存等) ---
       if (idsOnly) {
