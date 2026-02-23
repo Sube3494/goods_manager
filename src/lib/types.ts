@@ -28,6 +28,7 @@ export interface Product {
   supplierId?: string;
   supplier?: Supplier;
   workspaceId?: string;
+  gallery?: GalleryItem[];
   createdAt?: string;
   updatedAt?: string;
 }

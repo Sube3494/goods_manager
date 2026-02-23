@@ -44,10 +44,47 @@ export async function POST(request: Request) {
             const sku = String(item.sku || item['SKU/店内码'] || item['SKU'] || item['编码'] || item['*SKU'] || "");
             const quantity = Number(item['入库数量'] || item['*入库数量'] || item['当前库存'] || item.stock || item['数量'] || item['Quantity'] || 0);
             const costPrice = Number(item['进货单价'] || item['*进货单价'] || item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
-            const image = String(item['商品图片'] || item.image || item['图片'] || "");
+            // 1. 基础数据解析
             const name = String(item['商品名称'] || item.name || "");
+            const image = String(item['商品图片'] || item.image || item['图片'] || "");
             const categoryName = String(item['分类'] || item.category || "");
+            const isPublicText = String(item['公开状态'] || "");
+            const isPublic = isPublicText === "私有" ? false : true;
+
+            // 2. 解析规格参数 (specs)
+            const specs: Record<string, string> = {};
             
+            // A. 解析单列合并格式 (e.g., "重量: 10kg\n尺寸: 大")
+            const mergedSpecsText = String(item['商品参数'] || "");
+            if (mergedSpecsText) {
+                const lines = mergedSpecsText.split(/[\n;；]/);
+                lines.forEach(line => {
+                    const separatorIndex = line.indexOf(':');
+                    const separatorIndexZh = line.indexOf('：');
+                    const finalIndex = separatorIndex !== -1 ? separatorIndex : separatorIndexZh;
+                    
+                    if (finalIndex !== -1) {
+                        const key = line.substring(0, finalIndex).trim();
+                        const val = line.substring(finalIndex + 1).trim();
+                        if (key && val) {
+                            specs[key] = val;
+                        }
+                    }
+                });
+            }
+
+            // B. 解析展平列格式 (兼容模式, e.g., "参数:重量")
+            Object.entries(item).forEach(([key, val]) => {
+                if (key.startsWith('参数:') && val) {
+                    const specKey = key.replace('参数:', '');
+                    specs[specKey] = String(val);
+                }
+            });
+ 
+            // 3. 解析多图库图片 (gallery)
+            const galleryText = String(item['图库图片'] || "");
+            const galleryUrls = galleryText ? galleryText.split(/[\n,，]/).map(url => url.trim()).filter(Boolean) : [];
+
             if (!sku) {
                 failCount++;
                 errors.push({ sku: "未知", reason: "未填写 SKU" });
@@ -78,41 +115,26 @@ export async function POST(request: Request) {
 
                 const updateData: Record<string, unknown> = {
                     costPrice: newCostPrice,
-                    pinyin: name ? generatePinyinSearchText(name) : undefined
+                    pinyin: name ? generatePinyinSearchText(name) : undefined,
+                    isPublic,
+                    specs: Object.keys(specs).length > 0 ? specs : undefined
                 };
 
                 if (quantity > 0) {
                     updateData.stock = { increment: quantity };
                 }
 
+                // 处理主图
                 if (image && image !== "暂无图片") {
-                    let finalImage = image;
+                    let finalImage: string = image;
                     const uploadIndex = finalImage.indexOf('/uploads/');
                     if (uploadIndex !== -1) {
                         finalImage = finalImage.substring(uploadIndex);
-                    } else if (finalImage.startsWith('http')) {
-                        try {
-                            const url = new URL(finalImage);
-                            if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.startsWith('192.168.')) {
-                                finalImage = url.pathname + url.search;
-                            }
-                        } catch { }
                     }
                     updateData.image = finalImage;
-
-                    // Sync to Gallery
-                    const existingGallery = await prisma.galleryItem.findFirst({
-                        where: { productId: product.id, url: finalImage }
-                    });
-                    if (!existingGallery) {
-                        await prisma.galleryItem.create({
-                            data: {
-                                url: finalImage,
-                                productId: product.id,
-                                workspaceId,
-                                isPublic: true
-                            }
-                        });
+                    
+                    if (!galleryUrls.includes(finalImage)) {
+                        galleryUrls.push(finalImage);
                     }
                 }
 
@@ -120,6 +142,28 @@ export async function POST(request: Request) {
                     where: { id: product.id },
                     data: updateData
                 });
+
+                // 处理图库同步 (Sync Gallery)
+                if (galleryUrls.length > 0) {
+                    for (const gUrl of galleryUrls) {
+                        const uploadIndex = gUrl.indexOf('/uploads/');
+                        const cleanedUrl = uploadIndex !== -1 ? gUrl.substring(uploadIndex) : gUrl;
+                        
+                        const existing = await prisma.galleryItem.findFirst({
+                            where: { productId: product.id, url: cleanedUrl }
+                        });
+                        if (!existing) {
+                            await prisma.galleryItem.create({
+                                data: {
+                                    url: cleanedUrl,
+                                    productId: product.id,
+                                    workspaceId,
+                                    isPublic: true
+                                }
+                            });
+                        }
+                    }
+                }
 
                 if (quantity > 0) {
                     importedItems.push({
@@ -137,7 +181,7 @@ export async function POST(request: Request) {
                     continue;
                 }
 
-                // Handle Category for new product
+                // Handle Category
                 let finalCategoryId: string;
                 if (categoryName) {
                     let category = await prisma.category.findFirst({
@@ -151,7 +195,6 @@ export async function POST(request: Request) {
                     }
                     finalCategoryId = category.id;
                 } else {
-                    // Try to find or create a default category if none exists
                     const defaultCat = await prisma.category.findFirst({
                         where: { name: "其他分类" }
                     });
@@ -165,12 +208,14 @@ export async function POST(request: Request) {
                     }
                 }
 
-                let finalImage: string | undefined = undefined;
+                let finalMainImage: string | undefined = undefined;
                 if (image && image !== "暂无图片") {
-                    finalImage = image;
-                    const uploadIndex = finalImage.indexOf('/uploads/');
+                    const tempMainImage: string = image;
+                    const uploadIndex = tempMainImage.indexOf('/uploads/');
                     if (uploadIndex !== -1) {
-                        finalImage = finalImage.substring(uploadIndex);
+                        finalMainImage = tempMainImage.substring(uploadIndex);
+                    } else {
+                        finalMainImage = tempMainImage;
                     }
                 }
 
@@ -181,17 +226,26 @@ export async function POST(request: Request) {
                         categoryId: finalCategoryId as string,
                         costPrice: costPrice > 0 ? costPrice : 0,
                         stock: quantity > 0 ? quantity : 0,
-                        image: finalImage,
+                        image: finalMainImage,
                         pinyin: generatePinyinSearchText(name),
-                        workspaceId
+                        workspaceId,
+                        isPublic,
+                        specs: Object.keys(specs).length > 0 ? specs : undefined
                     }
                 });
 
-                // Automatically create gallery item for new product if image exists
-                if (finalImage) {
+                // 处理图库 (Gallery)
+                const allGalleryToCreate = [...galleryUrls];
+                if (finalMainImage && !allGalleryToCreate.includes(finalMainImage)) {
+                    allGalleryToCreate.push(finalMainImage);
+                }
+
+                for (const gUrl of allGalleryToCreate) {
+                    const uploadIndex = gUrl.indexOf('/uploads/');
+                    const cleanedUrl = uploadIndex !== -1 ? gUrl.substring(uploadIndex) : gUrl;
                     await prisma.galleryItem.create({
                         data: {
-                            url: finalImage,
+                            url: cleanedUrl,
                             productId: newProduct.id,
                             workspaceId,
                             isPublic: true

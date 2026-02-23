@@ -77,10 +77,14 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
   useEffect(() => {
     if (isOpen) {
       updatePosition();
+      document.body.style.overflow = "hidden";
       window.addEventListener("scroll", updatePosition, true);
       window.addEventListener("resize", updatePosition);
+    } else {
+      document.body.style.overflow = "unset";
     }
     return () => {
+      document.body.style.overflow = "unset";
       window.removeEventListener("scroll", updatePosition, true);
       window.removeEventListener("resize", updatePosition);
     };

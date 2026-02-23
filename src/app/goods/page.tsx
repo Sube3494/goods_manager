@@ -396,16 +396,33 @@ export default function GoodsPage() {
         return;
       }
 
-      const exportData = allGoods.map(g => ({
-        "商品名称": g.name,
-        "SKU/店内码": g.sku || "",
-        "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
-        "进货单价": g.costPrice,
-        "当前库存": g.stock,
-        "供应商": g.supplier?.name || "未知供应商",
-        "商品图片": g.image || "暂无图片",
-        "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
-      }));
+      const exportData = allGoods.map(g => {
+        // 基础数据
+        const baseData: Record<string, string | number | boolean | null | undefined> = {
+          "商品名称": g.name,
+          "SKU/店内码": g.sku || "",
+          "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
+          "进货单价": g.costPrice,
+          "当前库存": g.stock,
+          "供应商": g.supplier?.name || "未知供应商",
+          "商品图片": g.image || "暂无图片",
+          "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
+          "公开状态": g.isPublic ? "公开" : "私有",
+          "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
+        };
+
+        // 合并规格参数 (Merge specs into a single column)
+        if (g.specs && typeof g.specs === 'object') {
+          const specString = Object.entries(g.specs)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("\n");
+          baseData["商品参数"] = specString;
+        } else {
+          baseData["商品参数"] = "";
+        }
+
+        return baseData;
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
@@ -416,7 +433,7 @@ export default function GoodsPage() {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, sortBy, showToast]);
 
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
@@ -641,7 +658,10 @@ export default function GoodsPage() {
             "库存": 100,
             "SKU": "EXAMPLE-001",
             "供应商": "默认供应商",
-            "商品图片": "https://example.com/image.jpg"
+            "商品图片": "https://example.com/main.jpg",
+            "图库图片": "https://example.com/p1.jpg\nhttps://example.com/p2.jpg",
+            "公开状态": "公开",
+            "商品参数": "材质: 不锈钢\n规格: 100ml"
           }
         ]}
       />

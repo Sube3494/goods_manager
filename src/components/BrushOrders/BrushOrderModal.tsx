@@ -65,6 +65,17 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
   }, []);
 
   useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
     
     if (initialData?.id !== prevInitialDataRef.current?.id) {

@@ -9,6 +9,7 @@ import { Product, Category, Supplier } from "@/lib/types";
 type ProductWithRelations = Product & {
   category: Category;
   supplier: Supplier | null;
+  gallery: GalleryItem[];
 };
 
 type ProductWhereInput = NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"];
@@ -132,18 +133,12 @@ export async function GET(request: Request) {
         include: {
           category: true,
           supplier: true,
+          gallery: true,
         },
       });
 
       // 5. 由于 in 并不保证顺序，我们需要按 pageIds 重新排序
       products = pageIds.map(id => detailedProducts.find((d) => d.id === id)).filter((p): p is NonNullable<typeof p> => !!p) as unknown as ProductWithRelations[];
-
-      if (idsOnly) {
-        return NextResponse.json({ 
-          ids: allProductIds.map(p => p.id),
-          total
-        });
-      }
     } else {
       // --- 原生数据库分页模式 (用于时间、库存等) ---
       if (idsOnly) {
@@ -164,6 +159,7 @@ export async function GET(request: Request) {
           include: {
             category: true,
             supplier: true,
+            gallery: true,
           },
           orderBy,
           skip,
@@ -175,12 +171,13 @@ export async function GET(request: Request) {
       total = pTotal;
     }
 
-
-
     const storage = await getStorageStrategy();
     const resolvedProducts = products.filter((p): p is NonNullable<typeof p> => !!p).map(p => ({
       ...p,
-      image: p.image ? storage.resolveUrl(p.image) : null
+      image: p.image ? storage.resolveUrl(p.image) : null,
+      gallery: Array.isArray(p.gallery) 
+        ? p.gallery.map((img: { url: string }) => ({ ...img, url: storage.resolveUrl(img.url) }))
+        : []
     }));
 
     return NextResponse.json({

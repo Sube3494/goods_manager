@@ -84,6 +84,18 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   // 移动端排序模式 (Mobile reorder mode)
   const [isReorderMode, setIsReorderMode] = useState(false);
 
+  // Lock background scroll
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
   const enterBatchMode = () => {
     setIsBatchMode(true);
     setSelectedIds(new Set());

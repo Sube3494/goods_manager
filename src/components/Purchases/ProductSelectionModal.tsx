@@ -58,6 +58,18 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   const { showToast } = useToast();
   const observerTarget = useRef<HTMLDivElement>(null);
 
+  // Lock background scroll
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
+
   // 1. Sync selection when modal opens
   useEffect(() => {
     if (isOpen) {
