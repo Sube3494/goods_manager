@@ -45,7 +45,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     sku: initialData?.sku || "",
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
-    specs: (initialData?.specs as Record<string, string>) || {}
+    specs: (initialData?.specs as Record<string, string>) || {},
+    remark: initialData?.remark || ""
   });
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -210,7 +211,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           image: initialData.image || "",
           isPublic: initialData.isPublic ?? true,
           isDiscontinued: initialData.isDiscontinued ?? false,
-          specs: initialData.specs as Record<string, string> || {}
+          specs: initialData.specs as Record<string, string> || {},
+          remark: initialData.remark || ""
         });
         fetchGallery(initialData.id, initialData.image || "");
       } else {
@@ -224,7 +226,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           image: "",
           isPublic: true,
           isDiscontinued: false,
-          specs: {}
+          specs: {},
+          remark: ""
         });
       }
     }
@@ -897,6 +900,20 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             </div>
                         </div>
                     )}
+
+                    {/* Remark / 备注 */}
+                    <div className="space-y-2 pb-2">
+                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <FileText size={16} /> 备忘录 / 备注
+                        </label>
+                        <textarea 
+                            value={formData.remark}
+                            onChange={(e) => setFormData({...formData, remark: e.target.value})}
+                            className="w-full rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-3 text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all resize-none dark:hover:bg-white/10"
+                            placeholder="例如：某些特殊货品的非单进说明（仅作为备忘）..."
+                            rows={3}
+                        />
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         {/* Cost Price */}

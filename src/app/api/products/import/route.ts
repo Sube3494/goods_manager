@@ -61,6 +61,8 @@ export async function POST(request: Request) {
 
             const isDiscontinuedText = String(item['生产状态'] || item.isDiscontinued || "");
             const isDiscontinued = isDiscontinuedText === "已停产" || isDiscontinuedText === "是" || isDiscontinuedText === "true" ? true : false;
+            
+            const remarkText = String(item['备注'] || item.remark || "");
 
             // 2. 解析规格参数 (specs)
             const specs: Record<string, string> = {};
@@ -129,7 +131,8 @@ export async function POST(request: Request) {
                     pinyin: name ? generatePinyinSearchText(name) : undefined,
                     isPublic,
                     isDiscontinued,
-                    specs: Object.keys(specs).length > 0 ? specs : undefined
+                    specs: Object.keys(specs).length > 0 ? specs : undefined,
+                    ...(remarkText ? { remark: remarkText } : {})
                 };
 
                 // Handle supplier update
@@ -308,6 +311,7 @@ export async function POST(request: Request) {
                         workspaceId,
                         isPublic,
                         isDiscontinued,
+                        remark: remarkText || undefined,
                         specs: Object.keys(specs).length > 0 ? specs : undefined
                     }
                 });

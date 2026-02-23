@@ -422,6 +422,7 @@ function PurchasesContent() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const price = (item as any).price || item.costPrice || item.product?.costPrice || 0;
           const subtotal = qty * price;
+          const subtotalFormula = { formula: `E${currentRowIndex}*F${currentRowIndex}`, result: subtotal };
           
           totalQty += qty;
           totalAmount += subtotal;
@@ -433,7 +434,7 @@ function PurchasesContent() {
             item.product?.sku || "",
             price,
             qty,
-            subtotal,
+            subtotalFormula,
           ]);
           
           row.height = 80;
@@ -445,6 +446,7 @@ function PurchasesContent() {
           worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };   // 名称 (确保换行)
           worksheet.getCell(`D${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 编码
           worksheet.getCell(`E${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 单价
+          // 让数量和金额都是数值型（确保公式可计算），数量可编辑
           worksheet.getCell(`F${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 数量
           worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 小计
           
@@ -522,8 +524,12 @@ function PurchasesContent() {
         }
       }
       
+      const lastDataRow = currentRowIndex - 1;
+      const totalQtyFormula = lastDataRow >= 4 ? { formula: `SUM(F4:F${lastDataRow})`, result: totalQty } : totalQty;
+      const totalAmountFormula = lastDataRow >= 4 ? { formula: `SUM(G4:G${lastDataRow})`, result: totalAmount } : totalAmount;
+
       // Add total row
-      const totalRow = worksheet.addRow(["", "", "总计", "", "", totalQty, totalAmount]);
+      const totalRow = worksheet.addRow(["", "", "总计", "", "", totalQtyFormula, totalAmountFormula]);
       totalRow.font = { bold: true };
       totalRow.height = 35; // 稍微增加总计行高度
       

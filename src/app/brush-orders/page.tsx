@@ -389,7 +389,10 @@ export default function BrushOrdersPage() {
                 ]}
                 placeholder="全部平台"
                 className="h-full"
-                triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 shadow-sm"
+                triggerClassName={cn(
+                    "h-full rounded-full border shadow-sm transition-all text-sm",
+                    selectedType !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                )}
             />
         </div>
         <div className="flex flex-nowrap items-center gap-2 h-10">

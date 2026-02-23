@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, Check, Package, Tag, Truck, Plus } from "lucide-react";
+import { X, Search, Check, Package, Truck, Plus } from "lucide-react";
 import { Product, Supplier, GalleryItem } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
 
 
-import { getCategoryName } from "@/lib/utils";
+
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -358,7 +358,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                             <div className="flex items-center gap-2">
                                <span className={`text-[15px] font-medium truncate leading-snug ${isSelected ? "text-primary" : "text-foreground"}`}>{product.name}</span>
                             </div>
-                             {(product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId))) && (
+                             {(product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark) && (
                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                                     {product.sku && (
                                       <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
@@ -369,6 +369,13 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                                       <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
                                           <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name}</span>
                                       </span>
+                                    )}
+                                    {/* Product Remark Display Inline */}
+                                    {product.remark && (
+                                        <span className="flex flex-wrap items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
+                                            <span className="font-bold opacity-70 shrink-0">注:</span>
+                                            <span className="truncate leading-none">{product.remark}</span>
+                                        </span>
                                     )}
                                  </div>
                              )}

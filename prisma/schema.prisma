@@ -57,6 +57,7 @@ model Product {
   isPublic        Boolean             @default(true)
   isDiscontinued  Boolean             @default(false)
   specs           Json?
+  remark          String?
   pinyin          String?
   brushOrderItems BrushOrderItem[]
   gallery         GalleryItem[]

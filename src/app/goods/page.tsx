@@ -413,6 +413,7 @@ export default function GoodsPage() {
           "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
           "公开状态": g.isPublic ? "公开" : "私密",
           "生产状态": g.isDiscontinued ? "已停产" : "正常经营",
+          "备注": g.remark || "",
           "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
         };
 
@@ -547,7 +548,8 @@ export default function GoodsPage() {
                     ]}
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate",
+                        selectedStatus !== 'all' ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5",
                         isPending && "opacity-70"
                     )}
                 />
@@ -562,7 +564,8 @@ export default function GoodsPage() {
                     ]}
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate",
+                        selectedCategory !== 'all' ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5",
                         isPending && "opacity-70"
                     )}
                 />
@@ -577,7 +580,8 @@ export default function GoodsPage() {
                     ]}
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate",
+                        selectedSupplier !== 'all' ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5",
                         isPending && "opacity-70"
                     )}
                 />
@@ -597,7 +601,8 @@ export default function GoodsPage() {
                     ]}
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate",
+                        sortBy !== 'sku-asc' ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5",
                         isPending && "opacity-70"
                     )}
                 />
@@ -679,7 +684,8 @@ export default function GoodsPage() {
             "商品图片": "https://example.com/main.jpg",
             "图库图片": "https://example.com/p1.jpg\nhttps://example.com/p2.jpg",
             "公开状态": "公开",
-            "商品参数": "材质: 不锈钢\n规格: 100ml"
+            "商品参数": "材质: 不锈钢\n规格: 100ml",
+            "备注": "这是一条示例备注文本"
           }
         ]}
       />

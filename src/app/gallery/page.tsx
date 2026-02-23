@@ -792,7 +792,10 @@ function GalleryContent() {
                             ...categories.map(c => ({ value: c.name, label: c.name }))
                         ]}
                         className="h-full"
-                        triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                        triggerClassName={cn(
+                            "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate",
+                            selectedCategory !== "All" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                        )}
                     />
               </div>
           </div>

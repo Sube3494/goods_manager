@@ -26,6 +26,7 @@ export interface Product {
   isPublic?: boolean;
   isDiscontinued?: boolean;
   specs?: Record<string, string>;
+  remark?: string;
   supplierId?: string;
   supplier?: Supplier;
   workspaceId?: string;

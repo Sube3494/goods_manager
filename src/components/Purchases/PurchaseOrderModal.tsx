@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle, RotateCcw } from "lucide-react";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle } from "lucide-react";
 import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -403,7 +403,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                 <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
                                                     {item.product?.name || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.name || "加载中..."}
                                                 </span>
-                                                 <div className="flex items-center gap-2">
+                                                 <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                                     {(item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku) && (
                                                       <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
                                                           #{item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku}
@@ -417,7 +417,15 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                             • {supplierName}
                                                         </span>
                                                       ) : null;
-                                                    })()}
+                                                     })()}
+                                                       
+                                                     {/* Remarks Display in purchase rows */}
+                                                     {((Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.remark || item.product?.remark) && (
+                                                        <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
+                                                            <span className="font-bold opacity-70 shrink-0">注:</span>
+                                                            <span className="truncate leading-none">{(Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.remark || item.product?.remark}</span>
+                                                        </span>
+                                                     )}
                                                  </div>
                                             </div>
                                         </div>

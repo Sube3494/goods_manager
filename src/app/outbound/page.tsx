@@ -16,6 +16,7 @@ import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function OutboundPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([]);
@@ -198,7 +199,10 @@ export default function OutboundPage() {
                         { value: "Return", label: "退货出库" }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm font-medium"
+                    triggerClassName={cn(
+                        "h-full rounded-full border text-sm font-medium transition-all",
+                        typeFilter !== "all" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                    )}
                 />
             </div>
         </div>

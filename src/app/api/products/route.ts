@@ -217,7 +217,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
 
     const stockNum = Number(stock) || 0;
 
@@ -234,6 +234,7 @@ export async function POST(request: Request) {
         isPublic: isPublic ?? true,
         isDiscontinued: isDiscontinued ?? false,
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+        remark: remark || null,
         workspaceId: session.workspaceId,
       },
       include: {
@@ -304,7 +305,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -334,7 +335,8 @@ export async function PUT(request: Request) {
         // Using Prisma Json values correctly. If specs is explicitly sent (even empty object), save it. 
         // If undefined entirely, don't update it to avoid wiping out accidently.
         // It accepts `null` to clear it, or the object to save.
-        specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined
+        specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+        remark: remark !== undefined ? remark : undefined
       },
       include: {
         category: true,

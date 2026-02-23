@@ -146,6 +146,12 @@ export const GoodsCard = memo(function GoodsCard({
                 </span>
               </div>
           )}
+
+          {product.remark && (
+              <div className="mt-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/10 px-2 py-1.5 rounded-md line-clamp-2" title={product.remark}>
+                  {product.remark}
+              </div>
+          )}
         </div>
 
         {/* 弹性空隙，将底部栏推到卡片底部 */}
