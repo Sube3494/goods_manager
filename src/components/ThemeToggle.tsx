@@ -40,6 +40,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
 
     // 2. Start the transition
     const transition = (document as unknown as DocumentWithViewTransition).startViewTransition(() => {
+      // Add class to disable all CSS transitions during theme change
+      document.documentElement.classList.add("disable-transitions");
       setTheme(resolvedTheme === "light" ? "dark" : "light");
     });
 
@@ -55,12 +57,17 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           clipPath: clipPath,
         },
         {
-          duration: 400,
-          easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+          duration: 750,
+          easing: "cubic-bezier(0.16, 1, 0.3, 1)", // Smoother, faster start
           // The new view (next theme) renders on top, effectively "revealing" it
           pseudoElement: "::view-transition-new(root)",
         }
       );
+    });
+
+    // Clean up: remove the class once the transition is finished
+    transition.finished.finally(() => {
+      document.documentElement.classList.remove("disable-transitions");
     });
   };
 

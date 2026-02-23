@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Save, Loader2, ArrowLeft } from "lucide-react";
+import { User, Mail, Save, Loader2, ArrowLeft, ExternalLink } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/components/ui/Toast";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
+import md5 from "blueimp-md5";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -75,9 +77,27 @@ export default function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             className="rounded-3xl border border-border bg-white dark:bg-white/5 p-8 flex flex-col items-center h-full shadow-sm"
           >
-            <div className="h-28 w-28 rounded-full bg-primary/10 flex items-center justify-center mb-6 border-4 border-white dark:border-white/10 shadow-md">
-               <User size={56} className="text-primary" />
-            </div>
+            <a 
+              href="https://cravatar.cn/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              title="前往 Cravatar 设置头像"
+              className="h-28 w-28 rounded-full bg-primary/10 flex items-center justify-center mb-6 border-4 border-white dark:border-white/10 shadow-md overflow-hidden relative group/avatar cursor-pointer"
+            >
+               {user?.email ? (
+                 <Image 
+                   src={`https://cravatar.cn/avatar/${md5(user.email)}?d=mp&s=200`} 
+                   alt="Current user"
+                   fill
+                   className="object-cover transition-transform group-hover/avatar:scale-110"
+                 />
+               ) : (
+                 <User size={56} className="text-primary" />
+               )}
+               <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                 <ExternalLink size={20} className="text-white" />
+               </div>
+            </a>
             <h2 className="font-bold text-xl text-foreground truncate w-full text-center px-2">{user?.name || "未命名用户"}</h2>
             <p className="text-sm text-muted-foreground mt-1.5 truncate w-full text-center">{user?.email}</p>
             
