@@ -44,6 +44,13 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
   if (isLoading) return null; // Or a skeleton
   if (pathname === "/login") return null;
 
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.superAdminOnly && user?.role !== "SUPER_ADMIN") return false;
+    if (item.permission && !hasPermission(user as SessionUser | null, item.permission)) return false;
+    if (item.adminOnly && !item.permission && user?.role !== "SUPER_ADMIN" && user?.role !== "USER") return false;
+    return true;
+  });
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -88,8 +95,8 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
             title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
           >
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-linear-to-br from-primary to-blue-600 shadow-lg shadow-blue-500/30 flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
-                P
+              <div className="h-9 w-9 shrink-0">
+                <Image src="/picknote.png" alt="PickNote Logo" width={36} height={36} className="rounded-xl" />
               </div>
               {!isCollapsed && (
                 <motion.div 
@@ -110,31 +117,17 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
             {/* Background highlight pill that physically translates within the container */}
             <div 
               className={cn(
-                  "absolute inset-x-1 lg:inset-x-0 bg-primary z-0 rounded-xl transition-all duration-300 ease-out",
-                  isCollapsed ? "w-10 left-1/2 -translate-x-1/2" : "left-1 right-1"
+                  "absolute bg-primary z-0 rounded-xl transition-all duration-300 ease-out",
+                  isCollapsed ? "w-10 left-1/2 -translate-x-1/2" : "inset-x-1 lg:inset-x-0"
               )}
               style={{
-                  height: isCollapsed ? '40px' : '40px',
-                  // 1.5 spacing is 6px. Item height is 40px (10) or 44px (py-2.5 = 10*2 + 20 = 40).
-                  // We'll calculate top offset based on active index.
-                  // (40px height + 6px gap) * index.
-                  // For collapsed: 40px height. For expanded: py-2.5 (20px) + text (20px) = 40px.
-                  // The offset calculation needs to account for the exact layout space.
-                  top: `calc(${navItems.findIndex((item) => pathname === item.href) * (40 + 6)}px)`
+                  height: '40px',
+                  top: `calc(${visibleNavItems.findIndex((item) => pathname === item.href) * (40 + 6)}px)`
               }}
-              // Hide if no active match
-              hidden={navItems.findIndex((item) => pathname === item.href) === -1}
+              hidden={visibleNavItems.findIndex((item) => pathname === item.href) === -1}
             />
 
-            {navItems.map((item: NavItem) => {
-              // 1. Super Admin Only Check
-              if (item.superAdminOnly && user?.role !== "SUPER_ADMIN") return null;
-              
-              // 2. Permission Check
-              if (item.permission && !hasPermission(user as SessionUser | null, item.permission)) return null;
-
-              // 3. Admin Only Check (fallback)
-              if (item.adminOnly && !item.permission && user?.role !== "SUPER_ADMIN" && user?.role !== "USER") return null;
+            {visibleNavItems.map((item: NavItem) => {
 
               
               const isActive = pathname === item.href;
