@@ -72,32 +72,32 @@ export async function DELETE(
 
     const { id: idParam } = await params;
     
-    // 支持逗号分隔的批量 ID
     const ids = idParam.split(",");
 
-    // 检查是否有任何供应商下仍有商品
-    const productCount = await prisma.product.count({
-      where: {
-        supplierId: { in: ids }
-      }
-    });
+    // 使用事务确保“先解绑，后删除”的原子性
+    await prisma.$transaction(async (tx) => {
+      // 1. 解绑商品 (将关联商品的 supplierId 置为 null)
+      await tx.product.updateMany({
+        where: { supplierId: { in: ids } },
+        data: { supplierId: null }
+      });
 
-    if (productCount > 0) {
-      return NextResponse.json(
-        { error: "无法删除：选中的某些供应商仍有关联商品。" },
-        { status: 400 }
-      );
-    }
+      // 2. 解绑采购项 (将关联采购单项的 supplierId 置为 null)
+      await tx.purchaseOrderItem.updateMany({
+        where: { supplierId: { in: ids } },
+        data: { supplierId: null }
+      });
 
-    await prisma.supplier.deleteMany({
-      where: {
-        id: { in: ids }
-      }
+      // 3. 执行删除
+      await tx.supplier.deleteMany({
+        where: { id: { in: ids } }
+      });
     });
     
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Bulk delete suppliers failed:", error);
-    return NextResponse.json({ error: "无法删除：该供应商可能正在被采购单等订单引用。" }, { status: 500 });
+    return NextResponse.json({ error: "无法删除：请检查相关数据引用是否过深（如已被外部系统快照等）。" }, { status: 500 });
   }
+
 }

@@ -264,7 +264,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
           >
              <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
               <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-medium text-foreground">选择商品</h2>
+                <h2 className="text-2xl font-bold text-foreground">选择商品</h2>
                 <button
                     onClick={() => setIsCreateModalOpen(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/40 active:scale-95 transition-all text-xs font-medium border border-primary/20"
@@ -358,21 +358,20 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                             <div className="flex items-center gap-2">
                                <span className={`text-[15px] font-medium truncate leading-snug ${isSelected ? "text-primary" : "text-foreground"}`}>{product.name}</span>
                             </div>
-                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                                {product.sku && (
-                                  <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
-                                    {product.sku}
-                                  </span>
-                                )}
-                                <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
-                                    <Tag size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{getCategoryName(product.category)}</span>
-                                </span>
-                                {product.supplierId && suppliers.find(s => s.id === product.supplierId) && (
-                                  <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
-                                      <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name}</span>
-                                  </span>
-                                )}
-                             </div>
+                             {(product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId))) && (
+                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                                    {product.sku && (
+                                      <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
+                                        {product.sku}
+                                      </span>
+                                    )}
+                                    {product.supplierId && suppliers.find(s => s.id === product.supplierId) && (
+                                      <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
+                                          <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name}</span>
+                                      </span>
+                                    )}
+                                 </div>
+                             )}
 
                              {showPrice && (
                                 <div className="mt-1.5">

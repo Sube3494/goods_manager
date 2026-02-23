@@ -67,7 +67,8 @@ model Product {
 
   @@index([categoryId])
   @@index([supplierId])
-  @@index([workspaceId])
+  @@index([workspaceId, pinyin])
+  @@index([workspaceId, createdAt])
 }
 
 model Supplier {
@@ -107,7 +108,8 @@ model PurchaseOrder {
   workspace       Workspace?          @relation(fields: [workspaceId], references: [id])
   items           PurchaseOrderItem[]
 
-  @@index([workspaceId])
+  @@index([workspaceId, date(sort: Desc)])
+  @@index([workspaceId, status])
 }
 
 

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
 import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText, Download } from "lucide-react";
-import * as XLSX from "xlsx";
-
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -45,6 +43,7 @@ const getTrackingUrl = (num: string, courierName?: string) => {
 };
 
 function PurchasesContent() {
+  const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
   const { user } = useUser();
   const canCreate = hasPermission(user as SessionUser | null, "purchase:create");
@@ -55,8 +54,9 @@ function PurchasesContent() {
   const pathname = usePathname();
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isOverviewOpen, setIsOverviewOpen] = useState(false);
+  const [overviewPurchase, setOverviewPurchase] = useState<PurchaseOrder | null>(null);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseOrder | null>(null);
+
 
   const [detailReadOnly, setDetailReadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -114,7 +114,9 @@ function PurchasesContent() {
       const pRes = await fetch("/api/purchases");
       
       if (pRes.ok) {
-        setPurchases(await pRes.json());
+        const data = await pRes.json();
+        // Extract items from paginated response
+        setPurchases(Array.isArray(data) ? data : (data.items || []));
       }
     } catch (error) {
       console.error("Failed to fetch purchases data:", error);
@@ -159,7 +161,10 @@ function PurchasesContent() {
 
 
   const handleStatusFilterChange = (status: string) => {
-    setStatusFilter(status);
+    startTransition(() => {
+      setStatusFilter(status);
+    });
+    
     const params = new URLSearchParams(searchParams);
     if (status === 'All') {
         params.delete('status');
@@ -326,9 +331,29 @@ function PurchasesContent() {
     }
   };
 
-  const filteredPurchases = purchases.filter(p => {
-    const query = searchQuery.trim();
-    if (!query) {
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter(p => {
+      const query = searchQuery.trim();
+      if (!query) {
+        let matchesStatus = statusFilter === 'All';
+        if (!matchesStatus) {
+          if (statusFilter === 'Confirmed') {
+            matchesStatus = p.status === 'Confirmed' || (p.status as string) === 'Ordered';
+          } else {
+            matchesStatus = p.status === statusFilter;
+          }
+        }
+        return matchesStatus;
+      }
+
+      const matchesId = pinyinMatch(p.id, query);
+      const matchesSupplier = p.items.some(item => 
+        item.supplier?.name && pinyinMatch(item.supplier.name, query)
+      );
+      const matchesProduct = p.items.some(item =>
+        item.product?.name && pinyinMatch(item.product.name, query)
+      );
+      
       let matchesStatus = statusFilter === 'All';
       if (!matchesStatus) {
         if (statusFilter === 'Confirmed') {
@@ -337,67 +362,206 @@ function PurchasesContent() {
           matchesStatus = p.status === statusFilter;
         }
       }
-      return matchesStatus;
-    }
+      
+      return (matchesId || matchesSupplier || matchesProduct) && matchesStatus;
+    });
+  }, [purchases, searchQuery, statusFilter]);
 
-    const matchesId = pinyinMatch(p.id, query);
-    const matchesSupplier = p.items.some(item => 
-      item.supplier?.name && pinyinMatch(item.supplier.name, query)
-    );
-    const matchesProduct = p.items.some(item =>
-      item.product?.name && pinyinMatch(item.product.name, query)
-    );
-    
-    let matchesStatus = statusFilter === 'All';
-    if (!matchesStatus) {
-      if (statusFilter === 'Confirmed') {
-        matchesStatus = p.status === 'Confirmed' || (p.status as string) === 'Ordered';
-      } else {
-        matchesStatus = p.status === statusFilter;
-      }
-    }
-    
-    return (matchesId || matchesSupplier || matchesProduct) && matchesStatus;
-  });
+  const handleExport = useCallback(async (specificPO?: PurchaseOrder) => {
+    const targets = specificPO ? [specificPO] : filteredPurchases;
 
-  const handleExport = useCallback(() => {
-    if (filteredPurchases.length === 0) {
+    if (targets.length === 0) {
       showToast("没有可导出的采购记录", "error");
       return;
     }
 
-    const dateStr = new Date().toLocaleDateString("zh-CN");
-    // Title row + blank row then headers are handled via aoa_to_sheet
-    const dataRows: (string | number)[][] = [];
+    showToast("正在准备带有图片的导出数据，请稍候...", "info");
 
-    let globalIndex = 1;
-    for (const po of filteredPurchases) {
-      for (const item of po.items) {
-        dataRows.push([
-          globalIndex++,
-          item.product?.name || "未知商品",
-          item.product?.sku || "",
-          item.quantity || 0,
-        ]);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const { saveAs } = await import("file-saver");
+      
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("明细");
+      
+      const dateStr = new Date().toLocaleDateString("zh-CN");
+      const title = specificPO ? `采购单明细` : `进货汇总`;
+      
+      // 添加标题行
+      worksheet.addRow([`${title} — ${dateStr}`]);
+      worksheet.mergeCells('A1:G1'); // 扩展到 G 列 (小计)
+      worksheet.getCell('A1').font = { size: 14, bold: true };
+      worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' }; // 居中及垂直居中
+      
+      // 添加空行
+      worksheet.addRow([]);
+      
+      // 添加表头
+      const headerRow = worksheet.addRow(["序号", "商品图片", "商品名称", "货品编码", "单价", "数量", "小计"]);
+      headerRow.font = { bold: true };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      // 设置列宽
+      worksheet.getColumn(1).width = 8;
+      worksheet.getColumn(2).width = 18;
+      worksheet.getColumn(3).width = 35;
+      worksheet.getColumn(4).width = 18;
+      worksheet.getColumn(5).width = 12;
+      worksheet.getColumn(6).width = 12;
+      worksheet.getColumn(7).width = 15;
+      
+      let globalIndex = 1;
+      let currentRowIndex = 4; // Start at row 4 because of title(1), empty(2), header(3)
+      let totalQty = 0;
+      let totalAmount = 0;
+      
+      for (const po of targets) {
+        for (const item of po.items) {
+          const qty = item.quantity || 0;
+          // 兼容性读取单价：尝试多个可能的属性名
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const price = (item as any).price || item.costPrice || item.product?.costPrice || 0;
+          const subtotal = qty * price;
+          
+          totalQty += qty;
+          totalAmount += subtotal;
+          
+          const row = worksheet.addRow([
+            globalIndex++,
+            "", // Placeholder for image
+            item.product?.name || "未知商品",
+            item.product?.sku || "",
+            price,
+            qty,
+            subtotal,
+          ]);
+          
+          row.height = 80;
+          row.alignment = { vertical: 'middle', wrapText: true };
+          
+          // 对齐设置 (A-G)
+          worksheet.getCell(`A${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 序号
+          worksheet.getCell(`B${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 图片
+          worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };   // 名称 (确保换行)
+          worksheet.getCell(`D${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 编码
+          worksheet.getCell(`E${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 单价
+          worksheet.getCell(`F${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 数量
+          worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 小计
+          
+          // 格式化金额
+          worksheet.getCell(`E${currentRowIndex}`).numFmt = '¥#,##0.00';
+          worksheet.getCell(`G${currentRowIndex}`).numFmt = '¥#,##0.00';
+          
+          // Image handling
+          const imageUrl = item.image || item.product?.image;
+          if (imageUrl) {
+            try {
+              // Fetch image as array buffer
+              const response = await fetch(imageUrl);
+              if (response.ok) {
+                const buffer = await response.arrayBuffer();
+                const ext = imageUrl.split('.').pop()?.toLowerCase();
+                const extType = ext === 'png' ? 'png' : 'jpeg';
+                
+                const imageId = workbook.addImage({
+                  buffer: buffer,
+                  extension: extType as 'png' | 'jpeg',
+                });
+                
+                // Get image dimensions to preserve aspect ratio
+                const blob = new Blob([buffer]);
+                const blobUrl = URL.createObjectURL(blob);
+                const dims = await new Promise<{width: number, height: number}>((resolve) => {
+                  const img = new Image();
+                  img.onload = () => {
+                    URL.revokeObjectURL(blobUrl);
+                    resolve({ width: img.width, height: img.height });
+                  };
+                  img.onerror = () => {
+                    URL.revokeObjectURL(blobUrl);
+                    resolve({ width: 100, height: 100 });
+                  };
+                  img.src = blobUrl;
+                });
+
+                // Excel width 18 (getColumn.width) is approx 135px in many viewers
+                // Row height 80 (row.height) is approx 106px (80 * 1.33)
+                const cellWidthPx = 135;
+                const cellHeightPx = 106;
+                
+                const maxW = 125;
+                const maxH = 95;
+                const scale = Math.min(maxW / dims.width, maxH / dims.height);
+                
+                const finalW = dims.width * scale;
+                const finalH = dims.height * scale;
+
+                // Calculate center offset in pixels, then convert to proportional offset for ExcelJS
+                // colOffset and rowOffset are fractions of the cell's dimension
+                const colOffsetPx = (cellWidthPx - finalW) / 2;
+                const rowOffsetPx = (cellHeightPx - finalH) / 2;
+                
+                const colOffset = colOffsetPx / cellWidthPx;
+                const rowOffset = rowOffsetPx / cellHeightPx;
+
+                // Add image to cell with preserved aspect ratio and centering
+                worksheet.addImage(imageId, {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  tl: { col: 1 + colOffset, row: currentRowIndex - 1 + rowOffset } as any,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  ext: { width: finalW, height: finalH } as any,
+                  editAs: 'oneCell'
+                });
+              }
+            } catch (err) {
+              console.error("Failed to load image for export", err);
+            }
+          }
+          
+          currentRowIndex++;
+        }
       }
+      
+      // Add total row
+      const totalRow = worksheet.addRow(["", "", "总计", "", "", totalQty, totalAmount]);
+      totalRow.font = { bold: true };
+      totalRow.height = 35; // 稍微增加总计行高度
+      
+      // 合并总计标签对应的单元格 A-E 没必要全部居中，让"总计"在C列
+      worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getCell(`F${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 总数量居中
+      worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 总金额居中
+      worksheet.getCell(`G${currentRowIndex}`).numFmt = '¥#,##0.00';
+      
+      // Add borders everywhere
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 2) {
+          row.eachCell((cell) => {
+            cell.border = {
+              top: {style:'thin'},
+              left: {style:'thin'},
+              bottom: {style:'thin'},
+              right: {style:'thin'}
+            };
+          });
+        }
+      });
+      
+      // Generate and save file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const filename = specificPO 
+          ? `采购单_${specificPO.id}_${new Date().toISOString().split("T")[0]}.xlsx`
+          : `进货汇总_${new Date().toISOString().split("T")[0]}.xlsx`;
+          
+      saveAs(new Blob([buffer]), filename);
+      showToast(specificPO ? `已导出单据` : `已导出 ${targets.length} 张单据`, "success");
+      
+    } catch (error) {
+      console.error("Export failed:", error);
+      showToast("导出失败，请重试", "error");
     }
-
-    // Summary row
-    const totalQty = dataRows.reduce((s, r) => s + (typeof r[3] === "number" ? r[3] : 0), 0);
-    dataRows.push(["", `合计 ${filteredPurchases.length} 张单`, "", totalQty]);
-
-    // Build sheet with title on row 1
-    const wsData = [
-      [`进货明细 — 导出日期：${dateStr}`, "", "", ""],
-      ["序号", "商品名称", "SKU 编码", "数量"],
-      ...dataRows,
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "进货明细");
-    XLSX.writeFile(wb, `进货一览_${new Date().toISOString().split("T")[0]}.xlsx`);
-    showToast(`已导出 ${dataRows.length - 1} 条商品记录`, "success");
   }, [filteredPurchases, showToast]);
+
 
 
 
@@ -421,20 +585,6 @@ function PurchasesContent() {
         
         {canCreate && (
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setIsOverviewOpen(true)}
-              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-muted px-4 text-xs md:text-sm font-bold text-foreground border border-border hover:bg-accent transition-all"
-            >
-              <ShoppingBag size={15} />
-              <span className="hidden sm:inline">总览</span>
-            </button>
-            <button
-              onClick={handleExport}
-              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-muted px-4 text-xs md:text-sm font-bold text-foreground border border-border hover:bg-accent transition-all"
-            >
-              <Download size={15} />
-              <span className="hidden sm:inline">导出</span>
-            </button>
             <button 
               onClick={handleCreate}
               className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
@@ -447,6 +597,7 @@ function PurchasesContent() {
 
 
 
+
       </div>
 
       {/* Search Box */}
@@ -456,7 +607,10 @@ function PurchasesContent() {
           type="text"
           placeholder="搜索采购记录..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSearchQuery(val);
+          }}
           className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
         />
       </div>
@@ -510,9 +664,8 @@ function PurchasesContent() {
                 {filteredPurchases.map((po) => (
                    <motion.tr 
                     key={po.id}
-                    layout
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    animate={{ opacity: isPending ? 0.6 : 1 }}
                     exit={{ opacity: 0 }}
                     className="hover:bg-muted/20 transition-colors group"
                   >
@@ -599,6 +752,23 @@ function PurchasesContent() {
                             <Eye size={16} />
                           </button>
                         )}
+
+                        {/* Overview & Export per order */}
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setOverviewPurchase(po); }}
+                            className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+                            title="总览商品汇总"
+                        >
+                            <ShoppingBag size={16} />
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleExport(po); }}
+                            className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+                            title="导出采购明细"
+                        >
+                            <Download size={16} />
+                        </button>
+
 
                         {/* Management Actions: Show Truck for Confirmed, Ordered, or Shipped */}
                         {(po.status === "Confirmed" || (po.status as string) === "Ordered" || po.status === "Shipped") && (
@@ -831,6 +1001,22 @@ function PurchasesContent() {
                         详情
                     </button>
                    )}
+                    <button 
+                         onClick={() => setOverviewPurchase(po)}
+                         className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-muted border border-border/50 text-foreground font-medium transition-all text-xs"
+                    >
+                        <ShoppingBag size={14} />
+                        总览
+                    </button>
+                    <button 
+                         onClick={() => handleExport(po)}
+                         className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-muted border border-border/50 text-foreground font-medium transition-all text-xs"
+                    >
+                        <Download size={14} />
+                        导出
+                    </button>
+
+
   
                     {/* Management Actions: Show Truck for Ordered/Received */}
                     {/* Management Actions: Show Truck for Confirmed/Shipped/Ordered */}
@@ -985,10 +1171,11 @@ function PurchasesContent() {
 
       {/* Purchase Overview Modal */}
       <PurchaseOverviewModal
-        isOpen={isOverviewOpen}
-        onClose={() => setIsOverviewOpen(false)}
-        purchases={filteredPurchases}
+        isOpen={!!overviewPurchase}
+        onClose={() => setOverviewPurchase(null)}
+        purchases={overviewPurchase ? [overviewPurchase] : []}
       />
+
     </div>
 
   );

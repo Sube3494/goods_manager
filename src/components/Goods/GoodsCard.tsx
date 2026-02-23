@@ -46,7 +46,6 @@ export const GoodsCard = memo(function GoodsCard({
   return (
     <motion.div
       onClick={handleCardClick}
-      layout="position"
       className={`group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer transform-gpu will-change-transform translate-z-0 ${
         isSelected ? 'ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5' : ''
       }`}

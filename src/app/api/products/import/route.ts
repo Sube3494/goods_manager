@@ -11,6 +11,13 @@ function generatePinyinSearchText(name: string): string {
   return `${fullPinyin} ${firstLetters}`.toLowerCase();
 }
 
+const INVALID_SUPPLIERS = ["未知供应商", "暂无", "无", "无供应商", "空", "-", "N/A", "未知"];
+function isInvalidSupplier(name: string): boolean {
+  if (!name) return true;
+  return INVALID_SUPPLIERS.includes(name.trim());
+}
+
+
 export async function POST(request: Request) {
   try {
     const session = await getSession() as SessionUser | null;
@@ -123,17 +130,35 @@ export async function POST(request: Request) {
                 };
 
                 // Handle supplier update
-                if (supplierName) {
+                if (supplierName && !isInvalidSupplier(supplierName)) {
                     let supplier = await prisma.supplier.findFirst({
                         where: { name: supplierName, workspaceId }
                     });
                     if (!supplier) {
+                        // Generate code
+                        const lastSupplier = await prisma.supplier.findFirst({
+                            where: { workspaceId, code: { startsWith: 'SUP-' } },
+                            orderBy: { code: 'desc' }
+                        });
+                        let nextNumber = 1;
+                        if (lastSupplier?.code) {
+                            const lastNumber = parseInt(lastSupplier.code.split('-')[1]);
+                            if (!isNaN(lastNumber)) nextNumber = lastNumber + 1;
+                        }
+                        const newCode = `SUP-${String(nextNumber).padStart(3, '0')}`;
+
                         supplier = await prisma.supplier.create({
-                            data: { name: supplierName, workspaceId, contact: "", phone: "", email: "", address: "" }
+                            data: { 
+                                name: supplierName, 
+                                code: newCode,
+                                workspaceId, 
+                                contact: "", phone: "", email: "", address: "" 
+                            }
                         });
                     }
                     updateData.supplierId = supplier.id;
                 }
+
 
 
                 if (quantity > 0) {
@@ -237,17 +262,35 @@ export async function POST(request: Request) {
 
                 // Handle Supplier
                 let finalSupplierId: string | undefined = undefined;
-                if (supplierName) {
+                if (supplierName && !isInvalidSupplier(supplierName)) {
                     let supplier = await prisma.supplier.findFirst({
                         where: { name: supplierName, workspaceId }
                     });
                     if (!supplier) {
+                        // Generate code
+                        const lastSupplier = await prisma.supplier.findFirst({
+                            where: { workspaceId, code: { startsWith: 'SUP-' } },
+                            orderBy: { code: 'desc' }
+                        });
+                        let nextNumber = 1;
+                        if (lastSupplier?.code) {
+                            const lastNumber = parseInt(lastSupplier.code.split('-')[1]);
+                            if (!isNaN(lastNumber)) nextNumber = lastNumber + 1;
+                        }
+                        const newCode = `SUP-${String(nextNumber).padStart(3, '0')}`;
+
                         supplier = await prisma.supplier.create({
-                            data: { name: supplierName, workspaceId, contact: "", phone: "", email: "", address: "" }
+                            data: { 
+                                name: supplierName, 
+                                code: newCode,
+                                workspaceId, 
+                                contact: "", phone: "", email: "", address: "" 
+                            }
                         });
                     }
                     finalSupplierId = supplier.id;
                 }
+
 
                 const newProduct = await prisma.product.create({
                     data: {

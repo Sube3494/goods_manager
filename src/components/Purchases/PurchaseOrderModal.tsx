@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle, RotateCcw } from "lucide-react";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle, RotateCcw } from "lucide-react";
 import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -312,33 +312,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                 <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-8">
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-muted/20 dark:bg-white/5 p-3 sm:p-6 rounded-2xl border border-border/50">
-                        {/* 业务类型：仅在查看已有单据时显示（新建时默认为采购入库，无需展示） */}
-                        {initialData && (
-                        <div className="flex flex-col gap-2">
-                            <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center justify-between uppercase tracking-wider">
-                                <span className="flex items-center gap-1.5"><ListOrdered size={14} /> 业务类型</span>
-                            </label>
-                            <div className="relative">
-                                <select 
-                                    disabled={effectiveReadOnly || isSystemGenerated}
-                                    value={formData.type || "Purchase"}
-                                    onChange={(e) => setFormData({...formData, type: e.target.value})}
-                                    className={`w-full h-10 sm:h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-bold appearance-none ${effectiveReadOnly || isSystemGenerated ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
-                                >
-                                    <option value="Purchase">采购入库 (常规进货)</option>
-                                    <option value="Return">销售退回 (系统自动生成)</option>
-                                    <option value="InternalReturn">领用退回 (系统自动生成)</option>
-                                    <option value="Inbound">补拨入库 (库存修正)</option>
-                                </select>
-                                {isSystemGenerated && (
-                                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-orange-500 font-bold bg-orange-500/5 px-2 py-0.5 rounded-md border border-orange-500/10 w-fit">
-                                        <RotateCcw size={10} />
-                                        系统自动生成，关联出库单对冲
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        )}
+
 
                         <div className="flex flex-col gap-2">
                             <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
@@ -395,7 +369,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                             {/* Desktop Header */}
                             {formData.items.length > 0 && (
                                 <div className={`hidden sm:grid ${readOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_80px_120px_120px_40px]'} gap-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/10 mb-2`}>
-                                    <div className="pl-12">商品信息 <span className="text-red-500">*</span></div>
+                                    <div className="text-left pl-2">商品信息 <span className="text-red-500">*</span></div>
                                     <div className="text-center">数量 <span className="text-red-500">*</span></div>
                                     <div className="text-center">单价 <span className="text-red-500">*</span></div>
                                     <div className="text-right pr-4">小计</div>
@@ -408,22 +382,25 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                     {/* Product Info Column */}
                                     <div className="flex w-full items-center gap-3">
                                         <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50">
-                                            {(Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.image ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img 
-                                                    src={(Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.image} 
-                                                    alt="product" 
-                                                    className="h-full w-full object-cover" 
-                                                />
-                                            ) : (
-                                                <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
-                                                    <Package size={14} />
-                                                </div>
-                                            )}
+                                            {(() => {
+                                                const imageUrl = item.image || item.product?.image || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.image;
+                                                return imageUrl ? (
+                                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                                    <img 
+                                                        src={imageUrl} 
+                                                        alt="product" 
+                                                        className="h-full w-full object-cover" 
+                                                    />
+                                                ) : (
+                                                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
+                                                        <Package size={14} />
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="flex-1 space-y-1 min-w-0">
                                             <div className="flex flex-col gap-0.5 min-w-0">
-                                                <span className="text-xs sm:text-sm font-bold text-foreground line-clamp-2">
+                                                <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
                                                     {item.product?.name || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.name || "加载中..."}
                                                 </span>
                                                  <div className="flex items-center gap-2">
@@ -820,16 +797,16 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                             {/* Discount field */}
                             <div className="flex items-center gap-2 group flex-1 sm:flex-initial">
                                 <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 group-hover:text-foreground transition-colors shrink-0">
-                                    − 折扣
+                                    <Minus size={12} /> 折扣
                                 </label>
                                 {readOnly ? (
                                     <div className="relative flex-1 sm:flex-initial h-[34px] w-full sm:w-20 flex items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-amber-400 opacity-70">･</span>
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-amber-400 opacity-70">￥</span>
                                         {(formData.discountAmount || 0).toLocaleString()}
                                     </div>
                                 ) : (
                                     <div className="relative flex-1 sm:flex-initial">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">·</span>
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">￥</span>
                                         <input
                                             type="number"
                                             min="0"
@@ -846,6 +823,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                     </div>
                                 )}
                             </div>
+
                         </div>
                         </>
                         )}

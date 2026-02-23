@@ -12,6 +12,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
   const productId = searchParams.get("productId");
+  const page = parseInt(searchParams.get("page") || "1");
+  const pageSize = parseInt(searchParams.get("pageSize") || "50");
+  const skip = (page - 1) * pageSize;
 
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,24 +44,33 @@ export async function GET(request: Request) {
       };
     }
 
-    const purchases = await prisma.purchaseOrder.findMany({
-      where: {
-        ...where,
-        // Optional: constrain by workspace check if needed, though permission might be enough if we trust workspaceId
-        workspaceId: session.workspaceId
-      },
-      include: {
-        items: {
-          include: {
-            product: true,
-            supplier: true
+    const [purchases, total] = await Promise.all([
+      prisma.purchaseOrder.findMany({
+        where: {
+          ...where,
+          workspaceId: session.workspaceId
+        },
+        include: {
+          items: {
+            include: {
+              product: true,
+              supplier: true
+            }
           }
+        },
+        orderBy: {
+          date: 'desc'
+        },
+        skip,
+        take: pageSize,
+      }),
+      prisma.purchaseOrder.count({
+        where: {
+          ...where,
+          workspaceId: session.workspaceId
         }
-      },
-      orderBy: {
-        date: 'desc'
-      }
-    });
+      })
+    ]);
     const storage = await getStorageStrategy();
     const resolvedPurchases = purchases.map(po => ({
       ...po,
@@ -78,7 +90,13 @@ export async function GET(request: Request) {
       }))
     }));
 
-    return NextResponse.json(resolvedPurchases);
+    return NextResponse.json({
+      items: resolvedPurchases,
+      total,
+      page,
+      pageSize,
+      hasMore: (skip + purchases.length) < total
+    });
   } catch (error) {
     console.error("Failed to fetch purchases:", error);
     return NextResponse.json({ error: "Failed to fetch purchases" }, { status: 500 });
@@ -123,58 +141,54 @@ export async function POST(request: Request) {
 
     const orderId = generateOrderId();
 
-    const purchase = await prisma.purchaseOrder.create({
-      data: {
-        id: orderId,
-        type: type || undefined,
-        status: status || "Draft",
-        date: date ? new Date(date) : new Date(),
-        totalAmount: Number(totalAmount) || 0,
-        shippingFees: Number(shippingFees) || 0,
-        extraFees: Number(extraFees) || 0,
-        discountAmount: Number(discountAmount) || 0,
+    const purchase = await prisma.$transaction(async (tx) => {
+      const p = await tx.purchaseOrder.create({
+        data: {
+          id: orderId,
+          type: type || undefined,
+          status: status || "Draft",
+          date: date ? new Date(date) : new Date(),
+          totalAmount: Number(totalAmount) || 0,
+          shippingFees: Number(shippingFees) || 0,
+          extraFees: Number(extraFees) || 0,
+          discountAmount: Number(discountAmount) || 0,
 
-        paymentVouchers: paymentVouchers || [],
-        trackingData: trackingData || [],
-        workspaceId: session.workspaceId,
-        items: {
-          create: items.map((item: PurchaseOrderItem) => ({
-            productId: item.productId,
-            supplierId: item.supplierId,
-            quantity: Number(item.quantity) || 0,
-            remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
-            costPrice: Number(item.costPrice) || 0
-          }))
-        }
-      },
-      include: {
-        items: {
-          include: {
-            supplier: true
+          paymentVouchers: paymentVouchers || [],
+          trackingData: trackingData || [],
+          workspaceId: session.workspaceId,
+          items: {
+            create: items.map((item: PurchaseOrderItem) => ({
+              productId: item.productId,
+              supplierId: item.supplierId,
+              quantity: Number(item.quantity) || 0,
+              remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
+              costPrice: Number(item.costPrice) || 0
+            }))
+          }
+        },
+        include: {
+          items: {
+            include: {
+              supplier: true
+            }
           }
         }
-      }
-    });
+      });
 
-    // 如果状态是 Received，增加商品库存
-    if (status === "Received") {
-      for (const item of items) {
-        const product = await prisma.product.findUnique({
-          where: { id: item.productId }
-        });
-
-        if (product) {
-          const incomingQty = Number(item.quantity) || 0;
-
-          await prisma.product.update({
+      // 如果状态是 Received，增加商品库存 (原子事务)
+      if (status === "Received") {
+        for (const item of items) {
+          await tx.product.update({
             where: { id: item.productId },
             data: {
-              stock: { increment: incomingQty }
+              stock: { increment: Number(item.quantity) || 0 }
             }
           });
         }
       }
-    }
+      
+      return p;
+    });
 
     return NextResponse.json(purchase);
   } catch (error) {

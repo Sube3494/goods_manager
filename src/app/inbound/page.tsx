@@ -27,7 +27,8 @@ function InboundContent() {
     try {
       const res = await fetch("/api/purchases?type=Inbound");
       if (res.ok) {
-        setInbounds(await res.json());
+        const data = await res.json();
+        setInbounds(Array.isArray(data) ? data : (data.items || []));
       }
     } catch (error) {
       console.error("Failed to fetch inbound records:", error);

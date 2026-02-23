@@ -22,94 +22,93 @@ export async function PUT(
     } = body;
 
 
-    // 更新采购订单
-    const purchase = await prisma.purchaseOrder.update({
-      where: { id },
-      data: {
-        status,
-        totalAmount: totalAmount !== undefined ? Number(totalAmount) : undefined,
-        shippingFees: shippingFees !== undefined ? Number(shippingFees) : undefined,
-        extraFees: extraFees !== undefined ? Number(extraFees) : undefined,
-        discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
+    // 使用事务确保更新和库存调整的原子性
+    const purchase = await prisma.$transaction(async (tx) => {
+      // 1. 更新采购订单
+      const p = await tx.purchaseOrder.update({
+        where: { id },
+        data: {
+          status,
+          totalAmount: totalAmount !== undefined ? Number(totalAmount) : undefined,
+          shippingFees: shippingFees !== undefined ? Number(shippingFees) : undefined,
+          extraFees: extraFees !== undefined ? Number(extraFees) : undefined,
+          discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
 
-        paymentVouchers: paymentVouchers !== undefined ? paymentVouchers : undefined,
-        trackingData: trackingData !== undefined ? trackingData : undefined,
-        date: date ? new Date(date) : undefined,
-        // 如果提供了 items，先删除所有旧的，再创建新的
-        ...(items && {
+          paymentVouchers: paymentVouchers !== undefined ? paymentVouchers : undefined,
+          trackingData: trackingData !== undefined ? trackingData : undefined,
+          date: date ? new Date(date) : undefined,
+          ...(items && {
+            items: {
+              deleteMany: {},
+              create: items.map((item: PurchaseOrderItemType) => ({
+                productId: item.productId,
+                supplierId: item.supplierId,
+                quantity: Number(item.quantity) || 0,
+                remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
+                costPrice: Number(item.costPrice) || 0
+              }))
+            }
+          })
+        },
+        include: {
           items: {
-            deleteMany: {},
-            create: items.map((item: PurchaseOrderItemType) => ({
-              productId: item.productId,
-              supplierId: item.supplierId,
-              quantity: Number(item.quantity) || 0,
-              remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
-              costPrice: Number(item.costPrice) || 0
-            }))
+            include: {
+              product: true,
+              supplier: true
+            }
           }
-        })
-      },
-      include: {
-        items: {
-          include: {
-            product: true,
-            supplier: true
-          }
-        }
-      } as any // eslint-disable-line @typescript-eslint/no-explicit-any
-    });
-
-    // 如果状态变为 "Received"，自动增加商品库存
-    // 注意：在更严谨的系统中，这里应该检查“前置状态”以防重复入库，但当前通过状态字匹配实现
-    if (status === "Received") {
-      const orderItems = await prisma.purchaseOrderItem.findMany({
-        where: { purchaseOrderId: id }
+        } as any // eslint-disable-line @typescript-eslint/no-explicit-any
       });
 
-      for (const item of orderItems) {
-        // Calculate new Weighted Average Cost
-        const product = await prisma.product.findUnique({
-          where: { id: item.productId }
+      // 2. 如果状态变为 "Received"，自动增加商品库存并计算加权平均成本
+      if (status === "Received") {
+        const orderItems = await tx.purchaseOrderItem.findMany({
+          where: { purchaseOrderId: id }
         });
 
-        if (product) {
-          const currentStock = product.stock;
-          const currentCost = product.costPrice || 0;
-          const incomingQty = item.quantity;
-          const incomingCost = item.costPrice || 0;
-
-          let newCostPrice = currentCost;
-
-          if (incomingCost > 0) {
-              if (currentStock <= 0) {
-                  newCostPrice = incomingCost;
-              } else {
-                  const totalValue = (currentStock * currentCost) + (incomingQty * incomingCost);
-                  const totalQty = currentStock + incomingQty;
-                  newCostPrice = totalValue / totalQty;
-              }
-          }
-
-          await prisma.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: incomingQty },
-              costPrice: newCostPrice
-            }
+        for (const item of orderItems) {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId }
           });
 
-          // FIFO 支持：如果该项还没有设置余量，将其设置为入库量
-          if (item.remainingQuantity === null) {
-            await prisma.purchaseOrderItem.update({
-              where: { id: item.id },
-              data: { remainingQuantity: incomingQty }
+          if (product) {
+            const currentStock = product.stock;
+            const currentCost = product.costPrice || 0;
+            const incomingQty = item.quantity;
+            const incomingCost = item.costPrice || 0;
+
+            let newCostPrice = currentCost;
+
+            if (incomingCost > 0) {
+              if (currentStock <= 0) {
+                newCostPrice = incomingCost;
+              } else {
+                const totalValue = (currentStock * currentCost) + (incomingQty * incomingCost);
+                const totalQty = currentStock + incomingQty;
+                newCostPrice = totalValue / totalQty;
+              }
+            }
+
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: { increment: incomingQty },
+                costPrice: newCostPrice
+              }
             });
+
+            // FIFO 支持：如果该项还没有设置余量
+            if (item.remainingQuantity === null) {
+              await tx.purchaseOrderItem.update({
+                where: { id: item.id },
+                data: { remainingQuantity: incomingQty }
+              });
+            }
           }
         }
       }
-    }
-
-
+      return p;
+    });
 
     return NextResponse.json(purchase);
   } catch (error) {

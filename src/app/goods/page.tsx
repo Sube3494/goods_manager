@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useTransition } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
@@ -19,9 +19,11 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
+import { cn } from "@/lib/utils";
 
 export default function GoodsPage() {
   const { user } = useUser();
+  const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -534,7 +536,7 @@ export default function GoodsPage() {
              <div className="col-span-1 lg:w-36 h-10 sm:h-11"> 
                 <CustomSelect 
                     value={selectedStatus}
-                    onChange={setSelectedStatus}
+                    onChange={(val) => startTransition(() => setSelectedStatus(val))}
                     options={[
                         { value: 'all', label: '所有状态' },
                         { value: 'public', label: '公开可见' },
@@ -542,37 +544,46 @@ export default function GoodsPage() {
                         { value: 'low_stock', label: '库存预警' }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                    triggerClassName={cn(
+                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        isPending && "opacity-70"
+                    )}
                 />
              </div>
              <div className="col-span-1 lg:w-40 h-10 sm:h-11">
                 <CustomSelect 
                     value={selectedCategory}
-                    onChange={setSelectedCategory}
+                    onChange={(val) => startTransition(() => setSelectedCategory(val))}
                     options={[
                         { value: 'all', label: '所有分类' },
                         ...(Array.isArray(categories) ? categories.map(c => ({ value: c.name, label: c.name })) : [])
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                    triggerClassName={cn(
+                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        isPending && "opacity-70"
+                    )}
                 />
              </div>
              <div className="col-span-1 lg:w-40 h-10 sm:h-11">
                 <CustomSelect 
                     value={selectedSupplier}
-                    onChange={setSelectedSupplier}
+                    onChange={(val) => startTransition(() => setSelectedSupplier(val))}
                     options={[
                         { value: 'all', label: '所有供应商' },
                         ...(Array.isArray(suppliers) ? suppliers.map(s => ({ value: s.id, label: s.name })) : [])
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                    triggerClassName={cn(
+                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        isPending && "opacity-70"
+                    )}
                 />
              </div>
              <div className="col-span-1 lg:w-48 h-10 sm:h-11">
                 <CustomSelect 
                     value={sortBy}
-                    onChange={setSortBy}
+                    onChange={(val) => startTransition(() => setSortBy(val))}
                     options={[
                         { value: 'sku-asc', label: '编号从小到大' },
                         { value: 'sku-desc', label: '编号从大到小' },
@@ -583,7 +594,10 @@ export default function GoodsPage() {
                         { value: 'name-asc', label: '名称 A-Z' }
                     ]}
                     className="h-full"
-                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                    triggerClassName={cn(
+                        "h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate",
+                        isPending && "opacity-70"
+                    )}
                 />
               </div>
           </div>
