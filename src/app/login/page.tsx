@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Lock, Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft } from "lucide-react";
+import Image from "next/image";
+import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft, QrCode } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -152,9 +153,15 @@ export default function LoginPage() {
               initial={{ scale: 0.5, rotate: -10, opacity: 0 }}
               animate={{ scale: 1, rotate: 0, opacity: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-              className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-blue-600 mb-6 shadow-lg shadow-blue-500/30"
+              className="inline-flex items-center justify-center mb-6"
             >
-              <Lock className="h-8 w-8 text-white" />
+              <Image 
+                src="/picknote.png" 
+                alt="PickNote Logo" 
+                width={140} 
+                height={50} 
+                className="object-contain drop-shadow-md hover:scale-105 transition-transform duration-300" 
+              />
             </motion.div>
             
             <motion.h1 
@@ -223,9 +230,35 @@ export default function LoginPage() {
                     <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-linear-to-r from-transparent via-white/20 to-transparent z-0" />
                   </button>
                     
-                  <p className="text-center text-xs text-muted-foreground/60 mt-4">
-                        未注册邮箱将无法获取验证码，请联系管理员。
-                  </p>
+                  <div className="text-center text-xs text-muted-foreground/60 mt-4 flex justify-center items-center gap-1">
+                      <span>未注册邮箱将无法获取验证码，</span>
+                      <span className="relative inline-flex items-center justify-center group/wechat cursor-help">
+                        <span className="text-primary/70 hover:text-primary transition-colors border-b border-primary/30 hover:border-primary border-dashed pb-0.5">请联系管理员</span>
+                        
+                        {/* 悬停微信号/二维码气泡 */}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 opacity-0 pointer-events-none group-hover/wechat:opacity-100 group-hover/wechat:pointer-events-auto transition-all duration-300 translate-y-2 group-hover/wechat:translate-y-0 z-50 origin-bottom scale-95 group-hover/wechat:scale-100">
+                          <div className="bg-zinc-900/95 dark:bg-zinc-800/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-4 flex flex-col items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#07C160]/20 flex items-center justify-center mb-1">
+                              <QrCode size={16} className="text-[#07C160]" />
+                            </div>
+                            <p className="text-xs text-white/90 text-center font-medium leading-relaxed">
+                              管理员微信号<br/>
+                              <span className="font-bold text-white text-[13px] select-all tracking-wider mt-1 block">Sube3494</span>
+                            </p>
+                            <div className="w-full h-px bg-white/10 my-1" />
+                            {/* 留给用户放二维码的位置 */}
+                            <div className="w-full aspect-square bg-white rounded-xl p-2 relative flex flex-col items-center justify-center border border-white/20 overflow-hidden group/qr">
+                               <span className="text-xs text-zinc-400 font-bold text-center leading-relaxed z-0 absolute px-2">如果已放置 public/wechat.png <br/>请刷新页面</span>
+                               <div className="absolute inset-0 z-10 bg-white">
+                                  <Image src="/wechat.png" alt="WeChat QR" fill sizes="150px" className="object-cover rounded-lg" unoptimized />
+                               </div>
+                            </div>
+                          </div>
+                          {/* 底部小箭头 */}
+                          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-zinc-900/95 dark:bg-zinc-800/95 backdrop-blur-xl border-b border-r border-white/10 rotate-45" />
+                        </div>
+                      </span>
+                  </div>
                 </motion.form>
               ) : (
                 <motion.form 

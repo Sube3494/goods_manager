@@ -30,6 +30,14 @@ const nextConfig: NextConfig = {
     },
     proxyClientMaxBodySize: 50 * 1024 * 1024, // 50MB
   },
+  async rewrites() {
+    return [
+      {
+        source: '/gallery/:path*',
+        destination: '/uploads/gallery/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

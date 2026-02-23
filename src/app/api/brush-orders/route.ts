@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
+import { getStorageStrategy } from '@/lib/storage';
+
 export async function GET(req: NextRequest) {
   const session = await getFreshSession() as SessionUser | null;
   const searchParams = req.nextUrl.searchParams;
@@ -38,8 +40,20 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
+    const storage = await getStorageStrategy();
+    const resolvedOrders = orders.map(order => ({
+      ...order,
+      items: order.items.map(item => ({
+        ...item,
+        product: item.product ? {
+          ...item.product,
+          image: item.product.image ? storage.resolveUrl(item.product.image) : null
+        } : null
+      }))
+    }));
+
     return NextResponse.json({
-      data: orders,
+      data: resolvedOrders,
       meta: {
         total,
         page,
@@ -72,7 +86,6 @@ export async function POST(req: NextRequest) {
       date,
       type,
       items,
-      principalAmount,
       paymentAmount,
       receivedAmount,
       commission,
@@ -85,7 +98,6 @@ export async function POST(req: NextRequest) {
         date: new Date(date),
         type,
         workspaceId: session.workspaceId,
-        principalAmount: parseFloat(principalAmount || 0),
         paymentAmount: parseFloat(paymentAmount || 0),
         receivedAmount: parseFloat(receivedAmount || 0),
         commission: parseFloat(commission || 0),
@@ -99,11 +111,27 @@ export async function POST(req: NextRequest) {
         },
       },
       include: {
-        items: true,
+        items: {
+          include: {
+            product: true
+          }
+        },
       },
     });
 
-    return NextResponse.json(order, { status: 201 });
+    const storage = await getStorageStrategy();
+    const resolvedOrder = {
+      ...order,
+      items: order.items.map(item => ({
+        ...item,
+        product: item.product ? {
+          ...item.product,
+          image: item.product.image ? storage.resolveUrl(item.product.image) : null
+        } : null
+      }))
+    };
+
+    return NextResponse.json(resolvedOrder, { status: 201 });
   } catch (error: unknown) {
     console.error('Error creating brush order:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

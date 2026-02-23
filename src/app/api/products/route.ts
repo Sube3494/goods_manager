@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     const status = searchParams.get("status") || "all";
     const sortByParam = searchParams.get("sortBy") || "sku-asc";
     const idsOnly = searchParams.get("idsOnly") === "true";
+    const supplierId = searchParams.get("supplierId") || "all";
 
     const [field, order] = sortByParam.split("-") as [string, "asc" | "desc"];
 
@@ -62,6 +63,11 @@ export async function GET(request: Request) {
     // 分类过滤
     if (categoryName !== "all") {
       andConditions.push({ category: { name: categoryName } });
+    }
+
+    // 供应商过滤
+    if (supplierId !== "all") {
+      andConditions.push({ supplierId: supplierId });
     }
 
     // 状态过滤 (库存预警、可见性)

@@ -38,9 +38,10 @@ export async function POST(request: Request) {
       const storage = await getStorageStrategy();
       const folder = request.headers.get("x-folder") || undefined;
       const useTimestamp = request.headers.get("x-use-timestamp") === "true";
+      const overrideName = request.headers.get("x-file-name");
 
       const result = await storage.upload(file, {
-        name: file.name,
+        name: overrideName || file.name,
         type: file.type,
         folder,
         useTimestamp

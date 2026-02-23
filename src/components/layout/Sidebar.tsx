@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, LogIn, X } from "lucide-react";
+import { LogOut, LogIn } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -77,24 +77,18 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
         </button>
 
         <div className="flex h-full flex-col p-4 relative">
-          {/* Mobile Close Button */}
-          <button 
-            onClick={onClose}
-            className="lg:hidden absolute right-4 top-4 p-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
-          >
-            <X size={18} />
-          </button>
-
-          {/* Logo Area - Also acts as a toggle */}
+          {/* Logo Area - Also acts as a toggle (desktop). Contains mobile close button. */}
           <div 
-            onClick={onToggleCollapse}
             className={cn(
-                "mb-8 px-2 flex items-center shrink-0 cursor-pointer transition-all duration-300 hover:opacity-80 active:scale-95", 
+                "mb-8 px-2 flex items-center shrink-0 transition-all duration-300", 
                 isCollapsed ? "justify-center" : "justify-between"
             )}
-            title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
           >
-            <div className="flex items-center gap-3">
+            <div
+              onClick={onToggleCollapse}
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 active:scale-95 transition-all duration-300"
+              title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
+            >
               <div className="h-9 w-9 shrink-0">
                 <Image src="/picknote.png" alt="PickNote Logo" width={36} height={36} className="rounded-xl" />
               </div>

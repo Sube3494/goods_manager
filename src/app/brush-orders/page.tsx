@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Plus, Search, Calendar, ShoppingBag, Upload, Download, X as ClearIcon } from "lucide-react";
+import { Plus, Search, Calendar, ShoppingBag, Upload, Download, Check, X as ClearIcon } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { BrushOrderModal } from "@/components/BrushOrders/BrushOrderModal";
 import { ImportModal } from "@/components/Goods/ImportModal";
@@ -18,6 +18,7 @@ import { pinyinMatch } from "@/lib/pinyin";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 export default function BrushOrdersPage() {
   const { showToast } = useToast();
@@ -48,29 +49,22 @@ export default function BrushOrdersPage() {
   });
   const [selectedType, setSelectedType] = useState("全部");
 
-  const filteredOrders = useMemo(() => {
+   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
-      if (!searchQuery.trim()) {
-        let matchesDate = true;
-        if (startDate || endDate) {
-            const orderDate = typeof o.date === 'string' ? parseISO(o.date) : o.date;
-            const start = startDate ? startOfDay(parseISO(startDate)) : new Date(0);
-            const end = endDate ? endOfDay(parseISO(endDate)) : new Date(8640000000000000);
-            matchesDate = isWithinInterval(orderDate, { start, end });
-        }
-        return matchesDate;
-      }
-
       const query = searchQuery.trim();
-      const matchesSearch = (
+      
+      // 1. 搜索筛选 (当 query 为空时 pinyinMatch 会返回 true)
+      const matchesSearch = !query || (
           pinyinMatch(o.id, query) ||
           pinyinMatch(o.type, query) ||
           pinyinMatch(o.note || "", query) ||
           o.items.some(i => i.product?.name && pinyinMatch(i.product.name, query)) 
       );
 
+      // 2. 平台筛选
       const matchesType = selectedType === "全部" || o.type === selectedType;
 
+      // 3. 日期筛选
       let matchesDate = true;
       if (startDate || endDate) {
           const orderDate = typeof o.date === 'string' ? parseISO(o.date) : o.date;
@@ -86,11 +80,10 @@ export default function BrushOrdersPage() {
   const stats = useMemo(() => {
     return filteredOrders.reduce((acc, curr) => ({
       count: acc.count + 1,
-      principal: acc.principal + curr.principalAmount,
       payment: acc.payment + curr.paymentAmount,
       received: acc.received + curr.receivedAmount,
       commission: acc.commission + curr.commission,
-    }), { count: 0, principal: 0, payment: 0, received: 0, commission: 0 });
+    }), { count: 0, payment: 0, received: 0, commission: 0 });
   }, [filteredOrders]);
 
   const showToastRef = useRef(showToast);
@@ -237,7 +230,6 @@ export default function BrushOrdersPage() {
         "日期": formattedDate,
         "类型": o.type,
         "商品": o.items.map(i => i.product?.name).join(", "),
-        "本金": o.principalAmount,
         "实付": o.paymentAmount,
         "到手金额": o.receivedAmount,
         "佣金": o.commission,
@@ -346,15 +338,14 @@ export default function BrushOrdersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "总单数", value: stats.count, color: "text-blue-500", suffix: "单" },
-          { label: "总本金", value: stats.principal, color: "" },
           { label: "总实付", value: stats.payment, color: "" },
           { label: "总到手", value: stats.received, color: "text-emerald-500" },
           { label: "总佣金", value: stats.commission, color: "text-orange-500" },
         ].map((s, idx) => (
-          <div key={idx} className={`bg-white dark:bg-white/5 p-4 rounded-3xl border border-border shadow-sm flex flex-col justify-center ${idx === 0 ? "col-span-2 lg:col-span-1" : ""}`}>
+          <div key={idx} className={`bg-white dark:bg-white/5 p-4 rounded-3xl border border-border shadow-sm flex flex-col justify-center col-span-1`}>
             <p className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">{s.label}</p>
             <p className={`text-lg md:text-2xl font-mono font-bold mt-0.5 ${s.color || "text-foreground"}`}>
                 {s.label === "总单数" ? "" : "¥"}{typeof s.value === 'number' && !s.suffix ? s.value.toFixed(2) : s.value}{s.suffix || ""}
@@ -427,7 +418,7 @@ export default function BrushOrdersPage() {
       </div>
 
       {/* Table */}
-      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-gray-900/70 backdrop-blur-md overflow-hidden shadow-sm">
+      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
         <div className="overflow-auto">
           {isLoading && (
               <div className="p-8 text-center text-muted-foreground">加载中...</div>
@@ -438,24 +429,30 @@ export default function BrushOrdersPage() {
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-4 py-4 w-12">
                    <div className="flex justify-center">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 rounded-full border-2 border-border appearance-none checked:bg-primary checked:border-primary transition-all cursor-pointer relative checked:after:content-[''] checked:after:absolute checked:after:left-[4px] checked:after:top-px checked:after:w-[4px] checked:after:h-[8px] checked:after:border-white checked:after:border-b-2 checked:after:border-r-2 checked:after:rotate-45"
-                      checked={filteredOrders.length > 0 && selectedIds.length === filteredOrders.length}
-                      onChange={() => {
+                    <button 
+                      onClick={() => {
                         if (selectedIds.length === filteredOrders.length) {
                           setSelectedIds([]);
                         } else {
                           setSelectedIds(filteredOrders.map(o => o.id));
                         }
                       }}
-                    />
+                      className={cn(
+                        "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
+                        filteredOrders.length > 0 && selectedIds.length === filteredOrders.length
+                        ? "bg-foreground border-foreground text-background scale-110" 
+                        : "border-muted-foreground/30 hover:border-foreground/50"
+                      )}
+                    >
+                      {filteredOrders.length > 0 && selectedIds.length === filteredOrders.length && (
+                        <Check size={12} strokeWidth={4} />
+                      )}
+                    </button>
                    </div>
                 </th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">日期</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left">商品</th>
+                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">日期</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">平台</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">商品</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">本金</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">实付</th>
                 <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-center text-emerald-500">到手</th>
                 <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-center text-orange-500">佣金</th>
@@ -471,14 +468,44 @@ export default function BrushOrdersPage() {
                     onClick={() => handleEdit(order)}
                     className={`hover:bg-muted/20 transition-colors cursor-pointer group ${selectedIds.includes(order.id) ? 'bg-primary/5' : ''}`}
                    >
-                     <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-center">
-                          <input 
-                            type="checkbox" 
-                            className="w-4 h-4 rounded-full border-2 border-border appearance-none checked:bg-primary checked:border-primary transition-all cursor-pointer relative checked:after:content-[''] checked:after:absolute checked:after:left-[4px] checked:after:top-px checked:after:w-[4px] checked:after:h-[8px] checked:after:border-white checked:after:border-b-2 checked:after:border-r-2 checked:after:rotate-45"
-                            checked={selectedIds.includes(order.id)}
-                            onChange={() => toggleSelect(order.id)}
-                          />
+                          <button 
+                            onClick={() => toggleSelect(order.id)}
+                            className={cn(
+                                "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
+                                selectedIds.includes(order.id)
+                                ? "bg-foreground border-foreground text-background scale-110" 
+                                : "border-muted-foreground/30 hover:border-foreground/50"
+                            )}
+                          >
+                            {selectedIds.includes(order.id) && (
+                                <Check size={12} strokeWidth={4} />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                     <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border dark:border-white/10 overflow-hidden shrink-0 relative">
+                                {order.items[0]?.product?.image ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                 <img src={order.items[0].product.image} className="w-full h-full object-cover" alt="Product" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+                                        <ShoppingBag size={16} />
+                                    </div>
+                                )}
+                                {order.items.length > 1 && (
+                                    <div className="absolute top-0 right-0 bg-primary/90 text-primary-foreground text-[8px] font-bold px-1 rounded-bl-md shadow-sm">
+                                        {order.items.length}
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-sm font-medium line-clamp-1 max-w-[200px]" title={order.items.map(i => i.product?.name).join("\n")}>
+                                {order.items[0]?.product?.name || "未绑定商品"}
+                                {order.items.length > 1 && <span className="text-muted-foreground ml-1 text-xs">等{order.items.length}件</span>}
+                            </p>
                         </div>
                      </td>
                      <td className="px-6 py-4 text-sm font-mono text-muted-foreground whitespace-nowrap">
@@ -492,12 +519,6 @@ export default function BrushOrdersPage() {
                              {order.type}
                          </span>
                      </td>
-                     <td className="px-6 py-4 text-center">
-                        <p className="text-sm font-medium line-clamp-1 max-w-[200px] mx-auto" title={order.items.map(i => i.product?.name).join(", ")}>
-                            {order.items.map(i => i.product?.name).join(", ") || "未绑定商品"}
-                        </p>
-                     </td>
-                     <td className="px-6 py-4 font-mono font-medium text-center text-sm">¥{order.principalAmount.toFixed(2)}</td>
                      <td className="px-6 py-4 font-mono font-medium text-center text-sm">¥{order.paymentAmount.toFixed(2)}</td>
                      <td className="px-6 py-4 font-mono font-bold text-emerald-500 text-center text-sm">¥{order.receivedAmount.toFixed(2)}</td>
                      <td className="px-6 py-4 font-mono font-bold text-orange-500 text-center text-sm">¥{order.commission.toFixed(2)}</td>
@@ -521,63 +542,86 @@ export default function BrushOrdersPage() {
         </div>
       </div>
 
-       <div className="md:hidden space-y-4">
+       <div className="md:hidden rounded-3xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+         <div className="p-3 space-y-3">
            {filteredOrders.map(order => (
                <div 
                 key={order.id} 
                 onClick={() => handleEdit(order)}
-                className={`bg-white dark:bg-white/5 p-4 rounded-3xl border border-border shadow-sm space-y-4 cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden ${selectedIds.includes(order.id) ? 'ring-2 ring-primary ring-inset flex-1' : ''}`}
+                className={`bg-white/50 dark:bg-white/5 p-3 rounded-2xl border border-border/50 shadow-sm space-y-3 cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden ${selectedIds.includes(order.id) ? 'ring-2 ring-primary ring-inset' : ''}`}
                >
-                   {/* Mobile selection overlay/hitbox */}
+                   {/* Mobile selection overlay - Moved to top-right to avoid blocking content */}
                    <div 
-                    className="absolute top-2 left-2 z-10"
+                    className="absolute top-2.5 left-2.5 z-10"
                     onClick={(e) => toggleSelect(order.id, e)}
                    >
-                      <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${selectedIds.includes(order.id) ? 'bg-primary border-primary' : 'bg-white/50 dark:bg-black/50 border-white/20 dark:border-white/10'}`}>
-                        {selectedIds.includes(order.id) && (
-                          <div className="w-1.5 h-3 border-white border-b-2 border-r-2 rotate-45 mb-0.5" />
+                      <button 
+                        className={cn(
+                            "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
+                            selectedIds.includes(order.id)
+                            ? "bg-foreground border-foreground text-background scale-110" 
+                            : "bg-black/20 dark:bg-black/40 backdrop-blur-md border-white/40 hover:border-white/60"
                         )}
-                      </div>
+                      >
+                        {selectedIds.includes(order.id) && (
+                          <Check size={12} strokeWidth={4} />
+                        )}
+                      </button>
                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-muted-foreground text-xs font-mono">
-                            <Calendar size={14} />
-                            {formatLocalDateTime(order.date)}
+                     <div className="flex gap-3">
+                                 <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-white/5 border dark:border-white/10 overflow-hidden shrink-0 relative">
+                                     {order.items[0]?.product?.image ? (
+                                         /* eslint-disable-next-line @next/next/no-img-element */
+                                          <img src={order.items[0].product.image} className="w-full h-full object-cover" alt="Product" />
+                                     ) : (
+                                         <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+                                             <ShoppingBag size={24} />
+                                         </div>
+                                     )}
+                                     {order.items.length > 1 && (
+                                         <div className="absolute top-0 right-0 bg-primary/90 text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-bl-xl shadow-md border-l border-b border-primary-foreground/20">
+                                             {order.items.length}
+                                         </div>
+                                     )}
+                                 </div>
+                                 <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                                      <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-mono">
+                                              <Calendar size={12} />
+                                              {formatLocalDateTime(order.date)}
+                                          </div>
+                                          <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[9px] font-bold border border-primary/20 uppercase tracking-tighter">
+                                              {order.type}
+                                          </span>
+                                      </div>
+                                      <div>
+                                          <p className="text-sm font-bold text-foreground line-clamp-2 leading-tight">
+                                               {order.items[0]?.product?.name || "未绑定商品"}
+                                               {order.items.length > 1 && <span className="text-muted-foreground font-normal ml-1 text-[11px]">等{order.items.length}件</span>}
+                                          </p>
+                                          {order.note && (
+                                              <p className="text-[11px] text-muted-foreground mt-1 line-clamp-1 opacity-60">
+                                                  &quot;{order.note}&quot;
+                                              </p>
+                                          )}
+                                      </div>
+                                 </div>
+                     </div>
+
+                    <div className="flex items-center justify-between pt-2.5 border-t border-border/10">
+                        <div className="flex-1">
+                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight opacity-60 font-mono">实付</p>
+                            <p className="font-mono text-xs font-bold mt-0.5">¥{order.paymentAmount.toFixed(2)}</p>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20 uppercase tracking-tight">
-                            {order.type}
-                        </span>
+                        <div className="flex-1 text-center border-x border-border/10">
+                            <p className="text-[9px] uppercase text-emerald-500 font-bold tracking-tight">到手</p>
+                            <p className="font-mono text-xs text-emerald-500 font-bold mt-0.5">¥{order.receivedAmount.toFixed(2)}</p>
+                        </div>
+                        <div className="flex-1 text-right">
+                            <p className="text-[9px] uppercase text-orange-500 font-bold tracking-tight">佣金</p>
+                            <p className="font-mono text-xs text-orange-500 font-bold mt-0.5">¥{order.commission.toFixed(2)}</p>
+                        </div>
                     </div>
-
-                   <div>
-                       <p className="text-sm font-bold text-foreground line-clamp-2">
-                            {order.items.map(i => i.product?.name).join(", ") || "未绑定商品"}
-                       </p>
-                       {order.note && (
-                           <p className="text-xs text-muted-foreground mt-1 line-clamp-1 italic">
-                               &quot;{order.note}&quot;
-                           </p>
-                       )}
-                   </div>
-
-                   <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/50">
-                       <div className="space-y-0.5">
-                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">实付金额</p>
-                           <p className="font-mono text-sm font-bold">¥{order.paymentAmount.toFixed(2)}</p>
-                       </div>
-                       <div className="space-y-0.5 text-right font-bold">
-                           <p className="text-[10px] uppercase text-emerald-500/70 tracking-wider">预估到手</p>
-                           <p className="font-mono text-sm text-emerald-500 italic">¥{order.receivedAmount.toFixed(2)}</p>
-                       </div>
-                       <div className="space-y-0.5">
-                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">本金</p>
-                           <p className="font-mono text-sm">¥{order.principalAmount.toFixed(2)}</p>
-                       </div>
-                       <div className="space-y-0.5 text-right font-bold">
-                           <p className="text-[10px] uppercase text-orange-500/70 tracking-wider">预计佣金</p>
-                           <p className="font-mono text-sm text-orange-500">¥{order.commission.toFixed(2)}</p>
-                       </div>
-                   </div>
                </div>
            ))}
            {filteredOrders.length === 0 && !isLoading && (
@@ -586,6 +630,7 @@ export default function BrushOrdersPage() {
                    <p className="text-sm font-medium">暂无刷单记录</p>
                </div>
            )}
+         </div>
        </div>
 
       <BrushOrderModal 
@@ -634,7 +679,6 @@ export default function BrushOrdersPage() {
             "*类型": "淘宝",
             "*SKU": "SKU001",
             "数量": 1,
-            "本金": 100.00,
             "*实付": 95.00,
             "到手金额": 100.00,
             "佣金": 5.00,

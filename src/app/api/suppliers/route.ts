@@ -20,7 +20,7 @@ export async function GET() {
       where: {
         workspaceId
       },
-      orderBy: { name: 'asc' },
+      orderBy: { code: 'asc' },
       include: {
         _count: {
           select: { products: true }

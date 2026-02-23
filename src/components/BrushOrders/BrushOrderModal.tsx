@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2 } from "lucide-react";
+import { X, Package, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { BrushOrder, Product } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -30,16 +30,11 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
     date: initialData?.date || new Date().toISOString(),
     items: initialData?.items || [],
     type: initialData?.type || "淘宝",
-    principalAmount: initialData?.principalAmount || 0,
     paymentAmount: initialData?.paymentAmount || 0,
     receivedAmount: initialData?.receivedAmount || 0,
     commission: initialData?.commission || 0,
     note: initialData?.note || "",
   }));
-
-
-
-
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -47,11 +42,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
   const [products, setProducts] = useState<Product[]>([]);
   const prevInitialDataRef = useRef<BrushOrder | undefined>(undefined);
   
-
-
   useEffect(() => {
-    // Avoid setting state immediately if not needed or handle via generic loading state
-    // But here we just need to ensure hydration match
     const timer = setTimeout(() => setMounted(true), 0);
     return () => clearTimeout(timer);
   }, []);
@@ -61,38 +52,42 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
       .then(res => res.json())
       .then(data => {
         setMounted(true);
-        setProducts(data);
+        if (data && Array.isArray(data.items)) {
+          setProducts(data.items);
+        } else if (Array.isArray(data)) {
+          setProducts(data);
+        }
       })
-      .catch(err => console.error(err));
+      .catch(err => {
+        console.error(err);
+        setMounted(true);
+      });
   }, []);
 
   useEffect(() => {
     if (!isOpen) return;
     
-    // reset form when opening with new data
     if (initialData?.id !== prevInitialDataRef.current?.id) {
        prevInitialDataRef.current = initialData || undefined;
        
-       // Use setTimeout to avoid synchronous state update warning during render
        setTimeout(() => {
            if (initialData) {
                setFormData({
                  ...initialData,
-                 note: initialData.note || "" // Ensure note is string
+                 note: initialData.note || ""
                });
            } else {
                setFormData({
-                id: "",
-                status: "Draft",
-                date: new Date().toISOString(),
-                items: [],
-                type: "淘宝",
-                principalAmount: 0,
-                paymentAmount: 0,
-                receivedAmount: 0,
-                commission: 0,
-                note: "",
-            });
+                 id: "",
+                 status: "Draft",
+                 date: new Date().toISOString(),
+                 items: [],
+                 type: "淘宝",
+                 paymentAmount: 0,
+                 receivedAmount: 0,
+                 commission: 0,
+                 note: "",
+               });
            }
        }, 0);
     }
@@ -122,8 +117,9 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
     });
   };
 
-  const updateItem = (index: number, quantity: number) => {
+  const updateItem = (index: number, val: string) => {
     const newItems = [...formData.items];
+    const quantity = val === "" ? 0 : parseInt(val) || 0;
     newItems[index] = { ...newItems[index], quantity };
     setFormData({ ...formData, items: newItems });
   };
@@ -132,8 +128,18 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
     e.preventDefault();
     if (readOnly) return;
 
-    if (!formData.paymentAmount) {
-      showToast("请输入实付金额", "error");
+    if (!formData.paymentAmount || formData.paymentAmount <= 0) {
+      showToast("请输入有效的实付金额", "error");
+      return;
+    }
+
+    if (!formData.receivedAmount || formData.receivedAmount <= 0) {
+      showToast("请输入有效的到手金额", "error");
+      return;
+    }
+
+    if (formData.receivedAmount > formData.paymentAmount) {
+      showToast("到手金额不能大于实付金额", "error");
       return;
     }
 
@@ -149,9 +155,6 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
 
     onSubmit(formData);
   };
-
-
-
 
   if (!mounted) return null;
 
@@ -172,16 +175,16 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                className="fixed left-1/2 top-1/2 z-60 w-[calc(100%-32px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
-                <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 p-6">
-                    <h2 className="text-xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
-                        <X size={20} />
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 p-5 sm:p-8">
+                    <h2 className="text-2xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-red-500/10 dark:hover:text-red-500 rounded-full transition-colors">
+                        <X size={24} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-500">日期</label>
@@ -198,7 +201,6 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                                 const isStandard = BRUSH_TYPES.filter(t => t !== "其他").includes(formData.type);
                                 
                                 if (!isStandard) {
-                                    // Custom Input Mode
                                     return (
                                         <div className="relative group/custom animate-in zoom-in-95 duration-200">
                                             <input
@@ -208,7 +210,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                                                 value={formData.type === "其他" ? "" : formData.type}
                                                 disabled={readOnly}
                                                 onChange={(e) => setFormData({...formData, type: e.target.value})}
-                                                className="w-full h-10 px-3 pr-10 rounded-xl border bg-transparent border-gray-200 dark:bg-gray-800 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                                className="w-full h-10 px-3 pr-10 rounded-xl border bg-transparent border-gray-200 dark:bg-white/5 dark:border-white/10 outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
                                             />
                                             {!readOnly && (
                                                 <button 
@@ -224,7 +226,6 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                                     );
                                 }
 
-                                // Standard Select Mode
                                 return (
                                     <CustomSelect
                                         options={BRUSH_TYPES.map(t => ({ value: t, label: t }))}
@@ -237,59 +238,70 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-500">本金</label>
-                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">¥</span>
-                                <input
-                                    type="number"
-                                    className="w-full h-10 pl-7 pr-3 rounded-xl border bg-transparent dark:border-gray-700 [&::-webkit-inner-spin-button]:appearance-none"
-                                    placeholder="0"
-                                    value={formData.principalAmount || ""}
-                                    onChange={e => setFormData({...formData, principalAmount: parseFloat(e.target.value) || 0})}
-                                    disabled={readOnly}
-                                />
-                             </div>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-500">实付 <span className="text-red-500">*</span></label>
-                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">¥</span>
+                             <div className="relative flex items-center group">
+                                <span className="absolute left-3.5 text-gray-400 font-medium select-none">¥</span>
                                 <input
                                     type="number"
-                                    className="w-full h-10 pl-7 pr-3 rounded-xl border bg-transparent dark:border-gray-700 [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-full h-11 pl-8 pr-4 rounded-2xl border bg-transparent dark:bg-white/5 dark:border-white/10 focus:ring-2 focus:ring-primary/20 transition-all outline-none [&::-webkit-inner-spin-button]:appearance-none font-mono text-sm leading-none"
                                     placeholder="0"
-                                    value={formData.paymentAmount || ""}
-                                    onChange={e => setFormData({...formData, paymentAmount: parseFloat(e.target.value) || 0})}
+                                    value={formData.paymentAmount === 0 ? "" : formData.paymentAmount}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setFormData({...formData, paymentAmount: val === "" ? 0 : parseFloat(val) || 0});
+                                    }}
                                     disabled={readOnly}
                                 />
                              </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-500">到手</label>
-                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">¥</span>
-                                <input
-                                    type="number"
-                                    className="w-full h-10 pl-7 pr-3 rounded-xl border bg-transparent dark:border-gray-700 [&::-webkit-inner-spin-button]:appearance-none"
-                                    placeholder="0"
-                                    value={formData.receivedAmount || ""}
-                                    onChange={e => setFormData({...formData, receivedAmount: parseFloat(e.target.value) || 0})}
-                                    disabled={readOnly}
-                                />
+                            <label className="text-sm font-medium text-gray-500">到手 <span className="text-red-500">*</span></label>
+                             <div className="relative flex flex-col group">
+                                <div className="relative flex items-center">
+                                    <span className={`absolute left-3.5 font-medium select-none transition-colors ${
+                                        formData.receivedAmount > formData.paymentAmount && formData.paymentAmount > 0
+                                        ? "text-red-500" 
+                                        : "text-gray-400"
+                                    }`}>¥</span>
+                                    <input
+                                        type="number"
+                                        className={`w-full h-11 pl-8 pr-4 rounded-2xl border bg-transparent dark:bg-white/5 transition-all outline-none [&::-webkit-inner-spin-button]:appearance-none font-mono text-sm leading-none ${
+                                            formData.receivedAmount > formData.paymentAmount && formData.paymentAmount > 0
+                                            ? "border-red-500 ring-4 ring-red-500/10 text-red-500" 
+                                            : "dark:border-white/10 focus:ring-2 focus:ring-primary/20"
+                                        }`}
+                                        placeholder="0"
+                                        value={formData.receivedAmount === 0 ? "" : formData.receivedAmount}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setFormData({...formData, receivedAmount: val === "" ? 0 : parseFloat(val) || 0});
+                                        }}
+                                        disabled={readOnly}
+                                    />
+                                </div>
+                                {formData.receivedAmount > formData.paymentAmount && formData.paymentAmount > 0 && (
+                                    <div className="flex items-center gap-1.5 text-[10px] text-red-500 mt-1.5 font-bold bg-red-500/5 px-2.5 py-1 rounded-lg border border-red-500/10 w-fit animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <AlertTriangle size={12} className="shrink-0" />
+                                        <span>到手金额不应超过实付</span>
+                                    </div>
+                                )}
                              </div>
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-500">佣金</label>
-                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">¥</span>
+                             <div className="relative flex items-center group">
+                                <span className="absolute left-3.5 text-gray-400 font-medium select-none">¥</span>
                                 <input
                                     type="number"
-                                    className="w-full h-10 pl-7 pr-3 rounded-xl border bg-transparent dark:border-gray-700 [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-full h-11 pl-8 pr-4 rounded-2xl border bg-transparent dark:bg-white/5 dark:border-white/10 focus:ring-2 focus:ring-primary/20 transition-all outline-none [&::-webkit-inner-spin-button]:appearance-none font-mono text-sm leading-none"
                                     placeholder="0"
-                                    value={formData.commission || ""}
-                                    onChange={e => setFormData({...formData, commission: parseFloat(e.target.value) || 0})}
+                                    value={formData.commission === 0 ? "" : formData.commission}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setFormData({...formData, commission: val === "" ? 0 : parseFloat(val) || 0});
+                                    }}
                                     disabled={readOnly}
                                 />
                              </div>
@@ -308,35 +320,45 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                            )}
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {formData.items.map((item, index) => {
                                 const product = products.find(p => p.id === item.productId);
                                 return (
-                                    <div key={index} className="flex items-center gap-4 p-3 rounded-xl border bg-gray-50 dark:bg-gray-800/20 dark:border-gray-700">
-                                        <div className="w-12 h-12 rounded-lg bg-white border overflow-hidden shrink-0">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            {product?.image ? <img src={product.image} className="w-full h-full object-cover" alt={product.name}/> : <div className="w-full h-full flex items-center justify-center bg-gray-100"><Package size={16} /></div>}
+                                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border bg-gray-50/50 dark:bg-white/5 dark:border-white/10 backdrop-blur-md group hover:border-primary/30 transition-all shadow-sm">
+                                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                                            <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-800 border dark:border-white/10 overflow-hidden shrink-0 shadow-sm transition-transform group-hover:scale-105">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                {product?.image ? <img src={product.image} className="w-full h-full object-cover" alt={product.name}/> : <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800"><Package size={16} /></div>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold truncate text-sm text-foreground">{product?.name || "加载中..."}</div>
+                                                <div className="text-[10px] font-mono text-muted-foreground mt-0.5 truncate opacity-60 uppercase tracking-widest">{product?.sku || "NO SKU"}</div>
+                                            </div>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-medium truncate text-sm">{product?.name || "加载中..."}</div>
-                                            <div className="text-xs text-gray-500">{product?.sku}</div>
+                                        
+                                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-3 sm:pt-0 border-t sm:border-0 border-border/10">
+                                            <div className="flex items-center gap-2 bg-white/50 dark:bg-white/10 rounded-xl p-1 border border-border/50">
+                                                <span className="text-[10px] font-bold text-muted-foreground px-2 uppercase tracking-tight opacity-50">数量</span>
+                                                <input
+                                                    type="number"
+                                                    className="w-14 h-8 bg-transparent text-sm text-center focus:outline-none font-mono font-medium"
+                                                    value={item.quantity === 0 ? "" : item.quantity}
+                                                    onChange={e => updateItem(index, e.target.value)}
+                                                    disabled={readOnly}
+                                                    min="1"
+                                                />
+                                            </div>
+                                            {!readOnly && (
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => removeItem(index)} 
+                                                    className="p-2.5 rounded-xl text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-95 border border-transparent hover:border-red-500/20"
+                                                    title="移除商品"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-500">数量:</span>
-                                            <input
-                                                type="number"
-                                                className="w-16 h-8 rounded-lg border text-center bg-white dark:bg-black/20 dark:border-gray-700 [&::-webkit-inner-spin-button]:appearance-none"
-                                                value={item.quantity}
-                                                onChange={e => updateItem(index, parseInt(e.target.value) || 1)}
-                                                disabled={readOnly}
-                                                min="1"
-                                            />
-                                        </div>
-                                        {!readOnly && (
-                                            <button type="button" onClick={() => removeItem(index)} className="text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
                                     </div>
                                 );
                             })}
@@ -351,7 +373,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-500">备注</label>
                         <textarea
-                            className="w-full min-h-[80px] rounded-xl border p-3 bg-transparent dark:bg-gray-800 dark:border-gray-700 resize-y"
+                            className="w-full min-h-[80px] rounded-xl border p-3 bg-transparent dark:bg-white/5 dark:border-white/10 resize-y outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                             value={formData.note || ""}
                             onChange={e => setFormData({...formData, note: e.target.value})}
                             disabled={readOnly}
@@ -360,32 +382,48 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                     </div>
 
                     {!readOnly && (
-                        <div className="flex justify-between items-center pt-4 border-t dark:border-gray-800">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsConfirmOpen(true)}
-                                    className="px-4 py-2.5 rounded-xl text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                        <div className="flex items-center justify-between gap-4 pt-8 border-t dark:border-white/10">
+                            <div className="shrink-0">
+                                {initialData?.id && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsConfirmOpen(true)}
+                                        className="h-11 px-5 rounded-2xl text-red-500 font-bold hover:bg-red-500/10 transition-all flex items-center justify-center gap-2 border border-red-500/10 hover:border-red-500/30 active:scale-95"
+                                        title="删除此订单"
+                                    >
+                                        <Trash2 size={18} />
+                                        <span className="hidden sm:inline">删除订单</span>
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3 ml-auto">
+                                <button 
+                                    type="button" 
+                                    onClick={onClose} 
+                                    className="h-11 px-6 sm:px-8 rounded-2xl font-medium text-muted-foreground hover:bg-gray-100 dark:hover:bg-white/5 dark:hover:text-foreground border border-transparent hover:border-border transition-all active:scale-95 whitespace-nowrap"
                                 >
-                                    <Trash2 size={18} />
-                                    删除订单
+                                    取消
                                 </button>
-                            <div className="flex gap-4">
-                                <button type="button" onClick={onClose} className="px-6 py-2.5 rounded-xl font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">取消</button>
-                                <button type="submit" className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity">保存订单</button>
+                                <button 
+                                    type="submit" 
+                                    className="h-11 px-8 sm:px-10 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all whitespace-nowrap"
+                                >
+                                    保存订单
+                                </button>
                             </div>
                         </div>
                     )}
                     {readOnly && initialData?.id && (
-                         <div className="flex justify-between items-center pt-4 border-t dark:border-gray-800">
+                         <div className="flex items-center justify-between gap-4 pt-6 border-t dark:border-gray-800">
                              <button
                                     type="button"
                                     onClick={() => setIsConfirmOpen(true)}
-                                    className="px-4 py-2.5 rounded-xl text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                                    className="h-10 px-4 rounded-xl text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 border border-red-500/10 hover:border-red-500/30"
                                 >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={16} />
                                     删除订单
                                 </button>
-                             <button type="button" onClick={onClose} className="px-6 py-2.5 rounded-xl bg-secondary font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">关闭</button>
+                             <button type="button" onClick={onClose} className="h-10 px-8 rounded-xl bg-secondary font-medium hover:bg-gray-100 dark:hover:bg-gray-800 border border-border/50 transition-colors">关闭</button>
                         </div>
                     )}
                 </form>

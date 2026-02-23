@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
         // Map keys (supporting both Chinese and Optional * for required fields)
         const dateStr = row['日期'] || row['*日期'];
         const type = row['类型'] || row['*类型'];
-        const principal = row['本金'] || row['*本金'];
         const payment = row['实付'] || row['*实付'];
         const received = row['到手金额'] || row['*到手金额'];
         const commission = row['佣金'] || row['*佣金'];
@@ -78,7 +77,6 @@ export async function POST(req: NextRequest) {
             type: String(type),
             status: "Completed", // Default to completed for imports
             workspaceId,
-            principalAmount: parseFloat(String(principal || 0)),
             paymentAmount: parseFloat(String(payment || 0)),
             receivedAmount: parseFloat(String(received || 0)),
             commission: parseFloat(String(commission || 0)),

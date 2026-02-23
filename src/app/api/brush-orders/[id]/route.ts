@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+import { getStorageStrategy } from '@/lib/storage';
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,7 +27,19 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(order);
+    const storage = await getStorageStrategy();
+    const resolvedOrder = {
+      ...order,
+      items: order.items.map(item => ({
+        ...item,
+        product: item.product ? {
+          ...item.product,
+          image: item.product.image ? storage.resolveUrl(item.product.image) : null
+        } : null
+      }))
+    };
+
+    return NextResponse.json(resolvedOrder);
   } catch (error: unknown) {
     console.error('Error fetching brush order:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -47,7 +61,6 @@ export async function PUT(
       date,
       type,
       items,
-      principalAmount,
       paymentAmount,
       receivedAmount,
       commission,
@@ -67,7 +80,6 @@ export async function PUT(
         data: {
           date: new Date(date),
           type,
-          principalAmount: parseFloat(principalAmount || 0),
           paymentAmount: parseFloat(paymentAmount || 0),
           receivedAmount: parseFloat(receivedAmount || 0),
           commission: parseFloat(commission || 0),
@@ -81,12 +93,28 @@ export async function PUT(
           },
         },
         include: {
-          items: true,
+          items: {
+            include: {
+              product: true
+            }
+          },
         },
       });
     });
 
-    return NextResponse.json(order);
+    const storage = await getStorageStrategy();
+    const resolvedOrder = {
+      ...order,
+      items: order.items.map(item => ({
+        ...item,
+        product: item.product ? {
+          ...item.product,
+          image: item.product.image ? storage.resolveUrl(item.product.image) : null
+        } : null
+      }))
+    };
+
+    return NextResponse.json(resolvedOrder);
   } catch (error: unknown) {
     console.error('Error updating brush order:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

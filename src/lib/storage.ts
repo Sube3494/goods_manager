@@ -25,7 +25,8 @@ export interface UploadOptions {
 export interface StorageStrategy {
   upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult>;
   delete(url: string): Promise<void>;
-  resolveUrl(path: string): string; // Add resolveUrl to strategy
+  resolveUrl(path: string): string;
+  exists(relativeUrl: string): Promise<boolean>;
   getPresignedUrl?(options: UploadOptions): Promise<{ url: string; fileName: string; publicUrl: string } | null>;
 }
 
@@ -272,6 +273,20 @@ export class LocalStorageStrategy implements StorageStrategy {
     return result;
   }
 
+  async exists(relativeUrl: string): Promise<boolean> {
+    try {
+      let path = relativeUrl;
+      if (!path.startsWith('/uploads/') && !path.startsWith('uploads/')) {
+        path = '/uploads/' + path.replace(/^\//, '');
+      }
+      const filePath = join(process.cwd(), 'public', path);
+      await access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async delete(url: string): Promise<void> {
     try {
       // 提取文件名，假设格式为 /uploads/filename.ext
@@ -293,14 +308,10 @@ export class LocalStorageStrategy implements StorageStrategy {
 
       // 如果旧数据遗留的是 'gallery/xxx.jpg' 而非 '/uploads/...'，则补齐 uploads 前缀以便寻找真实物理路径
       if (!relativePath.startsWith('/uploads/') && !relativePath.startsWith('uploads/')) {
-        // 先去掉可能存在的前导斜杠
         relativePath = '/uploads/' + relativePath.replace(/^\//, '');
       }
 
-      // url is like /uploads/vouchers/filename.ext
-      // We need to join with public to get absolute path
       const filePath = join(uploadDir, relativePath);
-      
       await unlink(filePath);
     } catch (error) {
       // Ignore ENOENT (file already deleted)
@@ -548,6 +559,50 @@ export class MinioStorageStrategy implements StorageStrategy {
     }
   }
 
+  private resolveObjectName(url: string): string {
+    const bucketName = this.config.minioBucket || "goods-manager";
+    let objectName = "";
+    if (url.startsWith('http')) {
+      const publicUrlStr = this.config.minioPublicUrl ? this.config.minioPublicUrl.replace(/\/$/, "") : null;
+      if (publicUrlStr && url.startsWith(publicUrlStr)) {
+        const remaining = url.substring(publicUrlStr.length).replace(/^\//, '');
+        const pathParts = remaining.split("/");
+        if (pathParts[0] === bucketName) pathParts.shift();
+        objectName = pathParts.join("/");
+      } else {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split("/").filter(Boolean);
+        if (pathParts[0] === bucketName) pathParts.shift();
+        objectName = pathParts.join("/");
+      }
+    } else {
+      objectName = url;
+    }
+    if (objectName.startsWith('/uploads/')) objectName = objectName.substring(9);
+    if (objectName.startsWith('uploads/')) objectName = objectName.substring(8);
+    return objectName.replace(/^\//, '');
+  }
+
+  async exists(relativeUrl: string): Promise<boolean> {
+    try {
+      const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
+      const minioClient = new Minio.Client({
+        endPoint: endPoint,
+        port: this.config.minioPort ? Number(this.config.minioPort) : undefined,
+        useSSL: this.config.minioUseSSL,
+        accessKey: this.config.minioAccessKey,
+        secretKey: this.config.minioSecretKey,
+      });
+      const bucketName = this.config.minioBucket || "goods-manager";
+      const objectName = this.resolveObjectName(relativeUrl);
+      if (!objectName) return false;
+      await minioClient.statObject(bucketName, objectName);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async delete(url: string): Promise<void> {
     try {
       const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
@@ -560,36 +615,8 @@ export class MinioStorageStrategy implements StorageStrategy {
       });
 
       const bucketName = this.config.minioBucket || "goods-manager";
-      let objectName = "";
-
-      if (url.startsWith('http')) {
-        const publicUrlStr = this.config.minioPublicUrl ? this.config.minioPublicUrl.replace(/\/$/, "") : null;
-        if (publicUrlStr && url.startsWith(publicUrlStr)) {
-          const remaining = url.substring(publicUrlStr.length).replace(/^\//, '');
-          const pathParts = remaining.split("/");
-          if (pathParts[0] === bucketName) {
-              pathParts.shift();
-          }
-          objectName = pathParts.join("/");
-        } else {
-          const urlObj = new URL(url);
-          const pathParts = urlObj.pathname.split("/").filter(Boolean);
-          if (pathParts[0] === bucketName) {
-              pathParts.shift();
-          }
-          objectName = pathParts.join("/");
-        }
-      } else {
-        objectName = url;
-      }
-
-      // 如果旧数据从本地迁移过来带有 /uploads/，由于 MinIO 中没有该顶级目录（通常配置策略），尝试剥离以防删不掉
-      if (objectName.startsWith('/uploads/')) objectName = objectName.substring(9);
-      if (objectName.startsWith('uploads/')) objectName = objectName.substring(8);
-      objectName = objectName.replace(/^\//, '');
-
+      const objectName = this.resolveObjectName(url);
       if (!objectName) return;
-
       await minioClient.removeObject(bucketName, objectName);
     } catch (error) {
       console.error("Minio delete failed:", error);

@@ -60,6 +60,7 @@ export default function GoodsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>("sku-asc");
 
@@ -91,6 +92,7 @@ export default function GoodsPage() {
         search: debouncedSearch,
         category: selectedCategory,
         status: selectedStatus,
+        supplierId: selectedSupplier,
         sortBy: sortBy,
       });
 
@@ -119,7 +121,7 @@ export default function GoodsPage() {
       setIsLoading(false);
       setIsNextPageLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, sortBy]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy]);
 
   // Fetch metadata once on mount
   useEffect(() => {
@@ -414,7 +416,7 @@ export default function GoodsPage() {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, sortBy, showToast]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
 
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
@@ -509,8 +511,8 @@ export default function GoodsPage() {
             )}
           </div>
           
-          <div className="grid grid-cols-3 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto"> 
-             <div className="col-span-1 lg:w-40 h-10 sm:h-11"> 
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto"> 
+             <div className="col-span-1 lg:w-36 h-10 sm:h-11"> 
                 <CustomSelect 
                     value={selectedStatus}
                     onChange={setSelectedStatus}
@@ -531,6 +533,18 @@ export default function GoodsPage() {
                     options={[
                         { value: 'all', label: '所有分类' },
                         ...(Array.isArray(categories) ? categories.map(c => ({ value: c.name, label: c.name })) : [])
+                    ]}
+                    className="h-full"
+                    triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
+                />
+             </div>
+             <div className="col-span-1 lg:w-40 h-10 sm:h-11">
+                <CustomSelect 
+                    value={selectedSupplier}
+                    onChange={setSelectedSupplier}
+                    options={[
+                        { value: 'all', label: '所有供应商' },
+                        ...(Array.isArray(suppliers) ? suppliers.map(s => ({ value: s.id, label: s.name })) : [])
                     ]}
                     className="h-full"
                     triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all hover:bg-white/5 truncate"
@@ -603,7 +617,7 @@ export default function GoodsPage() {
 
       {/* Empty State */}
       {!isLoading && filteredGoods.length === 0 && (
-        <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-gray-900/70 text-center">
+        <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center">
             <div className="rounded-full bg-muted/50 p-4 mb-4">
                 <Search size={32} className="text-muted-foreground" />
             </div>
@@ -678,7 +692,7 @@ export default function GoodsPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.5, y: 20 }}
               onClick={scrollToTop}
-              className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"
+              className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"
             >
               <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
             </motion.button>

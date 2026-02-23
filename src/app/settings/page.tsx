@@ -52,6 +52,8 @@ export default function SettingsPage() {
   const [minioUseSSL, setMinioUseSSL] = useState(true);
   const [minioPublicUrl, setMinioPublicUrl] = useState("");
   const [uploadConflictStrategy, setUploadConflictStrategy] = useState<"overwrite" | "rename" | "skip">("rename");
+  const [shareExpireDuration, setShareExpireDuration] = useState<number>(1);
+  const [shareExpireUnit, setShareExpireUnit] = useState<"minutes" | "hours" | "days">("hours");
   // Use refs to track last saved values to prevent initial auto-save and loops
   const lastSavedSettings = useRef<Record<string, unknown>>({});
   // Add a ref to track if we should verify changes, only true after initial load
@@ -115,6 +117,8 @@ export default function SettingsPage() {
                 setUploadConflictStrategy(
                     data.uploadConflictStrategy || "uuid"
                 );
+                setShareExpireDuration(data.shareExpireDuration ?? 1);
+                setShareExpireUnit(data.shareExpireUnit || "hours");
 
                 lastSavedSettings.current = data;
             }
@@ -151,6 +155,8 @@ export default function SettingsPage() {
         minioUseSSL,
         minioPublicUrl,
         uploadConflictStrategy,
+        shareExpireDuration,
+        shareExpireUnit,
         ...newSettings
     };
 
@@ -187,6 +193,8 @@ export default function SettingsPage() {
     minioUseSSL, 
     minioPublicUrl, 
     uploadConflictStrategy, 
+    shareExpireDuration,
+    shareExpireUnit,
     showToast
   ]);
 
@@ -354,7 +362,7 @@ export default function SettingsPage() {
                           className={cn(
                             "flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl transition-all duration-300 text-sm font-medium",
                             theme === t.id 
-                              ? 'bg-white dark:bg-slate-800 shadow-md text-primary dark:text-white' 
+                              ? 'bg-white dark:bg-white/10 shadow-md text-primary dark:text-foreground' 
                               : 'text-muted-foreground hover:text-foreground'
                           )}
                         >
@@ -444,6 +452,40 @@ export default function SettingsPage() {
                       checked={allowGalleryUpload}
                       onChange={toggleGalleryUpload}
                     />
+                  </div>
+
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl bg-muted/20 border border-border/40">
+                    <div className="max-w-md">
+                      <h4 className="font-bold text-foreground">分享链接时效</h4>
+                      <p className="text-sm text-muted-foreground mt-1">配置分享给外部的图片及视频链接多久后自动失效。</p>
+                    </div>
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <input
+                        type="number"
+                        min="1"
+                        value={shareExpireDuration}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 1;
+                          setShareExpireDuration(val);
+                          saveSettings({ shareExpireDuration: val }, { silent: true });
+                        }}
+                        className="w-20 h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border px-3 text-center transition-all focus:ring-2 focus:ring-primary/20 outline-none"
+                      />
+                      <CustomSelect
+                        value={shareExpireUnit}
+                        triggerClassName="h-[42px] w-24 rounded-xl border-border bg-white dark:bg-white/5"
+                        onChange={(val) => {
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          setShareExpireUnit(val as any);
+                          saveSettings({ shareExpireUnit: val });
+                        }}
+                        options={[
+                          { value: "minutes", label: "分钟" },
+                          { value: "hours", label: "小时" },
+                          { value: "days", label: "天" }
+                        ]}
+                      />
+                    </div>
                   </div>
 
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl bg-muted/20 border border-border/40">
@@ -662,7 +704,7 @@ export default function SettingsPage() {
                           <motion.div 
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
-                              className="space-y-8 p-8 rounded-3xl bg-blue-500/5 border border-blue-500/10"
+                              className="space-y-8 p-8 rounded-3xl bg-black/2 dark:bg-white/2 border border-black/5 dark:border-white/5"
                           >
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                   <div className="space-y-2.5">
@@ -672,7 +714,7 @@ export default function SettingsPage() {
                                           value={minioEndpoint}
                                           onChange={(e) => { setMinioEndpoint(e.target.value); saveSettings({ minioEndpoint: e.target.value }, { silent: true }); }}
                                           placeholder="例如: 127.0.0.1"
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none"
                                       />
                                   </div>
                                   <div className="space-y-2.5">
@@ -686,7 +728,7 @@ export default function SettingsPage() {
                                               saveSettings({ minioPort: val }, { silent: true }); 
                                           }}
                                           placeholder="例如: 9000"
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all no-spinner focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all no-spinner focus:ring-2 focus:ring-primary/20 outline-none"
                                       />
                                   </div>
                               </div>
@@ -698,7 +740,7 @@ export default function SettingsPage() {
                                           type="text"
                                           value={minioAccessKey}
                                           onChange={(e) => { setMinioAccessKey(e.target.value); saveSettings({ minioAccessKey: e.target.value }, { silent: true }); }}
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-blue-500/20 outline-none font-mono"
+                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none font-mono"
                                       />
                                   </div>
                                   <div className="space-y-2.5">
@@ -707,7 +749,7 @@ export default function SettingsPage() {
                                           type="password"
                                           value={minioSecretKey}
                                           onChange={(e) => { setMinioSecretKey(e.target.value); saveSettings({ minioSecretKey: e.target.value }, { silent: true }); }}
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-blue-500/20 outline-none font-mono"
+                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none font-mono"
                                       />
                                   </div>
                               </div>
@@ -720,7 +762,7 @@ export default function SettingsPage() {
                                           value={minioBucket}
                                           onChange={(e) => { setMinioBucket(e.target.value); saveSettings({ minioBucket: e.target.value }, { silent: true }); }}
                                           placeholder="例如: picknote-assets"
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-blue-500/20 outline-none font-bold"
+                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none font-bold"
                                       />
                                   </div>
                                   <div className="space-y-2.5">
@@ -745,7 +787,7 @@ export default function SettingsPage() {
                                       value={minioPublicUrl}
                                       onChange={(e) => { setMinioPublicUrl(e.target.value); saveSettings({ minioPublicUrl: e.target.value }, { silent: true }); }}
                                       placeholder="例如: https://static.your-domain.com"
-                                      className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                      className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none"
                                   />
                                   <p className="text-xs text-muted-foreground/60 px-1">如果你在服务器前置了 Nginx 或 CDN 反向代理，请填写对外公开的域名。</p>
                               </div>

@@ -63,15 +63,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    // Physical deletion
-    try {
-      const storage = await getStorageStrategy();
-      await storage.delete(item.url);
-    } catch (storageError) {
-      console.error("Failed to delete physical file:", storageError);
-    }
+    // 计算该 URL 的引用数（有多少 GalleryItem 指向同一物理文件）
+    const refCount = await prisma.galleryItem.count({
+      where: { url: item.url }
+    });
 
-    // Clean up product cover images relying on this url 
+    // 先清除商品封面引用，再删数据库记录
     await prisma.product.updateMany({
       where: { image: item.url },
       data: { image: null }
@@ -80,6 +77,16 @@ export async function DELETE(
     await prisma.galleryItem.delete({
       where: { id }
     });
+
+    // 只有最后一个引用被删除时，才物理删除文件
+    if (refCount <= 1) {
+      try {
+        const storage = await getStorageStrategy();
+        await storage.delete(item.url);
+      } catch (storageError) {
+        console.error("Failed to delete physical file:", storageError);
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

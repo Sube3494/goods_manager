@@ -2,7 +2,7 @@
  * @Date: 2026-02-16 21:45:58
  * @Author: Sube
  * @FilePath: proxy.ts
- * @LastEditTime: 2026-02-16 22:01:16
+ * @LastEditTime: 2026-02-23 21:20:04
  * @Description: 
  */
 
@@ -18,8 +18,8 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Define public paths that don't require authentication
-  // STRICT MODE: Only Login, Gallery, and Settings are public.
-  const publicPaths = ["/login", "/gallery", "/settings"];
+  // STRICT MODE: Only Login, Gallery, Settings, and Share are public.
+  const publicPaths = ["/login", "/gallery", "/settings", "/share"];
 
   // 1. Always allow public static files (images, favicon, etc) - handled by matcher
 
@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public GET APIs
-  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info"];
+  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/share/sign"];
   const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public POST APIs (Guest uploads/submissions)
@@ -75,6 +75,6 @@ export const config = {
      * - images/ (public images if any)
      * - uploads/ (uploaded content)
      */
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|uploads|.*\\.txt$).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|uploads|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt)$).*)",
   ],
 };

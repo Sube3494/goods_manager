@@ -23,7 +23,9 @@ export async function GET() {
         allowDataImport: true,
         allowGalleryUpload: true,
         storageType: "local",
-        uploadConflictStrategy: "hash"
+        uploadConflictStrategy: "hash",
+        shareExpireDuration: 1,
+        shareExpireUnit: "hours"
       }
     });
     
@@ -54,7 +56,9 @@ export async function POST(request: Request) {
       minioBucket,
       minioUseSSL,
       minioPublicUrl,
-      uploadConflictStrategy
+      uploadConflictStrategy,
+      shareExpireDuration,
+      shareExpireUnit
     } = body;
 
     const updateData: Prisma.SystemSettingUpdateInput = {};
@@ -72,6 +76,8 @@ export async function POST(request: Request) {
     if (minioUseSSL !== undefined) updateData.minioUseSSL = Boolean(minioUseSSL);
     if (minioPublicUrl !== undefined) updateData.minioPublicUrl = minioPublicUrl;
     if (uploadConflictStrategy !== undefined) updateData.uploadConflictStrategy = uploadConflictStrategy;
+    if (shareExpireDuration !== undefined) updateData.shareExpireDuration = Number(shareExpireDuration);
+    if (shareExpireUnit !== undefined) updateData.shareExpireUnit = shareExpireUnit;
 
     const settings = await prisma.systemSetting.upsert({
       where: { id: "system" },
@@ -90,6 +96,8 @@ export async function POST(request: Request) {
         minioBucket: minioBucket || null,
         minioUseSSL: Boolean(minioUseSSL),
         minioPublicUrl: minioPublicUrl || null,
+        shareExpireDuration: (typeof shareExpireDuration === 'number') ? shareExpireDuration : 1,
+        shareExpireUnit: shareExpireUnit || "hours",
       }
     });
 

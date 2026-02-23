@@ -26,8 +26,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [canAnimate, setCanAnimate] = useState(false);
 
   const isLoginPage = pathname === "/login";
+  const isSharePage = pathname?.startsWith("/share");
+  const isFullScreenPage = isLoginPage || isSharePage;
+  
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
-  const showSidebar = !isLoginPage && !!user;
+  const showSidebar = !isFullScreenPage && !!user;
 
   // Track initialization to prevent initial mount transition
   useEffect(() => {
@@ -75,14 +78,14 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             canAnimate && "transition-[padding] duration-500 ease-in-out",
             showSidebar ? (isCollapsed ? "lg:pl-28" : "lg:pl-72") : "pl-0"
         )}>
-            {!isLoginPage && (
+            {!isFullScreenPage && (
               <MobileHeader 
                 isOpen={isSidebarOpen} 
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
                 showMenu={!!user}
               />
             )}
-            {!isLoginPage && (
+            {!isFullScreenPage && (
                 <header className="hidden lg:flex h-14 px-6 items-center justify-end gap-3">
                     <div className="flex items-center gap-3">
                         {!user && !isLoading && (
@@ -100,12 +103,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             )}            
             <main className={cn(
                 "flex-1 w-full",
-                !isLoginPage && "px-4 sm:px-6 lg:px-10 pb-10",
-                !isLoginPage && (pathname === "/gallery" ? "pt-0 sm:pt-2" : "pt-4")
+                !isFullScreenPage && "px-4 sm:px-6 lg:px-10 pb-10",
+                !isFullScreenPage && (pathname === "/gallery" ? "pt-0 sm:pt-2" : "pt-4")
             )}>
                 <div className={cn(
                     "h-full animate-fade-in",
-                    !isLoginPage && "mx-auto max-w-7xl"
+                    !isFullScreenPage && "mx-auto max-w-7xl"
                 )}>
                     <PageGuard>
                         {children}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Crown } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
@@ -674,6 +675,23 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const handlePointerUp = () => setIsDragging(false);
   // --- END Lightbox 增强功能 ---
 
+  const priceChartData = useMemo(() => {
+    if (!initialData || inboundHistory.length === 0) return [];
+    const data = inboundHistory
+      .map(order => {
+        const item = order.items.find((i: PurchaseOrderItem) => i.productId === initialData.id);
+        if (!item) return null;
+        return {
+          dateText: new Date(order.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          timestamp: new Date(order.date).getTime(),
+          price: item.costPrice
+        };
+      })
+      .filter((d): d is NonNullable<typeof d> => d !== null)
+      .sort((a, b) => a.timestamp - b.timestamp);
+    return data;
+  }, [inboundHistory, initialData]);
+
   if (!mounted) return null;
 
   // Helper for specs
@@ -810,43 +828,47 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         />
                     </div>
 
-                    {/* Cost Price */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <FileText size={16} /> 进货单价 (￥)
-                        </label>
-                        <input 
-                            type="number" 
-                            step="0.01"
-                            min="0"
-                            value={formData.costPrice}
-                            onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
-                            className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
-                            placeholder="0.00"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Cost Price */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <FileText size={16} /> 进货单价 (￥)
+                            </label>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                min="0"
+                                value={formData.costPrice}
+                                onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
+                                className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
+                                placeholder="0.00"
+                            />
+                        </div>
+
+                        {/* Initial Stock */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Package size={16} /> 商品库存
+                            </label>
+                            <div className="relative">
+                                {initialData ? (
+                                    <div className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground/60 font-medium cursor-not-allowed">
+                                        {formData.stock || 0}
+                                    </div>
+                                ) : (
+                                    <input 
+                                        type="number" 
+                                        min="0"
+                                        value={formData.stock}
+                                        onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                                        className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
+                                        placeholder="0"
+                                    />
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Initial Stock */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Package size={16} /> 商品库存
-                        </label>
-                        <div className="relative">
-                             {initialData ? (
-                                <div className="w-full rounded-full bg-muted/30 border border-border/50 px-4 py-2.5 flex items-center justify-between">
-                                    <span className="font-medium text-lg font-mono">{formData.stock}</span>
-                                    <span className="text-xs text-muted-foreground">当前库存 (不可直接修改)</span>
-                                </div>
-                            ) : (
-                                <input 
-                                    type="number" 
-                                    min="0"
-                                    value={formData.stock}
-                                    onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
-                                    placeholder="0"
-                                />
-                            )}
                             {/* Inbound History */}
                             {initialData && (
                                 <div className="mt-4 p-4 rounded-2xl bg-muted/20 border border-white/5 space-y-3">
@@ -855,6 +877,27 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         <div className="h-4 w-px bg-white/10" />
                                         <span className="text-[10px] text-primary font-medium">全部历史</span>
                                     </div>
+                                    
+                                    {/* 进价走势图 */}
+                                    {priceChartData.length > 1 && (
+                                        <div className="h-32 w-full mt-2 mb-4 border-b border-white/5 pb-4">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <LineChart data={priceChartData}>
+                                                    <XAxis dataKey="dateText" tick={{ fontSize: 9, fill: '#888888' }} axisLine={false} tickLine={false} tickMargin={8} />
+                                                    <YAxis domain={['auto', 'auto']} hide />
+                                                    <Tooltip 
+                                                        contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.8)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', fontSize: '12px', color: '#fff' }}
+                                                        itemStyle={{ color: '#f97316' }}
+                                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                        formatter={(value: any) => [`￥${value}`, '成本进价']}
+                                                        labelStyle={{ color: '#aaa', marginBottom: '4px' }}
+                                                    />
+                                                    <Line type="monotone" dataKey="price" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: '#f97316', strokeWidth: 0 }} activeDot={{ r: 5, stroke: 'rgba(249,115,22,0.3)', strokeWidth: 4 }} />
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                                         {isLoadingBatches ? (
                                             <div className="py-4 text-center text-[10px] text-muted-foreground">加载记录中...</div>
@@ -900,9 +943,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                     </div>
                                 </div>
                             )}
-                        </div>
-                    </div>
-
+                        
                     {/* Specifications */}
                     <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">

@@ -148,7 +148,6 @@ export interface BrushOrder {
   date: Date | string;
   type: string;
   status: BrushStatus | string;
-  principalAmount: number; // 本金
   paymentAmount: number;   // 实付
   receivedAmount: number;  // 到手金额
   commission: number;      // 佣金

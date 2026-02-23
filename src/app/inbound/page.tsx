@@ -79,7 +79,7 @@ function InboundContent() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-gray-900/70 backdrop-blur-md overflow-hidden shadow-sm">
+      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[calc(100vh-320px)]">
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-center">
@@ -159,36 +159,49 @@ function InboundContent() {
       </div>
 
       {/* Mobile Card View */}
-      <div className="grid grid-cols-1 gap-4 md:hidden pb-20">
-        <AnimatePresence mode="popLayout">
-          {filteredInbounds.map((po) => (
-            <motion.div
-              key={po.id}
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              onClick={() => handleView(po)}
-              className="rounded-2xl border border-border bg-white dark:bg-white/5 p-4 shadow-sm active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center justify-between mb-3">
-                 <span className="font-bold text-sm font-mono">{po.id}</span>
-                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase">
-                    已入库
-                 </span>
+      <div className="md:hidden rounded-3xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+        <div className="p-4 space-y-4">
+          <AnimatePresence mode="popLayout">
+            {isLoading ? (
+               <div className="py-12 flex flex-col items-center justify-center text-center text-muted-foreground/50">
+                  <div className="w-8 h-8 border-4 border-primary/10 border-t-primary rounded-full animate-spin mb-4" />
+                  <p className="text-sm font-medium tracking-widest uppercase opacity-50">Loading</p>
+               </div>
+            ) : filteredInbounds.length > 0 ? (
+              filteredInbounds.map((po) => (
+                <motion.div
+                  key={po.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  onClick={() => handleView(po)}
+                  className="rounded-2xl border border-border/50 bg-white/50 dark:bg-white/5 p-4 shadow-sm active:scale-[0.98] transition-all"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                     <span className="font-bold text-sm font-mono">{po.id}</span>
+                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase">
+                        已入库
+                     </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-4 border-t border-border/10 pt-3">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar size={12} />
+                        <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
+                    </div>
+                    <div className="font-bold text-foreground text-sm">
+                        ￥{po.totalAmount.toLocaleString()}
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="py-20 text-center text-muted-foreground">
+                <p className="text-sm font-medium">暂无记录</p>
               </div>
-              <div className="flex items-center justify-between mt-4 border-t border-border/10 pt-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar size={12} />
-                    <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
-                </div>
-                <div className="font-bold text-foreground text-sm">
-                    ￥{po.totalAmount.toLocaleString()}
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
 

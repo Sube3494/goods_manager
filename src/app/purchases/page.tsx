@@ -410,7 +410,7 @@ function PurchasesContent() {
 
       {/* Table/List View */}
       {/* Desktop Table View */}
-      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-gray-900/70 backdrop-blur-md overflow-hidden shadow-sm">
+      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[calc(100vh-220px)]">
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-center">

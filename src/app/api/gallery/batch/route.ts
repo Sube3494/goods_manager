@@ -30,26 +30,11 @@ export async function DELETE(request: Request) {
 
     // 获取所有待删除项的 URL
     const items = await prisma.galleryItem.findMany({
-      where: {
-        id: { in: ids }
-      },
+      where: { id: { in: ids } },
       select: { url: true, id: true }
     });
-    
 
-    // 执行物理清理
-    if (items.length > 0) {
-      try {
-        const storage = await getStorageStrategy();
-        await Promise.allSettled(
-          items.map((item: { url: string }) => storage.delete(item.url))
-        );
-      } catch (storageError) {
-        console.error("Batch physical deletion failed:", storageError);
-      }
-    }
-
-    // 清除引用了这些URL为封面的商品信息，防止幽灵缓存
+    // 清除涉及这些 URL 的商品封面引用
     const urls = items.map((item: { url: string }) => item.url);
     if (urls.length > 0) {
       await prisma.product.updateMany({
@@ -58,12 +43,25 @@ export async function DELETE(request: Request) {
       });
     }
 
+    // 先删数据库记录
     const deleteResult = await prisma.galleryItem.deleteMany({
-      where: {
-        id: { in: ids }
-      }
+      where: { id: { in: ids } }
     });
-    
+
+    // 对每个唯一 URL 检查是否还有其他 GalleryItem 引用，没有才物理删除
+    const uniqueUrls = [...new Set(urls)];
+    if (uniqueUrls.length > 0) {
+      const storage = await getStorageStrategy();
+      await Promise.allSettled(
+        uniqueUrls.map(async (url: string) => {
+          const remaining = await prisma.galleryItem.count({ where: { url } });
+          if (remaining === 0) {
+            await storage.delete(url);
+          }
+        })
+      );
+    }
+
     return NextResponse.json({ success: true, count: deleteResult.count });
   } catch (error) {
     console.error("Failed to batch delete gallery items:", error);

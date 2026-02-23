@@ -817,7 +817,7 @@ function GalleryContent() {
                         className="break-inside-avoid mb-3 sm:mb-6"
                     >
                         <div 
-                            className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-gray-900/70 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
+                            className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 flex flex-col h-full cursor-pointer"
                             onClick={() => handleOpenProductPreview(group)}
                         >
                             <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
@@ -966,7 +966,7 @@ function GalleryContent() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="relative z-10 w-full max-w-lg rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col"
+                            className="relative z-10 w-full max-w-lg rounded-3xl bg-white dark:bg-white/5 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col"
                         >
                             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
                                 <h2 className="text-xl font-bold text-foreground">上传实拍内容</h2>
@@ -1419,13 +1419,20 @@ function GalleryContent() {
                                         </button>
                                     )}
                                     <button 
-                                        onClick={() => {
-                                            const url = new URL(selectedImage.url, window.location.origin).href;
-                                            navigator.clipboard.writeText(url).then(() => {
-                                                showToast("链接已复制", "success");
-                                            }).catch(() => {
-                                                showToast("复制失败", "error");
-                                            });
+                                        onClick={async () => {
+                                            try {
+                                                const res = await fetch(`/api/share/sign?id=${selectedImage.id}`);
+                                                if (!res.ok) throw new Error("Sign failed");
+                                                const { expires, signature, expireText } = await res.json();
+                                                const url = new URL(`/share/${selectedImage.id}?e=${expires}&s=${signature}`, window.location.origin).href;
+                                                navigator.clipboard.writeText(url).then(() => {
+                                                    showToast(`链接已复制，${expireText}内有效`, "success");
+                                                }).catch(() => {
+                                                    showToast("复制失败", "error");
+                                                });
+                                            } catch {
+                                                showToast("生成链接失败", "error");
+                                            }
                                         }}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl shadow-xl"
                                         title="复制媒体链接"

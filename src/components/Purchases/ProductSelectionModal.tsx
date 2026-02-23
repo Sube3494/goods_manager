@@ -248,9 +248,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-60001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-60001 w-[calc(100%-24px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-             <div className="flex items-center justify-between border-b border-border/50 p-8 shrink-0">
+             <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-medium text-foreground">选择商品</h2>
                 <button
@@ -271,8 +271,8 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col p-8 space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+            <div className="flex-1 overflow-hidden flex flex-col p-5 sm:p-8 space-y-4">
+              <div className="flex flex-col gap-3 shrink-0">
                  <div className="relative flex-1 group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
                   <input 
@@ -287,12 +287,12 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 <div className="w-full sm:w-56 shrink-0">
                   <CustomSelect
                     options={[
-                      { value: "", label: "全部供应商" },
+                      { value: "", label: "所有供应商" },
                       ...suppliers.map(s => ({ value: s.id, label: s.name }))
                     ]}
                     value={selectedSupplierId}
                     onChange={setSelectedSupplierId}
-                    placeholder="按供应商筛选"
+                    placeholder="筛选供应商"
                     triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                   />
                 </div>
@@ -314,7 +314,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                           key={product.id}
                           onClick={() => toggleProduct(product)}
                             className={cn(
-                             "group relative flex items-center gap-5 p-4 rounded-2xl border transition-all cursor-pointer",
+                             "group relative flex items-center gap-3 sm:gap-5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer",
                              isSelected 
                                ? "bg-white dark:bg-white/5 border-primary shadow-md" 
                                : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
@@ -345,15 +345,15 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                             <div className="flex items-center gap-2">
                                <span className={`text-[15px] font-medium truncate leading-snug ${isSelected ? "text-primary" : "text-foreground"}`}>{product.name}</span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
+                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                                 <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
                                   {product.sku ? product.sku : `REF__${product.id.slice(0, 6)}`}
                                 </span>
-                                <span className="text-xs text-muted-foreground flex items-center gap-1 truncate opacity-70">
-                                    <Tag size={12} className="shrink-0" /> {getCategoryName(product.category)}
+                                <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
+                                    <Tag size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{getCategoryName(product.category)}</span>
                                 </span>
-                                <span className="text-xs text-muted-foreground flex items-center gap-1 truncate opacity-70">
-                                    <Truck size={12} className="shrink-0" /> {suppliers.find(s => s.id === product.supplierId)?.name || "未知供应商"}
+                                <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
+                                    <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name || "未知供应商"}</span>
                                 </span>
                             </div>
                              {showPrice && (
@@ -389,20 +389,20 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </div>
             </div>
 
-             <div className="flex items-center justify-between border-t border-border/50 p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5">
-              <div className="text-sm font-medium text-muted-foreground">
-                已选择 <span className="text-primary font-medium">{tempSelectedIds.length}</span> 项
+             <div className="flex items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5">
+              <div className="text-xs sm:text-sm font-medium text-muted-foreground">
+                已选 <span className="text-primary font-medium">{tempSelectedIds.length}</span> 项
               </div>
-              <div className="flex gap-4">
+              <div className="flex gap-2 sm:gap-4">
                 <button 
                   onClick={onClose} 
-                  className="rounded-xl px-6 py-2.5 text-sm font-medium text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
+                  className="rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
                 >
                   取消
                 </button>
                 <button 
                   onClick={handleConfirm}
-                  className="bg-primary text-primary-foreground px-8 py-2.5 rounded-xl text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all"
+                  className="bg-primary text-primary-foreground px-5 sm:px-8 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all"
                 >
                   确认添加
                 </button>
