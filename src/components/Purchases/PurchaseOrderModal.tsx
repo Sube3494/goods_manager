@@ -66,6 +66,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
   // Local state for fee inputs to allow typing "0." or decimals comfortably
   const [shippingFeeInput, setShippingFeeInput] = useState(initialData?.shippingFees?.toString() || "0");
   const [extraFeeInput, setExtraFeeInput] = useState(initialData?.extraFees?.toString() || "0");
+  const [discountInput, setDiscountInput] = useState(initialData?.discountAmount?.toString() || "0");
+
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -152,8 +154,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
   const calculateTotal = () => {
     const itemsTotal = formData.items.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
-    return itemsTotal + (Number(formData.shippingFees) || 0) + (Number(formData.extraFees) || 0);
+    const gross = itemsTotal + (Number(formData.shippingFees) || 0) + (Number(formData.extraFees) || 0);
+    return Math.max(0, gross - (Number(formData.discountAmount) || 0));
   };
+
 
   const addTrackingRow = () => {
       const current = formData.trackingData || [];
@@ -813,14 +817,45 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                     </div>
                                 )}
                             </div>
+                            {/* Discount field */}
+                            <div className="flex items-center gap-2 group flex-1 sm:flex-initial">
+                                <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 group-hover:text-foreground transition-colors shrink-0">
+                                    − 折扣
+                                </label>
+                                {readOnly ? (
+                                    <div className="relative flex-1 sm:flex-initial h-[34px] w-full sm:w-20 flex items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-amber-400 opacity-70">･</span>
+                                        {(formData.discountAmount || 0).toLocaleString()}
+                                    </div>
+                                ) : (
+                                    <div className="relative flex-1 sm:flex-initial">
+                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">·</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={discountInput}
+                                            placeholder="0"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setDiscountInput(val);
+                                                setFormData({...formData, discountAmount: parseFloat(val) || 0});
+                                            }}
+                                            className="w-full sm:w-20 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 pl-6 pr-2 py-1.5 text-amber-700 dark:text-amber-300 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-amber-500/20 transition-all font-mono text-xs no-spinner"
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         </>
                         )}
                     </div>
 
+
                     <div className="flex items-center justify-end gap-6 w-full sm:w-auto mt-4 sm:mt-0 text-right">
                         <div className="flex flex-col items-end gap-0.5 ml-auto">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1 sm:pl-0">合计结算</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1 sm:pl-0">实付金额</span>
+
                             <div className="flex items-baseline gap-1">
                                 <span className="text-sm font-bold text-primary">￥</span>
                                 <span className="text-3xl font-black text-foreground font-mono tracking-tighter">

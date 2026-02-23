@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
 
 interface ActionBarProps {
   selectedCount: number;
@@ -22,16 +21,9 @@ export function ActionBar({
   onEdit,
   label = "项" 
 }: ActionBarProps) {
-  const [mounted, setMounted] = useState(false);
   const isAllSelected = selectedCount === totalCount && totalCount > 0;
 
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      setMounted(true);
-    });
-  }, []);
-
-  if (!mounted) return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <AnimatePresence>

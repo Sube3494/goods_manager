@@ -15,10 +15,12 @@ export async function PUT(
       totalAmount,
       shippingFees,
       extraFees,
+      discountAmount,
       trackingData,
       paymentVouchers,
       date
     } = body;
+
 
     // 更新采购订单
     const purchase = await prisma.purchaseOrder.update({
@@ -28,6 +30,8 @@ export async function PUT(
         totalAmount: totalAmount !== undefined ? Number(totalAmount) : undefined,
         shippingFees: shippingFees !== undefined ? Number(shippingFees) : undefined,
         extraFees: extraFees !== undefined ? Number(extraFees) : undefined,
+        discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
+
         paymentVouchers: paymentVouchers !== undefined ? paymentVouchers : undefined,
         trackingData: trackingData !== undefined ? trackingData : undefined,
         date: date ? new Date(date) : undefined,

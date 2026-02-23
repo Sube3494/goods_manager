@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText } from "lucide-react";
+import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText, Download } from "lucide-react";
+import * as XLSX from "xlsx";
+
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
+import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
 import { PurchaseOrder, PurchaseStatus, TrackingInfo } from "@/lib/types";
+
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
@@ -51,7 +55,9 @@ function PurchasesContent() {
   const pathname = usePathname();
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseOrder | null>(null);
+
   const [detailReadOnly, setDetailReadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
@@ -207,6 +213,8 @@ function PurchasesContent() {
     setIsModalOpen(true);
   };
 
+
+
   const handleEdit = (po: PurchaseOrder) => {
     setEditingPurchase(po);
     setDetailReadOnly(false);
@@ -352,6 +360,54 @@ function PurchasesContent() {
     return (matchesId || matchesSupplier || matchesProduct) && matchesStatus;
   });
 
+  const handleExport = useCallback(() => {
+    if (filteredPurchases.length === 0) {
+      showToast("没有可导出的采购记录", "error");
+      return;
+    }
+
+    const dateStr = new Date().toLocaleDateString("zh-CN");
+    // Title row + blank row then headers are handled via aoa_to_sheet
+    const dataRows: (string | number)[][] = [];
+
+    let globalIndex = 1;
+    for (const po of filteredPurchases) {
+      for (const item of po.items) {
+        dataRows.push([
+          globalIndex++,
+          item.product?.name || "未知商品",
+          item.product?.sku || "",
+          item.quantity || 0,
+        ]);
+      }
+    }
+
+    // Summary row
+    const totalQty = dataRows.reduce((s, r) => s + (typeof r[3] === "number" ? r[3] : 0), 0);
+    dataRows.push(["", `合计 ${filteredPurchases.length} 张单`, "", totalQty]);
+
+    // Build sheet with title on row 1
+    const wsData = [
+      [`进货明细 — 导出日期：${dateStr}`, "", "", ""],
+      ["序号", "商品名称", "SKU 编码", "数量"],
+      ...dataRows,
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "进货明细");
+    XLSX.writeFile(wb, `进货一览_${new Date().toISOString().split("T")[0]}.xlsx`);
+    showToast(`已导出 ${dataRows.length - 1} 条商品记录`, "success");
+  }, [filteredPurchases, showToast]);
+
+
+
+
+
+
+
+
+
+
   if (!mounted) return null;
 
   return (
@@ -364,14 +420,33 @@ function PurchasesContent() {
         </div>
         
         {canCreate && (
-          <button 
-            onClick={handleCreate}
-            className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all shrink-0"
-          >
-            <Plus size={16} className="md:w-[18px] md:h-[18px]" />
-            新建采购单
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsOverviewOpen(true)}
+              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-muted px-4 text-xs md:text-sm font-bold text-foreground border border-border hover:bg-accent transition-all"
+            >
+              <ShoppingBag size={15} />
+              <span className="hidden sm:inline">总览</span>
+            </button>
+            <button
+              onClick={handleExport}
+              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-muted px-4 text-xs md:text-sm font-bold text-foreground border border-border hover:bg-accent transition-all"
+            >
+              <Download size={15} />
+              <span className="hidden sm:inline">导出</span>
+            </button>
+            <button 
+              onClick={handleCreate}
+              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+            >
+              <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+              新建采购单
+            </button>
+          </div>
         )}
+
+
+
       </div>
 
       {/* Search Box */}
@@ -907,7 +982,15 @@ function PurchasesContent() {
         initialIndex={galleryState.currentIndex}
         onClose={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Purchase Overview Modal */}
+      <PurchaseOverviewModal
+        isOpen={isOverviewOpen}
+        onClose={() => setIsOverviewOpen(false)}
+        purchases={filteredPurchases}
+      />
     </div>
+
   );
 }
 

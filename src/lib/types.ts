@@ -53,12 +53,15 @@ export interface PurchaseOrder {
   items: PurchaseOrderItem[];
   shippingFees: number;
   extraFees: number;
+  discountAmount?: number;
   workspaceId?: string;
   paymentVouchers?: string[];
   trackingData?: TrackingInfo[];
+  note?: string;
   createdAt?: string;
   updatedAt?: string;
 }
+
 
 export interface PurchaseOrderItem {
   id?: string;

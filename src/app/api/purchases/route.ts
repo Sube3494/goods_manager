@@ -109,9 +109,11 @@ export async function POST(request: Request) {
       items, 
       shippingFees, 
       extraFees,
+      discountAmount,
       trackingData,
       paymentVouchers
     } = body;
+
 
     // 权限检查
     const permission = type === "Inbound" ? "inbound:create" : "purchase:create";
@@ -130,6 +132,8 @@ export async function POST(request: Request) {
         totalAmount: Number(totalAmount) || 0,
         shippingFees: Number(shippingFees) || 0,
         extraFees: Number(extraFees) || 0,
+        discountAmount: Number(discountAmount) || 0,
+
         paymentVouchers: paymentVouchers || [],
         trackingData: trackingData || [],
         workspaceId: session.workspaceId,

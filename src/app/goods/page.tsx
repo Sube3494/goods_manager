@@ -246,9 +246,11 @@ export default function GoodsPage() {
         search: debouncedSearch,
         category: selectedCategory,
         status: selectedStatus,
+        supplierId: selectedSupplier,
         sortBy: sortBy,
         idsOnly: "true",
       });
+
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
       if (res.ok) {
@@ -263,7 +265,7 @@ export default function GoodsPage() {
       console.error("Failed to fetch all IDs:", error);
       showToast("网络请求失败", "error");
     }
-  }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, sortBy, showToast]);
+  }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
 
 
   const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string; isPublic?: boolean }) => {

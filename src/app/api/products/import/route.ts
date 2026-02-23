@@ -48,7 +48,9 @@ export async function POST(request: Request) {
             const name = String(item['商品名称'] || item.name || "");
             const image = String(item['商品图片'] || item.image || item['图片'] || "");
             const categoryName = String(item['分类'] || item.category || "");
+            const supplierName = String(item['供应商'] || item['supplier'] || "");
             const isPublicText = String(item['公开状态'] || "");
+
             const isPublic = isPublicText === "私有" ? false : true;
 
             // 2. 解析规格参数 (specs)
@@ -119,6 +121,20 @@ export async function POST(request: Request) {
                     isPublic,
                     specs: Object.keys(specs).length > 0 ? specs : undefined
                 };
+
+                // Handle supplier update
+                if (supplierName) {
+                    let supplier = await prisma.supplier.findFirst({
+                        where: { name: supplierName, workspaceId }
+                    });
+                    if (!supplier) {
+                        supplier = await prisma.supplier.create({
+                            data: { name: supplierName, workspaceId, contact: "", phone: "", email: "", address: "" }
+                        });
+                    }
+                    updateData.supplierId = supplier.id;
+                }
+
 
                 if (quantity > 0) {
                     updateData.stock = { increment: quantity };
@@ -219,11 +235,26 @@ export async function POST(request: Request) {
                     }
                 }
 
+                // Handle Supplier
+                let finalSupplierId: string | undefined = undefined;
+                if (supplierName) {
+                    let supplier = await prisma.supplier.findFirst({
+                        where: { name: supplierName, workspaceId }
+                    });
+                    if (!supplier) {
+                        supplier = await prisma.supplier.create({
+                            data: { name: supplierName, workspaceId, contact: "", phone: "", email: "", address: "" }
+                        });
+                    }
+                    finalSupplierId = supplier.id;
+                }
+
                 const newProduct = await prisma.product.create({
                     data: {
                         sku,
                         name,
                         categoryId: finalCategoryId as string,
+                        supplierId: finalSupplierId,
                         costPrice: costPrice > 0 ? costPrice : 0,
                         stock: quantity > 0 ? quantity : 0,
                         image: finalMainImage,
@@ -233,6 +264,7 @@ export async function POST(request: Request) {
                         specs: Object.keys(specs).length > 0 ? specs : undefined
                     }
                 });
+
 
                 // 处理图库 (Gallery)
                 const allGalleryToCreate = [...galleryUrls];
