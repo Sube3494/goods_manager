@@ -134,7 +134,7 @@ export async function GET() {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="Full_Data_Backup_${new Date().toISOString().split('T')[0]}.xlsx"`,
+        'Content-Disposition': `attachment; filename="Full_Data_Backup_${formatDate(new Date())}.xlsx"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     });

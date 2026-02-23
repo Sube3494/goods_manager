@@ -13,13 +13,14 @@ import { ActionBar } from "@/components/ui/ActionBar";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
-import * as XLSX from "xlsx";
+
 
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
 import { cn } from "@/lib/utils";
+import { formatLocalDate } from "@/lib/dateUtils";
 
 export default function GoodsPage() {
   const { user } = useUser();
@@ -430,10 +431,30 @@ export default function GoodsPage() {
         return baseData;
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "商品列表");
-      XLSX.writeFile(workbook, `商品库导出_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const ExcelJS = (await import("exceljs")).default;
+      const { saveAs } = await import("file-saver");
+      
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("商品列表");
+
+      if (exportData.length > 0) {
+        const headers = Object.keys(exportData[0]);
+        const headerRow = worksheet.addRow(headers);
+        headerRow.font = { bold: true };
+        
+        exportData.forEach(data => {
+          worksheet.addRow(headers.map(h => data[h]));
+        });
+
+        worksheet.eachRow((row) => {
+          row.eachCell((cell) => {
+            cell.font = { ...cell.font, name: '微软雅黑' };
+          });
+        });
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `商品库导出_${formatLocalDate(new Date())}.xlsx`);
       showToast(`已导出 ${allGoods.length} 条商品数据`, "success");
     } catch (error) {
       console.error("Export failed:", error);

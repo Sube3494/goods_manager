@@ -18,7 +18,7 @@ import { SessionUser } from "@/lib/permissions";
 
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { formatLocalDateTime } from "@/lib/dateUtils";
+import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { pinyinMatch } from "@/lib/pinyin";
 
 const COURIER_CODES: Record<string, string> = {
@@ -541,23 +541,24 @@ function PurchasesContent() {
       
       // Add borders everywhere
       worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber > 2) {
-          row.eachCell((cell) => {
+        row.eachCell((cell) => {
+          cell.font = { ...cell.font, name: '微软雅黑' };
+          if (rowNumber > 2) {
             cell.border = {
               top: {style:'thin'},
               left: {style:'thin'},
               bottom: {style:'thin'},
               right: {style:'thin'}
             };
-          });
-        }
+          }
+        });
       });
       
       // Generate and save file
       const buffer = await workbook.xlsx.writeBuffer();
       const filename = specificPO 
-          ? `采购单_${specificPO.id}_${new Date().toISOString().split("T")[0]}.xlsx`
-          : `进货汇总_${new Date().toISOString().split("T")[0]}.xlsx`;
+          ? `采购单_${specificPO.id}_${formatLocalDate(new Date())}.xlsx`
+          : `进货汇总_${formatLocalDate(new Date())}.xlsx`;
           
       saveAs(new Blob([buffer]), filename);
       showToast(specificPO ? `已导出单据` : `已导出 ${targets.length} 张单据`, "success");

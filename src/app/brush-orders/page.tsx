@@ -7,8 +7,8 @@ import { BrushOrderModal } from "@/components/BrushOrders/BrushOrderModal";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { BrushOrder } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatLocalDateTime } from "@/lib/dateUtils";
-import * as XLSX from "xlsx";
+import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
+
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -238,13 +238,33 @@ export default function BrushOrdersPage() {
     });
 
     // Wrap in setTimeout to allow click state/animations to settle and avoid UI blocking "shudder"
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "刷单记录");
-        const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
-        XLSX.writeFile(wb, `刷单记录_${timestamp}.xlsx`);
+        const ExcelJS = (await import("exceljs")).default;
+        const { saveAs } = await import("file-saver");
+        
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("刷单记录");
+
+        if (dataToExport.length > 0) {
+          const headers = Object.keys(dataToExport[0]);
+          const headerRow = worksheet.addRow(headers);
+          headerRow.font = { bold: true };
+          
+          dataToExport.forEach(data => {
+            worksheet.addRow(headers.map(h => data[h as keyof typeof data]));
+          });
+
+          worksheet.eachRow((row) => {
+            row.eachCell((cell) => {
+              cell.font = { ...cell.font, name: '微软雅黑' };
+            });
+          });
+        }
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const timestamp = formatLocalDate(new Date());
+        saveAs(new Blob([buffer]), `刷单记录_${timestamp}.xlsx`);
         showToast("导出成功");
       } catch (error) {
         console.error("Export failed:", error);
