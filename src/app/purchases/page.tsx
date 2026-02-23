@@ -5,7 +5,7 @@ import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
-import { PurchaseOrder, PurchaseStatus, TrackingInfo } from "@/lib/types";
+import { PurchaseOrder, PurchaseStatus, TrackingInfo, User as UserType } from "@/lib/types";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -19,7 +19,7 @@ import { SessionUser } from "@/lib/permissions";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
-import { pinyinMatch } from "@/lib/pinyin";
+import { pinyinMatch, sortPurchaseItems } from "@/lib/pinyin";
 
 const COURIER_CODES: Record<string, string> = {
   "顺丰速运": "shunfeng",
@@ -46,6 +46,7 @@ function PurchasesContent() {
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
   const { user } = useUser();
+  const typedUser = user as unknown as UserType;
   const canCreate = hasPermission(user as SessionUser | null, "purchase:create");
   const canInbound = hasPermission(user as SessionUser | null, "inbound:create");
   const canEdit = canCreate; // For now assuming create permission allows editing drafts
@@ -393,6 +394,25 @@ function PurchasesContent() {
       worksheet.getCell('A1').font = { size: 14, bold: true };
       worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' }; // 居中及垂直居中
       
+      // 添加收货地址
+      let displayAddress = "";
+      if (specificPO) {
+        displayAddress = specificPO.shippingAddress || "";
+      } else if (targets.length > 0) {
+        const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address;
+        displayAddress = targets[0].shippingAddress || defaultAddr || "";
+      }
+
+      if (displayAddress) {
+        worksheet.addRow([`收货地址：${displayAddress}`]);
+        const addrRowIdx = worksheet.rowCount;
+        worksheet.mergeCells(`A${addrRowIdx}:M${addrRowIdx}`); // 扩展到 M 列，确保一行能放下
+        const addressCell = worksheet.getCell(`A${addrRowIdx}`);
+        addressCell.font = { size: 14, bold: true, color: { argb: 'FFFF0000' } }; 
+        addressCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false }; // 关闭换行
+        worksheet.getRow(addrRowIdx).height = 25; // 稍微调小行高，让间距更自然
+      }
+      
       // 添加空行
       worksheet.addRow([]);
       
@@ -411,12 +431,17 @@ function PurchasesContent() {
       worksheet.getColumn(7).width = 15;
       
       let globalIndex = 1;
-      let currentRowIndex = 4; // Start at row 4 because of title(1), empty(2), header(3)
+      let currentRowIndex = worksheet.rowCount + 1; // 动态计算下一个数据行的起始索引
       let totalQty = 0;
       let totalAmount = 0;
       
       for (const po of targets) {
-        for (const item of po.items) {
+        const sortedItems = sortPurchaseItems(
+            po.items,
+            item => item.product?.sku,
+            item => item.product?.name
+        );
+        for (const item of sortedItems) {
           const qty = item.quantity || 0;
           // 兼容性读取单价：尝试多个可能的属性名
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -567,7 +592,7 @@ function PurchasesContent() {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
     }
-  }, [filteredPurchases, showToast]);
+  }, [filteredPurchases, showToast, typedUser?.shippingAddresses]);
 
 
 

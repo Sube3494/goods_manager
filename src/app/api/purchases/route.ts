@@ -129,7 +129,8 @@ export async function POST(request: Request) {
       extraFees,
       discountAmount,
       trackingData,
-      paymentVouchers
+      paymentVouchers,
+      shippingAddress
     } = body;
 
 
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
 
           paymentVouchers: paymentVouchers || [],
           trackingData: trackingData || [],
+          shippingAddress: shippingAddress || "",
           workspaceId: session.workspaceId,
           items: {
             create: items.map((item: PurchaseOrderItem) => ({

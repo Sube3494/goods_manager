@@ -3,12 +3,16 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle } from "lucide-react";
-import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle, MapPin } from "lucide-react";
+import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus, User as UserType } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
 import { useToast } from "@/components/ui/Toast";
+import { sortPurchaseItems } from "@/lib/pinyin";
+import { useUser } from "@/hooks/useUser";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+import { useRouter } from "next/navigation";
 
 const COURIER_CODES: Record<string, string> = {
   "顺丰速运": "shunfeng",
@@ -41,6 +45,9 @@ interface PurchaseOrderModalProps {
 
 export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false }: PurchaseOrderModalProps) {
   const { showToast } = useToast();
+  const { user } = useUser();
+  const router = useRouter();
+  const typedUser = user as unknown as UserType;
   
   const [formData, setFormData] = useState<PurchaseOrder>(() => ({
     id: initialData?.id || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
@@ -52,8 +59,13 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     shippingFees: initialData?.shippingFees || 0,
     extraFees: initialData?.extraFees || 0,
     totalAmount: initialData?.totalAmount || 0,
-    trackingData: initialData?.trackingData
+    trackingData: initialData?.trackingData,
+    shippingAddress: initialData?.shippingAddress || ""
   }));
+
+  const addressList = useMemo(() => {
+    return typedUser?.shippingAddresses || [];
+  }, [typedUser]);
 
 
   const effectiveReadOnly = readOnly || (initialData?.status !== "Draft" && !!initialData);
@@ -126,11 +138,19 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     // keeping initialization out of the render path (fixing the Math.random error)
     const timeoutId = setTimeout(() => {
         if (initialData) {
-            setFormData(initialData);
+            const sortedItems = sortPurchaseItems(
+                initialData.items,
+                (item) => item.product?.sku,
+                (item) => item.product?.name
+            );
+            setFormData({ ...initialData, items: sortedItems });
             setShippingFeeInput(initialData.shippingFees?.toString() || "0");
             setExtraFeeInput(initialData.extraFees?.toString() || "0");
         } else {
             const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
+            
+            const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address || "";
+
             setFormData(prev => ({
                 id: newId,
                 status: "Draft",
@@ -141,7 +161,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                 extraFees: 0,
                 totalAmount: 0,
                 trackingData: undefined,
-                paymentVouchers: []
+                paymentVouchers: [],
+                shippingAddress: defaultAddr
             }));
             setShippingFeeInput("0");
             setExtraFeeInput("0");
@@ -149,7 +170,21 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, user, typedUser?.shippingAddresses]);
+
+  // Auto-select default address if empty and list is available
+  useEffect(() => {
+    if (formData.type === "Purchase" && !formData.shippingAddress && addressList.length > 0) {
+      const defaultAddr = addressList.find(a => a.isDefault)?.address || addressList[0].address;
+      if (defaultAddr && defaultAddr !== formData.shippingAddress) {
+        // Using a microtask or next tick to avoid cascading render warning in some React versions/environments
+        const handle = requestAnimationFrame(() => {
+          setFormData(prev => prev.shippingAddress ? prev : { ...prev, shippingAddress: defaultAddr });
+        });
+        return () => cancelAnimationFrame(handle);
+      }
+    }
+  }, [formData.type, formData.shippingAddress, addressList]);
 
 
   const calculateTotal = () => {
@@ -187,7 +222,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
   const handleBatchAdd = (selectedProducts: Product[]) => {
     setFormData(prev => {
-      const newItems = [...prev.items];
+      let newItems = [...prev.items];
       
       selectedProducts.forEach(product => {
         // Check against the growing newItems list to prevent duplicates within the same batch
@@ -202,6 +237,12 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
           });
         }
       });
+
+      newItems = sortPurchaseItems(
+        newItems,
+        (item) => item.product?.sku,
+        (item) => item.product?.name
+      );
 
       return { ...prev, items: newItems };
     });
@@ -243,6 +284,14 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
   const handleAction = (status: PurchaseStatus) => {
     if (formData.items.length === 0) return;
+
+    if (formData.type === "Purchase" && status !== "Draft") {
+      if (!formData.shippingAddress) {
+        showToast("请先选择或配置收货地址，才可提交采购单", "error");
+        return;
+      }
+    }
+
     onSubmit({
       ...formData,
       totalAmount: calculateTotal(),
@@ -339,6 +388,34 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                 />
                             </div>
                         </div>
+
+                        {formData.type === "Purchase" && (
+                            <div className="flex flex-col gap-2 md:col-span-2">
+                                <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                    <MapPin size={14} /> 收货地址 <span className="text-red-500">*</span>
+                                </label>
+                                {readOnly ? (
+                                    <div className="w-full min-h-10 sm:min-h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 text-xs sm:text-sm text-foreground opacity-80 flex items-center">
+                                        {formData.shippingAddress || "未设置收货地址"}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <CustomSelect 
+                                            value={formData.shippingAddress || ""}
+                                            onChange={(val) => setFormData({...formData, shippingAddress: val})}
+                                            options={addressList.map(addr => ({
+                                                value: addr.address,
+                                                label: addr.label ? `[${addr.label}] ${addr.address}` : addr.address
+                                            }))}
+                                            placeholder="选择收货地址..."
+                                            className="flex-1 h-10 sm:h-[42px]"
+                                            onAddNew={() => router.push("/profile")}
+                                            addNewLabel="管理地址"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
 

@@ -14,6 +14,23 @@ export interface Supplier {
   updatedAt?: string;
 }
 
+export interface AddressItem {
+  id: string;
+  label: string;
+  address: string;
+  isDefault: boolean;
+}
+
+export interface User {
+  id: string;
+  name?: string | null;
+  email: string;
+  shippingAddresses?: AddressItem[];
+  shippingAddress?: string | null;
+  role: string;
+  status: string;
+}
+
 export interface Product {
   id: string;
   sku?: string;
@@ -59,6 +76,7 @@ export interface PurchaseOrder {
   workspaceId?: string;
   paymentVouchers?: string[];
   trackingData?: TrackingInfo[];
+  shippingAddress?: string;
   note?: string;
   createdAt?: string;
   updatedAt?: string;

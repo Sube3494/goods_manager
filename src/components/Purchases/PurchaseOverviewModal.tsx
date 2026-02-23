@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Package, Eye, EyeOff, Hash, Maximize, Minimize } from "lucide-react";
 
 import { PurchaseOrder } from "@/lib/types";
+import { sortPurchaseItems } from "@/lib/pinyin";
 
 interface PurchaseOverviewModalProps {
   isOpen: boolean;
@@ -68,7 +69,9 @@ export function PurchaseOverviewModal({ isOpen, onClose, purchases }: PurchaseOv
       }
     }
 
-    const products = Array.from(productMap.values()).sort((a, b) => b.totalQty - a.totalQty);
+    let products = Array.from(productMap.values());
+    products = sortPurchaseItems(products, p => p.sku, p => p.name);
+    
     const totalQty = products.reduce((s, p) => s + p.totalQty, 0);
 
     return { orderCount, products, totalQty };

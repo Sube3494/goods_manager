@@ -107,6 +107,7 @@ model PurchaseOrder {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   note            String?
+  shippingAddress String?
   workspace       Workspace?          @relation(fields: [workspaceId], references: [id])
   items           PurchaseOrderItem[]
 
@@ -195,6 +196,7 @@ model User {
   id             String     @id @default(cuid())
   email          String     @unique
   name           String?
+  shippingAddresses Json?   @default("[]")
   role           Role       @default(USER)
   status         String     @default("ACTIVE")
   permissions    Json?      @default("{}")

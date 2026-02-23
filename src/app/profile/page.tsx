@@ -1,25 +1,40 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Save, Loader2, ArrowLeft, ExternalLink } from "lucide-react";
+import { User, Mail, Save, Loader2, ArrowLeft, ExternalLink, MapPin, Plus, Trash2, Star } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/components/ui/Toast";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import md5 from "blueimp-md5";
+import { User as UserType, AddressItem } from "@/lib/types";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
+  const typedUser = user as unknown as UserType;
   const { showToast } = useToast();
   const [name, setName] = useState("");
+  const [addressList, setAddressList] = useState<AddressItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (user?.name) {
-      setName(user.name);
+    if (typedUser?.name) {
+      setName(typedUser.name);
     }
-  }, [user]);
+    const addresses = typedUser?.shippingAddresses;
+    if (Array.isArray(addresses)) {
+      setAddressList(addresses);
+    } else if (typeof typedUser?.shippingAddress === 'string' && typedUser.shippingAddress) {
+      // Migrate old string data to new list format locally if needed
+      setAddressList([{
+        id: 'legacy',
+        label: '默认地址',
+        address: typedUser.shippingAddress,
+        isDefault: true
+      }]);
+    }
+  }, [typedUser?.name, typedUser?.shippingAddress, typedUser?.shippingAddresses]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -27,12 +42,14 @@ export default function ProfilePage() {
       const res = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ 
+          name, 
+          shippingAddresses: addressList 
+        }),
       });
 
       if (res.ok) {
         showToast("个人信息已更新", "success");
-        // Reload to sync state across app
         window.location.reload();
       } else {
         showToast("更新失败", "error");
@@ -161,10 +178,82 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+              {/* Shipping Addresses Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <label className="text-xs font-black text-muted-foreground/70 uppercase tracking-widest flex items-center gap-2">
+                    <MapPin size={14} className="text-primary" /> 收货地址库
+                  </label>
+                  <button 
+                    onClick={() => setAddressList([...addressList, { id: Math.random().toString(36).substr(2, 9), label: "", address: "", isDefault: addressList.length === 0 }])}
+                    className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+                  >
+                    <Plus size={12} /> 添加地址
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {addressList.map((item, index) => (
+                    <div key={item.id} className="p-5 rounded-2xl border border-border bg-white dark:bg-white/10 space-y-3 relative group/addr">
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="text"
+                          placeholder="地址标签 (如: 总仓)"
+                          value={item.label}
+                          onChange={(e) => {
+                            const newList = [...addressList];
+                            newList[index].label = e.target.value;
+                            setAddressList(newList);
+                          }}
+                          className="flex-1 bg-transparent border-b border-border/50 text-sm font-bold outline-none focus:border-primary px-1"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => {
+                              const newList = addressList.map((a, i) => ({ ...a, isDefault: i === index }));
+                              setAddressList(newList);
+                            }}
+                            className={`p-1.5 rounded-lg transition-all ${item.isDefault ? 'text-amber-500 bg-amber-500/10' : 'text-muted-foreground/30 hover:text-amber-500/50 hover:bg-amber-500/5'}`}
+                            title={item.isDefault ? "默认地址" : "设为默认"}
+                          >
+                            <Star size={14} fill={item.isDefault ? "currentColor" : "none"} />
+                          </button>
+                          <button 
+                            onClick={() => setAddressList(addressList.filter((_, i) => i !== index))}
+                            className="p-1.5 rounded-lg text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-all"
+                            title="删除"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      <textarea 
+                        placeholder="详细地址..."
+                        value={item.address}
+                        onChange={(e) => {
+                          const newList = [...addressList];
+                          newList[index].address = e.target.value;
+                          setAddressList(newList);
+                        }}
+                        rows={2}
+                        className="w-full py-2 px-3 rounded-xl bg-muted/20 border border-transparent focus:bg-white dark:focus:bg-white/5 focus:border-primary/30 transition-all outline-none text-sm resize-none"
+                      />
+                    </div>
+                  ))}
+
+                  {addressList.length === 0 && (
+                    <div className="py-8 rounded-2xl border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-2 opacity-50">
+                      <MapPin size={24} className="text-muted-foreground" />
+                      <p className="text-[10px] font-bold">暂无收货地址，点击右上方添加</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="pt-6">
                 <button 
                   onClick={handleSave}
-                  disabled={isSaving || name === user?.name}
+                  disabled={isSaving || (name === typedUser?.name && JSON.stringify(addressList) === JSON.stringify(typedUser?.shippingAddresses || []))}
                   className="w-full h-12 bg-foreground text-background dark:bg-white dark:text-black rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100 shadow-xl shadow-foreground/10 dark:shadow-white/5"
                 >
                   {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
