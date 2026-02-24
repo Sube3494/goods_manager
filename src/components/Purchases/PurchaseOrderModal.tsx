@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle, MapPin } from "lucide-react";
-import { PurchaseOrder, Product, Supplier, PurchaseOrderItem, PurchaseStatus, User as UserType } from "@/lib/types";
+import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
@@ -85,6 +85,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isUploadingVoucher, setIsUploadingVoucher] = useState(false);
   const [galleryState, setGalleryState] = useState<{
     isOpen: boolean;
     images: string[];
@@ -298,6 +299,68 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
       status
     });
   };
+
+  const handleFileUpload = useCallback(async (files: FileList | File[], type: 'payment' | 'waybill', rowIndex?: number) => {
+    if (!files || files.length === 0) return;
+
+    if (type === 'payment') setIsUploadingVoucher(true);
+
+    const uploadPromises = Array.from(files).map(async (file) => {
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: uploadData,
+          headers: {
+            "x-folder": type === 'payment' ? "vouchers" : "labels",
+            "x-use-timestamp": "true"
+          }
+        });
+        if (res.ok) {
+          const { url } = await res.json();
+          return url as string;
+        }
+        console.error(`${type} upload failed with status: ${res.status}`);
+      } catch (error) {
+        console.error(`${type} upload failed:`, error);
+      }
+      return null;
+    });
+
+    try {
+      const results = await Promise.all(uploadPromises);
+      const urls = results.filter((url): url is string => !!url);
+      
+      if (urls.length > 0) {
+        if (type === 'payment') {
+          setFormData(prev => ({
+            ...prev,
+            paymentVouchers: [...(prev.paymentVouchers || []), ...urls]
+          }));
+          showToast(`成功上传 ${urls.length} 张支付凭证`, "success");
+        } else if (type === 'waybill' && typeof rowIndex === 'number') {
+          setFormData(prev => {
+            const current = [...(prev.trackingData || [])];
+            if (current[rowIndex]) {
+              const images = current[rowIndex].waybillImages || (current[rowIndex].waybillImage ? [current[rowIndex].waybillImage] : []);
+            const newImages = [...images, ...urls].filter((url): url is string => url !== undefined);
+            current[rowIndex] = { ...current[rowIndex], waybillImages: newImages };
+            }
+            return { ...prev, trackingData: current };
+          });
+          showToast(`成功上传 ${urls.length} 张物流面单`, "success");
+        }
+      } else {
+        showToast("上传文件失败，请重试", "error");
+      }
+    } catch (error) {
+      console.error("File upload failed:", error);
+      showToast("上传过程中发生错误", "error");
+    } finally {
+      if (type === 'payment') setIsUploadingVoucher(false);
+    }
+  }, [showToast]);
 
   const isShippedAndReady = useMemo(() => {
     return formData.status === "Shipped" && 
@@ -618,9 +681,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                 支付凭证
                             </label>
                         </div>
-                        {formData.paymentVouchers && formData.paymentVouchers.length > 0 ? (
+                        {((formData.paymentVouchers && formData.paymentVouchers.length > 0) || !readOnly) ? (
                             <div className="bg-muted/10 dark:bg-white/5 p-3 rounded-2xl border border-border/40 flex flex-wrap gap-3">
-                                {formData.paymentVouchers.map((url, idx) => (
+                                {formData.paymentVouchers?.map((url, idx) => (
                                     <div key={url || idx} className="relative group w-28 sm:w-48 aspect-square sm:aspect-3/2 rounded-xl overflow-hidden border border-border/60 shadow-sm transition-all hover:ring-2 hover:ring-primary/20">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img 
@@ -633,8 +696,57 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                 currentIndex: idx
                                             })}
                                         />
+                                        {!readOnly && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const newVouchers = (formData.paymentVouchers || []).filter((_, i) => i !== idx);
+                                                    setFormData({ ...formData, paymentVouchers: newVouchers });
+                                                }}
+                                                className="absolute top-2 right-2 p-1.5 rounded-lg bg-destructive text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
+                                {!readOnly && (
+                                    <label 
+                                        className="w-28 sm:w-48 aspect-square sm:aspect-3/2 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-95"
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.classList.add('border-primary', 'bg-primary/10');
+                                        }}
+                                        onDragLeave={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                            const files = e.dataTransfer.files;
+                                            if (files && files.length > 0) {
+                                                handleFileUpload(files, 'payment');
+                                            }
+                                        }}
+                                    >
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            className="hidden"
+                                            onChange={(e) => handleFileUpload(e.target.files!, 'payment')}
+                                            disabled={isUploadingVoucher}
+                                        />
+                                        <Camera size={24} className={`${isUploadingVoucher ? 'animate-spin' : 'text-muted-foreground group-hover/up:text-primary'} transition-colors`} />
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[10px] font-bold text-muted-foreground group-hover/up:text-primary">
+                                                {isUploadingVoucher ? "上传中..." : "上传凭证"}
+                                            </span>
+                                            <span className="text-[10px] scale-90 text-muted-foreground/40">支持拖拽</span>
+                                        </div>
+                                    </label>
+                                )}
                             </div>
                         ) : (
                             <div className="py-8 rounded-2xl border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-2 opacity-40">
@@ -730,7 +842,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                 {/* Right: Waybill Thumbnails */}
                                                 <div className="flex flex-wrap gap-1.5 sm:gap-2 min-w-0 sm:min-w-[120px] justify-start sm:justify-end items-start pt-1">
                                                     {(tracking.waybillImages || (tracking.waybillImage ? [tracking.waybillImage] : [])).map((img, imgIdx) => (
-                                                        <div key={imgIdx} className="relative h-12 w-16 sm:h-14 sm:w-20 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm hover:ring-2 hover:ring-primary/40 transition-all">
+                                                        <div key={imgIdx} className="relative h-12 w-16 sm:h-14 sm:w-20 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm transition-all hover:ring-2 hover:ring-primary/40 group/waybill">
                                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                                             <img 
                                                                 src={img} 
@@ -746,9 +858,54 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                                     setGalleryState({ isOpen: true, images: flatImages, currentIndex: targetIndex });
                                                                 }}
                                                             />
+                                                            {!readOnly && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const current = [...(formData.trackingData || [])];
+                                                                        const images = current[index].waybillImages || (current[index].waybillImage ? [current[index].waybillImage] : []);
+                                          const newImages = images.filter((url): url is string => url !== undefined).filter((_, i) => i !== imgIdx);
+                                          current[index] = { ...current[index], waybillImages: newImages };
+                                                                        setFormData({ ...formData, trackingData: current });
+                                                                    }}
+                                                                    className="absolute top-1 right-1 p-0.5 rounded bg-black/40 text-white opacity-0 group-hover/waybill:opacity-100 transition-opacity"
+                                                                >
+                                                                    <X size={10} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     ))}
-                                                    {(!tracking.waybillImages && !tracking.waybillImage) && (
+                                                    {!readOnly && (
+                                                        <label 
+                                                            className="h-12 w-16 sm:h-14 sm:w-20 rounded-lg border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex items-center justify-center bg-muted/10 active:scale-95"
+                                                            onDragOver={(e) => {
+                                                                e.preventDefault();
+                                                                e.currentTarget.classList.add('border-primary', 'bg-primary/10');
+                                                            }}
+                                                            onDragLeave={(e) => {
+                                                                e.preventDefault();
+                                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                                            }}
+                                                            onDrop={(e) => {
+                                                                e.preventDefault();
+                                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                                                const files = e.dataTransfer.files;
+                                                                if (files && files.length > 0) {
+                                                                    handleFileUpload(files, 'waybill', index);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                multiple
+                                                                className="hidden"
+                                                                onChange={(e) => handleFileUpload(e.target.files!, 'waybill', index)}
+                                                            />
+                                                            <Camera size={18} className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                                                        </label>
+                                                    )}
+                                                    {(!tracking.waybillImages && !tracking.waybillImage) && readOnly && (
                                                         <div className="h-14 w-20 rounded-lg border border-dashed border-border/60 flex items-center justify-center bg-muted/10">
                                                             <Camera size={14} className="text-muted-foreground/30" />
                                                         </div>

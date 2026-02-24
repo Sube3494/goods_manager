@@ -48,6 +48,22 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isCollapsed, showSidebar]);
 
+  // Disable number input scrolling globally
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'number') {
+        // Prevent default wheel behavior
+        e.preventDefault();
+        // Optionally blur the element to stop the scrolling completely if preventDefault is not enough
+        // but preventDefault on wheel usually stops the value change.
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+
   const toggleCollapse = () => {
     const newValue = !isCollapsed;
     setIsCollapsed(newValue);

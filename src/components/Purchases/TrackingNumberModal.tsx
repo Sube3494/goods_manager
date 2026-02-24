@@ -225,11 +225,10 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
     onClose();
   };
 
-  const handleVoucherUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const handleFileUpload = React.useCallback(async (files: FileList | File[], type: 'payment' | 'waybill', rowIndex?: number) => {
     if (!files || files.length === 0) return;
 
-    setIsUploadingVoucher(true);
+    if (type === 'payment') setIsUploadingVoucher(true);
     
     const uploadPromises = Array.from(files).map(async (file) => {
       const uploadData = new FormData();
@@ -239,29 +238,49 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
           method: "POST",
           body: uploadData,
           headers: {
-            "x-folder": "vouchers",
+            "x-folder": type === 'payment' ? "vouchers" : "labels",
             "x-use-timestamp": "true"
           }
         });
         if (res.ok) {
           const { url } = await res.json();
-          return url;
+          return url as string;
         }
+        console.error(`${type} upload failed with status: ${res.status}`);
       } catch (error) {
-        console.error("Voucher upload failed:", error);
+        console.error(`${type} upload failed:`, error);
       }
       return null;
     });
 
     try {
-      const urls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
+      const results = await Promise.all(uploadPromises);
+      const urls = results.filter((url): url is string => !!url);
+      
       if (urls.length > 0) {
-        setPaymentVouchers(prev => [...prev, ...urls]);
+        if (type === 'payment') {
+          setPaymentVouchers(prev => [...prev, ...urls]);
+          showToast(`成功上传 ${urls.length} 张支付凭证`, "success");
+        } else if (type === 'waybill' && typeof rowIndex === 'number') {
+          setRows(prev => {
+            const newRows = [...prev];
+            const currentRow = newRows[rowIndex];
+            const currentImages = currentRow.waybillImages || (currentRow.waybillImage ? [currentRow.waybillImage] : []);
+            newRows[rowIndex] = { ...currentRow, waybillImages: [...currentImages, ...urls] };
+            return newRows;
+          });
+          showToast(`成功上传 ${urls.length} 张物流面单`, "success");
+        }
+      } else {
+        showToast("上传文件失败，请重试", "error");
       }
+    } catch (error) {
+      console.error("Critical upload error:", error);
+      showToast("上传过程中发生意外错误", "error");
     } finally {
-      setIsUploadingVoucher(false);
+      if (type === 'payment') setIsUploadingVoucher(false);
     }
-  };
+  }, [showToast, setRows, setPaymentVouchers]);
 
   const handlePasteUpload = React.useCallback(async (e: React.ClipboardEvent | ClipboardEvent, type: 'payment' | 'waybill', rowIndex?: number) => {
       const items = e.clipboardData?.items;
@@ -271,50 +290,10 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
       if (imageItems.length === 0) return;
 
       e.preventDefault();
-      setIsUploadingVoucher(true); // Reusing this loading state for simplicity, or could add isUploadingWaybill
-
-      // Only process the first image found to avoid duplicates (e.g. multiple formats of same image)
-      const item = imageItems[0];
-      const file = item.getAsFile();
-      if (!file) return;
-
-      const formData = new FormData();
-      formData.append("file", file);
       
-      try {
-          const res = await fetch("/api/upload", { 
-            method: "POST", 
-            body: formData,
-            headers: {
-                "x-folder": type === 'payment' ? 'vouchers' : 'labels',
-                "x-use-timestamp": "true"
-            }
-          });
-          if (res.ok) {
-              const { url } = await res.json();
-              if (url) {
-                  if (type === 'payment') {
-                      setPaymentVouchers(prev => [...prev, url]);
-                      showToast("支付凭证上传成功", "success");
-                  } else if (type === 'waybill' && typeof rowIndex === 'number') {
-                       setRows(prev => {
-                           const newRows = [...prev];
-                           const currentRow = newRows[rowIndex];
-                           const currentImages = currentRow.waybillImages || (currentRow.waybillImage ? [currentRow.waybillImage] : []);
-                           newRows[rowIndex] = { ...currentRow, waybillImages: [...currentImages, url] };
-                           return newRows;
-                       });
-                       showToast("面单上传成功", "success");
-                  }
-              }
-          }
-      } catch (error) {
-          console.error("Paste upload failed:", error);
-      }
-      return;
-
-
-  }, [showToast, setRows]);
+      const files = imageItems.map(item => item.getAsFile()).filter(file => file !== null) as File[];
+      handleFileUpload(files, type, rowIndex);
+  }, [handleFileUpload]);
 
   // Global paste listener for Payment Mode
 
@@ -523,44 +502,31 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
 
                           {/* Upload Button */}
                           {!readOnly && (
-                            <label className="h-20 w-28 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 group/up">
+                            <label 
+                              className="h-20 w-28 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 group/up active:scale-95"
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.add('border-primary', 'bg-primary/10');
+                              }}
+                              onDragLeave={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                const files = e.dataTransfer.files;
+                                if (files && files.length > 0) {
+                                  handleFileUpload(files, 'waybill', index);
+                                }
+                              }}
+                            >
                               <input
                                 type="file"
                                 accept="image/*"
                                 multiple
                                 className="hidden"
-                                onChange={async (e) => {
-                                  const files = e.target.files;
-                                  if (!files || files.length === 0) return;
-                                  
-                                  const uploadPromises = Array.from(files).map(async (file) => {
-                                      const formData = new FormData();
-                                      formData.append("file", file);
-                                      try {
-                                          const res = await fetch("/api/upload", { 
-                                            method: "POST", 
-                                            body: formData,
-                                            headers: {
-                                                "x-folder": "labels",
-                                                "x-use-timestamp": "true"
-                                            }
-                                          });
-                                          if (res.ok) {
-                                              const { url } = await res.json();
-                                              return url;
-                                          }
-                                      } catch (error) {
-                                          console.error("Upload failed:", error);
-                                      }
-                                      return null;
-                                  });
-
-                                  const uploadedUrls = (await Promise.all(uploadPromises)).filter(url => url !== null);
-                                  if (uploadedUrls.length > 0) {
-                                      const newImages = [...images, ...uploadedUrls];
-                                      updateRow(index, "waybillImages", newImages);
-                                  }
-                                }}
+                                onChange={(e) => handleFileUpload(e.target.files!, 'waybill', index)}
                               />
                               <Camera size={20} className="text-muted-foreground group-hover/up:text-primary transition-colors" />
                               <div className="flex flex-col items-center">
@@ -628,13 +594,31 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                         ))}
                         
                         {!readOnly && (
-                            <label className={`rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up ${mode === 'payment' ? 'h-32 sm:h-40 w-full sm:w-56' : 'h-20 sm:h-32 w-28 sm:w-48'}`}>
+                            <label 
+                                className={`rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-[0.98] ${mode === 'payment' ? 'h-32 sm:h-40 w-full sm:w-56' : 'h-20 sm:h-32 w-28 sm:w-48'}`}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.currentTarget.classList.add('border-primary', 'bg-primary/10');
+                                }}
+                                onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                    const files = e.dataTransfer.files;
+                                    if (files && files.length > 0) {
+                                        handleFileUpload(files, 'payment');
+                                    }
+                                }}
+                            >
                                 <input
                                     type="file"
                                     accept="image/*"
                                     multiple
                                     className="hidden"
-                                    onChange={handleVoucherUpload}
+                                    onChange={(e) => handleFileUpload(e.target.files!, 'payment')}
                                     disabled={isUploadingVoucher}
                                 />
                                 <div className="p-2 sm:p-3 rounded-full bg-muted group-hover/up:bg-primary/10 transition-colors">

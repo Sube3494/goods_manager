@@ -82,7 +82,7 @@ export function ConfirmModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className={cn("fixed inset-0 z-20000 flex items-center justify-center p-4", className)}>
+        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-4", className)}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

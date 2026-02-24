@@ -1431,7 +1431,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-12000 flex items-center justify-center p-4 overflow-hidden touch-none"
+            className="fixed inset-0 z-100000 flex items-center justify-center p-4 overflow-hidden touch-none"
             onWheel={handleWheel}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}

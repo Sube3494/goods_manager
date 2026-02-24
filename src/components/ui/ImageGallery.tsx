@@ -157,7 +157,7 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-10001 flex items-center justify-center overflow-hidden bg-black/95 transition-colors duration-500"
+                    className="fixed inset-0 z-100000 flex items-center justify-center overflow-hidden bg-black/95 transition-colors duration-500"
                     onPointerUp={handlePointerUp}
                     onPointerLeave={handlePointerUp}
                 >
