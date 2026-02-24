@@ -454,7 +454,7 @@ export default function GoodsPage() {
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(new Blob([buffer]), `商品库导出_${formatLocalDate(new Date())}.xlsx`);
+      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `商品库导出_${formatLocalDate(new Date())}.xlsx`);
       showToast(`已导出 ${allGoods.length} 条商品数据`, "success");
     } catch (error) {
       console.error("Export failed:", error);

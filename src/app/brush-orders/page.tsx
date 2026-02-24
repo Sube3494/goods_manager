@@ -264,7 +264,7 @@ export default function BrushOrdersPage() {
 
         const buffer = await workbook.xlsx.writeBuffer();
         const timestamp = formatLocalDate(new Date());
-        saveAs(new Blob([buffer]), `刷单记录_${timestamp}.xlsx`);
+        saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `刷单记录_${timestamp}.xlsx`);
         showToast("导出成功");
       } catch (error) {
         console.error("Export failed:", error);

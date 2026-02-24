@@ -383,6 +383,13 @@ function PurchasesContent() {
       const { saveAs } = await import("file-saver");
       
       const workbook = new ExcelJS.Workbook();
+      
+      // 添加工作簿元数据，提升文件受信任度，避免编辑限制
+      workbook.creator = "Goods Manager";
+      workbook.lastModifiedBy = "Goods Manager";
+      workbook.created = new Date();
+      workbook.modified = new Date();
+      
       const worksheet = workbook.addWorksheet("明细");
       
       const dateStr = new Date().toLocaleDateString("zh-CN");
@@ -585,7 +592,7 @@ function PurchasesContent() {
           ? `采购单_${specificPO.id}_${formatLocalDate(new Date())}.xlsx`
           : `进货汇总_${formatLocalDate(new Date())}.xlsx`;
           
-      saveAs(new Blob([buffer]), filename);
+      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
       showToast(specificPO ? `已导出单据` : `已导出 ${targets.length} 张单据`, "success");
       
     } catch (error) {
