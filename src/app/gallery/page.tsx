@@ -691,7 +691,12 @@ function GalleryContent() {
           if (a.url === mainUrl) return -1;
           if (b.url === mainUrl) return 1;
       }
-      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+      // 优先按 sortOrder 升序 (Priority: sortOrder ASC)
+      if (a.sortOrder !== b.sortOrder) {
+          return (a.sortOrder || 0) - (b.sortOrder || 0);
+      }
+      // 其次按 createdAt 降序 (Secondary: createdAt DESC)
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 

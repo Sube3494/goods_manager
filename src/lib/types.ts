@@ -121,6 +121,7 @@ export interface GalleryItem {
   isPublic?: boolean;
   type?: "image" | "video";
   workspaceId?: string;
+  sortOrder?: number;
   createdAt?: string;
 }
 
