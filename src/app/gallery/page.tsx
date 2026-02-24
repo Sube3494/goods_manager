@@ -1373,7 +1373,7 @@ function GalleryContent() {
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                                 transition={{ duration: 0.2 }}
-                                                className="absolute top-16 md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/80 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/10 shadow-2xl flex flex-col gap-2 max-w-full md:max-w-md pointer-events-auto"
+                                                className="absolute top-16 md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/90 backdrop-blur-2xl px-5 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col gap-3 max-w-full md:max-w-md pointer-events-auto"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <div className="flex flex-col gap-1 font-rounded">
@@ -1403,12 +1403,12 @@ function GalleryContent() {
                                                                     <div 
                                                                         key={index} 
                                                                         className={cn(
-                                                                            "group/item relative bg-white/4 hover:bg-white/8 border-white/6 hover:border-white/12 p-4 rounded-2xl transition-all duration-300",
+                                                                            "group/item relative bg-white/8 backdrop-blur-md hover:bg-white/12 border border-white/15 hover:border-white/30 p-4 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl",
                                                                             isLongValue ? "col-span-2" : "col-span-1"
                                                                         )}
                                                                     >
                                                                         <div className="flex flex-col gap-1.5">
-                                                                            <span className="text-[10px] text-white/60 font-bold uppercase tracking-widest">{key}</span>
+                                                                            <span className="text-[10px] text-white/75 font-bold uppercase tracking-widest">{key}</span>
                                                                             <div className="text-white text-sm font-bold tracking-tight group-hover/item:text-primary transition-colors whitespace-pre-wrap wrap-break-word leading-relaxed">
                                                                                 {value as React.ReactNode}
                                                                             </div>
