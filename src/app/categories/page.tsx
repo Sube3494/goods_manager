@@ -212,7 +212,7 @@ export default function CategoriesPage() {
                             )}
                         </div>
                         
-                        <h3 className="text-lg font-bold text-foreground mb-4 group-hover:text-primary transition-colors duration-300">{category.name}</h3>
+                        <h3 className="text-base font-bold text-foreground mb-4 group-hover:text-primary transition-colors duration-300">{category.name}</h3>
                         
                         <div className="flex justify-between items-center w-full mt-auto">
                               <div className={cn(
@@ -220,7 +220,7 @@ export default function CategoriesPage() {
                                 color.bg, color.text, color.border
                               )}>
                                   <Tag size={12} strokeWidth={2.5} />
-                                  <span>{category.count || 0} ITEMS</span>
+                                  <span>{category.count || 0}</span>
                               </div>
                               
                               {user && (

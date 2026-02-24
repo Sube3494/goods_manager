@@ -866,7 +866,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         "text-xs tracking-wider",
                                         formData.isDiscontinued ? "text-red-500" : "text-emerald-500"
                                     )}>
-                                        {formData.isDiscontinued ? "已暂停生产" : "正在正常经营"}
+                                        {formData.isDiscontinued ? "已停止生产" : "正常供应"}
                                     </span>
                                     <Switch 
                                         checked={!formData.isDiscontinued} 
@@ -890,7 +890,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         "text-xs tracking-wider",
                                         formData.isPublic ? "text-emerald-500" : "text-amber-600"
                                     )}>
-                                        {formData.isPublic ? "全体公开可见" : "私密列表 (仅管理)"}
+                                        {formData.isPublic ? "公开可见" : "仅自己可见"}
                                     </span>
                                     <Switch 
                                         checked={formData.isPublic} 

@@ -59,7 +59,7 @@ export const GoodsCard = memo(function GoodsCard({
           <div className="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-grayscale-[0.8]"></div>
           
           <div 
-             className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-7xl sm:text-8xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
+             className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-5xl sm:text-7xl lg:text-6xl xl:text-5xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
              style={{ WebkitTextStroke: '2px rgba(255, 255, 255, 0.5)' }}
           >
             已停产
@@ -110,7 +110,7 @@ export const GoodsCard = memo(function GoodsCard({
       {/* Content */}
       <div className="flex flex-1 flex-col p-3 sm:p-5">
         <div>
-          <h3 className="font-bold text-sm sm:text-lg leading-tight text-foreground mb-2 sm:mb-4 group-hover:text-primary transition-colors">
+          <h3 className="font-bold text-[12px] sm:text-[15px] leading-tight text-foreground mb-1.5 sm:mb-2.5 group-hover:text-primary transition-colors">
             {product.name}
             <button
                onClick={handleCopyName}
@@ -126,32 +126,26 @@ export const GoodsCard = memo(function GoodsCard({
             </button>
           </h3>
           
-          <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-4">
+          <div className="flex flex-wrap items-center gap-1.5 min-h-[22px]">
             {product.sku && (
-              <span className="text-[10px] bg-secondary border border-border/50 px-2 py-0.5 rounded text-muted-foreground font-mono shrink-0">
+              <span className="text-[10px] bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full text-muted-foreground font-mono shrink-0 leading-none flex items-center h-5">
                 {product.sku}
               </span>
             )}
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
-                <Package size={12} strokeWidth={2.5} />
-                {getCategoryName(product.category)}
-              </span>
-          </div>
-          
-          {product.supplierId && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary/30 w-fit px-2 py-1 rounded-md">
-                <Truck size={12} />
-                <span className="truncate max-w-[150px]">
+            <span className="text-[10px] bg-primary/5 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 h-5 leading-none">
+              <Package size={10} strokeWidth={2.5} className="shrink-0" />
+              {getCategoryName(product.category)}
+            </span>
+            {product.supplierId && (
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-zinc-500/5 border border-zinc-500/10 px-2 py-0.5 rounded-full h-5 leading-none">
+                <Truck size={10} className="shrink-0" />
+                <span className="truncate max-w-[100px]">
                     {product.supplier?.name || "未知供应商"}
                 </span>
               </div>
-          )}
+            )}
+          </div>
 
-          {product.remark && (
-              <div className="mt-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/10 px-2 py-1.5 rounded-md line-clamp-2" title={product.remark}>
-                  {product.remark}
-              </div>
-          )}
         </div>
 
         {/* 弹性空隙，将底部栏推到卡片底部 */}

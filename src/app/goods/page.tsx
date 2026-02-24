@@ -413,7 +413,7 @@ export default function GoodsPage() {
           "商品图片": g.image || "暂无图片",
           "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
           "公开状态": g.isPublic ? "公开" : "私密",
-          "生产状态": g.isDiscontinued ? "已停产" : "正常经营",
+          "生产状态": g.isDiscontinued ? "已停止生产" : "正常供应",
           "备注": g.remark || "",
           "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
         };
@@ -633,13 +633,13 @@ export default function GoodsPage() {
 
       {/* Grid */}
       {isLoading && items.length === 0 ? (
-        <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-64 rounded-2xl bg-muted/20 animate-pulse border border-border" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {filteredGoods.map((product, index) => (
             <GoodsCard 
               key={product.id} 

@@ -806,7 +806,7 @@ function GalleryContent() {
           </div>
 
         {/* Responsive Grid / Waterfall */}
-        <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
            <AnimatePresence>
                {groupedProducts.map((group) => {
                     // Use product.image as cover URL directly (it may not be a gallery item)
@@ -836,7 +836,7 @@ function GalleryContent() {
                                 <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden">
                                     <div className="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-grayscale-[0.8]"></div>
                                     <div 
-                                        className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-4xl sm:text-6xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
+                                        className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-3xl sm:text-5xl lg:text-4xl xl:text-3xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
                                         style={{ WebkitTextStroke: '2px rgba(255, 255, 255, 0.5)' }}
                                     >
                                         已停产
@@ -885,7 +885,7 @@ function GalleryContent() {
 
                                 <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/95 via-black/40 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-2.5 sm:p-5 pt-12 sm:pt-16">
                                     <div className="flex flex-col gap-0.5 sm:gap-1">
-                                        <p className="text-white font-bold text-[11px] sm:text-xs line-clamp-2 leading-relaxed" style={{ fontFamily: 'ui-rounded, "SF Pro Rounded", "PingFang SC", "Hiragino Maru Gothic ProN", sans-serif' }}>{group.product.name}</p>
+                                        <p className="text-white font-bold text-[9.5px] sm:text-[11px] line-clamp-2 leading-tight" style={{ fontFamily: 'ui-rounded, "SF Pro Rounded", "PingFang SC", "Hiragino Maru Gothic ProN", sans-serif' }}>{group.product.name}</p>
                                     </div>
                                 </div>
                             </div>
@@ -922,7 +922,7 @@ function GalleryContent() {
 
         {/* Skeleton Grid for Initial Loading */}
         {isLoading && (
-            <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {[...Array(8)].map((_, i) => (
                     <div key={i} className="rounded-2xl sm:rounded-3xl overflow-hidden border border-border/50 bg-white dark:bg-zinc-900/50 flex flex-col h-full animate-pulse">
                         <div className="aspect-4/5 sm:aspect-square bg-muted relative overflow-hidden">
