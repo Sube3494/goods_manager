@@ -183,7 +183,6 @@ export default function OutboundPage() {
                     className="h-full flex-1 md:w-36"
                     triggerClassName="rounded-full shadow-sm"
                     isCompact
-                    align="right"
                 />
             </div>
 

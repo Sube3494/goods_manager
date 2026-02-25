@@ -539,7 +539,6 @@ export default function BrushOrdersPage() {
                         startDate && "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30"
                     )}
                     isCompact={false}
-                    align="left"
                 />
                 <span className="text-muted-foreground text-xs shrink-0 font-medium">至</span>
                 <DatePicker 
@@ -553,7 +552,6 @@ export default function BrushOrdersPage() {
                         endDate && "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30"
                     )}
                     isCompact={false}
-                    align="right"
                 />
             </div>
 
@@ -823,6 +821,7 @@ export default function BrushOrdersPage() {
 
                                         <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-white/5 border dark:border-white/10 overflow-hidden shrink-0 relative">
                                             {order.items[0]?.product?.image ? (
+                                                /* eslint-disable-next-line @next/next/no-img-element */
                                                 <img src={order.items[0].product.image} className="w-full h-full object-cover" alt="Product" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
