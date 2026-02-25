@@ -73,11 +73,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     return (
     <ToastProvider>
         <div className="w-full min-h-screen bg-transparent text-foreground relative flex font-sans overflow-x-hidden">
-        {/* Ambient Background Mesh - Animated Blobs */}
+        {/* Ambient Background - Static blobs, no GPU hint needed */}
         <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
-            {/* Subtle Ambient Light - Clean & Professional */}
-            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-500/3 dark:bg-blue-600/2 rounded-full blur-[80px] transform-gpu will-change-transform translate-z-0" />
-            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-500/3 dark:bg-purple-600/2 rounded-full blur-[60px] transform-gpu will-change-transform translate-z-0" />
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/3 dark:bg-blue-600/2 rounded-full blur-2xl" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-500/3 dark:bg-purple-600/2 rounded-full blur-2xl" />
         </div>
 
         {showSidebar && (

@@ -1,5 +1,4 @@
 import { memo, useState } from "react";
-import { motion } from "framer-motion";
 import { Edit, Package, Truck, Trash2, Check } from "lucide-react";
 import Image from "next/image";
 import { Product } from "@/lib/types";
@@ -44,10 +43,10 @@ export const GoodsCard = memo(function GoodsCard({
   };
 
   return (
-    <motion.div
+    <div
       onClick={handleCardClick}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all hover:-translate-y-2 cursor-pointer transform-gpu will-change-transform translate-z-0",
+        "group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all duration-200 hover:-translate-y-1.5 cursor-pointer",
         isSelected ? "ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5" : "hover:shadow-2xl hover:shadow-primary/10",
         product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20" : ""
       )}
@@ -227,7 +226,7 @@ export const GoodsCard = memo(function GoodsCard({
            )}
         </div>
 
-    </motion.div>
+    </div>
   );
 }, (prev, next) => {
   // Precision check to minimize re-renders in huge lists

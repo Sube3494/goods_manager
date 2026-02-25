@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
-import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText, Download } from "lucide-react";
+import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText, Download, RotateCcw, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
 import { PurchaseOrder, PurchaseStatus, TrackingInfo, User as UserType } from "@/lib/types";
-
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
@@ -14,6 +13,7 @@ import TrackingNumberModal, { TrackingNumberModalProps } from "@/components/Purc
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 
 
@@ -103,6 +103,19 @@ function PurchasesContent() {
     scale: 1,
     direction: 0
   });
+
+  const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "All";
+
+  const resetFilters = useCallback(() => {
+    setSearchQuery("");
+    setStatusFilter("All");
+    
+    // Also clean URL params if necessary
+    const params = new URLSearchParams(searchParams);
+    params.delete('status');
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [searchParams, router, pathname]);
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
@@ -639,19 +652,36 @@ function PurchasesContent() {
 
       </div>
 
-      {/* Search Box */}
-      <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full shrink-0 mb-4">
-        <Search size={18} className="text-muted-foreground shrink-0" />
-        <input
-          type="text"
-          placeholder="搜索采购记录..."
-          value={searchQuery}
-          onChange={(e) => {
-            const val = e.target.value;
-            setSearchQuery(val);
-          }}
-          className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
-        />
+      {/* Search Box & Reset */}
+      <div className="flex flex-row items-center gap-3 mb-6 md:mb-8">
+        <div className="h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
+            <Search size={18} className="text-muted-foreground shrink-0" />
+            <input
+            type="text"
+            placeholder="搜索采购记录..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
+            />
+            {searchQuery && (
+                <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
+                >
+                    <X size={14} />
+                </button>
+            )}
+        </div>
+
+        {hasActiveFilters && (
+            <button
+                onClick={resetFilters}
+                className="h-11 px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+            >
+                <RotateCcw size={14} />
+                <span>重置</span>
+            </button>
+        )}
       </div>
 
       {/* Status Filter Tabs */}
@@ -660,13 +690,13 @@ function PurchasesContent() {
               <button
                 key={status}
                 onClick={() => handleStatusFilterChange(status)}
-                className={`
-                    px-4 h-9 rounded-full text-sm font-bold transition-all whitespace-nowrap
-                    ${statusFilter === status 
-                        ? 'bg-foreground text-background border-foreground shadow-sm' 
-                        : 'bg-white dark:bg-white/5 border border-border text-muted-foreground hover:bg-muted/80'
-                    }
-                `}
+                className={cn(
+                    "px-4 h-9 rounded-full text-sm font-bold transition-all whitespace-nowrap border",
+                    statusFilter === status 
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm" 
+                        : "bg-white dark:bg-white/5 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80",
+                    statusFilter !== "All" && status === statusFilter && status !== "All" && "ring-2 ring-primary/20"
+                )}
               >
                 {status === 'All' ? '全部' : 
                  status === 'Confirmed' ? '已下单' :
@@ -1029,38 +1059,37 @@ function PurchasesContent() {
                     )}
                 </div>
   
-                 {/* Actions */}
-                <div className="flex items-center gap-2">
+                 {/* Actions - icon only to prevent crowding on mobile */}
+                <div className="flex items-center gap-2 justify-end">
                    {po.status !== "Draft" && (
                      <button 
                         onClick={() => handleView(po)}
-                        className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-secondary text-foreground font-medium hover:bg-secondary/80 active:scale-95 transition-all text-xs"
+                        className="flex-none flex items-center justify-center h-9 w-9 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 active:scale-95 transition-all"
+                        title="查看详情"
                     >
-                        <Eye size={14} />
-                        详情
+                        <Eye size={16} />
                     </button>
                    )}
                     <button 
                          onClick={() => setOverviewPurchase(po)}
-                         className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-muted border border-border/50 text-foreground font-medium transition-all text-xs"
+                         className="flex-none flex items-center justify-center h-9 w-9 rounded-lg bg-muted border border-border/50 text-foreground transition-all"
+                         title="总览商品汇总"
                     >
-                        <ShoppingBag size={14} />
-                        总览
+                        <ShoppingBag size={16} />
                     </button>
                     <button 
                          onClick={() => handleExport(po)}
-                         className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-muted border border-border/50 text-foreground font-medium transition-all text-xs"
+                         className="flex-none flex items-center justify-center h-9 w-9 rounded-lg bg-muted border border-border/50 text-foreground transition-all"
+                         title="导出采购明细"
                     >
-                        <Download size={14} />
-                        导出
+                        <Download size={16} />
                     </button>
 
 
   
-                    {/* Management Actions: Show Truck for Ordered/Received */}
                     {/* Management Actions: Show Truck for Confirmed/Shipped/Ordered */}
                     {(po.status === "Confirmed" || po.status === "Shipped" || (po.status as string) === "Ordered") && (
-                        <div className="flex gap-2 w-full">
+                        <div className="flex gap-2">
                             {(() => {
                                 const tracking = po.trackingData || [];
                                 const hasTracking = tracking.length > 0;
@@ -1101,10 +1130,10 @@ function PurchasesContent() {
                                                 lockPackages: false,
                                                 mode: mode as NonNullable<TrackingNumberModalProps['mode']>
                                             }); }}
-                                            className={`flex-1 flex items-center justify-center gap-2 h-9 rounded-lg ${colorClass} text-white shadow-lg ${colorClass}/20 ${animate} font-medium active:scale-95 transition-all text-xs`}
+                                            className={`h-9 w-9 flex items-center justify-center rounded-lg ${colorClass} text-white shadow-lg ${colorClass}/20 ${animate} active:scale-95 transition-all`}
+                                            title={label}
                                         >
-                                            <Icon size={14} />
-                                            {label}
+                                            <Icon size={16} />
                                         </button>
                                     );
                                 }
@@ -1117,10 +1146,10 @@ function PurchasesContent() {
                              canInbound && (
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
-                                    className="flex-1 flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-500 text-white font-medium hover:bg-emerald-600 active:scale-95 transition-all text-xs shadow-lg shadow-emerald-500/20"
+                                    className="h-9 w-9 flex items-center justify-center rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
+                                    title="确认入库"
                                 >
-                                    <CheckCircle2 size={14} />
-                                    确认入库
+                                    <CheckCircle2 size={16} />
                                 </button>
                             )}
                         </div>

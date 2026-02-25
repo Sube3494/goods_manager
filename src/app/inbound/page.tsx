@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Package, Calendar, Eye } from "lucide-react";
+import { Search, Package, Calendar, Eye, RotateCcw, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOrder } from "@/lib/types";
@@ -20,6 +20,13 @@ function InboundContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const hasActiveFilters = searchQuery.trim() !== "";
+
+  const resetFilters = useCallback(() => {
+    setSearchQuery("");
+  }, []);
+
   
 
   const fetchData = useCallback(async () => {
@@ -67,16 +74,36 @@ function InboundContent() {
       </div>
 
 
-      {/* Search Box */}
-      <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 mb-6 md:mb-8">
-        <Search size={18} className="text-muted-foreground shrink-0" />
-        <input
-          type="text"
-          placeholder="搜索入库单号或商品名称..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm"
-        />
+      {/* Search Box & Reset */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 md:mb-8">
+        <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
+            <Search size={18} className="text-muted-foreground shrink-0" />
+            <input
+            type="text"
+            placeholder="搜索入库单号或商品名称..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
+            />
+            {searchQuery && (
+                <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
+                >
+                    <X size={14} />
+                </button>
+            )}
+        </div>
+
+        {hasActiveFilters && (
+            <button
+                onClick={resetFilters}
+                className="h-10 sm:h-11 px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap ml-auto sm:ml-0"
+            >
+                <RotateCcw size={14} />
+                <span>重置</span>
+            </button>
+        )}
       </div>
 
       {/* Desktop Table View */}

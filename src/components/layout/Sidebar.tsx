@@ -53,17 +53,17 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop - pure color, no blur for mobile perf */}
       <div 
         className={cn(
-          "fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden transition-opacity duration-300",
+          "fixed inset-0 z-40 bg-background/70 lg:hidden transition-opacity duration-200",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={onClose}
       />
 
       <aside className={cn(
-        "fixed left-4 top-4 z-50 h-[calc(100vh-2rem)] rounded-2xl glass border-border transition-[width,transform] duration-200 ease-in-out lg:translate-x-0 outline-none group/sidebar transform-gpu will-change-[width,transform]",
+        "fixed left-4 top-4 z-50 h-[calc(100vh-2rem)] rounded-2xl glass border-border transition-[width,transform] duration-200 ease-in-out lg:translate-x-0 outline-none group/sidebar",
         isCollapsed ? "w-20" : "w-64",
         isOpen ? "translate-x-0" : "-translate-x-[120%]"
       )}>

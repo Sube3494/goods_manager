@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useTransition } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download, ArrowUp, X } from "lucide-react";
+import { Search, Plus, Download, ArrowUp, X, RotateCcw } from "lucide-react";
 import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -13,13 +13,13 @@ import { ActionBar } from "@/components/ui/ActionBar";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
 
 
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
-import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/dateUtils";
 
 export default function GoodsPage() {
@@ -68,6 +68,21 @@ export default function GoodsPage() {
   const [sortBy, setSortBy] = useState<string>("sku-asc");
 
   const debouncedSearch = useDebounce(searchQuery, 500);
+
+  const hasActiveFilters = 
+    searchQuery.trim() !== "" || 
+    selectedCategory !== "all" || 
+    selectedStatus !== "all" || 
+    selectedSupplier !== "all" || 
+    sortBy !== "sku-asc";
+
+  const resetFilters = useCallback(() => {
+    setSearchQuery("");
+    setSelectedCategory("all");
+    setSelectedStatus("all");
+    setSelectedSupplier("all");
+    setSortBy("sku-asc");
+  }, []);
 
   const { showToast } = useToast();
   const canCreate = hasPermission(user as SessionUser | null, "product:create");
@@ -170,21 +185,20 @@ export default function GoodsPage() {
   }, [hasMore, isLoading, isNextPageLoading, fetchGoods]);
 
   useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const target = e.target;
-      let st = 0;
-      
-      if (target === document || target === window) {
-        st = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      } else if (target instanceof HTMLElement) {
-        st = target.scrollTop;
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const st = window.pageYOffset || document.documentElement.scrollTop || 0;
+          setShowScrollTop(st > 10);
+          ticking = false;
+        });
+        ticking = true;
       }
-        
-      setShowScrollTop(st > 10);
     };
     
-    window.addEventListener("scroll", handleScroll, true);
-    return () => window.removeEventListener("scroll", handleScroll, true);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const scrollToTop = () => {
@@ -534,9 +548,9 @@ export default function GoodsPage() {
            )}
         </div>
       </div>
-
-      <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
-          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1 shrink-0 relative">
+      {/* 搜索框 + 重置按钮同行 */}
+      <div className="flex items-center gap-2 mb-3 md:mb-4">
+          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -554,7 +568,19 @@ export default function GoodsPage() {
               </button>
             )}
           </div>
-          
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="h-10 sm:h-11 px-3 sm:px-4 flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+            >
+              <RotateCcw size={14} />
+              <span className="hidden sm:inline">重置</span>
+            </button>
+          )}
+      </div>
+
+      {/* 筛选器行 */}
+      <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto"> 
              <div className="col-span-1 lg:w-36 h-10 sm:h-11"> 
                 <CustomSelect 
@@ -630,6 +656,7 @@ export default function GoodsPage() {
               </div>
           </div>
       </div>
+
 
       {/* Grid */}
       {isLoading && items.length === 0 ? (

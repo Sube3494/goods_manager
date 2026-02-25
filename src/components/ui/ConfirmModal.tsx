@@ -94,7 +94,7 @@ export function ConfirmModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative z-10 w-full max-w-md rounded-3xl bg-white/90 dark:bg-gray-900/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col"
+            className="relative z-10 w-full max-w-md rounded-3xl glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 p-6 shrink-0">

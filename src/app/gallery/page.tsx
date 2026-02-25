@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
-import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2 } from "lucide-react";
+import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -39,7 +39,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
     const [isZoomed, setIsZoomed] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    // 当切换到视频时强制播放
+    // 褰撳垏鎹㈠埌瑙嗛鏃跺己鍒舵挱鏀?
     useEffect(() => {
         if (item.type === 'video' && videoRef.current) {
             videoRef.current.currentTime = 0;
@@ -92,7 +92,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
-        // 视频可以滑动导航，但不拖动内容
+        // 瑙嗛鍙互婊戝姩瀵艰埅锛屼絾涓嶆嫋鍔ㄥ唴瀹?
         if (item.type !== 'video') {
             (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         }
@@ -119,7 +119,7 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
         setIsDragging(false);
 
         if (item.type === 'video') {
-            // 视频：只模拟滑动导航，不移动内容
+            // 瑙嗛锛氬彧妯℃嫙婊戝姩瀵艰埅锛屼笉绉诲姩鍐呭
             const swipeX = e.clientX - dragStart.x;
             const threshold = 50;
             if (totalItems > 1 && swipeX > threshold) {
@@ -328,7 +328,7 @@ function GalleryContent() {
   // Upload States
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
-  // 修改 isUploading 为 string | boolean 以便呈现进度
+  // 淇敼 isUploading 涓?string | boolean 浠ヤ究鍛堢幇杩涘害
   const [isUploading, setIsUploading] = useState<boolean | string>(false);
   const [uploadForm, setUploadForm] = useState<{
     productId: string;
@@ -339,6 +339,14 @@ function GalleryContent() {
     urls: [],
     tags: ""
   });
+
+  const hasActiveFilters = searchQuery.trim() !== "" || selectedCategory !== "All";
+
+  const resetFilters = useCallback(() => {
+    setSearchQuery("");
+    setSelectedCategory("All");
+  }, []);
+
   const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<number[]>([]);
 
   const fetchData = useCallback(async (isFirstPage = true) => {
@@ -458,7 +466,7 @@ function GalleryContent() {
     const remainingSlots = 9 - currentCount;
 
     if (remainingSlots <= 0) {
-      showToast("最多只能上传 9 个文件", "error");
+      showToast("鏈€澶氬彧鑳戒笂浼?9 涓枃浠?, "error");
       e.target.value = ''; // Reset input
       return;
     }
@@ -468,14 +476,14 @@ function GalleryContent() {
     let filesToUpload = filesArray;
     
     if (filesArray.length > remainingSlots) {
-      showToast(`最多只能上传 9 个文件，已为您保留前 ${remainingSlots} 个`, "error");
+      showToast(`鏈€澶氬彧鑳戒笂浼?9 涓枃浠讹紝宸蹭负鎮ㄤ繚鐣欏墠 ${remainingSlots} 涓猔, "error");
       filesToUpload = filesArray.slice(0, remainingSlots);
     }
 
-    setIsUploading(`准备上传 0/${filesToUpload.length}...`);
+    setIsUploading(`鍑嗗涓婁紶 0/${filesToUpload.length}...`);
 
     try {
-      // -- 并发控制逻辑 (Concurrency Control) --
+      // -- 骞跺彂鎺у埗閫昏緫 (Concurrency Control) --
       const CONCURRENCY_LIMIT = 3;
       const results: PromiseSettledResult<{ url: string; type: 'image' | 'video' }>[] = [];
       let completedCount = 0;
@@ -486,7 +494,7 @@ function GalleryContent() {
         const uploadTask = async () => {
           try {
             const data = await uploadFileWithChunking(file, "gallery", (pct) => {
-              setIsUploading(`文件 ${index + 1}/${filesToUpload.length} : ${pct}%`);
+              setIsUploading(`鏂囦欢 ${index + 1}/${filesToUpload.length} : ${pct}%`);
             });
             
             results.push({ status: 'fulfilled', value: data as { url: string; type: 'image'|'video' } });
@@ -494,7 +502,7 @@ function GalleryContent() {
             results.push({ status: 'rejected', reason: err });
           } finally {
             completedCount++;
-            setIsUploading(`已完成 ${completedCount}/${filesToUpload.length}`);
+            setIsUploading(`宸插畬鎴?${completedCount}/${filesToUpload.length}`);
           }
         };
 
@@ -514,7 +522,7 @@ function GalleryContent() {
 
       // Wait for all remaining
       await Promise.all(activePromises);
-      // -- 并发控制结束 --
+      // -- 骞跺彂鎺у埗缁撴潫 --
 
       const successfulFiles = results
         .filter((r): r is PromiseFulfilledResult<{ url: string; type: 'image' | 'video' }> => r.status === 'fulfilled')
@@ -527,11 +535,11 @@ function GalleryContent() {
         const uniqueNewFiles = successfulFiles.filter(f => !existingUrls.has(f.url));
         
         if (uniqueNewFiles.length > 0) {
-          showToast(`成功上传 ${uniqueNewFiles.length} 个文件${failedCount > 0 ? `，${failedCount} 个失败` : ''}`, "success");
+          showToast(`鎴愬姛涓婁紶 ${uniqueNewFiles.length} 涓枃浠?{failedCount > 0 ? `锛?{failedCount} 涓け璐 : ''}`, "success");
         } else if (failedCount > 0) {
-          showToast(`${failedCount} 个文件上传失败`, "error");
+          showToast(`${failedCount} 涓枃浠朵笂浼犲け璐, "error");
         } else if (successfulFiles.length > 0) {
-          showToast("所选文件已全部存在于列表中", "info");
+          showToast("鎵€閫夋枃浠跺凡鍏ㄩ儴瀛樺湪浜庡垪琛ㄤ腑", "info");
         }
         
         return { 
@@ -542,7 +550,7 @@ function GalleryContent() {
       
     } catch (error) {
       console.error("Critical upload error:", error);
-      showToast("操作失败，请重试", "error");
+      showToast("鎿嶄綔澶辫触锛岃閲嶈瘯", "error");
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -568,12 +576,12 @@ function GalleryContent() {
         if (res.ok) {
           setIsUploadModalOpen(false);
           setUploadForm({ productId: "", urls: [], tags: "" });
-          showToast("发布成功", "success");
+          showToast("鍙戝竷鎴愬姛", "success");
           fetchData();
         }
       } catch (error) {
         console.error("Gallery submit failed:", error);
-        showToast("发布失败", "error");
+        showToast("鍙戝竷澶辫触", "error");
       }
       return;
     }
@@ -598,14 +606,14 @@ function GalleryContent() {
       if (res.ok) {
         setIsUploadModalOpen(false);
         setUploadForm({ productId: "", urls: [], tags: "" });
-        showToast("已提交审核，请耐心等待管理员处理", "success");
+        showToast("宸叉彁浜ゅ鏍革紝璇疯€愬績绛夊緟绠＄悊鍛樺鐞?, "success");
       } else {
         const data = await res.json();
-        showToast(data.error || "提交失败", "error");
+        showToast(data.error || "鎻愪氦澶辫触", "error");
       }
     } catch (error) {
       console.error("Submission failed:", error);
-      showToast("提交失败", "error");
+      showToast("鎻愪氦澶辫触", "error");
     }
   };
 
@@ -624,7 +632,7 @@ function GalleryContent() {
       
       if (!groups.has(pid)) {
         // Prepare a robust product object for display
-        const productData = item.product || { id: pid, name: '未知商品', sku: 'N/A' };
+        const productData = item.product || { id: pid, name: '鏈煡鍟嗗搧', sku: 'N/A' };
         // Ensure id is present in the object used for grouping
         if (!productData.id) productData.id = pid;
         
@@ -654,8 +662,8 @@ function GalleryContent() {
     const count = selectedIds.length;
     setConfirmConfig({
       isOpen: true,
-      title: "批量删除媒体",
-      message: `确定要删除选中的 ${count} 个实拍项吗？此操作不可恢复。`,
+      title: "鎵归噺鍒犻櫎濯掍綋",
+      message: `纭畾瑕佸垹闄ら€変腑鐨?${count} 涓疄鎷嶉」鍚楋紵姝ゆ搷浣滀笉鍙仮澶嶃€俙,
       onConfirm: async () => {
         try {
           const res = await fetch("/api/gallery/batch", {
@@ -664,15 +672,15 @@ function GalleryContent() {
             body: JSON.stringify({ ids: selectedIds }),
           });
           if (res.ok) {
-            showToast(`成功删除 ${count} 个项目`, "success");
+            showToast(`鎴愬姛鍒犻櫎 ${count} 涓」鐩甡, "success");
             setSelectedIds([]);
             fetchData();
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           } else {
-            showToast("删除失败", "error");
+            showToast("鍒犻櫎澶辫触", "error");
           }
         } catch {
-          showToast("请求失败", "error");
+          showToast("璇锋眰澶辫触", "error");
         }
       },
     });
@@ -691,11 +699,11 @@ function GalleryContent() {
           if (a.url === mainUrl) return -1;
           if (b.url === mainUrl) return 1;
       }
-      // 优先按 sortOrder 升序 (Priority: sortOrder ASC)
+      // 浼樺厛鎸?sortOrder 鍗囧簭 (Priority: sortOrder ASC)
       if (a.sortOrder !== b.sortOrder) {
           return (a.sortOrder || 0) - (b.sortOrder || 0);
       }
-      // 其次按 createdAt 降序 (Secondary: createdAt DESC)
+      // 鍏舵鎸?createdAt 闄嶅簭 (Secondary: createdAt DESC)
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
@@ -741,10 +749,10 @@ function GalleryContent() {
         )}>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-                <span>实物<span className="text-primary">相册</span></span>
+                <span>瀹炵墿<span className="text-primary">鐩稿唽</span></span>
             </h1>
             <p className="text-muted-foreground mt-0.5 sm:mt-1.5 text-[10px] sm:text-lg truncate opacity-80 font-medium">
-                {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
+                {isAdmin ? "浠撳簱瀹炴媿銆侀獙璐ц鎯呬笌鍐呴儴妗ｆ搴? : "鍟嗗搧瀹炴媿鍥句笌缁嗚妭灞曠ず"}
             </p>
           </div>
 
@@ -759,7 +767,7 @@ function GalleryContent() {
                    className="h-9 w-9 sm:h-10 sm:w-auto sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center sm:gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap shrink-0"
                  >
                    <Plus size={20} className="shrink-0" />
-                   <span className="hidden sm:inline">上传实物</span>
+                   <span className="hidden sm:inline">涓婁紶瀹炵墿</span>
                  </button>
                )}
              </div>
@@ -773,7 +781,7 @@ function GalleryContent() {
                 <Search size={16} className="text-muted-foreground shrink-0 sm:w-[18px] sm:h-[18px]" />
                 <input 
                     type="text" 
-                    placeholder="搜索商品名..." 
+                    placeholder="鎼滅储鍟嗗搧鍚?.." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
@@ -793,7 +801,7 @@ function GalleryContent() {
                         value={selectedCategory === "All" ? "all" : selectedCategory}
                         onChange={(val) => setSelectedCategory(val === "all" ? "All" : val)}
                         options={[
-                            { value: 'all', label: '全部' },
+                            { value: 'all', label: '鍏ㄩ儴' },
                             ...categories.map(c => ({ value: c.name, label: c.name }))
                         ]}
                         className="h-full"
@@ -803,6 +811,16 @@ function GalleryContent() {
                         )}
                     />
               </div>
+
+              {hasActiveFilters && (
+                  <button
+                      onClick={resetFilters}
+                      className="h-10 sm:h-11 px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+                  >
+                      <RotateCcw size={14} />
+                      <span>重置</span>
+                  </button>
+              )}
           </div>
 
         {/* Responsive Grid / Waterfall */}
@@ -839,7 +857,7 @@ function GalleryContent() {
                                         className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-3xl sm:text-5xl lg:text-4xl xl:text-3xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
                                         style={{ WebkitTextStroke: '2px rgba(255, 255, 255, 0.5)' }}
                                     >
-                                        已停产
+                                        宸插仠浜?
                                     </div>
                                 </div>
                             )}
@@ -915,7 +933,7 @@ function GalleryContent() {
             <div className="py-12 w-full flex flex-col items-center justify-center animate-in fade-in duration-1000">
                 <div className="h-px w-12 bg-linear-to-r from-transparent via-border to-transparent mb-4" />
                 <p className="text-xs sm:text-sm text-muted-foreground/50 font-medium tracking-widest uppercase italic">
-                    —— 已显示全部内容 ——
+                    鈥斺€?宸叉樉绀哄叏閮ㄥ唴瀹?鈥斺€?
                 </p>
             </div>
         )}
@@ -953,9 +971,9 @@ function GalleryContent() {
                     </div>
                 </div>
                 <div className="space-y-3 max-w-xs mx-auto">
-                    <h3 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">找不到对应的实拍</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">鎵句笉鍒板搴旂殑瀹炴媿</h3>
                     <p className="text-muted-foreground text-sm leading-relaxed">
-                        没有找到与 {searchQuery ? `"${searchQuery}"` : "当前筛选"} 匹配的内容。您可以尝试清理过滤条件再次搜索。
+                        娌℃湁鎵惧埌涓?{searchQuery ? `"${searchQuery}"` : "褰撳墠绛涢€?} 鍖归厤鐨勫唴瀹广€傛偍鍙互灏濊瘯娓呯悊杩囨护鏉′欢鍐嶆鎼滅储銆?
                     </p>
                 </div>
                 
@@ -968,7 +986,7 @@ function GalleryContent() {
                         className="px-6 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground text-sm font-bold transition-all flex items-center gap-2 group border border-border/50"
                     >
                         <RefreshCcw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
-                        清除所有筛选
+                        娓呴櫎鎵€鏈夌瓫閫?
                     </button>
                 )}
             </div>
@@ -993,7 +1011,7 @@ function GalleryContent() {
                             className="relative z-10 w-full max-w-lg rounded-3xl bg-white dark:bg-white/5 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col"
                         >
                             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-                                <h2 className="text-xl font-bold text-foreground">上传实拍内容</h2>
+                                <h2 className="text-xl font-bold text-foreground">涓婁紶瀹炴媿鍐呭</h2>
                                 <button onClick={() => setIsUploadModalOpen(false)} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                                     <X size={20} />
                                 </button>
@@ -1006,7 +1024,7 @@ function GalleryContent() {
                                     <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                            <Camera size={16} className="text-black dark:text-white" /> 选择文件 ({uploadForm.urls.length})
+                                            <Camera size={16} className="text-black dark:text-white" /> 閫夋嫨鏂囦欢 ({uploadForm.urls.length})
                                         </label>
                                         
                                         {uploadForm.urls.length > 0 && (
@@ -1023,7 +1041,7 @@ function GalleryContent() {
                                                     }}
                                                     className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
                                                 >
-                                                    {selectedDeleteIndices.length === uploadForm.urls.length ? "取消全选" : "全选"}
+                                                    {selectedDeleteIndices.length === uploadForm.urls.length ? "鍙栨秷鍏ㄩ€? : "鍏ㄩ€?}
                                                 </button>
                                                 
                                                 <div className="w-px h-3 bg-border" />
@@ -1041,7 +1059,7 @@ function GalleryContent() {
                                                         className="text-xs font-medium text-destructive hover:text-destructive/80 transition-colors flex items-center gap-1"
                                                     >
                                                         <Trash2 size={12} />
-                                                        删除已选 ({selectedDeleteIndices.length})
+                                                        鍒犻櫎宸查€?({selectedDeleteIndices.length})
                                                     </button>
                                                 ) : (
                                                     <button 
@@ -1050,7 +1068,7 @@ function GalleryContent() {
                                                         className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                                                     >
                                                         <Trash2 size={12} />
-                                                        清空
+                                                        娓呯┖
                                                     </button>
                                                 )}
                                             </div>
@@ -1120,11 +1138,11 @@ function GalleryContent() {
                                                 )}
                                             </div>
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-center px-2">
-                                                {isUploading ? "上传中" : "添加"}
+                                                {isUploading ? "涓婁紶涓? : "娣诲姞"}
                                             </span>
                                         </label>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-2">支持多选，每次最多上传 9 个文件。</p>
+                                    <p className="text-xs text-muted-foreground mt-2">鏀寔澶氶€夛紝姣忔鏈€澶氫笂浼?9 涓枃浠躲€?/p>
                                 </div>
 
                                 {/* Product Select / Submission Info */}
@@ -1132,7 +1150,7 @@ function GalleryContent() {
                                     {isAdmin ? (
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                                <Package size={16} /> 关联商品
+                                                <Package size={16} /> 鍏宠仈鍟嗗搧
                                             </label>
                                             <div 
                                                 onClick={() => setIsProductSelectOpen(true)}
@@ -1161,8 +1179,8 @@ function GalleryContent() {
                                                     <div className="flex flex-col">
                                                         <span className={cn("text-sm", !uploadForm.productId ? "text-muted-foreground" : "text-foreground")}>
                                                             {uploadForm.productId 
-                                                                ? products.find(p => p.id === uploadForm.productId)?.name || "未知商品"
-                                                                : "点击选择关联商品..."
+                                                                ? products.find(p => p.id === uploadForm.productId)?.name || "鏈煡鍟嗗搧"
+                                                                : "鐐瑰嚮閫夋嫨鍏宠仈鍟嗗搧..."
                                                             }
                                                         </span>
                                                         {uploadForm.productId && (() => {
@@ -1197,7 +1215,7 @@ function GalleryContent() {
                                                         )}
                                                     </div>
                                                     <div>
-                                                        <p className="text-xs text-primary uppercase tracking-wider mb-0.5">关联商品</p>
+                                                        <p className="text-xs text-primary uppercase tracking-wider mb-0.5">鍏宠仈鍟嗗搧</p>
                                                         <p className="text-foreground text-sm">
                                                             {products.find(p => p.id === uploadForm.productId)?.name}
                                                         </p>
@@ -1208,17 +1226,17 @@ function GalleryContent() {
                                             <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-start gap-3">
                                                 <Info size={18} className="text-primary shrink-0 mt-0.5" />
                                                 <div className="space-y-1">
-                                                    <p className="text-sm text-primary">实拍审核说明</p>
-                                                    <p className="text-xs text-muted-foreground leading-relaxed">请提供商品货号或名称，管理员将在审核后将照片关联至对应商品。实拍内容不会立即显示在相册中。</p>
+                                                    <p className="text-sm text-primary">瀹炴媿瀹℃牳璇存槑</p>
+                                                    <p className="text-xs text-muted-foreground leading-relaxed">璇锋彁渚涘晢鍝佽揣鍙锋垨鍚嶇О锛岀鐞嗗憳灏嗗湪瀹℃牳鍚庡皢鐓х墖鍏宠仈鑷冲搴斿晢鍝併€傚疄鎷嶅唴瀹逛笉浼氱珛鍗虫樉绀哄湪鐩稿唽涓€?/p>
                                                 </div>
                                             </div>
                                             
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
-                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">货号 (SKU)</label>
+                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">璐у彿 (SKU)</label>
                                                     <input 
                                                         type="text" 
-                                                        placeholder="例如: B03"
+                                                        placeholder="渚嬪: B03"
                                                         value={uploadForm.tags.split(",")[0] || ""}
                                                         onChange={(e) => {
                                                             const parts = uploadForm.tags.split(",");
@@ -1229,10 +1247,10 @@ function GalleryContent() {
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">商品名称</label>
+                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">鍟嗗搧鍚嶇О</label>
                                                     <input 
                                                         type="text" 
-                                                        placeholder="例如: 赛车游戏机"
+                                                        placeholder="渚嬪: 璧涜溅娓告垙鏈?
                                                         value={uploadForm.tags.split(",")[1] || ""}
                                                         onChange={(e) => {
                                                             const parts = uploadForm.tags.split(",");
@@ -1252,14 +1270,14 @@ function GalleryContent() {
                                 </div>
 
                                 <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
-                                    <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">取消</button>
+                                    <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">鍙栨秷</button>
                                     <button 
                                         type="submit" 
                                         disabled={uploadForm.urls.length === 0 || (isAdmin && !uploadForm.productId) || (!isAdmin && !uploadForm.productId && !uploadForm.tags.split(",")[0] && !uploadForm.tags.split(",")[1]) || !!isUploading}
                                         className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all"
                                     >
                                         <CheckCircle size={18} />
-                                        {isAdmin ? "确认发布" : "提交审核"} ({uploadForm.urls.length})
+                                        {isAdmin ? "纭鍙戝竷" : "鎻愪氦瀹℃牳"} ({uploadForm.urls.length})
                                     </button>
                                 </div>
                             </form>
@@ -1344,7 +1362,7 @@ function GalleryContent() {
                                                 ? "bg-white text-black border-white" 
                                                 : "bg-black/60 text-white border-white/10 hover:bg-white hover:text-black"
                                         )}
-                                        title="显示商品详情"
+                                        title="鏄剧ず鍟嗗搧璇︽儏"
                                     >
                                         <motion.div
                                             animate={{ 
@@ -1378,7 +1396,7 @@ function GalleryContent() {
                                             >
                                                 <div className="flex flex-col gap-1 font-rounded">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-black shrink-0">商品信息</span>
+                                                        <span className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-black shrink-0">鍟嗗搧淇℃伅</span>
                                                         {selectedImage!.product?.sku && (
                                                             <span className="inline-flex items-center justify-center bg-white/10 px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-bold leading-none text-white/90">
                                                                 {selectedImage!.product?.sku}
@@ -1394,7 +1412,7 @@ function GalleryContent() {
                                                 {selectedImage!.product?.specs && Object.keys(selectedImage!.product!.specs as object).length > 0 && (
                                                     <div className="mt-10 space-y-5 font-rounded">
                                                         <div className="flex items-center">
-                                                            <span className="text-[10px] text-white/70 uppercase tracking-[0.3em] font-black">商品参数</span>
+                                                            <span className="text-[10px] text-white/70 uppercase tracking-[0.3em] font-black">鍟嗗搧鍙傛暟</span>
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-3">
                                                             {Object.entries(selectedImage!.product!.specs as Record<string, string>).map(([key, value], index) => {
@@ -1437,7 +1455,7 @@ function GalleryContent() {
                                                 setIsUploadModalOpen(true);
                                             }}
                                             className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
-                                            title="为此商品上传新实拍"
+                                            title="涓烘鍟嗗搧涓婁紶鏂板疄鎷?
                                         >
                                             <Plus size={20} strokeWidth={2.5} />
                                         </button>
@@ -1450,16 +1468,16 @@ function GalleryContent() {
                                                 const { expires, signature, expireText } = await res.json();
                                                 const url = new URL(`/share/${selectedImage.id}?e=${expires}&s=${signature}`, window.location.origin).href;
                                                 navigator.clipboard.writeText(url).then(() => {
-                                                    showToast(`链接已复制，${expireText}内有效`, "success");
+                                                    showToast(`閾炬帴宸插鍒讹紝${expireText}鍐呮湁鏁坄, "success");
                                                 }).catch(() => {
-                                                    showToast("复制失败", "error");
+                                                    showToast("澶嶅埗澶辫触", "error");
                                                 });
                                             } catch {
-                                                showToast("生成链接失败", "error");
+                                                showToast("鐢熸垚閾炬帴澶辫触", "error");
                                             }
                                         }}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl shadow-xl"
-                                        title="复制媒体链接"
+                                        title="澶嶅埗濯掍綋閾炬帴"
                                     >
                                         <Link2 size={18} />
                                     </button>
@@ -1473,7 +1491,7 @@ function GalleryContent() {
                                             handleDownload(selectedImage.url, fileName);
                                         }}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
-                                        title="下载原始文件"
+                                        title="涓嬭浇鍘熷鏂囦欢"
                                     >
                                         <Download size={18} className="group-hover:translate-y-0.5 transition-transform" />
                                     </button>
@@ -1607,7 +1625,7 @@ function GalleryContent() {
             onConfirm={confirmConfig.onConfirm}
             message={confirmConfig.message}
             title={confirmConfig.title}
-            confirmLabel="确认删除"
+            confirmLabel="纭鍒犻櫎"
             variant="danger"
             className="z-31000"
         />
@@ -1623,7 +1641,7 @@ function GalleryContent() {
                 }
             }}
             onClear={() => setSelectedIds([])}
-            label="个项目"
+            label="涓」鐩?
             onDelete={canDelete ? handleBatchDelete : undefined}
         />
       </>
@@ -1659,7 +1677,7 @@ export default function GalleryPage() {
   return (
     <Suspense fallback={
         <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
-            正在加载相册...
+            姝ｅ湪鍔犺浇鐩稿唽...
         </div>
     }>
         <GalleryContent />

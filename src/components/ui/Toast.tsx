@@ -38,7 +38,7 @@ function Toast({ id, message, type, onClose }: ToastProps) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
       layout
-      className="flex items-center gap-3 rounded-xl border border-border bg-card/80 p-4 shadow-lg backdrop-blur-md min-w-[300px]"
+      className="flex items-center gap-3 rounded-xl glass p-4 shadow-lg min-w-[300px]"
     >
       <div className="shrink-0">{icons[type]}</div>
       <p className="flex-1 text-sm font-medium text-foreground">{message}</p>

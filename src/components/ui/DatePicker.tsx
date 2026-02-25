@@ -97,7 +97,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className={cn(
-                "absolute top-full z-50 mt-2 w-full min-w-[280px] rounded-2xl border border-border dark:border-white/10 bg-white dark:bg-card/70 dark:backdrop-blur-xl p-4 shadow-2xl",
+                "absolute top-full z-999 mt-2 w-[min(280px,calc(100vw-2rem))] rounded-2xl glass p-4 shadow-2xl",
                 align === "left" ? "left-0" : "right-0"
             )}
           >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Package, Plus, Trash2, AlertTriangle } from "lucide-react";
@@ -20,7 +20,7 @@ interface BrushOrderModalProps {
   readOnly?: boolean;
 }
 
-const BRUSH_TYPES = ["淘宝", "京东", "拼多多", "抖音", "快手", "美团"];
+const BRUSH_TYPES = ["美团", "淘宝", "京东"];
 
 export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialData, readOnly = false }: BrushOrderModalProps) {
   const { showToast } = useToast();
@@ -29,7 +29,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
     status: initialData?.status || "Draft",
     date: initialData?.date || new Date().toISOString(),
     items: initialData?.items || [],
-    type: initialData?.type || "淘宝",
+    type: initialData?.type || "美团",
     paymentAmount: initialData?.paymentAmount || 0,
     receivedAmount: initialData?.receivedAmount || 0,
     commission: initialData?.commission || 0,
@@ -40,30 +40,24 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const prevInitialDataRef = useRef<BrushOrder | undefined>(undefined);
   
+  // 1. Data Fetching
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/products")
+    fetch("/api/products?pageSize=1000")
       .then(res => res.json())
       .then(data => {
-        setMounted(true);
         if (data && Array.isArray(data.items)) {
           setProducts(data.items);
         } else if (Array.isArray(data)) {
           setProducts(data);
         }
       })
-      .catch(err => {
-        console.error(err);
-        setMounted(true);
-      });
+      .catch(console.error);
+    return () => clearTimeout(timer);
   }, []);
 
+  // 2. Body Scroll logic
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -75,34 +69,36 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
+  // 3. Form Data Synchronization
+  const [prevId, setPrevId] = useState<string | undefined>(undefined);
+  const [isNewOrder, setIsNewOrder] = useState(true);
+
+  // Sync data when opening
+  if (isOpen && (initialData?.id !== prevId || (initialData === null && !isNewOrder))) {
+    setPrevId(initialData?.id);
+    setIsNewOrder(!initialData);
     
-    if (initialData?.id !== prevInitialDataRef.current?.id) {
-       prevInitialDataRef.current = initialData || undefined;
-       
-       setTimeout(() => {
-           if (initialData) {
-               setFormData({
-                 ...initialData,
-                 note: initialData.note || ""
-               });
-           } else {
-               setFormData({
-                 id: "",
-                 status: "Draft",
-                 date: new Date().toISOString(),
-                 items: [],
-                 type: "淘宝",
-                 paymentAmount: 0,
-                 receivedAmount: 0,
-                 commission: 0,
-                 note: "",
-               });
-           }
-       }, 0);
-    }
-  }, [isOpen, initialData]);
+    setFormData(initialData ? {
+      ...initialData,
+      note: initialData.note || ""
+    } : {
+      id: "",
+      status: "Draft",
+      date: new Date().toISOString(),
+      items: [],
+      type: "美团",
+      paymentAmount: 0,
+      receivedAmount: 0,
+      commission: 0,
+      note: "",
+    });
+  }
+
+  // Reset sync tracking during render when closed (avoids useEffect cascading render)
+  if (!isOpen && (prevId !== undefined || isNewOrder !== false)) {
+    setPrevId(undefined);
+    setIsNewOrder(false);
+  }
 
   const addItem = () => setIsSelectionModalOpen(true);
 
@@ -333,7 +329,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
 
                         <div className="space-y-3">
                             {formData.items.map((item, index) => {
-                                const product = products.find(p => p.id === item.productId);
+                                const product = item.product || products.find(p => p.id === item.productId);
                                 return (
                                     <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border bg-gray-50/50 dark:bg-white/5 dark:border-white/10 backdrop-blur-md group hover:border-primary/30 transition-all shadow-sm">
                                         <div className="flex items-center gap-4 flex-1 min-w-0">

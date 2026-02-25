@@ -35,7 +35,7 @@ export function ActionBar({
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           className="fixed bottom-6 lg:bottom-10 z-50000 pointer-events-none w-fit max-w-[calc(100%-2rem)] left-1/2 lg:left-[calc(50%+(var(--sidebar-width,0px)/2))] will-change-transform"
         >
-          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-6 pl-3 sm:pl-6 pr-2 sm:pr-4 h-14 sm:h-12 rounded-[24px] sm:rounded-full bg-white/80 dark:bg-black/40 border border-black/5 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] backdrop-blur-2xl pointer-events-auto">
+          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-6 pl-3 sm:pl-6 pr-2 sm:pr-4 h-14 sm:h-12 rounded-[24px] sm:rounded-full glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] pointer-events-auto">
 
             {/* Select All Checkbox - Minimal on mobile */}
             <button 

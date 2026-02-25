@@ -147,15 +147,15 @@
   Using semantic tokens to ensure correct light/dark adaptation.
 */
 @utility glass {
-  @apply bg-card/70 backdrop-blur-xl border border-border/50 shadow-sm dark:bg-white/5;
+  @apply bg-white/95 backdrop-blur-xl border border-white/20 shadow-xl dark:bg-[#0b111e]/98 dark:border-white/10;
 }
 
 @utility glass-panel {
-  @apply bg-card/50 backdrop-blur-2xl border border-border/50 shadow-sm dark:bg-white/5;
+  @apply bg-white/98 backdrop-blur-xl border border-white/30 shadow-2xl dark:bg-[#0b111e] dark:border-white/10;
 }
 
 @utility glass-card {
-  @apply bg-card/40 backdrop-blur-lg border border-border/50 shadow-sm transition-all hover:bg-accent/50 hover:border-border dark:bg-white/5 dark:hover:bg-white/10;
+  @apply bg-white/70 backdrop-blur-sm border border-white/20 shadow-sm transition-all hover:bg-white/80 hover:border-white/40 dark:bg-white/10 dark:hover:bg-white/15;
 }
 
 /* Disable default cross-fade for View Transitions to allow custom circular reveal */
@@ -257,19 +257,62 @@
 /* Ensure backdrop-filter works properly */
 @supports (backdrop-filter: blur(0)) or (-webkit-backdrop-filter: blur(0)) {
   .backdrop-blur-xl {
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
   .backdrop-blur-sm {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }
   .backdrop-blur-2xl {
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  .backdrop-blur-3xl {
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
   }
   .backdrop-blur-lg {
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+  }
+}
+
+/* 全局触摸交互优化：消除移动端 300ms 点击延迟 */
+button,
+a,
+[role="button"],
+[tabindex] {
+  touch-action: manipulation;
+}
+
+/* 可滚动容器：优化移动端滑动体验 */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* 低性能偏好 / 无障碍：禁用动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 移动端进一步降低 backdrop-blur 性能开销 */
+@media (max-width: 767px) {
+  @supports (backdrop-filter: blur(0)) or (-webkit-backdrop-filter: blur(0)) {
+    .backdrop-blur-xl,
+    .backdrop-blur-2xl,
+    .backdrop-blur-3xl {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
   }
 }
