@@ -3,26 +3,25 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { X, Package, Plus, Trash2, AlertTriangle, Wand2 } from "lucide-react";
 import { BrushOrder, Product } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductSelectionModal } from "../Purchases/ProductSelectionModal";
 import { useToast } from "@/components/ui/Toast";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 interface BrushOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: BrushOrder) => void;
-  onDelete?: (id: string) => void;
+  onSubmit: (data: Partial<BrushOrder>) => void;
   initialData?: BrushOrder | null;
   readOnly?: boolean;
+  onOpenBatch?: () => void;
 }
 
 const BRUSH_TYPES = ["美团", "淘宝", "京东"];
 
-export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialData, readOnly = false }: BrushOrderModalProps) {
+export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false, onOpenBatch }: BrushOrderModalProps) {
   const { showToast } = useToast();
   const [formData, setFormData] = useState<BrushOrder>(() => ({
     id: initialData?.id || "",
@@ -37,9 +36,11 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
   }));
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  // 移除单张识别状态，改为调用批量窗口
+  // const [isRecognizing, setIsRecognizing] = useState(false);
+  // const recognitionInputRef = useRef<HTMLInputElement>(null);
   
   // 1. Data Fetching
   useEffect(() => {
@@ -57,7 +58,8 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
     return () => clearTimeout(timer);
   }, []);
 
-  // 2. Body Scroll logic
+  // 2. Body Scroll logic - Removed to prevent scroll-to-top jump issue in some browsers
+  /*
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -68,6 +70,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
+  */
 
   // 3. Form Data Synchronization
   const [prevId, setPrevId] = useState<string | undefined>(undefined);
@@ -186,45 +189,56 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
             >
                 <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 p-5 sm:p-8">
                     <h2 className="text-2xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-red-500/10 dark:hover:text-red-500 rounded-full transition-colors">
-                        <X size={24} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {!readOnly && (
+                            <button
+                                type="button"
+                                onClick={onOpenBatch}
+                                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 transition-all font-bold active:scale-95"
+                            >
+                                <Wand2 size={18} />
+                                <span className="hidden sm:inline">一键识别</span>
+                            </button>
+                        )}
+                        <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-red-500/10 dark:hover:text-red-500 rounded-full transition-colors">
+                            <X size={24} />
+                        </button>
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* 第一行：日期和平台 */}
+                    <div className="grid grid-cols-2 gap-3 sm:gap-6">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-500">日期</label>
                             <DatePicker
                                 value={formData.date instanceof Date ? formData.date.toISOString() : (formData.date as string)}
                                 onChange={(val) => setFormData({...formData, date: val})}
                                 placeholder="选择日期"
-                                className="h-10"
+                                className="h-11"
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-500">平台 <span className="text-red-500">*</span></label>
                             {(() => {
                                 const isStandard = BRUSH_TYPES.filter(t => t !== "其他").includes(formData.type);
-                                
                                 if (!isStandard) {
                                     return (
                                         <div className="relative group/custom animate-in zoom-in-95 duration-200">
                                             <input
                                                 autoFocus={!readOnly}
                                                 type="text"
-                                                placeholder="输入平台名称"
+                                                placeholder="平台"
                                                 value={formData.type === "其他" ? "" : formData.type}
                                                 disabled={readOnly}
                                                 onChange={(e) => setFormData({...formData, type: e.target.value})}
-                                                className="w-full h-10 px-3 pr-10 rounded-xl border bg-transparent border-gray-200 dark:bg-white/5 dark:border-white/10 outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                                                className="w-full h-11 px-3 pr-8 rounded-2xl border bg-transparent border-gray-200 dark:bg-white/5 dark:border-white/10 outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
                                             />
                                             {!readOnly && (
                                                 <button 
                                                     type="button"
                                                     onClick={() => setFormData({...formData, type: "淘宝"})}
-                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-                                                    title="返回列表"
+                                                    className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
                                                 >
                                                     <X size={14} />
                                                 </button>
@@ -232,20 +246,19 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                                         </div>
                                     );
                                 }
-
                                 return (
                                     <CustomSelect
                                         options={BRUSH_TYPES.map(t => ({ value: t, label: t }))}
                                         value={formData.type}
                                         onChange={(val) => setFormData({...formData, type: val})}
-                                        className="w-full h-10"
+                                        className="w-full h-11"
                                     />
                                 );
                             })()}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-6">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-500">实付 <span className="text-red-500">*</span></label>
                              <div className="relative flex items-center group">
@@ -296,23 +309,24 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                                 )}
                              </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-500">佣金</label>
-                             <div className="relative flex items-center group">
-                                <span className="absolute left-3.5 text-gray-400 font-medium select-none">¥</span>
-                                <input
-                                    type="number"
-                                    className="w-full h-11 pl-8 pr-4 rounded-2xl border bg-transparent dark:bg-white/5 dark:border-white/10 focus:ring-2 focus:ring-primary/20 transition-all outline-none [&::-webkit-inner-spin-button]:appearance-none font-mono text-sm leading-none"
-                                    placeholder="0"
-                                    value={formData.commission === 0 ? "" : formData.commission}
-                                    onChange={e => {
-                                        const val = e.target.value;
-                                        setFormData({...formData, commission: val === "" ? 0 : parseFloat(val) || 0});
-                                    }}
-                                    disabled={readOnly}
-                                />
-                             </div>
-                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-500">佣金</label>
+                         <div className="relative flex items-center group">
+                            <span className="absolute left-3.5 text-gray-400 font-medium select-none">¥</span>
+                            <input
+                                type="number"
+                                className="w-full h-11 pl-8 pr-4 rounded-2xl border bg-transparent dark:bg-white/5 dark:border-white/10 focus:ring-2 focus:ring-primary/20 transition-all outline-none [&::-webkit-inner-spin-button]:appearance-none font-mono text-sm leading-none"
+                                placeholder="0"
+                                value={formData.commission === 0 ? "" : formData.commission}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setFormData({...formData, commission: val === "" ? 0 : parseFloat(val) || 0});
+                                }}
+                                disabled={readOnly}
+                            />
+                         </div>
                     </div>
 
                     <div className="space-y-4">
@@ -321,7 +335,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                                 <Package size={18} /> 关联商品 <span className="text-red-500">*</span>
                            </h3>
                            {!readOnly && (
-                               <button type="button" onClick={addItem} className="text-sm text-primary font-bold flex items-center gap-1 hover:underline">
+                               <button type="button" onClick={addItem} className="text-sm text-primary flex items-center gap-1 hover:underline">
                                     <Plus size={16} /> 添加商品
                                </button>
                            )}
@@ -388,21 +402,9 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                         />
                     </div>
 
-                    {!readOnly && (
+                    {!readOnly ? (
                         <div className="flex items-center justify-between gap-4 pt-8 border-t dark:border-white/10">
-                            <div className="shrink-0">
-                                {initialData?.id && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsConfirmOpen(true)}
-                                        className="h-11 px-5 rounded-2xl text-red-500 font-bold hover:bg-red-500/10 transition-all flex items-center justify-center gap-2 border border-red-500/10 hover:border-red-500/30 active:scale-95"
-                                        title="删除此订单"
-                                    >
-                                        <Trash2 size={18} />
-                                        <span className="hidden sm:inline">删除订单</span>
-                                    </button>
-                                )}
-                            </div>
+                            <div className="shrink-0" />
                             <div className="flex items-center gap-3 ml-auto">
                                 <button 
                                     type="button" 
@@ -415,22 +417,13 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
                                     type="submit" 
                                     className="h-11 px-8 sm:px-10 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all whitespace-nowrap"
                                 >
-                                    保存订单
+                                    {initialData ? "保存修改" : "创建订单"}
                                 </button>
                             </div>
                         </div>
-                    )}
-                    {readOnly && initialData?.id && (
-                         <div className="flex items-center justify-between gap-4 pt-6 border-t dark:border-gray-800">
-                             <button
-                                    type="button"
-                                    onClick={() => setIsConfirmOpen(true)}
-                                    className="h-10 px-4 rounded-xl text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 border border-red-500/10 hover:border-red-500/30"
-                                >
-                                    <Trash2 size={16} />
-                                    删除订单
-                                </button>
-                             <button type="button" onClick={onClose} className="h-10 px-8 rounded-xl bg-secondary font-medium hover:bg-gray-100 dark:hover:bg-gray-800 border border-border/50 transition-colors">关闭</button>
+                    ) : (
+                        <div className="flex items-center justify-end gap-4 pt-6 border-t dark:border-white/10">
+                             <button type="button" onClick={onClose} className="h-11 px-8 rounded-2xl bg-secondary font-medium hover:bg-gray-100 dark:hover:bg-white/5 dark:hover:text-foreground border border-border/50 transition-all active:scale-95">关闭详情</button>
                         </div>
                     )}
                 </form>
@@ -445,18 +438,6 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, onDelete, initialDa
         onClose={() => setIsSelectionModalOpen(false)}
         onSelect={handleBatchAdd}
         selectedIds={formData.items.map(i => i.productId)}
-    />
-    <ConfirmModal 
-        isOpen={isConfirmOpen}
-        onClose={() => setIsConfirmOpen(false)}
-        onConfirm={() => {
-            if (initialData?.id) onDelete?.(initialData.id);
-            setIsConfirmOpen(false);
-        }}
-        title="删除订单"
-        message="确定要删除此订单吗？此操作不可恢复。"
-        variant="danger"
-        confirmLabel="确认删除"
     />
     </>
   );

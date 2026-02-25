@@ -55,10 +55,10 @@ model Product {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   isPublic        Boolean             @default(true)
-  isDiscontinued  Boolean             @default(false)
   specs           Json?
-  remark          String?
   pinyin          String?
+  isDiscontinued  Boolean             @default(false)
+  remark          String?
   brushOrderItems BrushOrderItem[]
   gallery         GalleryItem[]
   outboundItems   OutboundOrderItem[]
@@ -114,7 +114,6 @@ model PurchaseOrder {
   @@index([workspaceId, date(sort: Desc)])
   @@index([workspaceId, status])
 }
-
 
 model PurchaseOrderItem {
   id                String        @id @default(cuid())
@@ -193,18 +192,18 @@ model GallerySubmission {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  email          String     @unique
-  name           String?
-  shippingAddresses Json?   @default("[]")
-  role           Role       @default(USER)
-  status         String     @default("ACTIVE")
-  permissions    Json?      @default("{}")
-  workspaceId    String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  workspace      Workspace? @relation("WorkspaceMembers", fields: [workspaceId], references: [id])
-  ownedWorkspace Workspace? @relation("WorkspaceOwner")
+  id                String     @id @default(cuid())
+  email             String     @unique
+  name              String?
+  role              Role       @default(USER)
+  status            String     @default("ACTIVE")
+  permissions       Json?      @default("{}")
+  workspaceId       String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  shippingAddresses Json?      @default("[]")
+  workspace         Workspace? @relation("WorkspaceMembers", fields: [workspaceId], references: [id])
+  ownedWorkspace    Workspace? @relation("WorkspaceOwner")
 }
 
 model EmailWhitelist {
@@ -256,15 +255,15 @@ model BrushOrder {
   date           DateTime         @default(now())
   type           String
   status         String           @default("Draft")
-  paymentAmount   Float            @default(0)
-  receivedAmount  Float            @default(0)
-  commission      Float            @default(0)
-  note            String?
-  workspaceId     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  workspace       Workspace?       @relation(fields: [workspaceId], references: [id])
-  items           BrushOrderItem[]
+  paymentAmount  Float            @default(0)
+  receivedAmount Float            @default(0)
+  commission     Float            @default(0)
+  note           String?
+  workspaceId    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  workspace      Workspace?       @relation(fields: [workspaceId], references: [id])
+  items          BrushOrderItem[]
 
   @@index([workspaceId])
 }

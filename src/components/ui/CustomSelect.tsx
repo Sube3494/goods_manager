@@ -96,7 +96,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex w-full h-full items-center justify-between rounded-xl max-md:rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-left text-sm transition-all outline-none ring-offset-background",
+          "flex w-full h-full items-center justify-between rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-left text-sm transition-all outline-none ring-offset-background",
           isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/50 dark:hover:bg-white/10",
           triggerClassName
         )}

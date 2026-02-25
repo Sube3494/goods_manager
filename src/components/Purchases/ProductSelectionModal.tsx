@@ -54,39 +54,37 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   const pageRef = useRef(1);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isDataStale, setIsDataStale] = useState(false); // 标记当前展示的数据是否与当前请求不匹配
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { showToast } = useToast();
-  const observerTarget = useRef<HTMLDivElement>(null);
+  const resultsVersion = useRef(0); // 处理竞态逻辑
 
-  // Lock background scroll
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
-
-  // 1. Sync selection when modal opens
+  // 初始化重置逻辑
   useEffect(() => {
     if (isOpen) {
       setTempSelectedIds(selectedIds);
-      setSelectedProducts([]); // Clear temporary session selections
+      setSelectedProducts([]);
       setSearchQuery("");
       setSelectedSupplierId("");
+      setProducts([]); // 初始切换时清空
+      setIsLoading(true);
+      setIsDataStale(true);
+      pageRef.current = 1;
+      setIsInitialized(true);
+    } else {
+      setIsInitialized(false);
     }
-  }, [isOpen, selectedIds]);
+  }, [isOpen, selectedIds]); // 仅在开关时触发一次重置
 
    const fetchData = useCallback(async (mode: 'initial' | 'search' | 'next' = 'initial') => {
-    if (mode === 'initial') {
-      setIsLoading(true);
+    const version = ++resultsVersion.current;
+    
+    if (mode === 'initial' || mode === 'search') {
       pageRef.current = 1;
-    } else if (mode === 'search') {
-      setIsSearching(true);
-      pageRef.current = 1;
+      setIsDataStale(true); // 开始新一轮搜索，标记旧数据失效
+      if (mode === 'search') setIsSearching(true);
     } else {
       setIsNextPageLoading(true);
     }
@@ -96,7 +94,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       const queryParams = new URLSearchParams({
         page: targetPage.toString(),
         pageSize: "20",
-        search: debouncedSearch,
+        search: mode === 'initial' ? "" : debouncedSearch,
       });
 
       const [pRes, sRes] = await Promise.all([
@@ -104,12 +102,15 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
         mode === 'initial' ? fetch("/api/suppliers") : Promise.resolve(null)
       ]);
 
+      if (version !== resultsVersion.current) return; // 检查是否已过期
+
       if (pRes.ok) {
         const pData = await pRes.json();
         const newItems = Array.isArray(pData.items) ? pData.items : [];
         
         if (mode === 'initial' || mode === 'search') {
           setProducts(newItems);
+          setIsDataStale(false); // 数据返回，标记数据新鲜
         } else {
           setProducts(prev => {
             const existingIds = new Set(prev.map(i => i.id));
@@ -127,23 +128,25 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     } catch (error) {
       console.error("Failed to fetch products or suppliers:", error);
     } finally {
-      setIsLoading(false);
-      setIsSearching(false);
-      setIsNextPageLoading(false);
+      if (version === resultsVersion.current) {
+        setIsLoading(false);
+        setIsSearching(false);
+        setIsNextPageLoading(false);
+      }
     }
   }, [debouncedSearch]);
 
   // 2. Data fetching when modal opens
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isInitialized) return;
     fetchData('initial');
-  }, [isOpen, fetchData]);
+  }, [isOpen, isInitialized, fetchData]);
 
   // 3. Search change (debounced)
   useEffect(() => {
-    if (!isOpen || isLoading) return; // Skip if modal just opened (handled by initial)
+    if (!isOpen || !isInitialized || isLoading) return; 
     fetchData('search');
-  }, [debouncedSearch, isOpen, isLoading, fetchData]);
+  }, [debouncedSearch, isOpen, isInitialized, isLoading, fetchData]);
 
   // 4. Infinite scroll observer
   useEffect(() => {
@@ -312,7 +315,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
 
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar min-h-0 relative">
-                 {isLoading ? (
+                 {(isLoading || isDataStale) ? (
                     <div className="space-y-2">
                         {[...Array(6)].map((_, i) => (
                            <ProductSkeleton key={i} />
