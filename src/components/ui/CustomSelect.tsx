@@ -126,7 +126,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
               }}
               className="z-99999 rounded-2xl glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
             >
-              <div className="max-h-60 overflow-auto p-1 py-1.5 scrollbar-hide">
+              <div className="max-h-60 overflow-auto p-1 py-1.5 custom-scrollbar">
                 {options.length > 0 ? (
                   options.map((option) => (
                     <button

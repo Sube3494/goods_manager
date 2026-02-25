@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Source Han Sans CN", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-rounded: ui-rounded, "Hiragino Maru Gothic ProN", "Quicksand", "Comfortaa", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   
   --animate-blob: blob 10s infinite;
@@ -227,6 +227,11 @@
   *:not(.custom-scrollbar)::-webkit-scrollbar {
     display: none;
   }
+  
+  /* 允许 custom-scrollbar 在滚动时显示 */
+  .custom-scrollbar::-webkit-scrollbar {
+    display: block;
+  }
 
   /* 隐藏数字输入框的加减器 (Hide number input spinners) */
   input[type="number"],
@@ -244,15 +249,7 @@
   }
 }
 
-/* 全球应用：隐藏 body 及所有具备滚动条的容器视觉 (Global application: hide scrollbar visuals for body and all scrollable containers) */
-* {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-}
-
-*::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, and Opera */
-}
+/* Ensure backdrop-filter works properly */
 
 /* Ensure backdrop-filter works properly */
 @supports (backdrop-filter: blur(0)) or (-webkit-backdrop-filter: blur(0)) {
@@ -291,7 +288,15 @@ a,
 .overflow-x-auto,
 .overflow-auto {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+}
+
+@layer utilities {
+  .font-number {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum";
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* 低性能偏好 / 无障碍：禁用动画 */

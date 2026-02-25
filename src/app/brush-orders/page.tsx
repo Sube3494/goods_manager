@@ -438,17 +438,17 @@ export default function BrushOrdersPage() {
             </div>
             
             <p className="text-[10px] sm:text-xs font-bold text-muted-foreground tracking-wider mb-1">{s.label}</p>
-            <p className={`text-xl sm:text-2xl font-mono font-black ${s.textColor}`}>
+            <p className={`text-xl sm:text-2xl font-black font-number ${s.textColor}`}>
                 {s.label === "总单数" ? "" : "¥"}{typeof s.value === 'number' && !s.suffix ? s.value.toFixed(2) : s.value}{s.suffix || ""}
             </p>
           </div>
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 mb-6 md:mb-8">
-        {/* 第一行：搜索框 + 平台选择 + 重置 */}
-        <div className="flex items-center gap-2">
+      {/* Filters - Single row on PC */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6 md:mb-8">
+        {/* Search & Platform */}
+        <div className="flex items-center gap-2 flex-1">
           <div className="h-10 sm:h-11 px-5 flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm relative">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
@@ -486,47 +486,49 @@ export default function BrushOrdersPage() {
                   )}
               />
           </div>
-
-          {hasActiveFilters && (
-            <button
-              onClick={resetFilters}
-              className="h-10 sm:h-11 px-3 sm:px-4 flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-            >
-              <RotateCcw size={14} />
-              <span className="hidden sm:inline">重置</span>
-            </button>
-          )}
         </div>
 
-        {/* 第二行：日期区间 */}
-        <div className="flex flex-nowrap items-center gap-2 h-10">
-            <DatePicker 
-                value={startDate} 
-                onChange={handleStartDateChange} 
-                maxDate={endDate}
-                placeholder="开始日期" 
-                className="h-full flex-1 md:flex-none md:w-44"
-                triggerClassName={cn(
-                    "rounded-full shadow-sm transition-all",
-                    startDate && "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30"
-                )}
-                isCompact={false}
-                align="left"
-            />
-            <span className="text-muted-foreground text-xs shrink-0 font-medium px-1">至</span>
-            <DatePicker 
-                value={endDate} 
-                onChange={handleEndDateChange} 
-                minDate={startDate}
-                placeholder="结束日期" 
-                className="h-full flex-1 md:flex-none md:w-44"
-                triggerClassName={cn(
-                    "rounded-full shadow-sm transition-all",
-                    endDate && "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30"
-                )}
-                isCompact={false}
-                align="right"
-            />
+        {/* Date Range & Reset */}
+        <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 h-10">
+                <DatePicker 
+                    value={startDate} 
+                    onChange={handleStartDateChange} 
+                    maxDate={endDate}
+                    placeholder="开始日期" 
+                    className="h-full w-full sm:w-36 md:w-40 lg:w-32 xl:w-40"
+                    triggerClassName={cn(
+                        "rounded-full shadow-sm transition-all",
+                        startDate && "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30"
+                    )}
+                    isCompact={false}
+                    align="left"
+                />
+                <span className="text-muted-foreground text-xs shrink-0 font-medium">至</span>
+                <DatePicker 
+                    value={endDate} 
+                    onChange={handleEndDateChange} 
+                    minDate={startDate}
+                    placeholder="结束日期" 
+                    className="h-full w-full sm:w-36 md:w-40 lg:w-32 xl:w-40"
+                    triggerClassName={cn(
+                        "rounded-full shadow-sm transition-all",
+                        endDate && "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30"
+                    )}
+                    isCompact={false}
+                    align="right"
+                />
+            </div>
+
+            {hasActiveFilters && (
+                <button
+                    onClick={resetFilters}
+                    className="h-10 sm:h-11 w-10 sm:w-11 flex items-center justify-center rounded-full border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0"
+                    title="重置筛选"
+                >
+                    <RotateCcw size={16} />
+                </button>
+            )}
         </div>
       </div>
 
@@ -659,9 +661,9 @@ export default function BrushOrdersPage() {
                                       {order.type}
                                   </span>
                               </td>
-                              <td className="px-6 py-4 font-mono font-medium text-center text-sm">¥{order.paymentAmount.toFixed(2)}</td>
-                              <td className="px-6 py-4 font-mono font-bold text-emerald-500 text-center text-sm">¥{order.receivedAmount.toFixed(2)}</td>
-                              <td className="px-6 py-4 font-mono font-bold text-orange-500 text-center text-sm">¥{order.commission.toFixed(2)}</td>
+                              <td className="px-6 py-4 font-number font-medium text-center text-sm">¥{order.paymentAmount.toFixed(2)}</td>
+                              <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm">¥{order.receivedAmount.toFixed(2)}</td>
+                              <td className="px-6 py-4 font-number font-bold text-orange-500 text-center text-sm">¥{order.commission.toFixed(2)}</td>
                               <td className="px-6 py-4 text-center">
                                  <p className="text-xs text-muted-foreground line-clamp-1 max-w-[150px] mx-auto" title={order.note}>
                                      {order.note || "-"}

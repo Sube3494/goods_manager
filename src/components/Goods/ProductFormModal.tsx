@@ -785,7 +785,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
                     {/* SKU */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -985,7 +985,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         </div>
                                     )}
 
-                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
                                         {isLoadingBatches ? (
                                             <div className="py-4 text-center text-[10px] text-muted-foreground">加载记录中...</div>
                                         ) : inboundHistory.length > 0 ? (

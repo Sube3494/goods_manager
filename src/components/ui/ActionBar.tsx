@@ -51,7 +51,7 @@ export function ActionBar({
 
             {/* Left Info */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <span className="text-[13px] sm:text-sm font-black text-black dark:text-white whitespace-nowrap truncate">已选 {selectedCount} {label}</span>
+              <span className="text-[13px] sm:text-sm font-black text-black dark:text-white whitespace-nowrap truncate">已选 <span className="font-number">{selectedCount}</span> {label}</span>
               <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest hidden md:inline">批量管理</span>
             </div>
 

@@ -153,7 +153,7 @@ export const GoodsCard = memo(function GoodsCard({
         <div className="mt-2 flex items-center justify-between pt-4 border-t border-white/10">
           <div>
             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">库存</p>
-            <p className={`text-sm font-bold mt-0.5 ${product.stock < lowStockThreshold ? 'text-destructive' : 'text-foreground'}`}>
+            <p className={`text-sm font-bold mt-0.5 font-number ${product.stock < lowStockThreshold ? 'text-destructive' : 'text-foreground'}`}>
                {product.stock} <span className="text-[10px] font-bold inline-block ml-1">件</span>
             </p>
           </div>
@@ -161,9 +161,9 @@ export const GoodsCard = memo(function GoodsCard({
              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">进货单价</p>
              <p className="font-bold text-foreground">
                 {Number(product.costPrice || 0) > 0 ? (
-                  <span className="text-base sm:text-lg">¥{Number(product.costPrice).toLocaleString()}</span>
+                  <span className="text-base sm:text-lg font-number">¥{Number(product.costPrice).toLocaleString()}</span>
                 ) : (
-                  <span className="text-xs sm:text-sm text-foreground font-bold">以实际为准</span>
+                  <span className="text-xs sm:text-sm text-foreground font-bold font-number">以实际为准</span>
                 )}
              </p>
           </div>
