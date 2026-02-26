@@ -6,8 +6,12 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+    const productId = searchParams.get("productId");
+    
+    const targetId = id || productId;
+
+    if (!targetId) {
+      return NextResponse.json({ error: "Missing ID or ProductID" }, { status: 400 });
     }
 
     const setting = await prisma.systemSetting.findUnique({
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
     
     // 生成简单的带盐签名，防止篡改过期时间
     const signature = createHmac("sha256", secret)
-      .update(`${id}:${expires}`)
+      .update(`${targetId}:${expires}`)
       .digest("hex")
       .slice(0, 16);
 

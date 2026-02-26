@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
-import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw } from "lucide-react";
+import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -731,8 +731,13 @@ function GalleryContent() {
                                         muted
                                         loop
                                         playsInline
-                                        // Optional: autoPlay if you want motion on hover, but static is safer for perf
-                                        onMouseOver={e => e.currentTarget.play()}
+                                        onMouseOver={e => {
+                                            const v = e.currentTarget;
+                                            const playPromise = v.play();
+                                            if (playPromise !== undefined) {
+                                                playPromise.catch(() => {});
+                                            }
+                                        }}
                                         onMouseOut={e => {
                                             e.currentTarget.pause();
                                             e.currentTarget.currentTime = 0;
@@ -762,8 +767,13 @@ function GalleryContent() {
                                     </>
                                 )}
                                 
-                                {/* Removed SKU badge from card top right */}
-
+                                {/* 媒体数量 (Media Count) - 完美契合右上角 */}
+                                {group.items.length > 1 && (
+                                    <div className="absolute top-0 right-0 z-20 h-7 min-w-[32px] px-2 flex items-center justify-center bg-black/60 backdrop-blur-md text-white text-[11px] font-black leading-none pointer-events-none rounded-bl-2xl border-b border-l border-white/10" style={{ borderTopRightRadius: 'inherit' }}>
+                                        {group.items.length}
+                                    </div>
+                                )}
+                                
                                 <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/95 via-black/40 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-2.5 sm:p-5 pt-12 sm:pt-16">
                                     <div className="flex flex-col gap-0.5 sm:gap-1">
                                         <p className="text-white font-bold text-[9.5px] sm:text-[11px] line-clamp-2 leading-tight" style={{ fontFamily: 'ui-rounded, "SF Pro Rounded", "PingFang SC", "Hiragino Maru Gothic ProN", sans-serif' }}>{group.product.name}</p>
@@ -1344,6 +1354,28 @@ function GalleryContent() {
                                         title="复制媒体链接"
                                     >
                                         <Link2 size={18} />
+                                    </button>
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                const productId = selectedImage.productId;
+                                                const res = await fetch(`/api/share/sign?productId=${productId}`);
+                                                if (!res.ok) throw new Error("Sign failed");
+                                                const { expires, signature, expireText } = await res.json();
+                                                const url = new URL(`/share/product/${productId}?e=${expires}&s=${signature}`, window.location.origin).href;
+                                                navigator.clipboard.writeText(url).then(() => {
+                                                    showToast(`相册链接已复制，${expireText}内有效`, "success");
+                                                }).catch(() => {
+                                                    showToast("复制失败", "error");
+                                                });
+                                            } catch {
+                                                showToast("生成链接失败", "error");
+                                            }
+                                        }}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
+                                        title="转发（分享全套实拍）"
+                                    >
+                                        <ExternalLink size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                                     </button>
                                     <button 
                                         onClick={() => {

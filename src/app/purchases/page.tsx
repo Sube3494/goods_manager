@@ -287,13 +287,13 @@ function PurchasesContent() {
     }
   };
 
-  const handleUpdateTracking = async (id: string, trackingData: TrackingInfo[], paymentVouchers?: string[]) => {
+  const handleUpdateTracking = async (id: string, trackingData: TrackingInfo[], paymentVouchers?: string[], shouldTransition: boolean = true) => {
     try {
-      // 记录当前状态，如果是 Confirmed/Ordered，则流转到 Shipped (仅当有物流信息时)
+      // 记录当前状态，如果是 Confirmed/Ordered，则流转到 Shipped (仅当有物流信息时，且用户明确要求流转)
       const currentOrder = purchases.find(p => p.id === id);
       const hasTracking = trackingData && trackingData.length > 0 && trackingData.some(td => td.number.trim());
       
-      const newStatus = ((currentOrder?.status === "Confirmed" || (currentOrder?.status as string) === "Ordered") && hasTracking)
+      const newStatus = (shouldTransition && (currentOrder?.status === "Confirmed" || (currentOrder?.status as string) === "Ordered") && hasTracking)
         ? "Shipped" 
         : currentOrder?.status;
 
@@ -307,8 +307,12 @@ function PurchasesContent() {
         }),
       });
       if (res.ok) {
-        fetchData();
-        showToast("进货资料已更新", "success");
+        const updatedOrder = await res.json();
+        // fetchData(); // 移除全量刷新，改为局部更新
+        setPurchases(prev => prev.map(p => p.id === id ? { ...p, ...updatedOrder } : p));
+        
+        const isNowShipped = newStatus === "Shipped" && currentOrder?.status !== "Shipped";
+        showToast(shouldTransition && isNowShipped ? "进货资料已更新，订单已发货" : "进货资料已暂存", "success");
       } else {
         showToast("更新失败", "error");
       }

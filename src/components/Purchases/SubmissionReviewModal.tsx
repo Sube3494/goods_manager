@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Check, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ProductSelectionModal } from "./ProductSelectionModal";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
@@ -56,6 +56,7 @@ export function SubmissionReviewModal({
     }, []);
     const [previewMedia, setPreviewMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
     const { showToast } = useToast();
+    const videoPreviewRef = useRef<HTMLVideoElement>(null);
 
     // Derived state / render-time update pattern to avoid useEffect cascading renders
     const [prevSubmissionId, setPrevSubmissionId] = useState<string | null>(null);
@@ -86,6 +87,19 @@ export function SubmissionReviewModal({
         setCurrentPage(1);
         setPreviewMedia(null);
     }
+
+    useEffect(() => {
+        if (previewMedia?.type === 'video') {
+            const video = videoPreviewRef.current;
+            if (video) {
+                video.currentTime = 0;
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {});
+                }
+            }
+        }
+    }, [previewMedia?.url, previewMedia?.type]);
 
     // Fetch product name when ID changes
     useEffect(() => {
@@ -451,11 +465,7 @@ export function SubmissionReviewModal({
                                             src={previewMedia.url} 
                                             controls 
                                             className="max-h-[85vh] rounded-2xl shadow-2xl"
-                                            ref={(el) => {
-                                                if (el && el.paused) {
-                                                    el.play().catch(() => {});
-                                                }
-                                            }}
+                                            ref={videoPreviewRef}
                                         />
 
                                     ) : (

@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 export interface TrackingNumberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (trackingData: TrackingInfo[], paymentVouchers?: string[]) => void;
+  onConfirm: (trackingData: TrackingInfo[], paymentVouchers?: string[], shouldTransition?: boolean) => void;
   initialValue?: TrackingInfo[];
   paymentVouchers?: string[];
   paymentVoucher?: string;
@@ -217,11 +217,11 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
     });
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, shouldTransition: boolean = true) => {
     e.preventDefault();
     if (readOnly) return;
-    const validRows = rows.filter(r => r.number.trim());
-    onConfirm(validRows, paymentVouchers);
+    const validRows = rows.filter(r => r.number.trim() || (r.waybillImages && r.waybillImages.length > 0) || r.waybillImage);
+    onConfirm(validRows, paymentVouchers, shouldTransition);
     onClose();
   };
 
@@ -350,7 +350,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
               </button>
             </div>
 
-             <form onSubmit={handleSubmit} className={`flex flex-col min-h-0 bg-background/20 ${mode === 'payment' ? 'justify-center' : ''}`}>
+             <form onSubmit={(e) => handleSubmit(e, true)} className={`flex flex-col min-h-0 bg-background/20 ${mode === 'payment' ? 'justify-center' : ''}`}>
               <div className={`flex-1 overflow-y-auto p-6 sm:p-12 ${mode !== "payment" ? "space-y-6 sm:space-y-8" : "space-y-0"}`}>
                 {mode !== "payment" && rows.map((row, index) => {
                   const isStandard = COURIER_OPTIONS.filter(o => o !== "其他").includes(row.courier);
@@ -410,7 +410,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                                 <CourierSelect 
                                 value={row.courier} 
                                 isStandard={isStandard}
-                                readOnly={readOnly || lockPackages || mode === "waybill"}
+                                readOnly={readOnly || lockPackages}
                                 onSelect={(val) => updateRow(index, "courier", val)} 
                               />
                             )}
@@ -530,7 +530,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                               />
                               <Camera size={20} className="text-muted-foreground group-hover/up:text-primary transition-colors" />
                               <div className="flex flex-col items-center">
-                                  <span className="text-[10px] font-bold text-muted-foreground/60 group-hover/up:text-primary mb-0.5">上传凭证</span>
+                                  <span className="text-[10px] font-bold text-muted-foreground/60 group-hover/up:text-primary mb-0.5">上传面单</span>
                                   <span className="text-[10px] scale-90 text-muted-foreground/40 font-medium group-hover/up:text-primary/60 transition-colors">支持 Ctrl+V</span>
                               </div>
                             </label>
@@ -538,7 +538,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                           
                           {images.length === 0 && readOnly && (
                             <div className="h-20 w-28 rounded-xl border border-dashed border-border/40 bg-muted/5 flex items-center justify-center">
-                              <span className="text-[10px] font-bold text-muted-foreground/40 italic">暂无凭证</span>
+                              <span className="text-[10px] font-bold text-muted-foreground/40 italic">暂无面单</span>
                             </div>
                           )}
                         </div>
@@ -635,38 +635,52 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                 )}
               </div>
 
-               <div className="p-6 sm:p-10 border-t border-border/40 shrink-0 bg-muted/10">
-                <div className="flex gap-3 sm:gap-4">
+              <div className="p-6 sm:p-10 border-t border-border/40 shrink-0 bg-muted/10">
+                <div className="flex items-center justify-between gap-4">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="flex-1 h-12 rounded-xl px-2 sm:px-4 text-xs sm:text-sm font-bold border border-border dark:border-white/10 hover:bg-secondary transition-colors"
+                    className="h-12 px-6 text-sm font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-2xl transition-all active:scale-95"
                   >
                     取消
                   </button>
-                  <button
-                    type="submit"
-                    disabled={readOnly || (paymentVouchers.length === 0 && rows.some(r => r.number.trim()))}
-                    className={`flex-2 sm:flex-1 h-12 rounded-xl px-2 sm:px-4 text-xs sm:text-sm font-black shadow-xl transition-all flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:pointer-events-none ${
-                        readOnly 
-                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-                        : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-black/10 dark:shadow-white/5 hover:brightness-110 active:scale-[0.98]'
-                    }`}
-                  >
+
+                  <div className="flex items-center gap-3">
                     {readOnly ? (
-                        <>
-                            <CheckCircle2 size={18} />
-                            <span className="truncate">数据锁定</span>
-                        </>
+                      <div className="flex items-center gap-2 h-12 px-8 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold">
+                        <CheckCircle2 size={18} />
+                        <span>数据锁定</span>
+                      </div>
                     ) : (
-                        <>
-                            <CheckCircle2 size={18} />
-                            <span className="truncate">
-                                {mode === "payment" ? "保存支付凭证" : mode === "tracking" ? "保存物流单号" : mode === "waybill" ? "保存物流面单" : "保存进货资料"}
-                            </span>
-                        </>
+                      <>
+                        {mode !== 'payment' && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleSubmit(e, false)}
+                            className="h-12 px-6 rounded-2xl text-sm font-bold border border-orange-500/20 bg-orange-500/5 text-orange-500/80 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all active:scale-95 shadow-sm"
+                          >
+                            暂存
+                          </button>
+                        )}
+                        <button
+                          type="submit"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleSubmit(e as any, true);
+                          }}
+                          className="h-12 px-8 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black shadow-xl shadow-gray-900/10 dark:shadow-white/10 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
+                        >
+                          <CheckCircle2 size={18} />
+                          <span className="truncate">
+                            {mode === "payment" ? "保存提交" : 
+                             mode === "tracking" ? "保存并完成发货" : 
+                             mode === "waybill" ? "保存并完成上传" : 
+                             "保存并完成录入"}
+                          </span>
+                        </button>
+                      </>
                     )}
-                  </button>
+                  </div>
                 </div>
               </div>
             </form>

@@ -77,7 +77,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const isDraggingTask = useRef(false);
   const dragSrcId = useRef<string | null>(null);
   const dragOverId = useRef<string | null>(null);
-  const [dragOverImageId, setDragOverImageId] = useState<string | null>(null);
+  const [dragOverImageId, setDragOverImageId] = useState<string|null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
   
   // 批量管理状态 (Batch manage state)
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -630,6 +631,21 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   useEffect(() => {
     resetTransform();
   }, [selectedPreviewImage?.id]);
+
+  useEffect(() => {
+    if (selectedPreviewImage?.type === 'video' || (selectedPreviewImage?.url && /\.(mp4|webm|ogg|mov)$/i.test(selectedPreviewImage.url))) {
+      const video = videoPreviewRef.current;
+      if (video) {
+        video.currentTime = 0;
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Interrupted play is fine to ignore
+          });
+        }
+      }
+    }
+  }, [selectedPreviewImage?.id, selectedPreviewImage?.url, selectedPreviewImage?.type]);
 
   const navigatePreview = (dir: number) => {
     if (!selectedPreviewImage) return;
@@ -1250,8 +1266,18 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                         src={img.url}
                                                         className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
                                                         muted playsInline
-                                                        onMouseOver={(e) => (e.target as HTMLVideoElement).play()}
-                                                        onMouseOut={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                                                        onMouseOver={(e) => {
+                                                            const v = e.target as HTMLVideoElement;
+                                                            const playPromise = v.play();
+                                                            if (playPromise !== undefined) {
+                                                                playPromise.catch(() => {});
+                                                            }
+                                                        }}
+                                                        onMouseOut={(e) => { 
+                                                            const v = e.target as HTMLVideoElement; 
+                                                            v.pause(); 
+                                                            v.currentTime = 0; 
+                                                        }}
                                                     />
                                                     {!isBatchMode && (
                                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover/video:opacity-0 transition-opacity">
@@ -1502,11 +1528,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 src={selectedPreviewImage.url} 
                                 className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
                                 controls
-                                ref={(el) => {
-                                    if (el && el.paused) {
-                                        el.play().catch(() => {});
-                                    }
-                                }}
+                                ref={videoPreviewRef}
                             />
 
                     ) : (
