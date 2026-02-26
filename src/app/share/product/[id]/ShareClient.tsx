@@ -197,8 +197,15 @@ export function ProductShareClient({ items }: ProductShareClientProps) {
                             )}
                         >
                             {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
-                                <div className="w-full h-full bg-black flex items-center justify-center">
-                                    <PlayCircle size={20} className="text-white/90" />
+                                <div className="w-full h-full bg-black flex items-center justify-center relative">
+                                    <video 
+                                        src={`${img.url}#t=0.1`} 
+                                        className="w-full h-full object-cover opacity-60" 
+                                        muted 
+                                        playsInline 
+                                        preload="metadata"
+                                    />
+                                    <PlayCircle size={20} className="text-white/90 absolute" />
                                 </div>
                             ) : (
                                 <Image src={img.url} alt="" fill sizes="50px" className="object-cover" />

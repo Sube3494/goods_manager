@@ -725,24 +725,32 @@ function GalleryContent() {
 
                             <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
                                 {isVideoCover ? (
-                                    <video 
-                                        src={coverUrl} 
-                                        className="w-full h-full object-cover pointer-events-none"
-                                        muted
-                                        loop
-                                        playsInline
-                                        onMouseOver={e => {
-                                            const v = e.currentTarget;
-                                            const playPromise = v.play();
-                                            if (playPromise !== undefined) {
-                                                playPromise.catch(() => {});
-                                            }
-                                        }}
-                                        onMouseOut={e => {
-                                            e.currentTarget.pause();
-                                            e.currentTarget.currentTime = 0;
-                                        }}
-                                    />
+                                    <div className="relative w-full h-full">
+                                        <video 
+                                            src={`${coverUrl}#t=0.1`} 
+                                            className="w-full h-full object-cover pointer-events-none"
+                                            muted
+                                            loop
+                                            playsInline
+                                            preload="metadata"
+                                            onMouseOver={e => {
+                                                const v = e.currentTarget;
+                                                const playPromise = v.play();
+                                                if (playPromise !== undefined) {
+                                                    playPromise.catch(() => {});
+                                                }
+                                            }}
+                                            onMouseOut={e => {
+                                                e.currentTarget.pause();
+                                                e.currentTarget.currentTime = 0;
+                                            }}
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <div className="bg-black/20 backdrop-blur-sm rounded-full p-3 border border-white/20 shadow-xl group-hover:scale-110 transition-transform duration-500">
+                                                <PlayCircle size={32} className="text-white fill-white/20" strokeWidth={1.5} />
+                                            </div>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <>
                                         <div className="absolute inset-0 bg-muted animate-pulse" />
@@ -1480,7 +1488,7 @@ function GalleryContent() {
                                                 {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
                                                     <div className="w-full h-full bg-black flex items-center justify-center">
                                                         <video 
-                                                            src={img.url} 
+                                                            src={`${img.url}#t=0.1`} 
                                                             className="w-full h-full object-cover opacity-60" 
                                                             muted 
                                                             playsInline 
