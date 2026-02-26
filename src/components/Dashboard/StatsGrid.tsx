@@ -86,7 +86,7 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
           transition={{ duration: 0.6, delay: i * 0.1, ease: [0.23, 1, 0.32, 1] }}
           onClick={() => stat.href && router.push(stat.href)}
           className={cn(
-            "group relative overflow-hidden rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-6 backdrop-blur-xl transition-all duration-500",
+            "group relative overflow-hidden rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-4 sm:p-6 backdrop-blur-xl transition-all duration-500",
             "hover:-translate-y-2 hover:bg-white/80 dark:hover:bg-white/10 hover:border-black/12 dark:hover:border-white/20 hover:shadow-2xl hover:shadow-black/5 dark:glowColor",
             stat.glowColor,
             stat.href ? 'cursor-pointer active:scale-[0.98]' : ''
@@ -100,7 +100,7 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
           
           {/* Border Glow Animation (Bottom Shine) */}
           <div className="absolute inset-x-0 bottom-0 h-px bg-linear-to-r from-transparent via-black/10 dark:via-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
+ 
           <div className="relative z-10 flex flex-col justify-between h-full">
             <div className="flex items-center justify-between mb-8">
                <div className="flex flex-col gap-1">
@@ -114,10 +114,10 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
                  <stat.icon size={20} strokeWidth={2.5} />
                </div>
             </div>
-
+ 
             <div className="space-y-3">
                <div className="flex items-baseline gap-2">
-                 <span className="text-4xl font-black tracking-tighter text-foreground font-mono">
+                 <span className="text-2xl sm:text-4xl font-black tracking-tighter text-foreground font-mono">
                    {stat.value}
                  </span>
                  {stat.title.includes("货值") && <span className="text-xs font-bold text-muted-foreground">CNY</span>}

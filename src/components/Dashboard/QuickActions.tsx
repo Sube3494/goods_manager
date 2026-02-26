@@ -38,7 +38,7 @@ export function QuickActions() {
   ];
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-6 backdrop-blur-xl shadow-xs dark:shadow-none">
+    <div className="relative overflow-hidden rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-4 sm:p-6 backdrop-blur-xl shadow-xs dark:shadow-none">
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between px-2">
             <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground/60">快速指挥中心</h3>

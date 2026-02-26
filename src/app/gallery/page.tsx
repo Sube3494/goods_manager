@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
-import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -994,12 +994,12 @@ function GalleryContent() {
                                                 
                                                 {/* Selection Checkbox */}
                                                 <div className={cn(
-                                                    "absolute top-2 right-2 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shadow-xl",
+                                                    "absolute top-2 right-2 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shadow-lg",
                                                     isSelected 
-                                                        ? "bg-primary border-primary text-white" 
-                                                        : "bg-black/30 border-white/50 backdrop-blur-sm hover:border-white"
+                                                        ? "bg-foreground border-foreground text-background scale-110" 
+                                                        : "bg-white/50 dark:bg-zinc-800/50 border-white/50 dark:border-white/20 backdrop-blur"
                                                 )}>
-                                                    {isSelected && <CheckCircle size={14} strokeWidth={3} className="drop-shadow-sm" />}
+                                                    {isSelected && <Check size={14} strokeWidth={4} />}
                                                 </div>
 
                                                 <div className={cn(
@@ -1065,14 +1065,7 @@ function GalleryContent() {
                                                                 : "点击选择关联商品..."
                                                             }
                                                         </span>
-                                                        {uploadForm.productId && (() => {
-                                                            const p = products.find(p => p.id === uploadForm.productId);
-                                                            return p && (
-                                                                <span className="text-xs text-muted-foreground font-mono opacity-70">
-                                                                    {p.sku}
-                                                                </span>
-                                                            );
-                                                        })()}
+                                                        {/* SKU hidden as per user request */}
                                                     </div>
                                                 </div>
                                                 <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
@@ -1279,11 +1272,6 @@ function GalleryContent() {
                                                 <div className="flex flex-col gap-1 font-rounded">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-black shrink-0">商品信息</span>
-                                                        {selectedImage!.product?.sku && (
-                                                            <span className="inline-flex items-center justify-center bg-white/10 px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-bold leading-none text-white/90">
-                                                                {selectedImage!.product?.sku}
-                                                            </span>
-                                                        )}
                                                     </div>
                                                     <h3 className="text-white font-bold text-sm md:text-xl leading-snug tracking-tight">
                                                         {selectedImage!.product?.name}

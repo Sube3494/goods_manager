@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
@@ -1252,10 +1252,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             {/* Batch selection overlay */}
                                             {isBatchMode && (
                                                 <div className={cn(
-                                                    "absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                                                    isSelected ? "bg-primary border-primary text-white shadow-lg" : "bg-white/20 border-white/40 backdrop-blur-md"
+                                                    "absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shadow-lg",
+                                                    isSelected 
+                                                        ? "bg-foreground border-foreground text-background scale-110" 
+                                                        : "bg-white/50 dark:bg-zinc-800/50 border-white/50 dark:border-white/20 backdrop-blur"
                                                 )}>
-                                                    {isSelected && <CheckCircle size={14} strokeWidth={3} />}
+                                                    {isSelected && <Check size={14} strokeWidth={4} />}
                                                 </div>
                                             )}
 

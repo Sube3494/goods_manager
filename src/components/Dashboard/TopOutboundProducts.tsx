@@ -37,7 +37,7 @@ export function TopOutboundProducts() {
   }, []);
 
   const TitleSection = () => (
-    <div className="p-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0">
+    <div className="p-4 sm:p-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0">
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
           <TrendingUp className="text-orange-500" size={16} />
@@ -60,7 +60,7 @@ export function TopOutboundProducts() {
       
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {isLoading ? (
-          <div className="flex flex-col gap-4 p-6">
+          <div className="flex flex-col gap-4 p-4 sm:p-6">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex items-center gap-4 animate-pulse">
                 <div className="w-14 h-14 rounded-2xl bg-black/3 dark:bg-white/5 border border-black/3 dark:border-white/5 shrink-0" />

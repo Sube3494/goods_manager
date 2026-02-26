@@ -74,5 +74,6 @@ export default async function ProductSharePage({ params, searchParams }: { param
   // Cast safely for the client component
   return <ProductShareClient 
     items={product.gallery as unknown as { id: string; url: string; type: string }[]} 
+    productName={product.name}
   />;
 }

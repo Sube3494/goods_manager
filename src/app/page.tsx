@@ -75,9 +75,8 @@ export default function Home() {
   }
 
   return (
-    <div className="relative isolate px-1">
-
-      <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="relative px-3 sm:px-1">
+      <div className="space-y-6 sm:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Header */}
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between mb-8">
           <div className="min-w-0 flex-1">
@@ -131,11 +130,11 @@ export default function Home() {
         </div>
 
         {/* Main Content Grid (1:1 Layout) */}
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-2 items-stretch pb-10">
-           <div className="w-full flex">
+        <div className="grid gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-2 items-stretch pb-10">
+           <div className="w-full flex min-w-0">
               <RecentInbound items={statsData?.recentInboundItems || []} isLoading={isLoading} />
            </div>
-           <div className="w-full flex">
+           <div className="w-full flex min-w-0">
               <TopOutboundProducts />
            </div>
         </div>
