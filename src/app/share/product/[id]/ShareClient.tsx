@@ -128,28 +128,21 @@ export function ProductShareClient({ items, productName }: ProductShareClientPro
       {/* Top Controls */}
       <motion.div 
         style={{ opacity: uiOpacity }}
-        className="absolute top-6 right-6 z-50 flex items-center gap-3 pointer-events-auto"
+        className="absolute top-6 right-6 z-50 pointer-events-auto"
       >
-        <div className="flex flex-col items-end gap-1">
-            <h1 className="text-sm md:text-base font-black tracking-tight text-white/90 drop-shadow-lg">
-                {productName}
-            </h1>
-            <div className="flex items-center gap-2">
-                <button 
-                    onClick={() => {
-                        const timestamp = new Date().getTime();
-                        const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
-                        const ext = isVideo ? 'mp4' : 'jpg';
-                        const fileName = `${productName}_${timestamp}.${ext}`;
-                        handleDownload(selectedImage.url, fileName);
-                    }}
-                    className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/40 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-xl group shadow-2xl"
-                    title="下载此文件"
-                >
-                    <Download size={20} className="group-hover:translate-y-0.5 transition-transform" />
-                </button>
-            </div>
-        </div>
+        <button 
+            onClick={() => {
+                const timestamp = new Date().getTime();
+                const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
+                const ext = isVideo ? 'mp4' : 'jpg';
+                const fileName = `${productName}_${timestamp}.${ext}`;
+                handleDownload(selectedImage.url, fileName);
+            }}
+            className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-black/40 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-xl group shadow-2xl"
+            title="下载此文件"
+        >
+            <Download size={20} className="group-hover:translate-y-0.5 transition-transform" />
+        </button>
       </motion.div>
 
       {/* Main Lightbox Area */}
