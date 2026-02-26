@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
-import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText, Download, RotateCcw, X } from "lucide-react";
+import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText, RotateCcw, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -247,18 +247,30 @@ function PurchasesContent() {
   };
 
   const handleDelete = async (id: string) => {
+    const po = purchases.find(p => p.id === id);
+    if (!po) return;
+
+    const isReceived = po.status === "Received";
+    
+    let message = `确定要删除单号为 ${id} 的采购单吗？此操作将移除所有关联的采购项目，且不可恢复。`;
+    if (isReceived) {
+      message = `警告：该采购单 [${id}] 已入库。删除此单据不会自动回滚已增加的商品库存。您确定要强制删除吗？此操作不可逆。`;
+    }
+
     setConfirmConfig({
       isOpen: true,
-      title: "删除采购单",
-      message: `确定要删除单号为 ${id} 的采购单吗？此操作将移除所有关联的采购项目，且不可恢复。`,
+      title: isReceived ? "强制删除已入库单据" : "删除采购单",
+      message,
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
           if (res.ok) {
-            fetchData();
+            setPurchases(prev => prev.filter(p => p.id !== id));
             showToast("采购单已删除", "success");
+            setIsModalOpen(false); // Close modal if delete was triggered from inside
           } else {
-            showToast("删除失败", "error");
+            const errData = await res.json();
+            showToast(errData.error || "删除失败", "error");
           }
         } catch (error) {
           console.error("Delete purchase failed:", error);
@@ -899,29 +911,27 @@ function PurchasesContent() {
                             </div>
                         )}
 
-                        {/* Actions: Only allow edit/delete for Drafts */}
-                        {po.status === "Draft" ? (
-                          <>
-                            {canEdit && (
-                              <button 
-                                  onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
-                                  className="p-2 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors"
-                                  title="编辑"
-                              >
-                                 <Edit2 size={16} />
-                              </button>
-                            )}
-                            {canEdit && (
-                               <button 
-                                   onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
-                                   className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                                   title="删除"
-                               >
-                                 <Trash2 size={16} />
-                               </button>
-                            )}
-                          </>
-                        ) : null}
+                        {/* Actions: Allow delete for all if has permission, edit only for Drafts */}
+                        <div className="flex gap-1">
+                          {po.status === "Draft" && canEdit && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
+                                className="p-2 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors"
+                                title="编辑"
+                            >
+                               <Edit2 size={16} />
+                            </button>
+                          )}
+                          {canEdit && (
+                             <button 
+                                 onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
+                                 className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                                 title="删除"
+                             >
+                               <Trash2 size={16} />
+                             </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </motion.tr>
@@ -1130,23 +1140,25 @@ function PurchasesContent() {
                     )}
   
                     
-                    {/* Actions: Only allow edit/delete for Drafts */}
-                    {po.status === "Draft" ? (
-                      <div className="flex gap-2">
+                    {/* Actions: Allow delete for all if has permission, edit only for Drafts */}
+                    <div className="flex gap-2">
+                       {po.status === "Draft" && (
                          <button 
                           onClick={() => handleEdit(po)}
                           className="h-9 w-9 flex items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 active:scale-95 transition-all"
                         >
                           <Edit2 size={16} />
                         </button>
+                       )}
+                       {canEdit && (
                         <button 
                           onClick={() => handleDelete(po.id)}
                           className="h-9 w-9 flex items-center justify-center rounded-lg bg-red-500/10 text-destructive hover:bg-red-500/20 active:scale-95 transition-all"
                         >
                           <Trash2 size={16} />
                         </button>
-                      </div>
-                    ) : null}
+                       )}
+                    </div>
                 </div>
               </motion.div>
             ))

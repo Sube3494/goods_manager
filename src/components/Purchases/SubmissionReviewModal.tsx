@@ -407,19 +407,19 @@ export function SubmissionReviewModal({
                                 </div>
                             </div>
 
-                            {/* Mobile Actions Footer - Order 3 */}
+                             {/* Mobile Actions Footer - Order 3 */}
                              <div className="md:hidden p-4 pt-0 shrink-0 order-3">
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-2 gap-2">
                                     <button 
                                         onClick={handleRejectClick}
-                                        className="h-11 rounded-xl bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors"
+                                        className="h-10 rounded-xl bg-destructive/10 text-destructive text-[13px] font-bold hover:bg-destructive/20 transition-colors"
                                     >
                                         拒绝
                                     </button>
                                     <button 
                                         onClick={handleApproveClick}
                                         disabled={(!approvedProductId || selectedMediaIndices.length === 0) || (submission.status === 'approved' && approvedProductId === submission.productId && JSON.stringify([...selectedMediaIndices].sort()) === JSON.stringify([...(submission.selectedIndices || [])].sort()))}
-                                        className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-2 shadow-xl shadow-primary/20 disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
+                                        className="h-10 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold flex items-center justify-center gap-1.5 shadow-xl shadow-primary/20 disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
                                     >
                                         {submission.status === 'approved' ? '更新' : '批准'} {selectedMediaIndices.length > 0 && `(${selectedMediaIndices.length})`}
                                     </button>

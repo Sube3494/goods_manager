@@ -104,14 +104,18 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   }, [formData.items]);
 
 
-  // Robust scroll lock logic: standard overflow hidden with scrollbar-gutter
+  // Robust scroll lock logic: standard overflow hidden on both body and html to prevent leakage
   useEffect(() => {
     if (isOpen) {
-      const originalStyle = document.body.style.overflow;
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
       
       return () => {
-        document.body.style.overflow = originalStyle;
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
       };
     }
   }, [isOpen]);
@@ -463,7 +467,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-8">
+                <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-8 space-y-4 sm:space-y-8">
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-muted/20 dark:bg-white/5 p-3 sm:p-6 rounded-2xl border border-border/50">
 
@@ -1025,157 +1029,156 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
 
                 </div>
 
-                {/* Ultra-Compact Footer Summary & Actions */}
-                <div className="flex flex-col bg-muted/20 dark:bg-white/5 border-t border-border/10 shrink-0">
-                    {/* Fee Adjustments - Horizontal Row */}
-                    {formData.type !== "Inbound" && !isSystemGenerated && (
-                        <div className="flex flex-row items-center divide-x divide-border/10 border-b border-border/5">
-                            {/* Shipping Fee */}
-                            <div className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 hover:bg-white/5 transition-colors">
-                                <Truck size={12} className="text-orange-500 opacity-60" />
-                                <span className="text-[10px] font-bold text-muted-foreground/60 whitespace-nowrap">运费</span>
-                                {readOnly ? (
-                                    <span className="text-xs font-mono font-bold text-foreground">
-                                        <span className="text-[9px] opacity-40 mr-0.5">￥</span>{formData.shippingFees}
-                                    </span>
-                                ) : (
-                                    <div className="relative flex items-center">
-                                        <span className="text-[9px] text-muted-foreground/40 mr-0.5">￥</span>
-                                        <input 
-                                            type="number" 
-                                            value={shippingFeeInput}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setShippingFeeInput(val);
-                                                setFormData({...formData, shippingFees: parseFloat(val) || 0});
-                                            }}
-                                            className="w-12 bg-transparent text-xs font-mono font-bold text-foreground outline-none no-spinner"
-                                            placeholder="0"
-                                        />
+                {/* Modern Footer Summary Panel */}
+                <div className="bg-muted/30 dark:bg-white/5 border-t border-border/10 p-3 sm:p-4 px-4 sm:px-8 shrink-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
+                        {/* Fee Pills Group - Horizontal Scroll on Mobile */}
+                        {!isSystemGenerated && formData.type !== "Inbound" && (
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-2 px-2 py-0.5 sm:mx-0 sm:px-0 sm:py-0">
+                                {/* Shipping Pill */}
+                                <div className="flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/50 dark:bg-white/5 border border-border/50 shadow-sm transition-all hover:border-orange-500/30 group">
+                                    <div className="p-1 rounded-full bg-orange-500/10 text-orange-500">
+                                        <Truck size={10} />
                                     </div>
-                                )}
-                            </div>
+                                    <span className="text-[10px] font-bold text-muted-foreground/60">运费</span>
+                                    {readOnly ? (
+                                        <span className="text-xs font-mono font-black text-foreground">￥{formData.shippingFees}</span>
+                                    ) : (
+                                        <div className="flex items-center text-xs font-mono font-black border-none outline-none">
+                                            <span className="text-[9px] opacity-40">￥</span>
+                                            <input 
+                                                type="number" 
+                                                value={shippingFeeInput}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setShippingFeeInput(val);
+                                                    setFormData({...formData, shippingFees: parseFloat(val) || 0});
+                                                }}
+                                                className="w-10 sm:w-12 bg-transparent text-foreground outline-none no-spinner p-0 h-auto"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
 
-                            {/* Extra Fee */}
-                            <div className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 hover:bg-white/5 transition-colors">
-                                <Plus size={12} className="text-blue-500 opacity-60" />
-                                <span className="text-[10px] font-bold text-muted-foreground/60 whitespace-nowrap">其它</span>
-                                {readOnly ? (
-                                    <span className="text-xs font-mono font-bold text-foreground">
-                                        <span className="text-[9px] opacity-40 mr-0.5">￥</span>{formData.extraFees}
-                                    </span>
-                                ) : (
-                                    <div className="relative flex items-center">
-                                        <span className="text-[9px] text-muted-foreground/40 mr-0.5">￥</span>
-                                        <input 
-                                            type="number" 
-                                            value={extraFeeInput}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setExtraFeeInput(val);
-                                                setFormData({...formData, extraFees: parseFloat(val) || 0});
-                                            }}
-                                            className="w-12 bg-transparent text-xs font-mono font-bold text-foreground outline-none no-spinner"
-                                            placeholder="0"
-                                        />
+                                {/* Extra Pill */}
+                                <div className="flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/50 dark:bg-white/5 border border-border/50 shadow-sm transition-all hover:border-blue-500/30 group">
+                                    <div className="p-1 rounded-full bg-blue-500/10 text-blue-500">
+                                        <Plus size={10} />
                                     </div>
-                                )}
-                            </div>
+                                    <span className="text-[10px] font-bold text-muted-foreground/60">其它</span>
+                                    {readOnly ? (
+                                        <span className="text-xs font-mono font-black text-foreground">￥{formData.extraFees}</span>
+                                    ) : (
+                                        <div className="flex items-center text-xs font-mono font-black border-none outline-none">
+                                            <span className="text-[9px] opacity-40">￥</span>
+                                            <input 
+                                                type="number" 
+                                                value={extraFeeInput}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setExtraFeeInput(val);
+                                                    setFormData({...formData, extraFees: parseFloat(val) || 0});
+                                                }}
+                                                className="w-10 sm:w-12 bg-transparent text-foreground outline-none no-spinner p-0 h-auto"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
 
-                            {/* Discount */}
-                            <div className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
-                                <Minus size={12} className="text-amber-500 opacity-60" />
-                                <span className="text-[10px] font-bold text-amber-600/60 dark:text-amber-400/40 whitespace-nowrap">折扣</span>
-                                {readOnly ? (
-                                    <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
-                                        <span className="text-[9px] opacity-40 mr-0.5">￥</span>{formData.discountAmount || 0}
-                                    </span>
-                                ) : (
-                                    <div className="relative flex items-center">
-                                        <span className="text-[9px] text-amber-500/40 mr-0.5">￥</span>
-                                        <input 
-                                            type="number" 
-                                            value={discountInput}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setDiscountInput(val);
-                                                setFormData({...formData, discountAmount: parseFloat(val) || 0});
-                                            }}
-                                            className="w-12 bg-transparent text-xs font-mono font-bold text-amber-700 dark:text-amber-300 outline-none no-spinner"
-                                            placeholder="0"
-                                        />
+                                {/* Discount Pill */}
+                                <div className="flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/5 border border-amber-500/20 shadow-sm transition-all hover:border-amber-500/40 group">
+                                    <div className="p-1 rounded-full bg-amber-500/10 text-amber-500">
+                                        <Minus size={10} />
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Total & Actions - Compressed */}
-                    <div className="flex items-center justify-between gap-4 p-3 sm:px-6">
-                        {/* Compact Total */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">实付总计</span>
-                            <div className="flex items-baseline gap-0.5">
-                                <span className="text-xs font-bold text-primary">￥</span>
-                                <span className="text-xl font-black text-foreground font-mono tabular-nums">
-                                    {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        {!readOnly && (
-                            <div className="flex items-center gap-2">
-                                {formData.status === "Draft" && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleAction("Draft")}
-                                            className="px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
-                                        >
-                                            暂存
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
-                                        >
-                                            <CheckCircle size={14} />
-                                            确认下单
-                                        </button>
-                                    </>
-                                )}
-
-                                {((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered") && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const hasTracking = formData.trackingData && formData.trackingData.length > 0;
-                                            handleAction(hasTracking ? "Shipped" : "Confirmed");
-                                        }}
-                                        className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
-                                    >
-                                        <Truck size={14} />
-                                        保存物流
-                                    </button>
-                                )}
-
-                                {formData.status === "Shipped" && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleAction("Received")}
-                                        disabled={!isShippedAndReady}
-                                        className={cn(
-                                            "px-8 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg",
-                                            isShippedAndReady 
-                                                ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]" 
-                                                : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                                        )}
-                                    >
-                                        确认入库
-                                    </button>
-                                )}
+                                    <span className="text-[10px] font-bold text-amber-600/60 dark:text-amber-400/40">折扣</span>
+                                    {readOnly ? (
+                                        <span className="text-xs font-mono font-black text-amber-600 dark:text-amber-400">￥{formData.discountAmount || 0}</span>
+                                    ) : (
+                                        <div className="flex items-center text-xs font-mono font-black border-none outline-none">
+                                            <span className="text-[9px] opacity-40 text-amber-500/50">￥</span>
+                                            <input 
+                                                type="number" 
+                                                value={discountInput}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setDiscountInput(val);
+                                                    setFormData({...formData, discountAmount: parseFloat(val) || 0});
+                                                }}
+                                                className="w-10 sm:w-12 bg-transparent text-amber-700 dark:text-amber-300 outline-none no-spinner p-0 h-auto"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
+
+                        {/* Total & Primary Action Container */}
+                        <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-8">
+                            {/* Final Total */}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-3">
+                                <span className="text-[8px] sm:text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">实付总计</span>
+                                <div className="flex items-baseline gap-0.5 sm:gap-1">
+                                    <span className="text-[10px] sm:text-xs font-bold text-primary">￥</span>
+                                    <span className="text-xl sm:text-2xl font-black text-foreground font-mono tabular-nums leading-none">
+                                        {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Actions Container */}
+                            {!readOnly && (
+                                <div className="flex items-center gap-2 sm:border-l sm:border-border/10 sm:pl-6 h-9 sm:h-10">
+                                    {formData.status === "Draft" && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAction("Draft")}
+                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
+                                            >
+                                                暂存
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2"
+                                            >
+                                                <CheckCircle size={14} className="hidden sm:block" />
+                                                确认下单
+                                            </button>
+                                        </>
+                                    )}
+
+                                    {((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered") && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const hasTracking = formData.trackingData && formData.trackingData.length > 0;
+                                                handleAction(hasTracking ? "Shipped" : "Confirmed");
+                                            }}
+                                            className="px-5 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-1.5 sm:gap-2"
+                                        >
+                                            <Truck size={14} className="hidden sm:block" />
+                                            保存物流
+                                        </button>
+                                    )}
+
+                                    {formData.status === "Shipped" && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAction("Received")}
+                                            disabled={!isShippedAndReady}
+                                            className={cn(
+                                                "px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg",
+                                                isShippedAndReady 
+                                                    ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]" 
+                                                    : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                                            )}
+                                        >
+                                            确认入库
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </form>

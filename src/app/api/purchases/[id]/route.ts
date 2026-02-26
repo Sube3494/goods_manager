@@ -125,7 +125,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    // 首先删除关联的细项（虽然 Prisma schema 可能设置了级联删除，但显式删除更稳妥）
+    
+    // 显式删除关联明细（由于 schema 有 onDelete: Cascade，此步通常是多余的，但保留作为保险）
     await prisma.purchaseOrderItem.deleteMany({
       where: { purchaseOrderId: id }
     });
@@ -133,8 +134,13 @@ export async function DELETE(
     await prisma.purchaseOrder.delete({
       where: { id }
     });
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to delete purchase order" }, { status: 500 });
+
+    return NextResponse.json({ success: true, message: "Purchase order deleted successfully" });
+  } catch (error) {
+    console.error("Failed to delete purchase order:", error);
+    return NextResponse.json(
+      { error: "Failed to delete purchase order", details: error instanceof Error ? error.message : String(error) }, 
+      { status: 500 }
+    );
   }
 }

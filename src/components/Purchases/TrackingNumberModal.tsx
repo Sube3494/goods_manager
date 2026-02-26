@@ -635,21 +635,21 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                 )}
               </div>
 
-              <div className="p-6 sm:p-10 border-t border-border/40 shrink-0 bg-muted/10">
-                <div className="flex items-center justify-between gap-4">
+              <div className="p-4 sm:p-10 border-t border-border/40 shrink-0 bg-muted/10">
+                <div className="flex items-center justify-between gap-2 sm:gap-4">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="h-12 px-6 text-sm font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-2xl transition-all active:scale-95"
+                    className="h-10 sm:h-12 px-4 sm:px-6 text-[13px] sm:text-sm font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-2xl transition-all active:scale-95 shrink-0"
                   >
                     取消
                   </button>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     {readOnly ? (
-                      <div className="flex items-center gap-2 h-12 px-8 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold">
-                        <CheckCircle2 size={18} />
-                        <span>数据锁定</span>
+                      <div className="flex items-center gap-2 h-10 sm:h-12 px-4 sm:px-8 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold text-[13px] sm:text-sm">
+                        <CheckCircle2 size={16} className="shrink-0" />
+                        <span className="truncate">数据锁定</span>
                       </div>
                     ) : (
                       <>
@@ -657,25 +657,31 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                           <button
                             type="button"
                             onClick={(e) => handleSubmit(e, false)}
-                            className="h-12 px-6 rounded-2xl text-sm font-bold border border-orange-500/20 bg-orange-500/5 text-orange-500/80 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all active:scale-95 shadow-sm"
+                            className="h-10 sm:h-12 px-4 sm:px-6 rounded-2xl text-[13px] sm:text-sm font-bold border border-orange-500/20 bg-orange-500/5 text-orange-500/80 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all active:scale-95 shadow-sm shrink-0"
                           >
                             暂存
                           </button>
                         )}
                         <button
                           type="submit"
-                          onClick={(e) => {
+                          onClick={(e: React.MouseEvent) => {
                             e.preventDefault();
-                            handleSubmit(e as any, true);
+                            handleSubmit(e as unknown as React.FormEvent, true);
                           }}
-                          className="h-12 px-8 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black shadow-xl shadow-gray-900/10 dark:shadow-white/10 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
+                          className="h-10 sm:h-12 px-4 sm:px-8 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[13px] sm:text-sm font-black shadow-xl shadow-gray-900/10 dark:shadow-white/10 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 sm:gap-2 min-w-0"
                         >
-                          <CheckCircle2 size={18} />
+                          <CheckCircle2 size={16} className="shrink-0 hidden xs:block" />
                           <span className="truncate">
                             {mode === "payment" ? "保存提交" : 
-                             mode === "tracking" ? "保存并完成发货" : 
-                             mode === "waybill" ? "保存并完成上传" : 
-                             "保存并完成录入"}
+                             mode === "tracking" ? (
+                               <><span className="hidden sm:inline">保存并</span>完成发货</>
+                             ) : 
+                             mode === "waybill" ? (
+                               <><span className="hidden sm:inline">保存并</span>完成上传</>
+                             ) : 
+                             (
+                               <><span className="hidden sm:inline">保存并</span>完成录入</>
+                             )}
                           </span>
                         </button>
                       </>
