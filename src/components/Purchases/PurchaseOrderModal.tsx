@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, AlertCircle, MapPin } from "lucide-react";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, Download, AlertCircle, MapPin } from "lucide-react";
 import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { sortPurchaseItems } from "@/lib/pinyin";
 import { useUser } from "@/hooks/useUser";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 const COURIER_CODES: Record<string, string> = {
@@ -39,11 +40,13 @@ interface PurchaseOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: PurchaseOrder) => void;
+  onExport?: (po: PurchaseOrder) => void;
+  onOverview?: (po: PurchaseOrder) => void;
   initialData?: PurchaseOrder | null;
   readOnly?: boolean;
 }
 
-export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false }: PurchaseOrderModalProps) {
+export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOverview, initialData, readOnly = false }: PurchaseOrderModalProps) {
   const { showToast } = useToast();
   const { user } = useUser();
   const router = useRouter();
@@ -101,6 +104,18 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
   }, [formData.items]);
 
 
+  // Robust scroll lock logic: standard overflow hidden with scrollbar-gutter
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
     
@@ -113,7 +128,6 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
         
         if (pRes.ok) {
           const pData = await pRes.json();
-          // Backend now returns paginated object with { items, total, ... }
           const items = Array.isArray(pData.items) ? pData.items : (Array.isArray(pData) ? pData : []);
           setProducts(items);
         }
@@ -392,7 +406,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-10000 w-[calc(100%-32px)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <div className="flex flex-col gap-1">
@@ -415,9 +429,37 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                   </p>
                 )}
               </div>
-              <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2">
+                {readOnly && initialData && (
+                  <div className="flex items-center gap-1 sm:gap-2 mr-2 border-r border-border/50 pr-2 sm:pr-4">
+                    {onOverview && (
+                      <button 
+                        type="button"
+                        onClick={() => onOverview(initialData)}
+                        className="p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-2"
+                        title="总览商品汇总"
+                      >
+                        <ShoppingBag size={20} />
+                        <span className="hidden sm:inline text-xs font-bold">汇总</span>
+                      </button>
+                    )}
+                    {onExport && (
+                      <button 
+                        type="button"
+                        onClick={() => onExport(initialData)}
+                        className="p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-2"
+                        title="导出采购明细"
+                      >
+                        <Download size={20} />
+                        <span className="hidden sm:inline text-xs font-bold">导出</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
@@ -434,20 +476,21 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                 disabled
                                 type="text" 
                                 value={formData.id}
-                                className="w-full h-10 sm:h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent opacity-70 font-mono"
+                                className="w-full h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent opacity-70 font-mono"
                             />
                         </div>
                         <div className="flex flex-col gap-2">
                             <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
                                 <Calendar size={14} /> {formData.type === "Inbound" ? "入库时间" : (readOnly ? "订单时间" : "时间")}
                             </label>
-                            <div className={`w-full h-10 sm:h-[42px] ${readOnly ? "pointer-events-none opacity-80" : ""}`}>
+                            <div className={`w-full h-[42px] ${readOnly ? "pointer-events-none opacity-80" : ""}`}>
                                 <DatePicker 
                                     value={formData.date}
                                     onChange={(val) => setFormData({...formData, date: val})}
                                     placeholder="选择日期"
                                     showClear={false}
                                     className="h-full"
+                                    triggerClassName="h-[42px] rounded-xl"
                                 />
                             </div>
                         </div>
@@ -458,7 +501,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                     <MapPin size={14} /> 收货地址 <span className="text-red-500">*</span>
                                 </label>
                                 {readOnly ? (
-                                    <div className="w-full min-h-10 sm:min-h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 text-xs sm:text-sm text-foreground opacity-80 flex items-center">
+                                    <div className="w-full min-h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 text-xs sm:text-sm text-foreground opacity-80 flex items-center">
                                         {formData.shippingAddress || "未设置收货地址"}
                                     </div>
                                 ) : (
@@ -471,7 +514,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                 label: addr.label ? `[${addr.label}] ${addr.address}` : addr.address
                                             }))}
                                             placeholder="选择收货地址..."
-                                            className="flex-1 h-10 sm:h-[42px]"
+                                            className="flex-1 h-[42px]"
+                                            triggerClassName="h-[42px] rounded-xl"
                                             onAddNew={() => router.push("/profile")}
                                             addNewLabel="管理地址"
                                         />
@@ -540,9 +584,24 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                         </div>
                                         <div className="flex-1 space-y-1 min-w-0">
                                             <div className="flex flex-col gap-0.5 min-w-0">
-                                                <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
-                                                    {item.product?.name || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.name || "加载中..."}
-                                                </span>
+                                                    <div className="flex items-start justify-between gap-2">
+                                                    <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
+                                                        {item.product?.name || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.name || "加载中..."}
+                                                    </span>
+                                                    {!readOnly && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                removeItem(index);
+                                                            }}
+                                                            className="sm:hidden shrink-0 flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
+                                                            title="移除商品"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                                     {(item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku) && (
                                                       <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
@@ -569,19 +628,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                  </div>
                                             </div>
                                         </div>
-                                        {!readOnly && (
-                                            <button 
-                                                type="button"
-                                                onClick={() => removeItem(index)}
-                                                className="sm:hidden p-2 rounded-xl bg-destructive/10 text-destructive active:scale-90"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        )}
-                                     </div>
+                                    </div>
                                     
                                     {/* Mobile Stats Row / Desktop Columns */}
-                                    <div className="grid grid-cols-3 sm:contents gap-2 w-full pt-3 sm:pt-0 border-t border-border/10 sm:border-0">
+                                    <div className="grid grid-cols-3 sm:contents gap-2 w-full pt-3 sm:pt-0 border-t border-border/10 sm:border-0 items-center">
                                         {/* Quantity Column */}
                                         <div className="flex flex-col sm:block items-center justify-center">
                                             <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">数量</label>
@@ -630,20 +680,22 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
                                                 {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1 })}
                                             </div>
                                         </div>
+                                        {!readOnly && (
+                                            <div className="hidden sm:flex w-full sm:w-auto pt-2 sm:pt-0 justify-end">
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        removeItem(index);
+                                                    }}
+                                                    className="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
+                                                    title="移除商品"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-
-                                     {/* Delete Button (Desktop) & Mobile Delete Wrapper */}
-                                    {!readOnly && (
-                                        <div className="absolute right-4 top-4 sm:static flex items-center justify-center">
-                                            <button 
-                                                type="button"
-                                                onClick={() => removeItem(index)}
-                                                className="flex items-center justify-center h-9 w-9 sm:h-8 sm:w-8 rounded-xl sm:rounded-lg bg-destructive/10 sm:bg-transparent text-destructive sm:text-muted-foreground/40 hover:bg-destructive/15 sm:hover:bg-destructive/10 sm:hover:text-destructive transition-all sm:opacity-0 sm:group-hover:opacity-100"
-                                            >
-                                                <Trash2 size={readOnly ? 0 : 18} className="sm:size-4" />
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
                             ))}
                             
@@ -973,171 +1025,154 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, initialData, rea
 
                 </div>
 
-                {/* Footer Totals & Actions */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 sm:p-6 bg-white dark:bg-white/5 border-t border-border/10 shrink-0 z-10">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-                        {formData.type !== "Inbound" && !isSystemGenerated && (
-                        <>
-                        <div className="flex items-center gap-2 min-w-fit pr-0 sm:pr-4 border-r-0 sm:border-r border-border/50">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-2">附加金额</span>
-                        </div>
-                        <div className="grid grid-cols-2 sm:flex items-center gap-4 w-full sm:w-auto">
-                            <div className="flex items-center gap-2 group flex-1 sm:flex-initial">
-                                <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 group-hover:text-foreground transition-colors shrink-0">
-                                    <Truck size={12} /> 运费
-                                </label>
+                {/* Ultra-Compact Footer Summary & Actions */}
+                <div className="flex flex-col bg-muted/20 dark:bg-white/5 border-t border-border/10 shrink-0">
+                    {/* Fee Adjustments - Horizontal Row */}
+                    {formData.type !== "Inbound" && !isSystemGenerated && (
+                        <div className="flex flex-row items-center divide-x divide-border/10 border-b border-border/5">
+                            {/* Shipping Fee */}
+                            <div className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 hover:bg-white/5 transition-colors">
+                                <Truck size={12} className="text-orange-500 opacity-60" />
+                                <span className="text-[10px] font-bold text-muted-foreground/60 whitespace-nowrap">运费</span>
                                 {readOnly ? (
-                                    <div className="relative flex-1 sm:flex-initial h-[34px] w-full sm:w-20 flex items-center justify-center rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono font-bold text-foreground">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">￥</span>
-                                        {formData.shippingFees.toLocaleString()}
-                                    </div>
+                                    <span className="text-xs font-mono font-bold text-foreground">
+                                        <span className="text-[9px] opacity-40 mr-0.5">￥</span>{formData.shippingFees}
+                                    </span>
                                 ) : (
-                                    <div className="relative flex-1 sm:flex-initial">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">￥</span>
+                                    <div className="relative flex items-center">
+                                        <span className="text-[9px] text-muted-foreground/40 mr-0.5">￥</span>
                                         <input 
                                             type="number" 
-                                            min="0"
-                                            step="0.01"
                                             value={shippingFeeInput}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setShippingFeeInput(val);
                                                 setFormData({...formData, shippingFees: parseFloat(val) || 0});
                                             }}
-                                            className="w-full sm:w-20 rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-6 pr-2 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
+                                            className="w-12 bg-transparent text-xs font-mono font-bold text-foreground outline-none no-spinner"
+                                            placeholder="0"
                                         />
                                     </div>
                                 )}
                             </div>
-                            <div className="flex items-center gap-2 group flex-1 sm:flex-initial">
-                                <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 group-hover:text-foreground transition-colors shrink-0">
-                                    <Plus size={12} /> 其它
-                                </label>
+
+                            {/* Extra Fee */}
+                            <div className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 hover:bg-white/5 transition-colors">
+                                <Plus size={12} className="text-blue-500 opacity-60" />
+                                <span className="text-[10px] font-bold text-muted-foreground/60 whitespace-nowrap">其它</span>
                                 {readOnly ? (
-                                    <div className="relative flex-1 sm:flex-initial h-[34px] w-full sm:w-20 flex items-center justify-center rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono font-bold text-foreground">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">￥</span>
-                                        {formData.extraFees.toLocaleString()}
-                                    </div>
+                                    <span className="text-xs font-mono font-bold text-foreground">
+                                        <span className="text-[9px] opacity-40 mr-0.5">￥</span>{formData.extraFees}
+                                    </span>
                                 ) : (
-                                    <div className="relative flex-1 sm:flex-initial">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">￥</span>
+                                    <div className="relative flex items-center">
+                                        <span className="text-[9px] text-muted-foreground/40 mr-0.5">￥</span>
                                         <input 
                                             type="number" 
-                                            min="0"
-                                            step="0.01"
                                             value={extraFeeInput}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setExtraFeeInput(val);
                                                 setFormData({...formData, extraFees: parseFloat(val) || 0});
                                             }}
-                                            className="w-full sm:w-20 rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-6 pr-2 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
+                                            className="w-12 bg-transparent text-xs font-mono font-bold text-foreground outline-none no-spinner"
+                                            placeholder="0"
                                         />
                                     </div>
                                 )}
                             </div>
-                            {/* Discount field */}
-                            <div className="flex items-center gap-2 group flex-1 sm:flex-initial">
-                                <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 group-hover:text-foreground transition-colors shrink-0">
-                                    <Minus size={12} /> 折扣
-                                </label>
+
+                            {/* Discount */}
+                            <div className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
+                                <Minus size={12} className="text-amber-500 opacity-60" />
+                                <span className="text-[10px] font-bold text-amber-600/60 dark:text-amber-400/40 whitespace-nowrap">折扣</span>
                                 {readOnly ? (
-                                    <div className="relative flex-1 sm:flex-initial h-[34px] w-full sm:w-20 flex items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-amber-400 opacity-70">￥</span>
-                                        {(formData.discountAmount || 0).toLocaleString()}
-                                    </div>
+                                    <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
+                                        <span className="text-[9px] opacity-40 mr-0.5">￥</span>{formData.discountAmount || 0}
+                                    </span>
                                 ) : (
-                                    <div className="relative flex-1 sm:flex-initial">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground opacity-50">￥</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
+                                    <div className="relative flex items-center">
+                                        <span className="text-[9px] text-amber-500/40 mr-0.5">￥</span>
+                                        <input 
+                                            type="number" 
                                             value={discountInput}
-                                            placeholder="0"
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 setDiscountInput(val);
                                                 setFormData({...formData, discountAmount: parseFloat(val) || 0});
                                             }}
-                                            className="w-full sm:w-20 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 pl-6 pr-2 py-1.5 text-amber-700 dark:text-amber-300 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-amber-500/20 transition-all font-mono text-xs no-spinner"
+                                            className="w-12 bg-transparent text-xs font-mono font-bold text-amber-700 dark:text-amber-300 outline-none no-spinner"
+                                            placeholder="0"
                                         />
                                     </div>
                                 )}
                             </div>
-
                         </div>
-                        </>
-                        )}
-                    </div>
+                    )}
 
-
-                    <div className="flex items-center justify-end gap-6 w-full sm:w-auto mt-4 sm:mt-0 text-right">
-                        <div className="flex flex-col items-end gap-0.5 ml-auto">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1 sm:pl-0">实付金额</span>
-
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-sm font-bold text-primary">￥</span>
-                                <span className="text-3xl font-black text-foreground font-mono tracking-tighter">
+                    {/* Total & Actions - Compressed */}
+                    <div className="flex items-center justify-between gap-4 p-3 sm:px-6">
+                        {/* Compact Total */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">实付总计</span>
+                            <div className="flex items-baseline gap-0.5">
+                                <span className="text-xs font-bold text-primary">￥</span>
+                                <span className="text-xl font-black text-foreground font-mono tabular-nums">
                                     {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                                 </span>
                             </div>
                         </div>
 
+                        {/* Actions */}
                         {!readOnly && (
-                            <div className="flex flex-1 sm:flex-initial items-center gap-2 sm:gap-3">
-                                {/* Actions for Draft state */}
+                            <div className="flex items-center gap-2">
                                 {formData.status === "Draft" && (
                                     <>
                                         <button
                                             type="button"
                                             onClick={() => handleAction("Draft")}
-                                            disabled={formData.items.length === 0}
-                                            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-secondary px-4 sm:px-5 py-3.5 text-xs sm:text-sm font-bold text-foreground border border-border/50 transition-all hover:bg-secondary/80 active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+                                            className="px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
                                         >
-                                            暂存草稿
+                                            暂存
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={formData.items.length === 0}
-                                            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 sm:px-8 py-3.5 text-xs sm:text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+                                            className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
                                         >
-                                            <CheckCircle size={18} className="hidden sm:block" />
-                                            <span>确认下单</span>
+                                            <CheckCircle size={14} />
+                                            确认下单
                                         </button>
                                     </>
                                 )}
 
-                                {/* Actions for Confirmed (Ordered) state */}
-                                {(formData.status === "Confirmed" || (formData.status as string) === "Ordered") && (
+                                {((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered") && (
                                     <button
                                         type="button"
                                         onClick={() => {
                                             const hasTracking = formData.trackingData && formData.trackingData.length > 0;
                                             handleAction(hasTracking ? "Shipped" : "Confirmed");
                                         }}
-                                        className="flex-1 sm:flex-initial flex items-center justify-center rounded-2xl bg-primary px-8 py-3.5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 whitespace-nowrap"
+                                        className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
                                     >
-                                        保存物流资料
+                                        <Truck size={14} />
+                                        保存物流
                                     </button>
                                 )}
 
-                                {/* Actions for Shipped state */}
                                 {formData.status === "Shipped" && (
-                                    <div className="flex flex-1 sm:flex-initial items-center gap-3">
-                                        {!isShippedAndReady && (
-                                            <p className="hidden md:block text-[10px] text-orange-500 font-bold max-w-[200px] text-right">请补全物流面单照片后即可入库</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleAction("Received")}
+                                        disabled={!isShippedAndReady}
+                                        className={cn(
+                                            "px-8 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg",
+                                            isShippedAndReady 
+                                                ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]" 
+                                                : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
                                         )}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleAction("Received")}
-                                            disabled={!isShippedAndReady}
-                                            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl px-8 py-3.5 text-sm font-black transition-all shadow-lg whitespace-nowrap ${isShippedAndReady ? 'bg-emerald-500 text-white shadow-emerald-500/25 hover:bg-emerald-600' : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'}`}
-                                        >
-                                            <CheckCircle size={18} />
-                                            确认入库
-                                        </button>
-                                    </div>
+                                    >
+                                        确认入库
+                                    </button>
                                 )}
                             </div>
                         )}

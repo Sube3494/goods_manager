@@ -86,16 +86,16 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   // 移动端排序模式 (Mobile reorder mode)
   const [isReorderMode, setIsReorderMode] = useState(false);
 
-  // Lock background scroll
+  // Robust scroll lock logic: standard overflow hidden
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
+      const originalStyle = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
     }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
   }, [isOpen]);
 
   const enterBatchMode = () => {
@@ -238,15 +238,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     return () => cancelAnimationFrame(handle);
   }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      const originalStyle = window.getComputedStyle(document.body).overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = originalStyle;
-      };
-    }
-  }, [isOpen]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isMain: boolean = false) => {
     const files = e.target.files;

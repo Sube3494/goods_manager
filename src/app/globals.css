@@ -68,6 +68,7 @@
     --background: hsl(0 0% 100%);
     --foreground: hsl(240 10% 4%); /* Zinc 950 */
     color-scheme: light;
+    scrollbar-gutter: stable;
 
     --card: hsl(0 0% 100%);
     --card-foreground: hsl(240 10% 4%);

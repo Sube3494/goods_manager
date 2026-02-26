@@ -622,19 +622,19 @@ export default function BrushOrdersPage() {
                              </td>
                              <td className="px-6 py-2.5 text-center">
                                  <div className="flex items-center justify-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">实付</span>
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">总实付</span>
                                     <span className="text-xs font-mono font-bold text-foreground">¥{group.dailyStats.payment.toFixed(2)}</span>
                                  </div>
                              </td>
                              <td className="px-6 py-2.5 text-center">
                                  <div className="flex items-center justify-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">到手</span>
+                                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">总到手</span>
                                     <span className="text-xs font-mono font-bold text-emerald-500">¥{group.dailyStats.received.toFixed(2)}</span>
                                  </div>
                              </td>
                              <td className="px-6 py-2.5 text-center">
                                  <div className="flex items-center justify-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">佣金</span>
+                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">总佣金</span>
                                     <span className="text-xs font-mono font-bold text-orange-500">¥{group.dailyStats.commission.toFixed(2)}</span>
                                  </div>
                              </td>
@@ -778,11 +778,11 @@ export default function BrushOrdersPage() {
                         </div>
                         <div className="flex flex-col items-end gap-0.5">
                             <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] text-muted-foreground font-bold">实付</span>
+                                <span className="text-[9px] text-muted-foreground font-bold">总实付</span>
                                 <span className="text-xs font-mono font-bold text-foreground">¥{group.dailyStats.payment.toFixed(2)}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] text-muted-foreground font-bold">到手</span>
+                                <span className="text-[9px] text-muted-foreground font-bold">总到手</span>
                                 <span className="text-xs font-mono font-bold text-emerald-500">¥{group.dailyStats.received.toFixed(2)}</span>
                             </div>
                         </div>

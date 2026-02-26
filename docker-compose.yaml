@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: goods-app
+    init: true
     restart: unless-stopped
     ports:
       - "18732:3000"

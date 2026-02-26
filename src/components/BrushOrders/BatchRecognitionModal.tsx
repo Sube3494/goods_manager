@@ -3,9 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Wand2, Loader2, Image as ImageIcon, CheckCircle2, AlertCircle, Trash2, Save, Plus, Upload } from "lucide-react";
+import Image from "next/image";
+import { X, Wand2, Loader2, Image as ImageIcon, CheckCircle2, AlertCircle, Trash2, Save, Plus, Upload, Calendar, Search, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Product } from "@/lib/types";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+import { GestureImage } from "@/components/ui/GestureImage";
 
 interface BatchItem {
   id: string;
@@ -22,6 +26,7 @@ interface BatchItem {
     items?: Array<{ name: string; quantity: number }>;
     note?: string;
     matchedItems?: Array<{ productId: string; product: Product; quantity: number }>;
+    timeMissing?: boolean;
   };
   error?: string;
 }
@@ -39,8 +44,12 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<string>("美团");
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [productSearch, setProductSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const editingItem = items.find(i => i.id === editingItemId);
 
   useEffect(() => {
     if (!isOpen) {
@@ -64,8 +73,17 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
     };
 
     window.addEventListener('paste', handlePaste);
+    
+    // 锁定背景滚动
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    const originalOverscroll = window.getComputedStyle(document.body).overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+
     return () => {
       window.removeEventListener('paste', handlePaste);
+      document.body.style.overflow = originalStyle;
+      document.body.style.overscrollBehavior = originalOverscroll;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -116,6 +134,68 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
     });
   };
 
+  /**
+   * 针对 AI 识别结果进行模糊匹配商品
+   * 策略：
+   * 1. 归一化：移除标点符号、空格及常见平台包裹符（如【美团】）
+   * 2. 多级匹配：完全匹配 -> 双向包含匹配 -> 基于字符重合度的模糊匹配
+   */
+  const findBestMatch = (recognizedName: string, products: Product[]) => {
+    if (!recognizedName || !products.length) return null;
+
+    const normalize = (str: string) => {
+      if (!str) return "";
+      return str.toLowerCase()
+        .replace(/[\[\]【】\(\)（）\s!@#\$%\^&\*\-_=\+\\\|;:'",<\.>\/\?？。，]/g, "") // 移除标点符号和空格
+        .replace(/美团|淘宝|京东|拼多多|点我达/g, ""); // 移除常见平台词
+    };
+
+    const normRecognized = normalize(recognizedName);
+    if (!normRecognized) return null;
+
+    // 第一阶段：找 SKU 完全匹配
+    const skuMatch = products.find(p => p.sku && normalize(p.sku) === normRecognized);
+    if (skuMatch) return skuMatch;
+
+    // 第二阶段：找名称完全匹配或被包含
+    const nameMatch = products.find(p => {
+      const normName = normalize(p.name);
+      return normName === normRecognized || normName.includes(normRecognized) || normRecognized.includes(normName);
+    });
+    if (nameMatch) return nameMatch;
+
+    // 第三阶段：基于字符覆盖率的重合度评分 (仅针对名称)
+    let bestScore = 0;
+    let bestProduct: Product | null = null;
+
+    products.forEach(p => {
+      const normName = normalize(p.name);
+      if (!normName) return;
+
+      // 计算 normName 中有多少个字符出现在了 normRecognized 中
+      let matchCount = 0;
+      const chars = normName.split("");
+      chars.forEach(char => {
+        if (normRecognized.includes(char)) {
+          matchCount++;
+        }
+      });
+
+      const score = matchCount / normName.length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestProduct = p;
+      }
+    });
+
+    // 设定阈值（重合度超过 60%）
+    if (bestScore >= 0.6) {
+      return bestProduct;
+    }
+
+    return null;
+  };
+
   const processBatch = async () => {
     if (isProcessing || items.length === 0) return;
     setIsProcessing(true);
@@ -156,10 +236,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
           const matchedItems: Array<{ productId: string; product: Product; quantity: number }> = [];
           if (result.items && Array.isArray(result.items)) {
             result.items.forEach((ri: { name: string; quantity: number }) => {
-              const found = products.find(p => 
-                p.name === ri.name || p.sku === ri.name || 
-                p.name.includes(ri.name) || ri.name.includes(p.name)
-              );
+              const found = findBestMatch(ri.name, products);
               if (found) {
                 matchedItems.push({ productId: found.id, product: found, quantity: ri.quantity || 1 });
               }
@@ -187,6 +264,13 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
     const successItems = items.filter(i => i.status === 'success' && i.result);
     if (successItems.length === 0) return;
 
+    // 检查是否有缺失精确时间的项
+    const hasMissingTime = successItems.some(i => i.result?.timeMissing);
+    if (hasMissingTime) {
+      const confirmSave = confirm("部分订单未能识别出精确时间（已标记为 00:00），是否确定直接保存？\n\n建议点击对应的预览图查看详情并手动修正。");
+      if (!confirmSave) return;
+    }
+
     setIsProcessing(true);
     let successCount = 0;
 
@@ -198,7 +282,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               date: item.result?.date as string,
-              type: selectedPlatform,
+              type: item.result?.platform || selectedPlatform,
               items: item.result?.matchedItems?.map(mi => ({
                 productId: mi.productId,
                 quantity: mi.quantity
@@ -206,7 +290,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
               paymentAmount: item.result?.paymentAmount || 0,
               receivedAmount: item.result?.receivedAmount || 0,
               commission: 0,
-              note: "AI识别",
+              note: item.result?.note || "AI识别",
               status: "Completed"
             })
           });
@@ -257,7 +341,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-            "relative z-10 w-full max-w-5xl max-h-[90vh] overflow-hidden bg-white/90 dark:bg-gray-900/70 backdrop-blur-xl rounded-3xl shadow-2xl border transition-all flex flex-col",
+            "relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden bg-white/90 dark:bg-gray-900/70 backdrop-blur-xl rounded-3xl shadow-2xl border transition-all flex flex-col",
             isDragging ? "border-primary scale-[1.01] ring-4 ring-primary/10" : "border-gray-200 dark:border-white/10"
         )}
       >
@@ -278,7 +362,10 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             )}
         </AnimatePresence>
         {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gray-50/50 dark:bg-white/5 relative">
+        <div className={cn(
+          "p-4 sm:p-6 border-b border-gray-100 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-gray-50/50 dark:bg-white/5 relative",
+          editingItemId && "hidden sm:flex" // 在移动端编辑时隐藏主页眉，或者保持精简
+        )}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 pr-8 w-full sm:w-auto">
             <div className="flex items-center gap-3">
               <div className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-primary/10 text-primary shrink-0">
@@ -291,7 +378,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             </div>
             
             <div className="flex items-center gap-2 sm:pl-6 sm:border-l border-gray-200 dark:border-white/10 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbars-hide">
-              <span className="text-xs font-bold text-gray-400 shrink-0">强制归属:</span>
+              <span className="text-xs font-bold text-gray-400 shrink-0">平台:</span>
               <div className="flex bg-gray-100/50 dark:bg-white/5 rounded-lg p-0.5 shrink-0">
                 {['美团', '淘宝', '京东'].map(p => (
                   <button
@@ -316,89 +403,392 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {items.length === 0 ? (
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="h-64 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group"
-            >
-              <div className="p-5 rounded-full bg-gray-50 dark:bg-white/5 group-hover:scale-110 transition-transform">
-                <ImageIcon size={40} className="text-gray-400 group-hover:text-primary" />
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+          {/* Left: List/Grid */}
+          <div className={cn(
+            "overflow-y-auto p-4 sm:p-6 transition-all duration-300",
+            editingItemId ? "hidden md:block w-full md:w-80 lg:w-96 border-r border-gray-100 dark:border-white/10 bg-gray-50/30" : "w-full"
+          )}>
+            {items.length === 0 ? (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="h-64 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group"
+              >
+                <div className="p-5 rounded-full bg-gray-50 dark:bg-white/5 group-hover:scale-110 transition-transform">
+                  <ImageIcon size={40} className="text-gray-400 group-hover:text-primary" />
+                </div>
+                <div className="text-center">
+                  <p className="font-bold text-lg">点击、拖拽或粘贴订单截图</p>
+                  <p className="text-sm text-gray-500">支持多张图片同时处理</p>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="font-bold text-lg">点击、拖拽或粘贴订单截图</p>
-                <p className="text-sm text-gray-500">支持多张图片同时处理</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-              {items.map((item) => (
-                <div key={item.id} className="relative group rounded-xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 overflow-hidden aspect-square transition-all hover:ring-2 hover:ring-primary/20">
-                  <div className="relative w-full h-full bg-black/5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={item.preview} 
-                      alt="preview" 
-                      className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300" 
-                      onClick={() => setPreviewImage(item.preview)}
-                    />
-                    
-                    {/* Status Badge Overlay */}
-                    <div className="absolute top-1 left-1">
-                      {item.status === 'pending' && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-md text-white font-bold">等待</span>}
-                      {item.status === 'processing' && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-500/80 backdrop-blur-md text-white font-bold flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> 识别中</span>}
-                      {item.status === 'success' && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/80 backdrop-blur-md text-white font-bold flex items-center gap-1"><CheckCircle2 size={10} /> 成功</span>}
-                      {item.status === 'error' && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-red-500/80 backdrop-blur-md text-white font-bold flex items-center gap-1"><AlertCircle size={10} /> 失败</span>}
-                    </div>
-
-                    {!isProcessing && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} 
-                        className="absolute top-1 right-1 p-1 bg-black/20 hover:bg-red-500 text-white rounded-md backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+            ) : (
+              <div className={cn(
+                "grid gap-3",
+                editingItemId ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-2" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
+              )}>
+                {items.map((item) => (
+                  <div 
+                    key={item.id} 
+                    onClick={() => {
+                      if (item.status === 'success') {
+                        setEditingItemId(item.id);
+                      } else {
+                        setPreviewImage(item.preview);
+                      }
+                    }}
+                    className={cn(
+                      "relative group rounded-2xl border overflow-hidden aspect-square transition-all cursor-pointer shadow-sm bg-white dark:bg-gray-800",
+                      editingItemId === item.id ? "ring-2 ring-primary border-transparent" : "border-gray-100 dark:border-white/10 hover:ring-2 hover:ring-primary/20"
                     )}
-
-                    {item.status === 'success' && item.result && (
-                      <div className="absolute inset-x-0 bottom-0 p-1.5 bg-black/60 backdrop-blur-md text-[9px] text-white space-y-0.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity rounded-b-lg">
-                        <div className="flex justify-between text-gray-300">
-                          <span>平台:</span> 
-                          <span className={cn(
-                            "font-bold",
-                            selectedPlatform !== 'auto' && selectedPlatform !== item.result.platform ? "line-through text-gray-500" : "text-white"
-                          )}>
-                            {item.result.platform || '未知'}
-                          </span>
-                        </div>
-                        {selectedPlatform !== 'auto' && selectedPlatform !== item.result.platform && (
-                          <div className="flex justify-end text-emerald-400 font-bold mb-0.5">
-                            ➔ {selectedPlatform}
+                  >
+                    <div className="relative w-full h-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={item.preview} 
+                        alt="preview" 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                      />
+                      
+                      {/* Status Badge Overlay - Refined as clean circles/capsules to eliminate "corners" */}
+                      <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+                        {item.status === 'pending' && (
+                          <div className="flex items-center px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[8px] text-white font-black shadow-lg">
+                            等待
                           </div>
                         )}
-                        <div className="flex justify-between"><span>实付:</span> <span>¥{item.result.paymentAmount}</span></div>
+                        {item.status === 'processing' && (
+                          <div className="h-6 w-6 rounded-full bg-blue-500/90 backdrop-blur-md text-white flex items-center justify-center shadow-lg">
+                            <Loader2 size={14} className="animate-spin" />
+                          </div>
+                        )}
+                        {item.status === 'success' && (
+                          <div className="h-6 w-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border border-white/20">
+                            <CheckCircle2 size={16} />
+                          </div>
+                        )}
+                        {item.status === 'error' && (
+                          <div className="h-6 w-6 rounded-full bg-red-500/90 backdrop-blur-md text-white flex items-center justify-center shadow-lg">
+                            <AlertCircle size={14} />
+                          </div>
+                        )}
+                        {item.status === 'success' && item.result?.timeMissing && (
+                          <motion.div 
+                            initial={{ scale: 0 }} 
+                            animate={{ scale: 1 }}
+                            className="h-6 w-6 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-lg border border-white/20 animate-pulse" 
+                            title="时间未能识别，请核对"
+                          >
+                             <Calendar size={12} />
+                          </motion.div>
+                        )}
                       </div>
-                    )}
+
+                      {!isProcessing && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); removeItem(item.id); if (editingItemId === item.id) setEditingItemId(null); }} 
+                          className="absolute top-2 right-2 p-1.5 bg-black/20 hover:bg-red-500 text-white rounded-lg backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 shadow-lg z-10"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+
+                    </div>
+                  </div>
+                ))}
+                
+                {!isProcessing && (
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl flex flex-col items-center justify-center gap-1 aspect-square hover:border-primary/50 hover:bg-primary/5 transition-all text-gray-400 hover:text-primary group"
+                  >
+                    <Plus size={20} />
+                    <span className="text-[9px] font-bold">添加</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Editor */}
+          <AnimatePresence>
+            {editingItemId && editingItem && editingItem.result ? (
+              <motion.div 
+                key={editingItemId}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                transition={{ duration: 0.1 }}
+                className="flex-1 overflow-y-auto bg-white dark:bg-black/20"
+              >
+                <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
+                  <div className="flex items-center justify-between">
+                     <h3 className="text-lg font-bold flex items-center gap-2">
+                       <ImageIcon size={18} className="text-primary" />
+                       订单详情修正
+                     </h3>
+                     <button 
+                       onClick={() => setEditingItemId(null)}
+                       className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
+                     >
+                       <X size={18} />
+                     </button>
+                  </div>
+
+                  {/* Top: Image Preview & Main Info */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                     <div className="relative group aspect-video rounded-2xl overflow-hidden border border-border shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={editingItem.preview} alt="Edit Preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                           <button 
+                              onClick={() => setPreviewImage(editingItem.preview)}
+                              className="px-4 py-2 bg-white text-black text-xs font-bold rounded-full shadow-lg hover:scale-105 transition-all"
+                           >
+                             点击放大查看
+                           </button>
+                        </div>
+                     </div>
+
+                     <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                <Calendar size={10} /> 订单日期
+                              </label>
+                                <DatePicker 
+                                  value={editingItem.result.date || ""} 
+                                  onChange={(val) => {
+                                    setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                      ...it,
+                                      result: { ...it.result!, date: val, timeMissing: false }
+                                    } : it));
+                                  }}
+                                  isCompact
+                                  triggerClassName={cn(editingItem.result.timeMissing && "border-orange-500 ring-1 ring-orange-500/50 bg-orange-500/5")}
+                                />
+                                {editingItem.result.timeMissing && (
+                                  <p className="text-[9px] text-orange-600 dark:text-orange-400 font-bold mt-1 flex items-center gap-1">
+                                    <AlertCircle size={10} /> 未能精确识别时间，默认设为 00:00:00
+                                  </p>
+                                )}
+                             </div>
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                <ShoppingBag size={10} /> 平台
+                              </label>
+                              <CustomSelect 
+                                value={editingItem.result.platform || ""} 
+                                options={[
+                                  { value: "美团", label: "美团" },
+                                  { value: "淘宝", label: "淘宝" },
+                                  { value: "京东", label: "京东" }
+                                ]}
+                                onChange={(val) => {
+                                  setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                    ...it,
+                                    result: { ...it.result!, platform: val }
+                                  } : it));
+                                }}
+                                triggerClassName="h-9 px-3 rounded-xl text-xs"
+                              />
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                ¥ 实付金额
+                              </label>
+                              <input 
+                                type="number" 
+                                step="0.01"
+                                value={editingItem.result.paymentAmount || 0}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                    ...it,
+                                    result: { ...it.result!, paymentAmount: val }
+                                  } : it));
+                                }}
+                                className="w-full h-9 rounded-xl bg-muted/30 border border-border/50 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+                              />
+                           </div>
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                ¥ 到手金额
+                              </label>
+                              <input 
+                                type="number" 
+                                step="0.01"
+                                value={editingItem.result.receivedAmount || 0}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                    ...it,
+                                    result: { ...it.result!, receivedAmount: val }
+                                  } : it));
+                                }}
+                                className="w-full h-9 rounded-xl bg-muted/30 border border-border/50 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+                              />
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Bottom: Items Adjustment */}
+                  <div className="space-y-4">
+                     <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                        <label className="text-xs font-bold text-foreground flex items-center gap-2">
+                          <ShoppingBag size={14} className="text-primary" />
+                          匹配商品清单
+                        </label>
+                        <span className="text-[10px] text-muted-foreground">AI 匹配到 {editingItem.result.matchedItems?.length || 0} 件商品</span>
+                     </div>
+
+                     <div className="space-y-3">
+                        {editingItem.result.matchedItems?.map((mi, idx) => (
+                           <div key={idx} className="flex items-center gap-3 p-3 rounded-2xl bg-muted/20 border border-border group">
+                              <div className="w-10 h-10 rounded-lg bg-white dark:bg-white/5 border border-border overflow-hidden shrink-0">
+                                 {mi.product.image ? (
+                                   /* eslint-disable-next-line @next/next/no-img-element */
+                                   <img src={mi.product.image} alt="Match" className="w-full h-full object-cover" />
+                                 ) : <ShoppingBag size={16} className="m-auto mt-3 opacity-20" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                 <p className="text-xs font-bold truncate leading-tight">{mi.product.name}</p>
+                                 <p className="text-[10px] text-muted-foreground mt-0.5">SKU: {mi.product.sku || '未知'}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="number"
+                                  min="1"
+                                  value={mi.quantity}
+                                  onChange={(e) => {
+                                    const qty = parseInt(e.target.value) || 1;
+                                    setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                      ...it,
+                                      result: { 
+                                        ...it.result!, 
+                                        matchedItems: it.result!.matchedItems?.map((m, i) => i === idx ? { ...m, quantity: qty } : m)
+                                      }
+                                    } : it));
+                                  }}
+                                  className="w-12 h-8 rounded-lg bg-white dark:bg-black/20 border border-border px-1.5 text-center text-xs font-bold"
+                                />
+                                <button 
+                                  onClick={() => {
+                                    setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                      ...it,
+                                      result: { 
+                                        ...it.result!, 
+                                        matchedItems: it.result!.matchedItems?.filter((_, i) => i !== idx)
+                                      }
+                                    } : it));
+                                  }}
+                                  className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors text-muted-foreground"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                           </div>
+                        ))}
+
+                        {/* Add/Search Product Field */}
+                        <div className="relative mt-4">
+                           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              <Search size={14} />
+                           </div>
+                           <input 
+                              type="text"
+                              placeholder="搜索系统商品以添加..."
+                              value={productSearch}
+                              onChange={(e) => setProductSearch(e.target.value)}
+                              className="w-full h-10 rounded-xl bg-muted/30 border border-border/50 pl-9 pr-10 text-xs focus:ring-2 focus:ring-primary outline-none"
+                           />
+                           
+                           {productSearch && (
+                             <button
+                               onClick={() => setProductSearch("")}
+                               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                             >
+                               <X size={14} />
+                             </button>
+                           )}
+                           
+                           {/* Search Results Dropdown */}
+                           {productSearch && (
+                             <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white dark:bg-gray-800 rounded-2xl border border-border shadow-xl overflow-hidden max-h-48 overflow-y-auto">
+                               {products.filter(p => p.name.includes(productSearch) || (p.sku && p.sku.includes(productSearch))).length > 0 ? (
+                                 products.filter(p => p.name.includes(productSearch) || (p.sku && p.sku.includes(productSearch))).slice(0, 5).map(p => (
+                                   <button
+                                     key={p.id}
+                                     onClick={() => {
+                                       setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                         ...it,
+                                         result: { 
+                                           ...it.result!, 
+                                           matchedItems: [...(it.result!.matchedItems || []), { productId: p.id, product: p, quantity: 1 }]
+                                         }
+                                       } : it));
+                                       setProductSearch("");
+                                     }}
+                                      className="w-full flex items-center gap-3 p-2.5 hover:bg-muted/50 text-left transition-colors"
+                                    >
+                                      <div className="w-8 h-8 rounded bg-gray-100 overflow-hidden shrink-0 relative">
+                                        {p.image && (
+                                          <Image 
+                                            src={p.image} 
+                                            alt="Search" 
+                                            width={32} 
+                                            height={32} 
+                                            className="w-full h-full object-cover text-transparent"
+                                            unoptimized
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                         <p className="text-[11px] font-bold truncate">{p.name}</p>
+                                         <p className="text-[9px] text-muted-foreground">SKU: {p.sku || '-'}</p>
+                                      </div>
+                                      <Plus size={14} className="text-primary" />
+                                   </button>
+                                 ))
+                               ) : (
+                                 <div className="p-4 text-center text-[10px] text-muted-foreground">未找到相关商品</div>
+                               )}
+                             </div>
+                           )}
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Note */}
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                        备注信息
+                     </label>
+                     <textarea 
+                        value={editingItem.result.note || ""}
+                        onChange={(e) => {
+                          setItems(prev => prev.map(it => it.id === editingItemId ? {
+                            ...it,
+                            result: { ...it.result!, note: e.target.value }
+                          } : it));
+                        }}
+                        placeholder="修正识别偏差或补充备注..."
+                        className="w-full rounded-2xl bg-muted/30 border border-border/50 p-4 text-xs min-h-[80px] focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none"
+                     />
                   </div>
                 </div>
-              ))}
-              
-              {!isProcessing && (
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 aspect-square hover:border-primary/50 hover:bg-primary/5 transition-all text-gray-400 hover:text-primary group"
-                >
-                  <Plus size={24} />
-                  <span className="text-[10px] font-bold">添加</span>
-                </button>
-              )}
-            </div>
-          )}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">
+        <div className="p-4 sm:p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-medium hidden sm:block">
             {items.length > 0 && (
               <span>已添加 {items.length} 张图片</span>
             ) || "等待添加图片"}
@@ -406,27 +796,27 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 rounded-2xl border border-gray-200 dark:border-white/20 font-bold hover:bg-gray-100 dark:hover:bg-white/10 transition-all text-sm text-gray-600 dark:text-gray-200 whitespace-nowrap"
+              className="px-4 sm:px-6 py-2.5 rounded-2xl border border-gray-200 dark:border-white/20 font-black hover:bg-gray-100 dark:hover:bg-white/10 transition-all text-sm text-gray-600 dark:text-gray-200 whitespace-nowrap"
             >
               取消
             </button>
-            {items.some(i => i.status === 'pending' || i.status === 'error') ? (
+            {items.length === 0 || items.some(i => i.status === 'pending' || i.status === 'processing' || i.status === 'error') ? (
               <button
                 disabled={isProcessing || items.length === 0}
                 onClick={processBatch}
-                className="flex-1 sm:flex-none px-4 sm:px-8 py-2.5 rounded-2xl bg-primary text-black font-black shadow-lg shadow-primary/40 hover:scale-105 transition-all flex items-center justify-center gap-1 sm:gap-2 text-sm disabled:opacity-50 disabled:transform-none whitespace-nowrap"
+                className="flex-1 sm:flex-none px-4 sm:px-8 py-2.5 rounded-2xl bg-primary text-primary-foreground font-black shadow-lg shadow-primary/40 hover:scale-105 transition-all flex items-center justify-center gap-1 sm:gap-2 text-sm disabled:opacity-50 disabled:transform-none whitespace-nowrap"
               >
                 {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Wand2 size={18} className="hidden sm:block" />}
                 开始识别
               </button>
             ) : (
               <button
-                disabled={isProcessing || items.length === 0}
+                disabled={isProcessing}
                 onClick={handleSaveAll}
-                className="flex-2 sm:flex-none px-4 sm:px-8 py-2.5 rounded-2xl bg-emerald-500 text-white font-black shadow-lg shadow-emerald-500/40 hover:scale-105 transition-all flex items-center justify-center gap-1 sm:gap-2 text-sm disabled:opacity-50 disabled:transform-none whitespace-nowrap"
+                className="flex-1 sm:flex-none px-4 sm:px-8 py-2.5 rounded-2xl bg-emerald-500 text-white font-black shadow-lg shadow-emerald-500/40 hover:scale-105 transition-all flex items-center justify-center gap-1 sm:gap-2 text-sm disabled:opacity-50 disabled:transform-none whitespace-nowrap"
               >
                 {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} className="hidden sm:block" />}
-                保存全部到清单
+                保存全部到清单 ({items.filter(i => i.status === 'success').length})
               </button>
             )}
           </div>
@@ -449,11 +839,11 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/95 p-4 sm:p-8 backdrop-blur-sm cursor-zoom-out"
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/95 backdrop-blur-sm touch-none overscroll-none"
             onClick={() => setPreviewImage(null)}
           >
             <button
-              className="absolute top-4 right-4 sm:top-8 sm:right-8 p-3 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 rounded-full backdrop-blur-md transition-all z-10"
+              className="absolute top-4 right-4 sm:top-8 sm:right-8 p-3 text-white/70 hover:text-white bg-black/40 hover:bg-black/40 rounded-full backdrop-blur-md transition-all z-10"
               onClick={(e) => {
                 e.stopPropagation();
                 setPreviewImage(null);
@@ -461,21 +851,13 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             >
               <X size={24} />
             </button>
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative max-w-full max-h-full flex items-center justify-center cursor-default"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewImage}
-                alt="Full Preview"
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl ring-1 ring-white/10"
-              />
-            </motion.div>
+
+            <div className="w-full h-full flex items-center justify-center p-4 sm:p-12 pointer-events-none">
+              <div className="w-full h-full max-w-5xl max-h-[90vh] pointer-events-auto">
+                {/* Assuming GestureImage is imported from './GestureImage' or similar */}
+                <GestureImage src={previewImage} />
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

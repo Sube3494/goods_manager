@@ -9,9 +9,6 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
-
-
-
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -41,7 +38,6 @@ function ProductSkeleton() {
 }
 
 export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, singleSelect = false, showPrice = true }: ProductSelectionModalProps) {
-
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
@@ -56,10 +52,10 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isDataStale, setIsDataStale] = useState(false); // 标记当前展示的数据是否与当前请求不匹配
+  const [isDataStale, setIsDataStale] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { showToast } = useToast();
-  const resultsVersion = useRef(0); // 处理竞态逻辑
+  const resultsVersion = useRef(0);
 
   // 初始化重置逻辑
   useEffect(() => {
@@ -68,7 +64,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       setSelectedProducts([]);
       setSearchQuery("");
       setSelectedSupplierId("");
-      setProducts([]); // 初始切换时清空
+      setProducts([]); 
       setIsLoading(true);
       setIsDataStale(true);
       pageRef.current = 1;
@@ -76,14 +72,25 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     } else {
       setIsInitialized(false);
     }
-  }, [isOpen, selectedIds]); // 仅在开关时触发一次重置
+  }, [isOpen, selectedIds]);
 
-   const fetchData = useCallback(async (mode: 'initial' | 'search' | 'next' = 'initial') => {
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
+
+  const fetchData = useCallback(async (mode: 'initial' | 'search' | 'next' = 'initial') => {
     const version = ++resultsVersion.current;
     
     if (mode === 'initial' || mode === 'search') {
       pageRef.current = 1;
-      setIsDataStale(true); // 开始新一轮搜索，标记旧数据失效
+      setIsDataStale(true);
       if (mode === 'search') setIsSearching(true);
     } else {
       setIsNextPageLoading(true);
@@ -102,7 +109,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
         mode === 'initial' ? fetch("/api/suppliers") : Promise.resolve(null)
       ]);
 
-      if (version !== resultsVersion.current) return; // 检查是否已过期
+      if (version !== resultsVersion.current) return;
 
       if (pRes.ok) {
         const pData = await pRes.json();
@@ -110,7 +117,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
         
         if (mode === 'initial' || mode === 'search') {
           setProducts(newItems);
-          setIsDataStale(false); // 数据返回，标记数据新鲜
+          setIsDataStale(false);
         } else {
           setProducts(prev => {
             const existingIds = new Set(prev.map(i => i.id));
@@ -136,19 +143,16 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     }
   }, [debouncedSearch]);
 
-  // 2. Data fetching when modal opens
   useEffect(() => {
     if (!isOpen || !isInitialized) return;
     fetchData('initial');
   }, [isOpen, isInitialized, fetchData]);
 
-  // 3. Search change (debounced)
   useEffect(() => {
     if (!isOpen || !isInitialized || isLoading) return; 
     fetchData('search');
   }, [debouncedSearch, isOpen, isInitialized, isLoading, fetchData]);
 
-  // 4. Infinite scroll observer
   useEffect(() => {
     if (!isOpen || !hasMore || isLoading || isSearching || isNextPageLoading) return;
 
@@ -178,8 +182,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
 
       if (res.ok) {
         const product = await res.json();
-        
-        // Handle gallery items persistence
         if (galleryItems && galleryItems.length > 0) {
           const tempItems = galleryItems.filter(item => item.id.startsWith('temp-'));
           if (tempItems.length > 0) {
@@ -193,13 +195,10 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
             });
           }
         }
-
         showToast("商品创建成功", "success");
         setIsCreateModalOpen(false);
-        
-        // Refresh and auto-select
         await fetchData();
-        toggleProduct(product.id);
+        toggleProduct(product);
       } else {
         showToast("创建失败", "error");
       }
@@ -209,8 +208,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   };
 
   const filteredProducts = (Array.isArray(products) ? products : []).filter(p => {
-    // Backend already handles search, but we apply supplier filter on top of it 
-    // since backend doesn't support supplierId param yet
     const matchesSupplier = !selectedSupplierId || p.supplierId === selectedSupplierId;
     return matchesSupplier;
   });
@@ -223,20 +220,14 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     } else {
         setTempSelectedIds(prev => {
             const isSelected = prev.includes(id);
-            if (isSelected) {
-                return prev.filter(i => i !== id);
-            } else {
-                return [...prev, id];
-            }
+            if (isSelected) return prev.filter(i => i !== id);
+            return [...prev, id];
         });
         
         setSelectedProducts(prev => {
             const isSelected = prev.some(p => p.id === id);
-            if (isSelected) {
-                return prev.filter(p => p.id !== id);
-            } else {
-                return [...prev, product];
-            }
+            if (isSelected) return prev.filter(p => p.id !== id);
+            return [...prev, product];
         });
     }
   };
@@ -313,16 +304,15 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </div>
               </div>
 
-
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar min-h-0 relative">
-                 {(isLoading || isDataStale) ? (
+                 {(isLoading && products.length === 0) ? (
                     <div className="space-y-2">
                         {[...Array(6)].map((_, i) => (
                            <ProductSkeleton key={i} />
                         ))}
                     </div>
                  ) : (
-                    <div className={cn("space-y-2 transition-opacity duration-200", isSearching && "opacity-50 pointer-events-none")}>
+                    <div className={cn("space-y-2 transition-opacity duration-200", (isSearching || isDataStale) && "opacity-60 pointer-events-none")}>
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
                       return (
@@ -336,7 +326,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                                : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
                            )}
                         >
-                          {/* Circular Checkbox/Radio Top-Right - enlarged for usability */}
                           <div className={cn(
                             "absolute top-3 right-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110",
                             isSelected 
@@ -348,7 +337,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
 
                           <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative">
                             {product.image ? (
-                                // eslint-disable-next-line @next/next/no-img-element
                                 <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
                             ) : (
                                 <div className="h-full w-full flex items-center justify-center text-muted-foreground">
@@ -359,7 +347,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                           
                            <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pr-10">
                             <div className="flex items-center gap-2">
-                               <span className={`text-[15px] font-medium truncate leading-snug ${isSelected ? "text-primary" : "text-foreground"}`}>{product.name}</span>
+                               <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary" : "text-foreground")}>{product.name}</span>
                             </div>
                              {(product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark) && (
                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
@@ -373,7 +361,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                                           <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name}</span>
                                       </span>
                                     )}
-                                    {/* Product Remark Display Inline */}
                                     {product.remark && (
                                         <span className="flex flex-wrap items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
                                             <span className="font-bold opacity-70 shrink-0">注:</span>

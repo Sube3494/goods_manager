@@ -97,11 +97,16 @@ export async function POST(req: NextRequest) {
       const jsonStr = content.replace(/```json\n?|```/g, '').trim();
       const parsed = JSON.parse(jsonStr);
 
+      // 检查日期是否是占位日期（00:00:00）或回退日期
+      const rawDateStr = String(parsed.date || "");
+      const isPlaceholderTime = rawDateStr.includes("00:00:00") || !rawDateStr.includes(" ");
+      const isValidDate = parsed.date && !isNaN(new Date(parsed.date).getTime());
+
       // 安全的回退机制，防止 AI 返回错误类型导致 Prisma 500
       result = {
         orderId: String(parsed.orderId || `AI-${Date.now()}`),
         platform: String(parsed.platform || "淘宝"),
-        date: parsed.date && !isNaN(new Date(parsed.date).getTime()) 
+        date: isValidDate 
           ? new Date(parsed.date).toISOString() 
           : new Date().toISOString(),
         paymentAmount: Number(parsed.paymentAmount) || 0,
@@ -112,7 +117,9 @@ export async function POST(req: NextRequest) {
               quantity: Number(i.quantity) || 1 
             })) 
           : [],
-        note: parsed.note ? String(parsed.note) : undefined
+        note: parsed.note ? String(parsed.note) : undefined,
+        // @ts-ignore - 动态添加标记，前端处理
+        timeMissing: isPlaceholderTime || !isValidDate
       };
     } catch (parseError: unknown) {
       console.error("Failed to parse JSON from AI response:", content, parseError);

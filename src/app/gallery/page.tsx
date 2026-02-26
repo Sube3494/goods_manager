@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
 import { Camera, ChevronRight, X, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw } from "lucide-react";
 
@@ -24,23 +24,14 @@ import { useCallback } from "react";
 
 interface LightboxMediaItemProps {
     item: GalleryItem;
-    direction: number;
-    onNavigate: (dir: number) => void;
     onScaleChange: (v: number) => void;
-    totalItems: number;
-    currentIndex: number;
 }
 
-const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalItems, currentIndex }: LightboxMediaItemProps) => {
-    const scaleValue = useMotionValue(1);
-    const xValue = useMotionValue(0);
-    const yValue = useMotionValue(0);
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [isZoomed, setIsZoomed] = useState(false);
+import { GestureImage } from "@/components/ui/GestureImage";
+
+const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    // 切换到视频时强制播放
     useEffect(() => {
         if (item.type === 'video' && videoRef.current) {
             videoRef.current.currentTime = 0;
@@ -48,175 +39,30 @@ const LightboxMediaItem = ({ item, direction, onNavigate, onScaleChange, totalIt
         }
     }, [item.type, item.url]);
 
-    const softSpringConfig = { stiffness: 180, damping: 20, mass: 0.4 };
-    const hardSpringConfig = { stiffness: 5000, damping: 200, mass: 0.05 };
-
-    const smoothScale = useSpring(scaleValue, softSpringConfig);
-    const smoothX = useSpring(xValue, isDragging ? hardSpringConfig : softSpringConfig);
-    const smoothY = useSpring(yValue, isDragging ? hardSpringConfig : softSpringConfig);
-
-    useEffect(() => {
-        const unsub = scaleValue.on("change", (v) => {
-            onScaleChange(v);
-            if (v > 1.05 && !isZoomed) setIsZoomed(true);
-            if (v <= 1.05 && isZoomed) setIsZoomed(false);
-        });
-        return unsub;
-    }, [isZoomed, scaleValue, onScaleChange]);
-
-    const handleWheel = (e: React.WheelEvent) => {
-        if (item.type === 'video') return;
-        e.preventDefault();
-        const delta = -e.deltaY;
-        const scaleStep = 0.3;
-        const currentScale = scaleValue.get();
-        const newScale = Math.min(Math.max(currentScale + (delta > 0 ? scaleStep : -scaleStep), 1), 5);
-        if (newScale === currentScale) return;
-
-        const rect = e.currentTarget.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left - rect.width / 2;
-        const mouseY = e.clientY - rect.top - rect.height / 2;
-        const scaleRatio = newScale / currentScale;
-        
-        const newX = mouseX - (mouseX - xValue.get()) * scaleRatio;
-        const newY = mouseY - (mouseY - yValue.get()) * scaleRatio;
-
-        if (newScale === 1) {
-            animate(scaleValue, 1, { type: "spring", ...softSpringConfig });
-            animate(xValue, 0, { type: "spring", ...softSpringConfig });
-            animate(yValue, 0, { type: "spring", ...softSpringConfig });
-        } else {
-            scaleValue.set(newScale);
-            xValue.set(newX);
-            yValue.set(newY);
-        }
-    };
-
-    const handlePointerDown = (e: React.PointerEvent) => {
-        // 视频可以滑动导航，但不拖动内容
-        if (item.type !== 'video') {
-            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-        }
-        setIsDragging(true);
-        setDragStart({ x: e.clientX - (item.type === 'video' ? 0 : xValue.get()), y: e.clientY - (item.type === 'video' ? 0 : yValue.get()) });
-    };
-
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isDragging || item.type === 'video') return;
-        const newX = e.clientX - dragStart.x;
-        if (scaleValue.get() <= 1) {
-            xValue.set(newX);
-        } else {
-            xValue.set(newX);
-            yValue.set(e.clientY - dragStart.y);
-        }
-    };
-
-    const handlePointerUp = (e: React.PointerEvent) => {
-        if (!isDragging) return;
-        if (item.type !== 'video') {
-            (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-        }
-        setIsDragging(false);
-
-        if (item.type === 'video') {
-            // 视频：只模拟滑动导航，不移动内容
-            const swipeX = e.clientX - dragStart.x;
-            const threshold = 50;
-            if (totalItems > 1 && swipeX > threshold && currentIndex > 0) {
-                onNavigate(-1);
-            } else if (totalItems > 1 && swipeX < -threshold && currentIndex < totalItems - 1) {
-                onNavigate(1);
-            }
-            return;
-        }
-
-        if (scaleValue.get() < 1.05) {
-            const currentX = xValue.get();
-            const threshold = 50;
-            if (totalItems > 1 && currentX > threshold && currentIndex > 0) {
-                onNavigate(-1);
-            } else if (totalItems > 1 && currentX < -threshold && currentIndex < totalItems - 1) {
-                onNavigate(1);
-            } else {
-                animate(xValue, 0, { type: "spring", ...softSpringConfig });
-                animate(yValue, 0, { type: "spring", ...softSpringConfig });
-            }
-        }
-    };
-
     return (
         <motion.div
-            custom={direction}
-            variants={{
-                enter: (dir: number) => ({
-                    x: dir === 0 ? 0 : (dir > 0 ? 500 : -500),
-                    opacity: 0,
-                    scale: 0.95,
-                    zIndex: 1
-                }),
-                center: { 
-                    x: 0, 
-                    opacity: 1, 
-                    scale: 1, 
-                    zIndex: 10 
-                },
-                exit: (dir: number) => ({
-                    x: dir === 0 ? 0 : (dir < 0 ? 500 : -500),
-                    opacity: 0,
-                    scale: 0.95,
-                    zIndex: 1
-                })
-            }}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ 
-                x: { type: "spring", stiffness: 1000, damping: 100 },
-                opacity: { duration: 0.1 },
-                scale: { duration: 0.1 }
-            }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
-            <motion.div 
-                className={cn(
-                    "relative drop-shadow-2xl pointer-events-auto flex items-center justify-center",
-                    isZoomed && !(item.type === 'video') ? "cursor-grab active:cursor-grabbing" : ""
-                )}
-                style={{
-                    x: smoothX,
-                    y: smoothY,
-                    scale: smoothScale,
-                    width: '100%',
-                    height: '100%',
-                    willChange: "transform",
-                    touchAction: 'none'
-                }}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-                onWheel={handleWheel}
-            >
-                {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
-                    <video 
-                        ref={videoRef}
-                        src={item.url} 
-                        className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
-                        controls
-                        muted
-                        playsInline
-                    />
-                ) : (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img 
-                        src={item.url} 
-                        alt="Gallery View" 
-                        className="max-w-[95%] sm:max-w-[90%] max-h-[70%] sm:max-h-[75%] object-contain rounded-2xl shadow-2xl mx-auto border border-white/5"
-                        draggable={false}
-                    />
-                )}
-            </motion.div>
+            <div className="w-full h-full flex items-center justify-center pointer-events-auto overflow-hidden">
+                <div className="w-full h-full flex items-center justify-center">
+                    {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
+                        <video 
+                            ref={videoRef}
+                            src={item.url} 
+                            className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
+                            controls
+                            muted
+                            playsInline
+                        />
+                    ) : (
+                        <GestureImage 
+                            src={item.url} 
+                            onScaleChange={onScaleChange}
+                            className="w-full h-full"
+                        />
+                    )}
+                </div>
+            </div>
         </motion.div>
     );
 };
@@ -236,6 +82,7 @@ function GalleryContent() {
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
   const itemsRef = useRef<GalleryItem[]>([]);
   const currentPageRef = useRef(1);
+  const thumbnailContainerRef = useRef<HTMLDivElement>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -282,21 +129,32 @@ function GalleryContent() {
   const canDelete = hasPermission(user as SessionUser | null, "gallery:delete");
   
   // Lightbox Enhancements
-  const [previewDirection, setPreviewDirection] = useState(0);
   const activeScale = useMotionValue(1);
   const uiOpacity = useTransform(activeScale, [1, 1.05], [1, 0]);
   const uiYOffset = useTransform(activeScale, [1, 1.05], [0, -20]);
   const bottomUiYOffset = useTransform(activeScale, [1, 1.05], [0, 20]);
 
-  const [isZoomed, setIsZoomed] = useState(false);
-  useEffect(() => {
-    return activeScale.on("change", (v) => {
-        if (v > 1.05 && !isZoomed) setIsZoomed(true);
-        if (v <= 1.05 && isZoomed) setIsZoomed(false);
-    });
-  }, [isZoomed, activeScale]);
+  const pointerEvents = useTransform(activeScale, (v) => v > 1.05 ? "none" as const : "auto" as const);
 
   const [showInfo, setShowInfo] = useState(false);
+
+  // Auto-scroll selected thumbnail into view
+  useEffect(() => {
+    if (selectedImage && thumbnailContainerRef.current) {
+        const container = thumbnailContainerRef.current;
+        const selectedThumb = container.querySelector('[data-selected="true"]') as HTMLElement;
+        if (selectedThumb) {
+            const containerWidth = container.offsetWidth;
+            const thumbOffset = selectedThumb.offsetLeft;
+            const thumbWidth = selectedThumb.offsetWidth;
+            
+            container.scrollTo({
+                left: thumbOffset - (containerWidth / 2) + (thumbWidth / 2),
+                behavior: "smooth"
+            });
+        }
+    }
+  }, [selectedImage]);
 
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -449,11 +307,14 @@ function GalleryContent() {
   useEffect(() => {
     if (selectedImage || isUploadModalOpen) {
       document.body.style.overflow = 'hidden';
+      document.body.style.overscrollBehavior = 'none';
     } else {
       document.body.style.overflow = 'unset';
+      document.body.style.overscrollBehavior = 'unset';
     }
     return () => {
       document.body.style.overflow = 'unset';
+      document.body.style.overscrollBehavior = 'unset';
     };
   }, [selectedImage, isUploadModalOpen]);
 
@@ -713,7 +574,6 @@ function GalleryContent() {
     if (!selectedImage) return;
     const nextIndex = currentIndex + dir;
     if (nextIndex < 0 || nextIndex >= relatedImages.length) return;
-    setPreviewDirection(dir);
     setSelectedImage(relatedImages[nextIndex]);
   };
 
@@ -827,7 +687,7 @@ function GalleryContent() {
 
         {/* Responsive Grid / Waterfall */}
         <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-               {groupedProducts.map((group) => {
+               {groupedProducts.map((group, idx) => {
                     // Use product.image as cover URL directly (it may not be a gallery item)
                     // then fall back to the first non-video item, then to any first item
                     const fallbackItem =
@@ -887,7 +747,9 @@ function GalleryContent() {
                                             fill 
                                             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                                             className="object-cover transition-all duration-700 opacity-0 group-hover:scale-105" 
-                                            onLoadingComplete={(img) => {
+                                            priority={idx < 6}
+                                            onLoad={(e) => {
+                                                const img = e.currentTarget;
                                                 img.classList.remove('opacity-0');
                                                 img.classList.add('opacity-100');
                                                 // Find the closest sibling with animate-pulse and hide it
@@ -997,12 +859,12 @@ function GalleryContent() {
             <AnimatePresence>
                 {isUploadModalOpen && (
                     <div className="fixed inset-0 z-50000 flex items-center justify-center p-4">
-                        <motion.div
+                        <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.1 }}
-                            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm touch-none overscroll-none"
                             onClick={() => setIsUploadModalOpen(false)}
                         />
                         <motion.div
@@ -1351,7 +1213,7 @@ function GalleryContent() {
                                 style={{ 
                                     opacity: uiOpacity, 
                                     y: uiYOffset,
-                                    pointerEvents: isZoomed ? 'none' : 'auto'
+                                    pointerEvents: pointerEvents
                                 }}
                                 className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55 pointer-events-none"
                             >
@@ -1512,38 +1374,32 @@ function GalleryContent() {
                                     <motion.div
                                         style={{ 
                                             opacity: uiOpacity,
-                                            pointerEvents: isZoomed ? 'none' : 'auto'
+                                            pointerEvents: pointerEvents
                                         }}
-                                        className="contents"
+                                        className="hidden md:contents"
                                     >
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(-1); }}
                                             disabled={currentIndex === 0}
-                                            className="hidden md:flex absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
+                                            className="absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
                                         >
                                             <ChevronRight size={32} className="rotate-180 group-hover/btn:-translate-x-1 transition-transform group-disabled/btn:translate-x-0" />
                                         </button>
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(1); }}
                                             disabled={currentIndex === relatedImages.length - 1}
-                                            className="hidden md:flex absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-white/5 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
+                                            className="absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
                                         >
                                             <ChevronRight size={32} className="group-hover/btn:translate-x-1 transition-transform group-disabled/btn:translate-x-0" />
                                         </button>
                                     </motion.div>
                                 )}
 
-                                <AnimatePresence initial={false} custom={previewDirection}>
-                                    <LightboxMediaItem 
-                                        key={selectedImage!.id}
-                                        item={selectedImage!}
-                                        direction={previewDirection}
-                                        onNavigate={navigate}
-                                        onScaleChange={(v) => activeScale.set(v)}
-                                        totalItems={relatedImages.length}
-                                        currentIndex={currentIndex}
-                                    />
-                                </AnimatePresence>
+                                <LightboxMediaItem 
+                                    key={selectedImage!.id}
+                                    item={selectedImage!}
+                                    onScaleChange={(v) => activeScale.set(v)}
+                                />
                             </div>
 
                         {/* Bottom Bar Overlay (Minimalist Float) */}
@@ -1552,34 +1408,54 @@ function GalleryContent() {
                                 style={{ 
                                     opacity: uiOpacity, 
                                     y: bottomUiYOffset,
-                                    pointerEvents: isZoomed ? 'none' : 'auto'
+                                    pointerEvents: pointerEvents
                                 }}
-                                className="bg-black/40 hover:bg-black/80 transition-colors backdrop-blur-xl px-4 py-3 rounded-2xl border border-white/10 shadow-2xl flex flex-col gap-2 pointer-events-auto items-center max-w-[95vw]"
+                                className="relative bg-black/40 hover:bg-black/60 transition-colors backdrop-blur-xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-1 md:gap-2 pointer-events-auto max-w-[95vw]"
                             >
-                                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-full py-2 px-4">
-                                {relatedImages.map((img, idx) => {
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); navigate(-1); }}
+                                    disabled={currentIndex === 0}
+                                    className="p-2.5 text-white/50 hover:text-white disabled:opacity-10 transition-all shrink-0 md:hidden"
+                                >
+                                    <ChevronRight size={24} className="rotate-180" />
+                                </button>
+
+                                <div 
+                                    ref={thumbnailContainerRef}
+                                    className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-[calc(95vw-100px)] md:max-w-[calc(95vw-40px)] py-2 px-1 scroll-smooth"
+                                >
+                                {relatedImages.map((img) => {
                                     const isSelected = img.id === selectedImage!.id;
                                     return (
-                                        <div key={img.id} className="flex flex-col items-center gap-2 shrink-0">
+                                        <div 
+                                            key={img.id} 
+                                            data-selected={isSelected}
+                                            className="flex flex-col items-center gap-2 shrink-0"
+                                        >
                                             <div 
                                                 onClick={() => {
                                                     if (!isSelected) {
-                                                        setPreviewDirection(idx > currentIndex ? 1 : -1);
                                                         setSelectedImage(img);
                                                     }
                                                 }}
                                                 className={cn(
                                                     "relative h-12 w-12 md:h-14 md:w-14 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border shrink-0 group",
                                                     isSelected 
-                                                    ? "border-primary scale-105 z-10 brightness-100 ring-2 ring-primary/40 shadow-lg shadow-primary/20" 
+                                                    ? "border-white scale-105 z-10 brightness-100 ring-2 ring-white/40 shadow-lg shadow-white/20" 
                                                     : "border-white/5 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100 hover:border-white/20"
                                                 )}
                                             >
                                                 {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
                                                     <div className="w-full h-full bg-black flex items-center justify-center">
-                                                        <video src={img.url} className="w-full h-full object-cover" />
+                                                        <video 
+                                                            src={img.url} 
+                                                            className="w-full h-full object-cover opacity-60" 
+                                                            muted 
+                                                            playsInline 
+                                                            preload="metadata"
+                                                        />
                                                         <div className="absolute inset-0 bg-black/10 transition-colors" />
-                                                        <PlayCircle size={20} className="absolute text-white/80" />
+                                                        <PlayCircle size={20} className="absolute text-white/90" />
                                                     </div>
                                                 ) : (
                                                     <Image 
@@ -1603,7 +1479,7 @@ function GalleryContent() {
                                                             stiffness: 800, 
                                                             damping: 40 
                                                         }}
-                                                        className="absolute inset-0 bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary-rgb),0.8)]"
+                                                        className="absolute inset-0 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]"
                                                     />
                                                 )}
                                             </div>
@@ -1611,6 +1487,14 @@ function GalleryContent() {
                                     );
                                 })}
                                 </div>
+
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); navigate(1); }}
+                                    disabled={currentIndex === relatedImages.length - 1}
+                                    className="p-2.5 text-white/50 hover:text-white disabled:opacity-10 transition-all shrink-0 md:hidden"
+                                >
+                                    <ChevronRight size={24} />
+                                </button>
                             </motion.div>
                         </div>
                     </motion.div>

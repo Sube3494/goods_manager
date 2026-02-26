@@ -548,41 +548,42 @@ export default function GoodsPage() {
            )}
         </div>
       </div>
-      {/* 搜索框 + 重置按钮同行 */}
-      <div className="flex items-center gap-2 mb-3 md:mb-4">
-          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
-            <Search size={18} className="text-muted-foreground shrink-0" />
-            <input
-              type="text"
-              placeholder="搜索商品..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery("")}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
-              >
-                <X size={14} />
-              </button>
-            )}
+      {/* 搜索框与筛选器行 - 在 PC 端 (xl) 合并为一行 */}
+      <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2 mb-6 md:mb-8 transition-all">
+          {/* 搜索框 + 重置按钮 */}
+          <div className="flex items-center gap-2 flex-1">
+              <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
+                <Search size={18} className="text-muted-foreground shrink-0" />
+                <input
+                  type="text"
+                  placeholder="搜索商品..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {hasActiveFilters && (
+                <button
+                  onClick={resetFilters}
+                  className="h-10 sm:h-11 px-3 sm:px-4 flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+                >
+                  <RotateCcw size={14} />
+                  <span className="hidden sm:inline">重置</span>
+                </button>
+              )}
           </div>
-          {hasActiveFilters && (
-            <button
-              onClick={resetFilters}
-              className="h-10 sm:h-11 px-3 sm:px-4 flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-            >
-              <RotateCcw size={14} />
-              <span className="hidden sm:inline">重置</span>
-            </button>
-          )}
-      </div>
 
-      {/* 筛选器行 */}
-      <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:flex lg:flex-row gap-2 sm:gap-3 w-full lg:w-auto"> 
-             <div className="col-span-1 lg:w-36 h-10 sm:h-11"> 
+          {/* 筛选选择器组 */}
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:flex xl:flex-row gap-2 sm:gap-3 w-full xl:w-auto shrink-0"> 
+             <div className="col-span-1 xl:w-36 h-10 sm:h-11"> 
                 <CustomSelect 
                     value={selectedStatus}
                     onChange={(val) => startTransition(() => setSelectedStatus(val))}
@@ -601,7 +602,7 @@ export default function GoodsPage() {
                     )}
                 />
              </div>
-             <div className="col-span-1 lg:w-40 h-10 sm:h-11">
+             <div className="col-span-1 xl:w-40 h-10 sm:h-11">
                 <CustomSelect 
                     value={selectedCategory}
                     onChange={(val) => startTransition(() => setSelectedCategory(val))}
@@ -617,7 +618,7 @@ export default function GoodsPage() {
                     )}
                 />
              </div>
-             <div className="col-span-1 lg:w-40 h-10 sm:h-11">
+             <div className="col-span-1 xl:w-40 h-10 sm:h-11">
                 <CustomSelect 
                     value={selectedSupplier}
                     onChange={(val) => startTransition(() => setSelectedSupplier(val))}
@@ -633,7 +634,7 @@ export default function GoodsPage() {
                     )}
                 />
              </div>
-             <div className="col-span-1 lg:w-48 h-10 sm:h-11">
+             <div className="col-span-1 xl:w-48 h-10 sm:h-11">
                 <CustomSelect 
                     value={sortBy}
                     onChange={(val) => startTransition(() => setSortBy(val))}

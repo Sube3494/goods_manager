@@ -822,22 +822,6 @@ function PurchasesContent() {
                           </button>
                         )}
 
-                        {/* Overview & Export per order */}
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setOverviewPurchase(po); }}
-                            className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-                            title="总览商品汇总"
-                        >
-                            <ShoppingBag size={16} />
-                        </button>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); handleExport(po); }}
-                            className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-                            title="导出采购明细"
-                        >
-                            <Download size={16} />
-                        </button>
-
 
                         {/* Management Actions: Show Truck for Confirmed, Ordered, or Shipped */}
                         {(po.status === "Confirmed" || (po.status as string) === "Ordered" || po.status === "Shipped") && (
@@ -1070,20 +1054,6 @@ function PurchasesContent() {
                         <Eye size={16} />
                     </button>
                    )}
-                    <button 
-                         onClick={() => setOverviewPurchase(po)}
-                         className="flex-none flex items-center justify-center h-9 w-9 rounded-lg bg-muted border border-border/50 text-foreground transition-all"
-                         title="总览商品汇总"
-                    >
-                        <ShoppingBag size={16} />
-                    </button>
-                    <button 
-                         onClick={() => handleExport(po)}
-                         className="flex-none flex items-center justify-center h-9 w-9 rounded-lg bg-muted border border-border/50 text-foreground transition-all"
-                         title="导出采购明细"
-                    >
-                        <Download size={16} />
-                    </button>
 
 
   
@@ -1196,6 +1166,8 @@ function PurchasesContent() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSave}
+        onExport={handleExport}
+        onOverview={setOverviewPurchase}
         initialData={editingPurchase || undefined}
         readOnly={detailReadOnly || (editingPurchase ? editingPurchase.status !== "Draft" : false)}
       />
