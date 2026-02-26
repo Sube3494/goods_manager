@@ -152,14 +152,14 @@ export function ProductShareClient({ items, productName }: ProductShareClientPro
                     <button 
                         onClick={() => navigate(-1)}
                         disabled={currentIndex === 0}
-                        className="absolute left-4 md:left-8 z-50 rounded-full p-4 bg-white/5 text-white hover:bg-white/10 transition-all border border-white/10 backdrop-blur-md disabled:opacity-0"
+                        className="absolute left-4 md:left-8 z-50 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
                     >
                         <ChevronRight size={32} className="rotate-180" />
                     </button>
                     <button 
                         onClick={() => navigate(1)}
                         disabled={currentIndex === items.length - 1}
-                        className="absolute right-4 md:right-8 z-50 rounded-full p-4 bg-white/5 text-white hover:bg-white/10 transition-all border border-white/10 backdrop-blur-md disabled:opacity-0"
+                        className="absolute right-4 md:right-8 z-50 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
                     >
                         <ChevronRight size={32} />
                     </button>
