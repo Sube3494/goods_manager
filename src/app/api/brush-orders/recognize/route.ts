@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `你是一个专业的电商订单识别专家。请从用户上传的订单截图中准确提取信息。你必须且只能返回合法的 JSON 格式数据，绝对不要包含任何 Markdown 标记或多余的解释。JSON 结构必须严格如下：\n{\n  "orderId": "",\n  "platform": "",\n  "date": "YYYY-MM-DD HH:mm:ss",\n  "paymentAmount": 0,\n  "receivedAmount": 0,\n  "items": [{ "name": "", "quantity": 1 }],\n  "note": ""\n}`
+            content: `你是一个专业的电商订单识别专家。请从用户上传的订单截图中准确提取信息。你必须且只能返回合法的 JSON 格式数据，绝对不要包含任何 Markdown 标记或多余的解释。JSON 结构必须严格如下：\n{\n  "orderId": "",\n  "date": "YYYY-MM-DD HH:mm:ss",\n  "paymentAmount": 0,\n  "receivedAmount": 0,\n  "items": [{ "name": "", "quantity": 1 }],\n  "note": ""\n}`
           },
           {
             role: "user",
@@ -108,7 +108,6 @@ export async function POST(req: NextRequest) {
       // 安全的回退机制，防止 AI 返回错误类型导致 Prisma 500
       result = {
         platformOrderId: String(parsed.orderId || ""),
-        platform: String(parsed.platform || "淘宝"),
         date: (() => {
           if (!isValidDate) return new Date().toISOString();
           const rawDate = String(parsed.date);

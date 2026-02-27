@@ -1431,26 +1431,28 @@ function GalleryContent() {
                             </div>
 
                         {/* Bottom Bar Overlay (Minimalist Float) */}
-                        <div className="absolute bottom-4 left-0 right-0 flex justify-center z-55 pointer-events-none px-4">
+                        <div className="absolute bottom-6 left-0 right-0 flex justify-center z-55 pointer-events-none px-4">
                             <motion.div 
                                 style={{ 
                                     opacity: uiOpacity, 
                                     y: bottomUiYOffset,
                                     pointerEvents: pointerEvents
                                 }}
-                                className="relative bg-black/40 hover:bg-black/60 transition-colors backdrop-blur-xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-1 md:gap-2 pointer-events-auto max-w-[95vw]"
+                                className="bg-black/40 backdrop-blur-xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-full overflow-hidden"
                             >
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); navigate(-1); }}
-                                    disabled={currentIndex === 0}
-                                    className="p-2.5 text-white/50 hover:text-white disabled:opacity-10 transition-all shrink-0 md:hidden"
-                                >
-                                    <ChevronRight size={24} className="rotate-180" />
-                                </button>
+                                {relatedImages.length > 1 && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); navigate(-1); }}
+                                        disabled={currentIndex === 0}
+                                        className="md:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-white disabled:opacity-20 transition-all border border-white/10 active:scale-95"
+                                    >
+                                        <ChevronRight size={20} className="rotate-180" />
+                                    </button>
+                                )}
 
                                 <div 
                                     ref={thumbnailContainerRef}
-                                    className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-[calc(95vw-100px)] md:max-w-[calc(95vw-40px)] py-2 px-1 scroll-smooth"
+                                    className="flex gap-2.5 overflow-x-auto scrollbar-hide items-end justify-start max-w-[calc(85vw-88px)] md:max-w-2xl py-1 px-1 scroll-smooth"
                                 >
                                 {relatedImages.map((img) => {
                                     const isSelected = img.id === selectedImage!.id;
@@ -1458,71 +1460,52 @@ function GalleryContent() {
                                         <div 
                                             key={img.id} 
                                             data-selected={isSelected}
-                                            className="flex flex-col items-center gap-2 shrink-0"
+                                            onClick={() => {
+                                                if (!isSelected) {
+                                                    setSelectedImage(img);
+                                                }
+                                            }}
+                                            className={cn(
+                                                "relative h-12 w-12 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border shrink-0 group",
+                                                isSelected 
+                                                ? "border-white scale-110 z-10 ring-2 ring-white/40 shadow-lg shadow-white/20" 
+                                                : "border-white/5 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100"
+                                            )}
                                         >
-                                            <div 
-                                                onClick={() => {
-                                                    if (!isSelected) {
-                                                        setSelectedImage(img);
-                                                    }
-                                                }}
-                                                className={cn(
-                                                    "relative h-12 w-12 md:h-14 md:w-14 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border shrink-0 group",
-                                                    isSelected 
-                                                    ? "border-white scale-105 z-10 brightness-100 ring-2 ring-white/40 shadow-lg shadow-white/20" 
-                                                    : "border-white/5 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100 hover:border-white/20"
-                                                )}
-                                            >
-                                                {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
-                                                    <div className="w-full h-full bg-black flex items-center justify-center">
-                                                        <video 
-                                                            src={`${img.url}#t=0.1`} 
-                                                            className="w-full h-full object-cover opacity-60" 
-                                                            muted 
-                                                            playsInline 
-                                                            preload="metadata"
-                                                        />
-                                                        <div className="absolute inset-0 bg-black/10 transition-colors" />
-                                                        <PlayCircle size={20} className="absolute text-white/90" />
-                                                    </div>
-                                                ) : (
-                                                    <Image 
-                                                        src={img.url} 
-                                                        alt="Thumbnail" 
-                                                        fill
-                                                        sizes="60px"
-                                                        className="object-cover" 
+                                            {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
+                                                <div className="w-full h-full bg-black flex items-center justify-center relative">
+                                                    <video 
+                                                        src={`${img.url}#t=0.1`} 
+                                                        className="w-full h-full object-cover opacity-60" 
+                                                        muted 
+                                                        playsInline 
+                                                        preload="metadata"
                                                     />
-                                                )}
-                                            </div>
-                                            
-                                            {/* Selection Indicator Strip */}
-                                            <div className="h-1 w-8 relative">
-                                                {isSelected && (
-                                                    <motion.div 
-                                                        layoutId="thumbnail-indicator"
-                                                        initial={false}
-                                                        transition={{ 
-                                                            type: "spring", 
-                                                            stiffness: 800, 
-                                                            damping: 40 
-                                                        }}
-                                                        className="absolute inset-0 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]"
-                                                    />
-                                                )}
-                                            </div>
+                                                    <PlayCircle size={20} className="text-white/90 absolute" />
+                                                </div>
+                                            ) : (
+                                                <Image 
+                                                    src={img.url} 
+                                                    alt="Thumbnail" 
+                                                    fill
+                                                    sizes="50px"
+                                                    className="object-cover" 
+                                                />
+                                            )}
                                         </div>
                                     );
                                 })}
                                 </div>
 
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); navigate(1); }}
-                                    disabled={currentIndex === relatedImages.length - 1}
-                                    className="p-2.5 text-white/50 hover:text-white disabled:opacity-10 transition-all shrink-0 md:hidden"
-                                >
-                                    <ChevronRight size={24} />
-                                </button>
+                                {relatedImages.length > 1 && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); navigate(1); }}
+                                        disabled={currentIndex === relatedImages.length - 1}
+                                        className="md:hidden flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-white disabled:opacity-20 transition-all border border-white/10 active:scale-95"
+                                    >
+                                        <ChevronRight size={20} />
+                                    </button>
+                                )}
                             </motion.div>
                         </div>
                     </motion.div>
