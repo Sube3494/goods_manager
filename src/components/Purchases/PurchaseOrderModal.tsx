@@ -1148,33 +1148,51 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                     )}
 
                                     {((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered") && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const hasTracking = formData.trackingData && formData.trackingData.length > 0;
-                                                handleAction(hasTracking ? "Shipped" : "Confirmed");
-                                            }}
-                                            className="px-5 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-1.5 sm:gap-2"
-                                        >
-                                            <Truck size={14} className="hidden sm:block" />
-                                            保存物流
-                                        </button>
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAction("Confirmed")}
+                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
+                                            >
+                                                暂存
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const hasTracking = formData.trackingData && formData.trackingData.length > 0;
+                                                    handleAction(hasTracking ? "Shipped" : "Confirmed");
+                                                }}
+                                                className="px-5 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-1.5 sm:gap-2"
+                                            >
+                                                <Truck size={14} className="hidden sm:block" />
+                                                保存并完成发货
+                                            </button>
+                                        </>
                                     )}
 
                                     {formData.status === "Shipped" && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleAction("Received")}
-                                            disabled={!isShippedAndReady}
-                                            className={cn(
-                                                "px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg",
-                                                isShippedAndReady 
-                                                    ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]" 
-                                                    : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                                            )}
-                                        >
-                                            确认入库
-                                        </button>
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAction("Shipped")}
+                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
+                                            >
+                                                暂存
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAction("Received")}
+                                                disabled={!isShippedAndReady}
+                                                className={cn(
+                                                    "px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg",
+                                                    isShippedAndReady 
+                                                        ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]" 
+                                                        : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                                                )}
+                                            >
+                                                确认入库
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             )}

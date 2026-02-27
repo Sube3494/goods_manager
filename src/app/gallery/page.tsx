@@ -705,10 +705,10 @@ function GalleryContent() {
                     >
                         <div 
                             className={cn(
-                                "group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 flex flex-col h-full",
-                                group.product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20 cursor-not-allowed" : "hover:shadow-2xl hover:shadow-primary/5 cursor-pointer"
+                                "group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 flex flex-col h-full hover:shadow-2xl hover:shadow-primary/5 cursor-pointer",
+                                group.product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20" : ""
                             )}
-                            onClick={() => !group.product.isDiscontinued && handleOpenProductPreview(group)}
+                            onClick={() => handleOpenProductPreview(group)}
                         >
                             {/* Full Card Discontinued Overlay */}
                             {group.product.isDiscontinued && (

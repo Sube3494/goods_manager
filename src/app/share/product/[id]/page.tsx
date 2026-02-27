@@ -75,5 +75,7 @@ export default async function ProductSharePage({ params, searchParams }: { param
   return <ProductShareClient 
     items={product.gallery as unknown as { id: string; url: string; type: string }[]} 
     productName={product.name}
+    sku={product.sku || ""}
+    description={product.remark || ""}
   />;
 }

@@ -18,7 +18,7 @@ interface BatchItem {
   status: 'pending' | 'processing' | 'success' | 'error';
   progress: number;
   result?: {
-    orderId?: string;
+    platformOrderId?: string;
     platform?: string;
     date?: string;
     paymentAmount?: number;
@@ -291,9 +291,15 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
               receivedAmount: item.result?.receivedAmount || 0,
               commission: 0,
               note: item.result?.note || "AI识别",
-              status: "Completed"
+              status: "Completed",
+              platformOrderId: item.result?.platformOrderId
             })
           });
+
+          if (res.status === 409) {
+            console.warn(`Item ${item.file.name} ignored: duplicate order.`);
+            continue;
+          }
 
           if (!res.ok) {
             console.error(`Failed to save item ${item.file.name}:`, await res.text());
@@ -427,7 +433,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                 "grid gap-3",
                 editingItemId ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-2" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
               )}>
-                {items.map((item) => (
+                {items.map((item, index) => (
                   <div 
                     key={item.id} 
                     onClick={() => {
@@ -450,49 +456,63 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                       />
                       
-                      {/* Status Badge Overlay - Refined as clean circles/capsules to eliminate "corners" */}
-                      <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+                      {/* Top-Left: Index Badge (Glassmorphism) */}
+                      <div className="absolute top-2 left-2 z-10">
+                        <div className="h-6 min-w-[24px] px-1.5 flex items-center justify-center rounded-lg bg-black/40 dark:bg-black/60 backdrop-blur-md border border-white/20 text-[10px] font-black text-white shadow-xl">
+                          {(index + 1).toString().padStart(2, '0')}
+                        </div>
+                      </div>
+
+                      {/* Top-Right: Action Button (Hover Only) */}
+                      {!isProcessing && (
+                        <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); if (editingItemId === item.id) setEditingItemId(null); }} 
+                            className="p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-lg backdrop-blur-md transition-all shadow-lg shadow-red-500/20"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Bottom-Right: Status Badge */}
+                      <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5">
                         {item.status === 'pending' && (
-                          <div className="flex items-center px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[8px] text-white font-black shadow-lg">
+                          <div className="h-6 px-2 flex items-center gap-1.5 rounded-lg bg-white/90 dark:bg-black/80 backdrop-blur-md border border-black/5 dark:border-white/10 text-[9px] font-bold text-muted-foreground shadow-lg">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 animate-pulse" />
                             等待
                           </div>
                         )}
                         {item.status === 'processing' && (
-                          <div className="h-6 w-6 rounded-full bg-blue-500/90 backdrop-blur-md text-white flex items-center justify-center shadow-lg">
-                            <Loader2 size={14} className="animate-spin" />
+                          <div className="h-6 w-6 flex items-center justify-center rounded-lg bg-primary/20 backdrop-blur-md border border-primary/30 text-primary shadow-lg shadow-primary/10">
+                            <Loader2 size={13} className="animate-spin" />
                           </div>
                         )}
                         {item.status === 'success' && (
-                          <div className="h-6 w-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border border-white/20">
-                            <CheckCircle2 size={16} />
+                          <div className="h-6 w-6 flex items-center justify-center rounded-lg bg-emerald-500 backdrop-blur-md border border-emerald-400/50 text-white shadow-lg shadow-emerald-500/20">
+                            <CheckCircle2 size={14} />
                           </div>
                         )}
                         {item.status === 'error' && (
-                          <div className="h-6 w-6 rounded-full bg-red-500/90 backdrop-blur-md text-white flex items-center justify-center shadow-lg">
-                            <AlertCircle size={14} />
+                          <div className="h-6 w-6 flex items-center justify-center rounded-lg bg-red-500 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20">
+                            <AlertCircle size={13} />
                           </div>
                         )}
-                        {item.status === 'success' && item.result?.timeMissing && (
+                      </div>
+
+                      {/* Bottom-Left: Warning Indicators */}
+                      {item.status === 'success' && item.result?.timeMissing && (
+                        <div className="absolute bottom-2 left-2 z-10">
                           <motion.div 
                             initial={{ scale: 0 }} 
                             animate={{ scale: 1 }}
-                            className="h-6 w-6 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-lg border border-white/20 animate-pulse" 
+                            className="h-6 w-6 flex items-center justify-center rounded-lg bg-orange-500 backdrop-blur-md border border-orange-400/50 text-white shadow-lg shadow-orange-500/20" 
                             title="时间未能识别，请核对"
                           >
                              <Calendar size={12} />
                           </motion.div>
-                        )}
-                      </div>
-
-                      {!isProcessing && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); removeItem(item.id); if (editingItemId === item.id) setEditingItemId(null); }} 
-                          className="absolute top-2 right-2 p-1.5 bg-black/20 hover:bg-red-500 text-white rounded-lg backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 shadow-lg z-10"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        </div>
                       )}
-
                     </div>
                   </div>
                 ))}
@@ -525,7 +545,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                   <div className="flex items-center justify-between">
                      <h3 className="text-lg font-bold flex items-center gap-2">
                        <ImageIcon size={18} className="text-primary" />
-                       订单详情修正
+                       订单详情修正 #{(items.findIndex(i => i.id === editingItemId) + 1).toString().padStart(2, '0')}
                      </h3>
                      <button 
                        onClick={() => setEditingItemId(null)}

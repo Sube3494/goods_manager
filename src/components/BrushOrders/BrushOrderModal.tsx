@@ -134,8 +134,9 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
     setFormData({ ...formData, items: newItems });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const status = "Completed";
     if (readOnly) return;
 
     if (!formData.paymentAmount || formData.paymentAmount <= 0) {
@@ -163,7 +164,12 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         return;
     }
 
-    onSubmit(formData);
+    const submissionData = {
+        ...formData,
+        status: status || formData.status
+    };
+
+    onSubmit(submissionData);
   };
 
   if (!mounted) return null;
@@ -188,7 +194,18 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
                 className="fixed left-1/2 top-1/2 z-60 w-[calc(100%-32px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
                 <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 p-5 sm:p-8">
-                    <h2 className="text-2xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>
+                        {formData.status === "Draft" ? (
+                            <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 text-[10px] font-bold border border-orange-500/20 uppercase tracking-widest">
+                                暂存草稿
+                            </span>
+                        ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold border border-emerald-500/20 uppercase tracking-widest">
+                                已完成
+                            </span>
+                        )}
+                    </div>
                     <div className="flex items-center gap-3">
                         {!readOnly && (
                             <button
@@ -409,15 +426,15 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
                                 <button 
                                     type="button" 
                                     onClick={onClose} 
-                                    className="h-11 px-6 sm:px-8 rounded-2xl font-medium text-muted-foreground hover:bg-gray-100 dark:hover:bg-white/5 dark:hover:text-foreground border border-transparent hover:border-border transition-all active:scale-95 whitespace-nowrap"
+                                    className="h-11 px-4 sm:px-6 rounded-2xl font-medium text-muted-foreground hover:bg-gray-100 dark:hover:bg-white/5 dark:hover:text-foreground transition-all active:scale-95 whitespace-nowrap"
                                 >
                                     取消
                                 </button>
                                 <button 
-                                    type="submit" 
+                                    type="submit"
                                     className="h-11 px-8 sm:px-10 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all whitespace-nowrap"
                                 >
-                                    {initialData ? "保存修改" : "创建订单"}
+                                    {initialData && formData.status === "Completed" ? "保存修改" : "确认完成"}
                                 </button>
                             </div>
                         </div>

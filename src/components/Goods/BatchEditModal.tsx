@@ -10,7 +10,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 interface BatchEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (data: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean }) => void;
+  onConfirm: (data: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean; costPrice?: number }) => void;
   categories: Category[];
   suppliers: Supplier[];
   selectedCount: number;
@@ -28,14 +28,16 @@ export function BatchEditModal({
   const [supplierId, setSupplierId] = useState<string>("keep");
   const [visibility, setVisibility] = useState<string>("keep");
   const [productionStatus, setProductionStatus] = useState<string>("keep");
+  const [costPrice, setCostPrice] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean } = {};
+    const data: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean; costPrice?: number } = {};
     if (categoryId !== "keep") data.categoryId = categoryId;
     if (supplierId !== "keep") data.supplierId = supplierId;
     if (visibility !== "keep") data.isPublic = visibility === "public";
     if (productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
+    if (costPrice.trim() !== "") data.costPrice = parseFloat(costPrice);
     
     onConfirm(data);
     onClose();
@@ -82,7 +84,7 @@ export function BatchEditModal({
                 value={categoryId}
                 onChange={setCategoryId}
                 options={[
-                  { value: "keep", label: "保持原分类 (不修改)" },
+                  { value: "keep", label: "保持原分类" },
                   ...categories.map(c => ({ value: c.id, label: c.name }))
                 ]}
                 triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
@@ -98,7 +100,7 @@ export function BatchEditModal({
                 value={supplierId}
                 onChange={setSupplierId}
                 options={[
-                  { value: "keep", label: "保持原供应商 (不修改)" },
+                  { value: "keep", label: "保持原供应商" },
                   ...suppliers.map(s => ({ value: s.id, label: s.name }))
                 ]}
                 triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
@@ -114,7 +116,7 @@ export function BatchEditModal({
                 value={visibility}
                 onChange={setVisibility}
                 options={[
-                  { value: "keep", label: "保持当前状态 (不修改)" },
+                  { value: "keep", label: "保持当前状态" },
                   { value: "public", label: "设为公开可见" },
                   { value: "private", label: "设为隐藏不公开" }
                 ]}
@@ -131,12 +133,30 @@ export function BatchEditModal({
                 value={productionStatus}
                 onChange={setProductionStatus}
                 options={[
-                  { value: "keep", label: "保持当前状态 (不修改)" },
+                  { value: "keep", label: "保持当前状态" },
                   { value: "active", label: "正常生产中" },
                   { value: "discontinued", label: "标记为已停产" }
                 ]}
                 triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
               />
+            </div>
+
+            {/* Cost Price Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Tag size={16} className="rotate-90" /> 进货单价
+              </label>
+              <div className="relative group/price">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold font-number">¥</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="保持原单价"
+                  value={costPrice}
+                  onChange={(e) => setCostPrice(e.target.value)}
+                  className="w-full h-12 pl-8 pr-4 rounded-2xl bg-muted/30 border border-transparent focus:border-primary/30 outline-none transition-all font-bold font-number"
+                />
+              </div>
             </div>
 
             <div className="pt-4 flex gap-3">
@@ -149,7 +169,7 @@ export function BatchEditModal({
               </button>
               <button
                 type="submit"
-                disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep"}
+                disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep" && costPrice.trim() === ""}
                 className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
               >
                 <CheckCircle size={18} />

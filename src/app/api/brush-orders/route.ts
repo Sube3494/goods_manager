@@ -91,7 +91,25 @@ export async function POST(req: NextRequest) {
       commission,
       note,
       status,
+      platformOrderId,
     } = body;
+
+    // 去重检查
+    if (platformOrderId) {
+      const existing = await prisma.brushOrder.findFirst({
+        where: {
+          workspaceId: session.workspaceId,
+          platformOrderId: platformOrderId,
+        }
+      });
+      if (existing) {
+        return NextResponse.json({ 
+          error: "该订单已存在（重复导入）", 
+          code: "DUPLICATE_ORDER",
+          orderId: existing.id 
+        }, { status: 409 });
+      }
+    }
 
     const order = await prisma.brushOrder.create({
       data: {
@@ -103,6 +121,7 @@ export async function POST(req: NextRequest) {
         commission: parseFloat(commission || 0),
         note: note || null,
         status: status || 'Draft',
+        platformOrderId: platformOrderId || null,
         items: {
           create: items.map((item: { productId: string; quantity: number }) => ({
             productId: item.productId,

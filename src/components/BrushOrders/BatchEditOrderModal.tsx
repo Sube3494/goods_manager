@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Check, FileText } from "lucide-react";
+import { X, Check, FileText, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ export function BatchEditOrderModal({
   // 仅在打开时由外部控制状态初始化的写法
   const [commission, setCommission] = useState<string>("");
   const [note, setNote] = useState<string>("");
+  const [type, setType] = useState<string>("");
   const [clearNote, setClearNote] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -44,9 +45,13 @@ export function BatchEditOrderModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data: { commission?: number; note?: string } = {};
+    const data: { commission?: number; note?: string; type?: string } = {};
     if (commission.trim() !== "") {
       data.commission = Number(commission);
+    }
+    
+    if (type !== "") {
+      data.type = type;
     }
     
     if (clearNote) {
@@ -117,6 +122,29 @@ export function BatchEditOrderModal({
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <ShoppingBag size={15} /> 批量修改平台
+                </label>
+                <div className="flex bg-muted/30 rounded-2xl p-1.5 border border-border/50">
+                  {['美团', '淘宝', '京东'].map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setType(type === p ? "" : p)}
+                      className={cn(
+                        "flex-1 py-2 text-xs font-bold rounded-xl transition-all",
+                        type === p 
+                          ? "bg-white dark:bg-gray-800 text-primary shadow-sm" 
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-bold text-muted-foreground flex items-center gap-2">
@@ -172,7 +200,7 @@ export function BatchEditOrderModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={commission.trim() === "" && note.trim() === "" && !clearNote}
+                  disabled={commission.trim() === "" && note.trim() === "" && !clearNote && type === ""}
                   className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
                 >
                   <Check size={18} />

@@ -259,6 +259,7 @@ model BrushOrder {
   receivedAmount Float            @default(0)
   commission     Float            @default(0)
   note           String?
+  platformOrderId String?
   workspaceId    String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -266,6 +267,7 @@ model BrushOrder {
   items          BrushOrderItem[]
 
   @@index([workspaceId])
+  @@index([workspaceId, platformOrderId])
 }
 
 model BrushOrderItem {

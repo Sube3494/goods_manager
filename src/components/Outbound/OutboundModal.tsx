@@ -50,6 +50,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         page: targetPage.toString(),
         pageSize: "20",
         search: debouncedSearch,
+        sortBy: "stock-desc",
       });
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
@@ -214,7 +215,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-[calc(100%-32px)] sm:w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-white/10 shadow-2xl flex flex-col"
+          className="relative w-[calc(100%-32px)] sm:w-full max-w-4xl h-[600px] max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-white/10 shadow-2xl flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/5 p-4 sm:p-6 shrink-0">
@@ -263,7 +264,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-2 space-y-1 relative">
+              <div className="flex-1 overflow-y-scroll p-2 space-y-1 relative scrollbar-none sm:scrollbar-thin">
 
                 {(isLoadingProducts || isSearching) ? (
                     <div className="py-10 text-center flex flex-col items-center justify-center gap-3">
@@ -286,17 +287,15 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                               <div className="relative h-10 w-10 rounded-lg overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
                                  {p.image ? <Image src={p.image} alt={p.name} fill className="object-cover" /> : <Package className="w-full h-full p-2 text-muted-foreground/40" />}
                                  {isSelected && (
-                                     <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                         <CheckCircle size={16} className="text-primary fill-white" />
-                                     </div>
+                                     <div className="absolute inset-0 bg-primary/10 ring-2 ring-inset ring-primary/20" />
                                  )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className={`text-xs truncate ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`} title={p.name}>{p.name}</p>
                                 <p className="text-[10px] text-muted-foreground truncate font-mono uppercase tracking-tighter">{p.sku}</p>
                               </div>
-                              <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-primary text-white' : 'bg-secondary text-secondary-foreground'}`}>
-                                  {isSelected ? "已选" : `库存 ${p.stock}`}
+                               <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-all ${isSelected ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm' : 'bg-muted text-muted-foreground border border-transparent'}`}>
+                                  库存 {p.stock}
                               </div>
                             </div>
                           </button>
@@ -323,8 +322,8 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                 )}
               </div>
 
-              {/* Left Side Footer - only visible on desktop */}
-              <div className="p-4 sm:p-5 shrink-0 md:flex flex-col gap-0.5 hidden">
+              {/* Left Side Footer - visible on desktop */}
+              <div className={`p-4 sm:p-5 shrink-0 flex-col gap-0.5 border-t border-white/5 md:border-t-0 hidden md:flex`}>
                   <span className="text-xs sm:text-sm font-bold text-foreground">共选择 {selectedItems.length} 项商品</span>
                   <span className="text-[10px] text-muted-foreground">已选清单实时汇总</span>
               </div>
@@ -382,28 +381,28 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                                 {item.sku}
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-1 bg-muted/50 rounded-full border border-white/10 p-1">
-                                            <button 
-                                                type="button"
-                                                onClick={() => updateQuantity(item.productId, -1)}
-                                                className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
-                                            >
-                                                <Minus size={14} />
-                                            </button>
-                                            <input 
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={(e) => handleManualQuantityChange(item.productId, e.target.value)}
-                                                className="w-10 text-center text-xs font-bold bg-transparent no-spinner outline-none"
-                                            />
-                                            <button 
-                                                type="button"
-                                                onClick={() => updateQuantity(item.productId, 1)}
-                                                className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
-                                            >
-                                                <Plus size={14} />
-                                            </button>
-                                        </div>
+                                         <div className="flex items-center bg-muted/30 rounded-lg border border-white/5 p-0.5 ml-auto">
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => updateQuantity(item.productId, -1)}
+                                                 className="p-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-muted-foreground transition-colors"
+                                             >
+                                                 <Minus size={12} />
+                                             </button>
+                                             <input 
+                                                 type="number"
+                                                 value={item.quantity}
+                                                 onChange={(e) => handleManualQuantityChange(item.productId, e.target.value)}
+                                                 className="w-8 text-center text-[11px] font-bold bg-transparent no-spinner outline-none"
+                                             />
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => updateQuantity(item.productId, 1)}
+                                                 className="p-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-muted-foreground transition-colors"
+                                             >
+                                                 <Plus size={12} />
+                                             </button>
+                                         </div>
                                         <button 
                                             type="button"
                                             onClick={() => removeItem(item.productId)}
@@ -426,37 +425,54 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                         </div>
                     </div>
 
-                  {/* Right Side Footer Area */}
-                  <div className="p-4 sm:p-5 border-t border-border dark:border-white/5 shrink-0">
-
-                      {/* Mobile Stats: shown only on mobile because the left panel is hidden in review mode */}
-                      <div className="flex items-center justify-between mb-4 md:hidden">
-                          <div className="flex flex-col gap-0.5">
-                              <span className="text-xs sm:text-sm font-bold text-foreground">共选择 {selectedItems.length} 项商品</span>
-                              <span className="text-[10px] text-muted-foreground">已选清单实时汇总</span>
-                          </div>
-                      </div>
-                      
+                  {/* Right Side Footer Area - Desktop Only */}
+                  <div className="p-4 sm:p-5 border-t border-border dark:border-white/5 shrink-0 hidden md:block">
                       <button
                           onClick={handleSubmit}
                           disabled={selectedItems.length === 0}
                           className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
                       >
-                          {mobileView === "selection" && window.innerWidth < 768 ? (
-                              <>
-                                  <span>以此为基础并下一步</span>
-                                  <CheckCircle size={20} className="ml-1" />
-                              </>
-                          ) : (
-                              <>
-                                  <CheckCircle size={20} />
-                                  <span>确认并减扣库存</span>
-                              </>
-                          )}
+                          <CheckCircle size={20} />
+                          <span>确认并减扣库存</span>
                       </button>
                   </div>
                 </div>
             </div>
+          </div>
+
+          {/* Mobile Bottom Bar - Fixed at bottom of modal body */}
+          <div className="md:hidden border-t border-white/5 p-4 bg-white dark:bg-gray-900 shrink-0">
+              <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-col">
+                      <span className="text-xs font-bold text-foreground">共选择 {selectedItems.length} 项商品</span>
+                      <span className="text-[10px] text-muted-foreground">清单实时更新</span>
+                  </div>
+                  {mobileView === "review" && (
+                    <button 
+                        onClick={() => setMobileView("selection")}
+                        className="text-[10px] font-bold text-primary"
+                    >
+                        返回修改
+                    </button>
+                  )}
+              </div>
+              <button
+                  onClick={handleSubmit}
+                  disabled={selectedItems.length === 0}
+                  className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                  {mobileView === "selection" ? (
+                      <>
+                          <span>确认清单并下一步</span>
+                          <Plus size={18} className="rotate-45" />
+                      </>
+                  ) : (
+                      <>
+                          <CheckCircle size={18} />
+                          <span>确认出库并扣减库存</span>
+                      </>
+                  )}
+              </button>
           </div>
 
 

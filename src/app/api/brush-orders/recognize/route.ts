@@ -4,7 +4,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 
 // 识别结果结构定义
 interface RecognitionResult {
-  orderId?: string;
+  platformOrderId?: string;
   platform?: string;
   date?: string;
   paymentAmount?: number;
@@ -44,8 +44,11 @@ export async function POST(req: NextRequest) {
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
     const imageDataUrl = `data:${file.type};base64,${base64Image}`;
 
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0]; // e: 2024-03-21
+    // 获取中国标准时间的时间和年份
+    const now = new Date();
+    const chinaTime = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
+    const todayYear = chinaTime.getFullYear();
+    const todayStr = chinaTime.toISOString().split('T')[0]; // e: 2024-03-21
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -65,7 +68,7 @@ export async function POST(req: NextRequest) {
             content: [
               {
                 type: "text",
-                text: `请分析这张截图，严格按照前面定义的 JSON 结构返回数据。要求：\n- date 必须是截图中显示的真实交易时间。如果截图中的时间缺少跨度（例如只有 "02-24 18:24"），请默认使用当前年份 "${today.getFullYear()}" 补充为完整的 "YYYY-MM-DD HH:mm:ss"。如果截图只有日期没有时间，请返回 "YYYY-MM-DD 00:00:00"。如果截图中**没有明确指出任何交易日期或时间**，请发挥你的推断返回 "${todayStr} 00:00:00" 而不是随便编造日期。\n- 金额字段（paymentAmount, receivedAmount）必须是数字，不要带货币符号。注意定义：\n    - \`paymentAmount\`（实付）：指买家/顾客端实际支付的金额。\n    - \`receivedAmount\`（到手/本金）：指商家端实际或预计能收到的结算金额（例如图中的“预计收入”）。\n- 返回的字符串必须是纯粹的 JSON 文本，严禁使用 \`\`\`json 等代码块包裹。`
+                text: `请分析这张截图，严格按照前面定义的 JSON 结构返回数据。要求：\n- date 必须是截图中显示的真实交易时间。如果截图中的时间缺少跨度（例如只有 "02-24 18:24"），请默认使用当前年份 "${todayYear}" 补充为完整的 "YYYY-MM-DD HH:mm:ss"。如果截图只有日期没有时间，请返回 "YYYY-MM-DD 00:00:00"。如果截图中**没有明确指出任何交易日期或时间**，请发挥你的推断返回 "${todayStr} 00:00:00" 而不是随便编造日期。\n- 金额字段（paymentAmount, receivedAmount）必须是数字，不要带货币符号。注意定义：\n    - \`paymentAmount\`（实付）：指买家/顾客端实际支付的金额。\n    - \`receivedAmount\`（到手/本金）：指商家端实际或预计能收到的结算金额（例如图中的“预计收入”）。\n- 返回的字符串必须是纯粹的 JSON 文本，严禁使用 \`\`\`json 等代码块包裹。`
               },
               {
                 type: "image_url",
@@ -104,11 +107,17 @@ export async function POST(req: NextRequest) {
 
       // 安全的回退机制，防止 AI 返回错误类型导致 Prisma 500
       result = {
-        orderId: String(parsed.orderId || `AI-${Date.now()}`),
+        platformOrderId: String(parsed.orderId || ""),
         platform: String(parsed.platform || "淘宝"),
-        date: isValidDate 
-          ? new Date(parsed.date).toISOString() 
-          : new Date().toISOString(),
+        date: (() => {
+          if (!isValidDate) return new Date().toISOString();
+          const rawDate = String(parsed.date);
+          // 如果没有设定时区，补全为中国标准时间 (+08:00)
+          const dateStr = (rawDate.includes('+') || rawDate.includes('Z')) 
+            ? rawDate 
+            : `${rawDate.replace(' ', 'T')}+08:00`;
+          return new Date(dateStr).toISOString();
+        })(),
         paymentAmount: Number(parsed.paymentAmount) || 0,
         receivedAmount: Number(parsed.receivedAmount) || 0,
         items: Array.isArray(parsed.items) 
@@ -118,7 +127,7 @@ export async function POST(req: NextRequest) {
             })) 
           : [],
         note: parsed.note ? String(parsed.note) : undefined,
-        // @ts-ignore - 动态添加标记，前端处理
+        // @ts-expect-error - 动态添加标记，前端处理
         timeMissing: isPlaceholderTime || !isValidDate
       };
     } catch (parseError: unknown) {

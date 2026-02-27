@@ -708,9 +708,9 @@ export default function BrushOrdersPage() {
                                  {formatLocalDateTime(order.date).split(' ')[1]}
                               </td>
                               <td className="px-6 py-4 text-center">
-                                  <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold border border-blue-500/20">
-                                      {order.type}
-                                  </span>
+                                      <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20 uppercase">
+                                          {order.type}
+                                      </span>
                               </td>
                               <td className="px-6 py-4 font-number font-medium text-center text-sm">¥{order.paymentAmount.toFixed(2)}</td>
                               <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm">¥{order.receivedAmount.toFixed(2)}</td>
@@ -844,7 +844,12 @@ export default function BrushOrdersPage() {
                                                     </div>
                                                     <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-500 text-[9px] font-bold border border-blue-500/20 uppercase">
                                                         {order.type}
-                                                    </span>
+                                                     </span>
+                                                     {order.status === "Draft" && (
+                                                         <span className="px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-500 text-[9px] font-bold border border-orange-500/20">
+                                                             草稿
+                                                         </span>
+                                                     )}
                                                 </div>
                                                 <div className="bg-muted/30 text-muted-foreground/50 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold border border-border/20">
                                                     #{String(order.globalIndex).padStart(2, '0')}

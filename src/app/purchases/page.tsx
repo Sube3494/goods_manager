@@ -350,7 +350,9 @@ function PurchasesContent() {
 
       if (res.ok) {
         fetchData();
-        showToast(isEdit ? "采购单已保存" : "采购单已创建", "success");
+        const isDraft = data.status === "Draft" || data.status === "Confirmed" || data.status === "Shipped"; // If status didn't change, it's a save
+        const msg = data.status === "Draft" ? "草稿已暂存" : (isEdit ? "采购单已更新" : "采购单已创建");
+        showToast(msg, "success");
         setIsModalOpen(false);
       } else {
         showToast("保存失败", "error");

@@ -39,9 +39,10 @@ export async function PUT(req: NextRequest) {
     }
 
     // 只允许更新特定的字段
-    const allowedUpdates: Partial<{ commission: number; note: string }> = {};
+    const allowedUpdates: Partial<{ commission: number; note: string; type: string }> = {};
     if (updates.commission !== undefined) allowedUpdates.commission = Number(updates.commission);
     if (updates.note !== undefined) allowedUpdates.note = String(updates.note);
+    if (updates.type !== undefined) allowedUpdates.type = String(updates.type);
 
     if (Object.keys(allowedUpdates).length === 0) {
       return NextResponse.json({ error: "没有有效的更新内容" }, { status: 400 });
