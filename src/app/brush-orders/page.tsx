@@ -56,27 +56,18 @@ export default function BrushOrdersPage() {
   
   const toggleDateExpansion = (date: string, e?: React.MouseEvent) => {
     const nextValue = expandedDate === date ? null : date;
+    const isExpanding = !!nextValue;
     setExpandedDate(nextValue);
     
-    // 如果是展开操作且有事件触发
-    if (nextValue && e) {
+    if (isExpanding && e) {
         const target = e.currentTarget as HTMLElement;
-        // 使用坐标计算替代 scrollIntoView，绕过浏览器的默认行为干扰
-        const scrollTarget = () => {
-            const rect = target.getBoundingClientRect();
-            const absoluteTop = rect.top + window.scrollY - 85; // 85px 是顶部偏移量
-            window.scrollTo({
-                top: absoluteTop,
-                behavior: 'smooth'
+        // 等待下一帧，确保 DOM 已渲染展开后的内容
+        requestAnimationFrame(() => {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
             });
-        };
-
-        // 第一次立即尝试滚动到大概位置
-        scrollTarget();
-
-        // 在内容展开过程中和完成后进行两次校准，应对布局高度的动态变化
-        setTimeout(scrollTarget, 100);
-        setTimeout(scrollTarget, 300);
+        });
     }
   };
 
@@ -582,7 +573,7 @@ export default function BrushOrdersPage() {
                  {groupedOrders.map((group) => (
                      <Fragment key={group.date}>
                          <tr 
-                            className="bg-muted/15 border-y border-border/50 cursor-pointer hover:bg-muted/25 transition-all sticky top-0 z-10 backdrop-blur-sm shadow-sm scroll-mt-20"
+                            className="bg-muted/15 border-y border-border/50 cursor-pointer hover:bg-muted/25 transition-all sticky top-0 z-10 backdrop-blur-sm shadow-sm scroll-mt-[85px]"
                             onClick={(e) => toggleDateExpansion(group.date, e)}
                          >
                              <td className="px-4 py-2.5 w-12" onClick={(e) => e.stopPropagation()}>
@@ -744,7 +735,7 @@ export default function BrushOrdersPage() {
             {groupedOrders.map((group) => (
                 <div key={group.date} className="space-y-3">
                     <div 
-                        className="flex items-center justify-between px-3 py-3 bg-muted/20 dark:bg-white/5 rounded-2xl active:scale-[0.98] transition-all border border-border/40 shadow-sm scroll-mt-20"
+                        className="flex items-center justify-between px-3 py-3 bg-muted/20 dark:bg-white/5 rounded-2xl active:scale-[0.98] transition-all border border-border/40 shadow-sm scroll-mt-[85px]"
                         onClick={(e) => toggleDateExpansion(group.date, e)}
                     >
                         <div className="flex items-center gap-3">

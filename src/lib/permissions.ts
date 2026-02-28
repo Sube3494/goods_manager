@@ -112,3 +112,42 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   // Check explicit permission or 'all' shortcut
   return !!(perms[permission] || perms["all"]);
 }
+/**
+ * Predefined permission templates for common roles
+ */
+export const ROLE_TEMPLATES: Record<string, Record<string, boolean>> = {
+  WAREHOUSE_ADMIN: {
+    "product:read": true,
+    "product:update": true,
+    "inbound:read": true,
+    "inbound:create": true,
+    "outbound:read": true,
+    "outbound:create": true,
+    "gallery:upload": true,
+  },
+  PURCHASER: {
+    "product:read": true,
+    "purchase:read": true,
+    "purchase:create": true,
+    "supplier:read": true,
+  },
+  OPERATOR: {
+    "product:read": true,
+    "product:create": true,
+    "product:update": true,
+    "category:read": true,
+    "category:manage": true,
+    "gallery:upload": true,
+    "gallery:delete": true,
+  },
+  FULL_ACCESS: {
+    "all": true
+  }
+};
+
+export const TEMPLATE_LABELS: Record<string, string> = {
+  WAREHOUSE_ADMIN: "仓库管理员",
+  PURCHASER: "采购员",
+  OPERATOR: "运营人员",
+  FULL_ACCESS: "全功能访问"
+};

@@ -32,28 +32,56 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
-        // Since we check whitelist in send-code, if we are here, user MUST be whitelisted
-        const whitelisted = await prisma.emailWhitelist.findUnique({
-            where: { email }
+        // User doesn't exist? Check authorization sources
+        const initialAdminEmail = process.env.INITIAL_ADMIN_EMAIL;
+        const superAdminExists = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
+        
+        const whitelisted = await prisma.emailWhitelist.findUnique({ where: { email } });
+        const invitation = await prisma.invitation.findFirst({
+            where: { 
+                email,
+                usedAt: null,
+                expiresAt: { gt: new Date() }
+            }
         });
 
-        if (!whitelisted) {
+        const isInitialAdmin = initialAdminEmail && email === initialAdminEmail && !superAdminExists;
+
+        if (!isInitialAdmin && !whitelisted && !invitation) {
             return NextResponse.json({ error: "Unauthorized registration" }, { status: 401 });
+        }
+
+        // Determine initial role and permissions
+        let role: any = "USER";
+        let permissions: any = {};
+        let targetWorkspaceId = undefined;
+
+        if (isInitialAdmin) {
+            role = "SUPER_ADMIN";
+            permissions = { all: true };
+        } else if (invitation) {
+            role = invitation.role;
+            permissions = invitation.permissions || {};
+            targetWorkspaceId = invitation.targetWorkspaceId || undefined;
+        } else if (whitelisted) {
+            role = whitelisted.role;
+            permissions = whitelisted.permissions || {};
+            targetWorkspaceId = whitelisted.targetWorkspaceId || undefined;
         }
 
         // Create user and their workspace
         user = await prisma.$transaction(async (tx) => {
             const newUser = await tx.user.create({
                 data: {
-                    email: whitelisted.email,
-                    role: whitelisted.role,
-                    permissions: whitelisted.permissions || {},
-                    workspaceId: whitelisted.targetWorkspaceId || undefined
+                    email,
+                    role,
+                    permissions,
+                    workspaceId: targetWorkspaceId
                 }
             });
 
             // If no target workspace, create a new one
-            if (!whitelisted.targetWorkspaceId) {
+            if (!targetWorkspaceId) {
                 const workspace = await tx.workspace.create({
                     data: {
                         name: `${newUser.email}'s Workspace`,
@@ -75,7 +103,16 @@ export async function POST(request: Request) {
                 include: { workspace: true }
             });
         });
+
+        // Mark invitation as used if applicable
+        if (invitation) {
+            await prisma.invitation.update({
+                where: { id: invitation.id },
+                data: { usedAt: new Date() }
+            });
+        }
     }
+
 
     // Ensure every user has a workspace (Fix for legacy or improperly initialized accounts)
     if (user && !user.workspaceId) {

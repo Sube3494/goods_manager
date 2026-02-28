@@ -2,13 +2,17 @@
  * @Date: 2026-02-16 21:45:58
  * @Author: Sube
  * @FilePath: proxy.ts
- * @LastEditTime: 2026-02-23 21:20:04
+ * @LastEditTime: 2026-03-01 01:23:46
  * @Description: 
  */
 
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { updateSession } from "@/lib/auth";
+import { jwtVerify } from "jose";
+
+const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
+const key = new TextEncoder().encode(secretKey);
 
 export async function proxy(request: NextRequest) {
   // Update session expiration if session exists
@@ -25,7 +29,7 @@ export async function proxy(request: NextRequest) {
 
   // 2. Allow auth API routes
   if (path.startsWith("/api/auth")) {
-    return NextResponse.next();
+    return response;
   }
 
   // 3. Check if path is public
@@ -56,10 +60,34 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 
+  // Extra Security: Super Admin Protection for restricted paths
+  if (path.startsWith("/admin") || path.startsWith("/api/admin")) {
+      if (!session) {
+          return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+      }
+      try {
+          const { payload } = await jwtVerify(session, key);
+          
+          if (payload.role !== "SUPER_ADMIN") {
+            return NextResponse.json({ error: "Forbidden: Super Admin only" }, { status: 403 });
+          }
+
+          // Optimization: Inject role/id into headers for the API to trust later
+          response.headers.set("x-user-role", payload.role as string);
+          response.headers.set("x-user-id", payload.id as string);
+          response.headers.set("x-workspace-id", payload.workspaceId as string);
+
+      } catch {
+          return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+      }
+  }
+
   // Redirect authenticated users away from login page
   if (path === "/login" && session) {
     return NextResponse.redirect(new URL("/", request.nextUrl));
   }
+
+
 
   return response;
 }

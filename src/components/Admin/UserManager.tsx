@@ -5,7 +5,7 @@ import { Shield, Settings2, Loader2, Save, User as UserIcon, Mail, Plus, Trash2,
 import { clsx } from "clsx";
 import { motion } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
-import { PERMISSION_TREE } from "@/lib/permissions";
+import { PERMISSION_TREE, ROLE_TEMPLATES, TEMPLATE_LABELS } from "@/lib/permissions";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -23,6 +23,8 @@ interface WhitelistEntry {
   id: string;
   email: string;
   role: string;
+  invitationToken?: string | null;
+  invitationExpiresAt?: string | null;
   user?: {
     id: string;
     name: string;
@@ -32,6 +34,7 @@ interface WhitelistEntry {
     workspaceId: string;
   };
 }
+
 
 const ROLE_NAMES: Record<string, string> = {
   USER: "普通用户",
@@ -89,6 +92,25 @@ function PermissionEditor({ permissions, onChange, onGroupToggle, onClose, onSav
                         <X size={20} />
                     </button>
                 </div>
+
+                {/* Template Quick Selection */}
+                <div className="px-8 py-4 border-b border-border bg-muted/5 flex flex-wrap gap-2 items-center">
+                    <span className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-tight mr-2">快速套用模板:</span>
+                    {Object.entries(ROLE_TEMPLATES).map(([key, template]) => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                // Reset to template
+                                onGroupToggle(PERMISSION_TREE.flatMap(g => g.children), false); // Clear all
+                                Object.keys(template).forEach(k => onChange(k, true)); // Apply template
+                            }}
+                            className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all active:scale-95"
+                        >
+                            {TEMPLATE_LABELS[key] || key}
+                        </button>
+                    ))}
+                </div>
+
 
                 {/* Single Column Accordion List */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 no-scrollbar select-none bg-muted/10 dark:bg-transparent">
@@ -499,7 +521,21 @@ export function UserManager() {
                             <span className={`text-sm font-bold ${isRegistered ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {isRegistered ? user?.name : "待注册邀请"}
                             </span>
-                            <span className="text-xs text-muted-foreground font-mono">{entry.email}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground font-mono">{entry.email}</span>
+                                {!isRegistered && entry.invitationToken && (
+                                    <button
+                                        onClick={() => {
+                                            const url = `${window.location.origin}/login?token=${entry.invitationToken}&email=${entry.email}`;
+                                            navigator.clipboard.writeText(url);
+                                            showToast("邀请链接已复制", "success");
+                                        }}
+                                        className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded hover:bg-primary/20 transition-colors"
+                                    >
+                                        复制链接
+                                    </button>
+                                )}
+                            </div>
                           </div>
                         </div>
                       </td>

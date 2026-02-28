@@ -16,42 +16,39 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
-        // Safe setup: allow the first user to be created as SUPER_ADMIN
-        const userCount = await prisma.user.count();
-        if (userCount === 0) {
-            await prisma.$transaction(async (tx) => {
-                const newUser = await tx.user.create({
-                    data: { 
-                      email, 
-                      role: 'SUPER_ADMIN',
-                      permissions: { all: true }
-                    }
-                });
+        // 1. Initial Admin setup via Environment Variable (Safest)
+        const initialAdmin = process.env.INITIAL_ADMIN_EMAIL;
+        const superAdminExists = await prisma.user.findFirst({
+            where: { role: 'SUPER_ADMIN' }
+        });
 
-                const workspace = await tx.workspace.create({
-                    data: {
-                        name: `${newUser.email}'s Workspace`,
-                        ownerId: newUser.id,
-                    }
-                });
-
-                await tx.user.update({
-                    where: { id: newUser.id },
-                    data: { workspaceId: workspace.id }
-                });
-            });
+        if (initialAdmin && email === initialAdmin && !superAdminExists) {
+            // Allow this specific user to be authorized
+            console.log(`Initial admin ${email} authorized via ENV block.`);
         } else {
-            // Check whitelist for new users
+            // 2. Check traditional whitelist
             const whitelisted = await prisma.emailWhitelist.findUnique({
                 where: { email }
             });
 
-            if (!whitelisted) {
-                return NextResponse.json({ error: "Email not in whitelist" }, { status: 401 });
+            // 3. Check active invitations
+            const invitation = await prisma.invitation.findFirst({
+                where: { 
+                    email,
+                    usedAt: null,
+                    expiresAt: { gt: new Date() }
+                }
+            });
+
+            if (!whitelisted && !invitation) {
+                return NextResponse.json({ 
+                    error: "邮箱未在白名单或邀请列表中", 
+                    allowRequest: true // Hint for frontend to show "Apply for access" button
+                }, { status: 401 });
             }
-            // User doesn't exist yet but is whitelisted, we'll create it during login/verification
         }
     }
+
 
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();

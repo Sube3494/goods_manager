@@ -226,6 +226,37 @@ model VerificationCode {
   @@unique([email, code])
 }
 
+model Invitation {
+  id                String   @id @default(cuid())
+  token             String   @unique @default(uuid())
+  email             String
+  role              Role     @default(USER)
+  permissions       Json?    @default("{}")
+  targetWorkspaceId String?
+  inviterId         String
+  expiresAt         DateTime
+  usedAt            DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([token])
+  @@index([email])
+}
+
+model RegistrationRequest {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  reason      String?
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  adminNote   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+}
+
+
 model SystemSetting {
   id                     String     @id @default(cuid())
   workspaceId            String?

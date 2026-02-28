@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getFreshSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 
 import { getStorageStrategy } from '@/lib/storage';
 
 export async function GET(req: NextRequest) {
-  const session = await getFreshSession() as SessionUser | null;
+  const { getLightSession } = await import("@/lib/auth");
+  const session = await getLightSession();
   const searchParams = req.nextUrl.searchParams;
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '10');
+  const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 1000);
   const skip = (page - 1) * limit;
 
   if (!session || !session.workspaceId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!hasPermission(session, "brush:read")) {
+  // Cast to SessionUser because getLightSession provides the required role/id
+  const user = session as import("@/lib/permissions").SessionUser;
+
+  if (!hasPermission(user, "brush:read")) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
 
@@ -72,12 +75,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
+    const { getLightSession } = await import("@/lib/auth");
+    const session = await getLightSession();
     if (!session || !session.workspaceId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "brush:create")) {
+    const user = session as import("@/lib/permissions").SessionUser;
+
+    if (!hasPermission(user, "brush:create")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 

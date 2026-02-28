@@ -29,6 +29,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(value ? new Date(value) : new Date());
   const containerRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   
   const [dropdownPosition, setDropdownPosition] = useState<{
@@ -49,13 +50,29 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
     if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
+      const windowWidth = window.innerWidth;
       const dropdownHeight = 350; 
+      const dropdownMinWidth = 280;
       const spaceBelow = windowHeight - rect.bottom;
       const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
+      let left = rect.left;
+      // 判定是否在屏幕右半部分，如果是，则尝试右对齐
+      if (rect.left + rect.width / 2 > windowWidth / 2) {
+          left = rect.right - dropdownMinWidth;
+      }
+
+      // 边界溢出保护 (保持 16px 间距)
+      if (left + dropdownMinWidth > windowWidth - 16) {
+        left = windowWidth - dropdownMinWidth - 16;
+      }
+      if (left < 16) {
+        left = 16;
+      }
+
       setDropdownPosition({
         top: showAbove ? rect.top - 8 : rect.bottom + 8,
-        left: rect.left,
+        left: left,
         width: rect.width,
         showAbove
       });
@@ -76,7 +93,11 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
       }
       
       const handleClickOutside = (event: MouseEvent) => {
-        if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        const target = event.target as Node;
+        const isClickInsideTrigger = containerRef.current?.contains(target);
+        const isClickInsidePicker = pickerRef.current?.contains(target);
+        
+        if (!isClickInsideTrigger && !isClickInsidePicker) {
           setIsOpen(false);
         }
       };
@@ -95,6 +116,8 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
 
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+  const nextYear = () => setCurrentMonth(addMonths(currentMonth, 12));
+  const prevYear = () => setCurrentMonth(subMonths(currentMonth, 12));
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 }),
@@ -140,9 +163,11 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
         )}
       </button>
 
-      {mounted && isOpen && createPortal(
-        <AnimatePresence mode="wait">
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isOpen && (
           <motion.div
+            ref={pickerRef}
             initial={{ opacity: 0, scale: 0.95, y: dropdownPosition.showAbove ? 10 : -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: dropdownPosition.showAbove ? 10 : -10 }}
@@ -161,14 +186,33 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
           >
             <div className="max-w-[320px] mx-auto">
               <div className="flex items-center justify-between mb-4 px-1">
-                <h4 className="text-sm font-bold text-foreground">
-                  {format(currentMonth, "yyyy年 MM月", { locale: zhCN })}
-                </h4>
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1.5 overflow-hidden">
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); prevYear(); }}
+                        className="rounded-lg p-1 hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-all"
+                        title="上一年"
+                    >
+                        <ChevronLeft size={14} strokeWidth={3} />
+                    </button>
+                    <h4 className="text-sm font-bold text-foreground whitespace-nowrap">
+                    {format(currentMonth, "yyyy年 MM月", { locale: zhCN })}
+                    </h4>
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); nextYear(); }}
+                        className="rounded-lg p-1 hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-all"
+                        title="下一年"
+                    >
+                        <ChevronRight size={14} strokeWidth={3} />
+                    </button>
+                </div>
+                <div className="flex gap-0.5 ml-2">
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); prevMonth(); }}
                     className="rounded-lg p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                    title="上一月"
                   >
                     <ChevronLeft size={18} />
                   </button>
@@ -176,6 +220,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                     type="button"
                     onClick={(e) => { e.stopPropagation(); nextMonth(); }}
                     className="rounded-lg p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                    title="下一月"
                   >
                     <ChevronRight size={18} />
                   </button>
@@ -238,6 +283,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
               </div>
             </div>
           </motion.div>
+          )}
         </AnimatePresence>,
         document.body
       )}

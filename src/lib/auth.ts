@@ -1,7 +1,9 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "./prisma";
+import { SessionUser } from "./permissions";
+import { SystemSetting } from "@prisma/client";
 
 const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
 const key = new TextEncoder().encode(secretKey);
@@ -41,7 +43,7 @@ export async function getFreshSession() {
   if (!session || !session.user) return null;
 
   const user = await prisma.user.findUnique({
-    where: { id: (session.user as any).id },
+    where: { id: (session.user as { id: string }).id },
     include: { workspace: true }
   });
 
@@ -49,13 +51,11 @@ export async function getFreshSession() {
 
   return {
     ...session,
-    // Flatten user fields for SessionUser compatibility
     id: user.id,
     email: user.email,
     role: user.role,
     workspaceId: user.workspaceId || "",
-    permissions: user.permissions as any,
-    // Keep the user object for existing frontend code that might expect it
+    permissions: user.permissions as Record<string, boolean>,
     user: {
       ...user,
       id: user.id,
@@ -67,11 +67,11 @@ export async function getFreshSession() {
   };
 }
 
-export async function login(userData: any) {
+export async function login(userData: Partial<SessionUser>) {
   const expires = new Date(Date.now() + SESSION_DURATION * 1000);
   const session = await encrypt({ 
     ...userData,
-    user: userData, // Keep nested user for backward compatibility if any
+    user: userData, 
     expires 
   });
   
@@ -91,7 +91,6 @@ export async function updateSession(request: NextRequest) {
   if (!session) return;
 
   try {
-    // Refresh the session so it doesn't expire
     const parsed = await decrypt(session) as SessionPayload;
     parsed.expires = new Date(Date.now() + SESSION_DURATION * 1000);
     const res = NextResponse.next();
@@ -103,8 +102,50 @@ export async function updateSession(request: NextRequest) {
     });
     return res;
   } catch {
-    // If session is invalid, we can just return (let middleware handle redirect if needed)
-    // or even clear the cookie.
     return;
   }
+}
+
+/**
+ * Lightweight session retrieval: Prioritizes headers injected by middleware/proxy,
+ * then falls back to JWT decoding. DOES NOT hit the database.
+ */
+export async function getLightSession(): Promise<Partial<SessionUser> | null> {
+    const headerPayload = await headers();
+    const role = headerPayload.get("x-user-role");
+    const id = headerPayload.get("x-user-id");
+    const workspaceId = headerPayload.get("x-workspace-id");
+
+    if (id && role) {
+        return { id, role: role as "SUPER_ADMIN" | "USER", workspaceId: workspaceId || "" };
+    }
+
+    const session = (await cookies()).get("session")?.value;
+    if (!session) return null;
+    try {
+        const payload = await decrypt(session);
+        return {
+            id: payload.id as string,
+            email: payload.email as string,
+            role: payload.role as "SUPER_ADMIN" | "USER",
+            workspaceId: payload.workspaceId as string,
+            name: payload.name as string,
+        };
+    } catch {
+        return null;
+    }
+}
+
+let settingsCache: SystemSetting | null = null;
+let lastSettingsFetch = 0;
+const SETTINGS_CACHE_TTL = 60 * 1000;
+
+export async function getCachedSettings() {
+    const now = Date.now();
+    if (settingsCache && (now - lastSettingsFetch < SETTINGS_CACHE_TTL)) {
+        return settingsCache;
+    }
+    settingsCache = await prisma.systemSetting.findFirst();
+    lastSettingsFetch = now;
+    return settingsCache;
 }

@@ -1409,16 +1409,16 @@ function GalleryContent() {
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(-1); }}
                                             disabled={currentIndex === 0}
-                                            className="absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
+                                            className="absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary hover:text-primary-foreground transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
                                         >
-                                            <ChevronRight size={32} className="rotate-180 group-hover/btn:-translate-x-1 transition-transform group-disabled/btn:translate-x-0" />
+                                            <ChevronRight size={32} className="rotate-180" />
                                         </button>
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(1); }}
                                             disabled={currentIndex === relatedImages.length - 1}
-                                            className="absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
+                                            className="absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary hover:text-primary-foreground transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
                                         >
-                                            <ChevronRight size={32} className="group-hover/btn:translate-x-1 transition-transform group-disabled/btn:translate-x-0" />
+                                            <ChevronRight size={32} />
                                         </button>
                                     </motion.div>
                                 )}

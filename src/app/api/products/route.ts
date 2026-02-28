@@ -1,18 +1,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getFreshSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
 import { getStorageStrategy } from "@/lib/storage";
-import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
+import { getFreshSession, getLightSession, getCachedSettings } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
-type ProductWithRelations = Product & {
-  category: Category;
-  supplier: Supplier | null;
-  gallery: GalleryItem[];
-};
-
-type ProductWhereInput = NonNullable<Parameters<typeof prisma.product.findMany>[0]>["where"];
+// ProductWithRelations and ProductWhereInput removed as unused or redundant with internal Prisma types
 
 function generatePinyinSearchText(name: string): string {
   if (!name) return "";
@@ -24,10 +17,16 @@ function generatePinyinSearchText(name: string): string {
 // 获取所有商品 (支持分页、筛选、排序)
 export async function GET(request: Request) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
+    // Optimization: Use light session (no DB hit)
+    const session = await getLightSession();
+    
+    // Optimization: Use cached settings
+    const settings = await getCachedSettings();
+    const lowStockThreshold = settings?.lowStockThreshold || 10;
+    
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const pageSize = parseInt(searchParams.get("pageSize") || "20");
+    const pageSize = Math.min(parseInt(searchParams.get("pageSize") || "20"), 100); // Limit max page size to 100
     const search = searchParams.get("search") || "";
     const categoryName = searchParams.get("category") || "all";
     const status = searchParams.get("status") || "all";
@@ -37,19 +36,12 @@ export async function GET(request: Request) {
 
     const [field, order] = sortByParam.split("-") as [string, "asc" | "desc"];
 
-    // 查询系统设置（获取库存预警阈值）
-    const settings = await prisma.systemSetting.findFirst();
-    const lowStockThreshold = settings?.lowStockThreshold || 10;
-
     // 构建查询条件
-    const andConditions: NonNullable<ProductWhereInput>[] = [];
-
-    // 工作区过滤
+    const andConditions: Array<Record<string, unknown>> = [];
     if (session?.workspaceId) {
       andConditions.push({ workspaceId: session.workspaceId });
     }
 
-    // 搜索词过滤 (支持 SKU、名称、分类、拼音)
     if (search) {
       andConditions.push({
         OR: [
@@ -61,17 +53,9 @@ export async function GET(request: Request) {
       });
     }
 
-    // 分类过滤
-    if (categoryName !== "all") {
-      andConditions.push({ category: { name: categoryName } });
-    }
+    if (categoryName !== "all") andConditions.push({ category: { name: categoryName } });
+    if (supplierId !== "all") andConditions.push({ supplierId: supplierId });
 
-    // 供应商过滤
-    if (supplierId !== "all") {
-      andConditions.push({ supplierId: supplierId });
-    }
-
-    // 状态过滤 (库存预警、可见性)
     if (status === "low_stock") {
       andConditions.push({ stock: { lt: lowStockThreshold } });
     } else if (status === "public") {
@@ -83,126 +67,91 @@ export async function GET(request: Request) {
     }
 
     const where = andConditions.length > 0 ? { AND: andConditions } : {};
-
-    // 构建排序
-    let orderBy: Array<Record<string, "asc" | "desc" | { [key: string]: "asc" | "desc" }>> = [];
-    if (field === "sku") {
-      // 在 SQL 层面，我们无法直接用 Prisma 实现自然排序，
-      // 但可以通过增加一个基于长度的排序规则来大幅改善 10 vs 100 的问题。
-      // 注意：Prisma 不支持直接在 orderBy 中写表达式，所以这里我们保持 sku 排序，
-      // 并在前端进行最终的自然排序微调。为了让分页结果更接近预期，我们这里仅保留 sku。
-      orderBy = [{ sku: order }, { createdAt: "desc" }];
-    } else if (field === "createdAt") {
-      orderBy = [{ createdAt: order }];
-    } else if (field === "stock") {
-      orderBy = [{ stock: order }];
-    } else if (field === "name") {
-      orderBy = [{ name: order }];
-    } else {
-      orderBy = [{ createdAt: "desc" }];
-    }
-
-    // 执行分页查询
     const skip = (page - 1) * pageSize;
-    let products: ProductWithRelations[] = [];
-    let total = 0;
 
+    // Build standard orderBy
+    const standardOrderBy: Record<string, string>[] = field === "sku" ? [{ sku: order }] : 
+                                  field === "stock" ? [{ stock: order }] :
+                                  field === "name" ? [{ name: order }] :
+                                  [{ createdAt: order }];
+
+    // Handle Natural Sort for SKU with performance consideration
     if (field === "sku") {
-      // --- 混合自然排序模式 ---
-      // 1. 获取所有符合条件的 ID 和 SKU
-      const allProductIds = await prisma.product.findMany({
-        where,
-        select: { id: true, sku: true },
-        // 不需要在这里 orderBy，我们之后在 JS 里排
-      });
-      total = allProductIds.length;
+        const totalCount = await prisma.product.count({ where });
+        
+        // PERFORMANCE SAFEGUARD: 
+        // Only perform in-memory natural sort if result set is manageable (< 2000)
+        // For larger datasets, use standard DB sorted pagination
+        if (totalCount < 2000) {
+            const allItems = await prisma.product.findMany({
+              where,
+              select: { id: true, sku: true },
+            });
 
-      // 2. 在 JS 中进行全局自然排序
-      allProductIds.sort((a, b) => {
-        const aVal = a.sku || "";
-        const bVal = b.sku || "";
-        return order === 'asc' 
-          ? aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' })
-          : bVal.localeCompare(aVal, undefined, { numeric: true, sensitivity: 'base' });
-      });
+            allItems.sort((a, b) => {
+              const aVal = a.sku || "";
+              const bVal = b.sku || "";
+              return order === 'asc' 
+                ? aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' })
+                : bVal.localeCompare(aVal, undefined, { numeric: true, sensitivity: 'base' });
+            });
 
-      // 3. If idsOnly requested, return all sorted IDs now
-      if (idsOnly) {
-        return NextResponse.json({ 
-          ids: allProductIds.map(p => p.id),
-          total: allProductIds.length
-        });
-      }
+            if (idsOnly) return NextResponse.json({ ids: allItems.map(p => p.id), total: totalCount });
 
-      // 4. Slice current page IDs
-      const pageIds = allProductIds.slice(skip, skip + pageSize).map(p => p.id);
+            const pageIds = allItems.slice(skip, skip + pageSize).map(p => p.id);
+            const detailedProducts = await prisma.product.findMany({
+              where: { id: { in: pageIds } },
+              include: { category: true, supplier: true, gallery: { take: 1 } }, // Optimization: Only 1 gallery img for list
+            });
 
-      // 5. Fetch detailed data for this page (keeping order)
-      const detailedProducts = await prisma.product.findMany({
-        where: { id: { in: pageIds } },
-        include: {
-          category: true,
-          supplier: true,
-          gallery: true,
-        },
-      });
-
-      // 6. Map back to maintain sorting order
-      products = pageIds.map(id => detailedProducts.find((d) => d.id === id)).filter((p): p is NonNullable<typeof p> => !!p) as unknown as ProductWithRelations[];
-
-    } else {
-      // --- 原生数据库分页模式 (用于时间、库存等) ---
-      if (idsOnly) {
-        const allMatchingIds = await prisma.product.findMany({
-          where,
-          select: { id: true },
-          orderBy,
-        });
-        return NextResponse.json({ 
-          ids: allMatchingIds.map(p => p.id),
-          total: allMatchingIds.length
-        });
-      }
-
-      const [pData, pTotal] = await Promise.all([
-        prisma.product.findMany({
-          where,
-          include: {
-            category: true,
-            supplier: true,
-            gallery: true,
-          },
-          orderBy,
-          skip,
-          take: pageSize,
-        }),
-        prisma.product.count({ where })
-      ]);
-      products = pData as unknown as ProductWithRelations[];
-      total = pTotal;
+            const sortedProducts = pageIds.map(id => detailedProducts.find(d => d.id === id)).filter(Boolean);
+            return formatResponse(sortedProducts, totalCount, page, pageSize);
+        }
     }
 
-    const storage = await getStorageStrategy();
-    const resolvedProducts = products.filter((p): p is NonNullable<typeof p> => !!p).map(p => ({
-      ...p,
-      image: p.image ? storage.resolveUrl(p.image) : null,
-      gallery: Array.isArray(p.gallery) 
-        ? p.gallery.map((img: { url: string }) => ({ ...img, url: storage.resolveUrl(img.url) }))
-        : []
-    }));
+    // Standard Database Pagination (Fastest)
+    if (idsOnly) {
+      const allIds = await prisma.product.findMany({ where, select: { id: true }, orderBy: standardOrderBy });
+      return NextResponse.json({ ids: allIds.map(p => p.id), total: allIds.length });
+    }
 
-    return NextResponse.json({
-      items: resolvedProducts,
-      total,
-      page,
-      pageSize,
-      hasMore: (skip + products.length) < total,
-    });
+    const [pData, pTotal] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: { category: true, supplier: true, gallery: { take: 1 } },
+        orderBy: standardOrderBy,
+        skip,
+        take: pageSize,
+      }),
+      prisma.product.count({ where })
+    ]);
+
+    return formatResponse(pData, pTotal, page, pageSize);
   } catch (error) {
     console.error("Failed to fetch products:", error);
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
   }
 }
+
+async function formatResponse(products: unknown[], total: number, page: number, pageSize: number) {
+  const { getStorageStrategy } = await import("@/lib/storage");
+  const storage = await getStorageStrategy();
+  
+  const resolved = (products as Record<string, unknown>[]).map(p => ({
+    ...p,
+    image: p.image ? storage.resolveUrl(p.image as string) : null,
+    gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || []
+  }));
+
+  return NextResponse.json({
+    items: resolved,
+    total,
+    page,
+    pageSize,
+    hasMore: (page * pageSize) < total,
+  });
+}
+
 
 // 创建新商品
 export async function POST(request: Request) {
