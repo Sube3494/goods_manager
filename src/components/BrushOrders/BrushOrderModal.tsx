@@ -25,7 +25,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
   const { showToast } = useToast();
   const [formData, setFormData] = useState<BrushOrder>(() => ({
     id: initialData?.id || "",
-    status: initialData?.status || "Draft",
+    status: initialData?.status || "Completed",
     date: initialData?.date || new Date().toISOString(),
     items: initialData?.items || [],
     type: initialData?.type || "美团",
@@ -86,7 +86,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
       note: initialData.note || ""
     } : {
       id: "",
-      status: "Draft",
+      status: "Completed",
       date: new Date().toISOString(),
       items: [],
       type: "美团",
@@ -196,15 +196,6 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
                 <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 p-5 sm:p-8">
                     <div className="flex items-center gap-3">
                         <h2 className="text-2xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>
-                        {formData.status === "Draft" ? (
-                            <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 text-[10px] font-bold border border-orange-500/20 uppercase tracking-widest">
-                                暂存草稿
-                            </span>
-                        ) : (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold border border-emerald-500/20 uppercase tracking-widest">
-                                已完成
-                            </span>
-                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         {!readOnly && (
