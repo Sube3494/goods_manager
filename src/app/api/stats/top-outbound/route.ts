@@ -6,13 +6,14 @@ import { getStorageStrategy } from "@/lib/storage";
 export async function GET() {
   try {
     const session = await getFreshSession();
-    if (!session) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 聚合出库数量
     const outboundItems = await prisma.outboundOrderItem.groupBy({
       by: ['productId'],
+      where: { outboundOrder: { userId: session.id } },
       _sum: {
         quantity: true,
       },

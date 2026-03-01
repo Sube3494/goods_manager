@@ -5,7 +5,11 @@ interface User {
   email: string;
   name?: string;
   role: string;
-  workspaceId: string;
+  roleProfile?: {
+    id: string;
+    name: string;
+    permissions: Record<string, boolean>;
+  };
   permissions?: Record<string, boolean>;
 }
 

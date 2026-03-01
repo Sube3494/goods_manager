@@ -6,8 +6,8 @@ import { SessionUser } from "@/lib/permissions";
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession() as SessionUser | null;
-    const workspaceId = session?.workspaceId;
-    if (!session || !workspaceId) {
+    const userId = session?.id;
+    if (!session || !userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
           product = await prisma.product.findFirst({ 
               where: { 
                   sku: String(sku), 
-                  workspaceId 
+                  userId 
               } 
           });
         }
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
           product = await prisma.product.findFirst({ 
               where: { 
                   name: String(productName), 
-                  workspaceId 
+                  userId 
               } 
           });
         }
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
             date: new Date(dateStr),
             type: String(type),
             status: "Completed", // Default to completed for imports
-            workspaceId,
+            userId,
             paymentAmount: parseFloat(String(payment || 0)),
             receivedAmount: parseFloat(String(received || 0)),
             commission: parseFloat(String(commission || 0)),

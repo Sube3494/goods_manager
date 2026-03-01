@@ -49,3 +49,17 @@ export function formatLocalDate(date: Date | string): string {
   
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * 格式化日期为本地月份
+ * @param date - 日期对象或 ISO 字符串
+ * @returns 格式化后的月份字符串 (YYYY年MM月)
+ */
+export function formatLocalMonth(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  
+  return `${year}年${month}月`;
+}

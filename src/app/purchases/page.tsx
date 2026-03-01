@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
-import { Plus, Search, ShoppingBag, Calendar, Edit2, Trash2, CheckCircle2, Truck, Eye, Copy, ExternalLink, Hash, Camera, FileText, RotateCcw, X } from "lucide-react";
+import { Plus, Search, ShoppingBag, Calendar, Trash2, Truck, Eye, Copy, ExternalLink, RotateCcw, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
-import { PurchaseOrder, PurchaseStatus, TrackingInfo, User as UserType } from "@/lib/types";
+import { PurchaseOrder, PurchaseStatus, User as UserType } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
-import TrackingNumberModal, { TrackingNumberModalProps } from "@/components/Purchases/TrackingNumberModal";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
@@ -48,7 +47,6 @@ function PurchasesContent() {
   const { user } = useUser();
   const typedUser = user as unknown as UserType;
   const canCreate = hasPermission(user as SessionUser | null, "purchase:create");
-  const canInbound = hasPermission(user as SessionUser | null, "inbound:create");
   const canEdit = canCreate; // For now assuming create permission allows editing drafts
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -73,23 +71,6 @@ function PurchasesContent() {
     onConfirm: () => {},
     message: "",
   });
-  const [trackingModal, setTrackingModal] = useState<{
-    isOpen: boolean;
-    purchaseId: string | null;
-    initialValue: TrackingInfo[];
-    paymentVouchers?: string[];
-    paymentVoucher?: string;
-    lockPackages: boolean;
-    mode: NonNullable<TrackingNumberModalProps['mode']>;
-  }>({
-    isOpen: false,
-    purchaseId: null,
-    initialValue: [],
-    paymentVouchers: [],
-    lockPackages: false,
-    mode: "all",
-  });
-
   const [galleryState, setGalleryState] = useState<{
     isOpen: boolean;
     images: string[];
@@ -207,24 +188,6 @@ function PurchasesContent() {
       default: return "草稿";
     }
   };
-  
-  const getTypeLabel = (type?: string) => {
-    switch (type) {
-      case "Return": return "销售退回";
-      case "InternalReturn": return "领用退回";
-      case "Inbound": return "补拨入库";
-      default: return "采购入库";
-    }
-  };
-
-  const getTypeColor = (type?: string) => {
-    switch (type) {
-      case "Return": return "text-orange-600 bg-orange-50 border-orange-100 dark:bg-orange-500/10 dark:border-orange-500/20";
-      case "InternalReturn": return "text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-500/10 dark:border-blue-500/20";
-      case "Inbound": return "text-indigo-600 bg-indigo-50 border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/20";
-      default: return "text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20";
-    }
-  };
 
   const handleCreate = () => {
     setEditingPurchase(null);
@@ -240,11 +203,6 @@ function PurchasesContent() {
     setIsModalOpen(true);
   };
 
-  const handleView = (po: PurchaseOrder) => {
-    setEditingPurchase(po);
-    setDetailReadOnly(true);
-    setIsModalOpen(true);
-  };
 
   const handleDelete = async (id: string) => {
     const po = purchases.find(p => p.id === id);
@@ -280,59 +238,7 @@ function PurchasesContent() {
     });
   };
 
-  const handleConfirmReceipt = async (id: string) => {
-    try {
-      const res = await fetch(`/api/purchases/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Received" }),
-      });
-      if (res.ok) {
-        fetchData();
-        showToast("采购入库成功", "success");
-      } else {
-        showToast("入库失败", "error");
-      }
-    } catch (error) {
-      console.error("Confirm receipt failed:", error);
-      showToast("网络错误", "error");
-    }
-  };
 
-  const handleUpdateTracking = async (id: string, trackingData: TrackingInfo[], paymentVouchers?: string[], shouldTransition: boolean = true) => {
-    try {
-      // 记录当前状态，如果是 Confirmed/Ordered，则流转到 Shipped (仅当有物流信息时，且用户明确要求流转)
-      const currentOrder = purchases.find(p => p.id === id);
-      const hasTracking = trackingData && trackingData.length > 0 && trackingData.some(td => td.number.trim());
-      
-      const newStatus = (shouldTransition && (currentOrder?.status === "Confirmed" || (currentOrder?.status as string) === "Ordered") && hasTracking)
-        ? "Shipped" 
-        : currentOrder?.status;
-
-      const res = await fetch(`/api/purchases/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-            trackingData, 
-            paymentVouchers,
-            status: newStatus 
-        }),
-      });
-      if (res.ok) {
-        const updatedOrder = await res.json();
-        // fetchData(); // 移除全量刷新，改为局部更新
-        setPurchases(prev => prev.map(p => p.id === id ? { ...p, ...updatedOrder } : p));
-        
-        const isNowShipped = newStatus === "Shipped" && currentOrder?.status !== "Shipped";
-        showToast(shouldTransition && isNowShipped ? "进货资料已更新，订单已发货" : "进货资料已暂存", "success");
-      } else {
-        showToast("更新失败", "error");
-      }
-    } catch (error) {
-      console.error("Update fulfillment info failed:", error);
-      showToast("网络错误", "error");
-    }
-  };
 
 
 
@@ -350,7 +256,6 @@ function PurchasesContent() {
 
       if (res.ok) {
         fetchData();
-        const isDraft = data.status === "Draft" || data.status === "Confirmed" || data.status === "Shipped"; // If status didn't change, it's a save
         const msg = data.status === "Draft" ? "草稿已暂存" : (isEdit ? "采购单已更新" : "采购单已创建");
         showToast(msg, "success");
         setIsModalOpen(false);
@@ -738,7 +643,6 @@ function PurchasesContent() {
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">单据编号</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">业务类型</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">交易金额</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">状态</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单/入库时间</th>
@@ -758,11 +662,6 @@ function PurchasesContent() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="font-bold text-foreground font-mono text-xs">{po.id}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${getTypeColor(po.type)}`}>
-                        {getTypeLabel(po.type)}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center text-foreground font-bold">
@@ -829,111 +728,26 @@ function PurchasesContent() {
                         </div>
                     </td>
                     <td className="px-6 py-4 text-center whitespace-nowrap">
-                      <div className="flex justify-center items-center gap-1 transition-opacity">
-                        {po.status !== "Draft" && (
-                          <button 
-                              onClick={(e) => { e.stopPropagation(); handleView(po); }}
-                              className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-                              title="查看详情"
-                          >
-                            <Eye size={16} />
-                          </button>
+                      <div className="flex justify-center items-center gap-3">
+                        {/* Unified Detail/Manage Button */}
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
+                            className="h-9 w-9 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm group/btn"
+                            title="详细管理"
+                        >
+                          <Eye size={18} className="group-hover/btn:scale-110 transition-transform" />
+                        </button>
+
+                        {/* Delete Action */}
+                        {canEdit && (
+                           <button 
+                               onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
+                               className="h-9 w-9 flex items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-sm group/btn"
+                               title="删除"
+                           >
+                             <Trash2 size={18} className="group-hover/btn:scale-110 transition-transform" />
+                           </button>
                         )}
-
-
-                        {/* Management Actions: Show Truck for Confirmed, Ordered, or Shipped */}
-                        {(po.status === "Confirmed" || (po.status as string) === "Ordered" || po.status === "Shipped") && (
-                            <div className="flex items-center gap-1">
-                                {(() => {
-                                    const tracking = po.trackingData || [];
-                                    const hasTracking = tracking.length > 0;
-                                    const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
-                                    const hasPayment = po.paymentVouchers && po.paymentVouchers.length > 0;
-                                    
-                                    if (!(hasTracking && hasAllWaybills && hasPayment)) {
-                                        let label = "补全资料";
-                                        let colorClass = "text-orange-500 bg-orange-500/10";
-                                        let Icon = Truck;
-                                        let animate = "";
-                                        
-                                        if (!hasPayment) {
-                                            label = "上传凭证";
-                                            colorClass = "text-amber-500 bg-amber-500/10";
-                                            Icon = FileText;
-                                        } else if (!hasTracking) {
-                                            label = "录入单号";
-                                            colorClass = "text-blue-500 bg-blue-500/10";
-                                            Icon = Hash;
-                                        } else if (!hasAllWaybills) {
-                                            label = "上传面单";
-                                            colorClass = "text-orange-500 bg-orange-500/10";
-                                            Icon = Camera;
-                                            animate = "animate-pulse";
-                                        }
-
-                                        return (
-                                            <button 
-                                                onClick={(e) => { 
-                                                    e.stopPropagation(); 
-                                                    setTrackingModal({
-                                                        isOpen: true,
-                                                        purchaseId: po.id,
-                                                        initialValue: po.trackingData || [],
-                                                        paymentVouchers: po.paymentVouchers || [],
-                                                        lockPackages: false,
-                                                        mode: (!hasPayment ? "payment" : !hasTracking ? "tracking" : !hasAllWaybills ? "waybill" : "all") as NonNullable<TrackingNumberModalProps['mode']>
-                                                    }); 
-                                                }}
-                                                className={`p-2 rounded-lg ${colorClass} ${animate} flex items-center gap-2 transition-all hover:scale-105`}
-                                                title={`点击以${label}`}
-                                            >
-                                                <Icon size={16} />
-                                                <span className="text-[10px] font-bold">{label}</span>
-                                            </button>
-                                        );
-                                    }
-                                    return null;
-                                })()}
-                                
-                                {/* Show Confirm button if it's Shipped (or legacy Ordered) AND all waybills are present */}
-                                {(po.status === "Shipped" || (po.status as string) === "Ordered") && 
-                                    (po.trackingData || []).length > 0 && 
-                                    (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && 
-                                    canInbound && (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
-                                            className="p-2 rounded-lg text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center gap-2 animate-in zoom-in-95 duration-300"
-                                            title="确认入库"
-                                        >
-                                            <CheckCircle2 size={16} />
-                                            <span className="text-[10px] font-bold ml-1">确认入库</span>
-                                        </button>
-                                    )
-                                }
-                            </div>
-                        )}
-
-                        {/* Actions: Allow delete for all if has permission, edit only for Drafts */}
-                        <div className="flex gap-1">
-                          {po.status === "Draft" && canEdit && (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
-                                className="p-2 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors"
-                                title="编辑"
-                            >
-                               <Edit2 size={16} />
-                            </button>
-                          )}
-                          {canEdit && (
-                             <button 
-                                 onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
-                                 className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                                 title="删除"
-                             >
-                               <Trash2 size={16} />
-                             </button>
-                          )}
-                        </div>
                       </div>
                     </td>
                   </motion.tr>
@@ -978,9 +792,6 @@ function PurchasesContent() {
                        <div className="flex items-center gap-2">
                           <span className="font-bold text-base leading-tight font-mono">
                             {po.id}
-                          </span>
-                          <span className={`px-1.5 py-0 rounded text-[9px] font-bold border ${getTypeColor(po.type)}`}>
-                            {getTypeLabel(po.type)}
                           </span>
                        </div>
                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(po.status)}`}>
@@ -1059,108 +870,25 @@ function PurchasesContent() {
                     )}
                 </div>
   
-                 {/* Actions - icon only to prevent crowding on mobile */}
-                <div className="flex items-center gap-2 justify-end">
-                   {po.status !== "Draft" && (
-                     <button 
-                        onClick={() => handleView(po)}
-                        className="flex-none flex items-center justify-center h-9 w-9 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 active:scale-95 transition-all"
-                        title="查看详情"
+                 <div className="flex items-center gap-3 justify-end mt-4 pt-4 border-t border-border/10">
+                    {/* Unified Mobile Action */}
+                    <button 
+                        onClick={() => handleEdit(po)}
+                        className="h-10 w-10 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white active:scale-95 transition-all shadow-sm"
+                        title="详细管理"
                     >
-                        <Eye size={16} />
+                        <Eye size={20} />
                     </button>
-                   )}
 
-
-  
-                    {/* Management Actions: Show Truck for Confirmed/Shipped/Ordered */}
-                    {(po.status === "Confirmed" || po.status === "Shipped" || (po.status as string) === "Ordered") && (
-                        <div className="flex gap-2">
-                            {(() => {
-                                const tracking = po.trackingData || [];
-                                const hasTracking = tracking.length > 0;
-                                const hasAllWaybills = hasTracking && tracking.every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0));
-                                const hasPayment = po.paymentVouchers && po.paymentVouchers.length > 0;
-                                
-                                if (!(hasTracking && hasAllWaybills && hasPayment)) {
-                                    let label = "补全资料";
-                                    let colorClass = "bg-orange-500";
-                                    let Icon = Truck;
-                                    let animate = "";
-                                    
-                                    if (!hasPayment) {
-                                        label = "上传凭证";
-                                        colorClass = "bg-amber-500";
-                                        Icon = FileText;
-                                    } else if (!hasTracking) {
-                                        label = "录入单号";
-                                        colorClass = "bg-blue-500";
-                                        Icon = Hash;
-                                    } else if (!hasAllWaybills) {
-                                        label = "上传面单";
-                                        colorClass = "bg-orange-500";
-                                        Icon = Camera;
-                                        animate = "animate-pulse";
-                                    }
-
-
-                                    const mode = !hasPayment ? "payment" : !hasTracking ? "tracking" : !hasAllWaybills ? "waybill" : "all";
-                                    
-                                    return (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); setTrackingModal({
-                                                isOpen: true,
-                                                purchaseId: po.id,
-                                                initialValue: po.trackingData || [],
-                                                paymentVouchers: po.paymentVouchers || [],
-                                                lockPackages: false,
-                                                mode: mode as NonNullable<TrackingNumberModalProps['mode']>
-                                            }); }}
-                                            className={`h-9 w-9 flex items-center justify-center rounded-lg ${colorClass} text-white shadow-lg ${colorClass}/20 ${animate} active:scale-95 transition-all`}
-                                            title={label}
-                                        >
-                                            <Icon size={16} />
-                                        </button>
-                                    );
-                                }
-                                return null;
-                            })()}
-
-                            {(po.status === "Shipped" || (po.status as string) === "Ordered") && 
-                             (po.trackingData || []).length > 0 && 
-                             (po.trackingData || []).every(td => td.waybillImage || (td.waybillImages && td.waybillImages.length > 0)) && 
-                             canInbound && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); handleConfirmReceipt(po.id); }}
-                                    className="h-9 w-9 flex items-center justify-center rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
-                                    title="确认入库"
-                                >
-                                    <CheckCircle2 size={16} />
-                                </button>
-                            )}
-                        </div>
-                    )}
-  
-                    
-                    {/* Actions: Allow delete for all if has permission, edit only for Drafts */}
-                    <div className="flex gap-2">
-                       {po.status === "Draft" && (
-                         <button 
-                          onClick={() => handleEdit(po)}
-                          className="h-9 w-9 flex items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 active:scale-95 transition-all"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                       )}
-                       {canEdit && (
+                    {canEdit && (
                         <button 
-                          onClick={() => handleDelete(po.id)}
-                          className="h-9 w-9 flex items-center justify-center rounded-lg bg-red-500/10 text-destructive hover:bg-red-500/20 active:scale-95 transition-all"
+                            onClick={() => handleDelete(po.id)}
+                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white active:scale-95 transition-all shadow-sm"
+                            title="删除"
                         >
-                          <Trash2 size={16} />
+                            <Trash2 size={20} />
                         </button>
-                       )}
-                    </div>
+                    )}
                 </div>
               </motion.div>
             ))
@@ -1187,7 +915,7 @@ function PurchasesContent() {
         onExport={handleExport}
         onOverview={setOverviewPurchase}
         initialData={editingPurchase || undefined}
-        readOnly={detailReadOnly || (editingPurchase ? editingPurchase.status !== "Draft" : false)}
+        readOnly={detailReadOnly}
       />
 
       <ConfirmModal 
@@ -1200,24 +928,6 @@ function PurchasesContent() {
         variant="danger"
       />
 
-      <TrackingNumberModal 
-        isOpen={trackingModal.isOpen}
-        onClose={() => setTrackingModal(prev => ({ ...prev, isOpen: false }))}
-        initialValue={trackingModal.initialValue}
-        paymentVouchers={trackingModal.paymentVouchers}
-        paymentVoucher={trackingModal.paymentVoucher}
-        readOnly={purchases.find(p => p.id === trackingModal.purchaseId)?.status === "Received"}
-        lockPackages={trackingModal.lockPackages}
-        mode={trackingModal.mode}
-        onConfirm={(trackingData: TrackingInfo[], paymentVouchers?: string[]) => {
-            if (trackingModal.purchaseId) {
-                handleUpdateTracking(trackingModal.purchaseId, trackingData, paymentVouchers);
-            }
-        }}
-        onViewImages={(images: string[], index?: number) => {
-          setGalleryState({ isOpen: true, images, currentIndex: index || 0, scale: 1, direction: 0 });
-        }}
-      />
 
       {/* Waybill Gallery Preview */}
       <ImageGallery 

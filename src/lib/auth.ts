@@ -44,7 +44,7 @@ export async function getFreshSession() {
 
   const user = await prisma.user.findUnique({
     where: { id: (session.user as { id: string }).id },
-    include: { workspace: true }
+    include: { roleProfile: true }
   });
 
   if (!user) return null;
@@ -54,14 +54,13 @@ export async function getFreshSession() {
     id: user.id,
     email: user.email,
     role: user.role,
-    workspaceId: user.workspaceId || "",
     permissions: user.permissions as Record<string, boolean>,
+    roleProfile: user.roleProfile,
     user: {
       ...user,
       id: user.id,
       email: user.email,
       role: user.role,
-      workspaceId: user.workspaceId,
       permissions: user.permissions
     }
   };
@@ -114,10 +113,8 @@ export async function getLightSession(): Promise<Partial<SessionUser> | null> {
     const headerPayload = await headers();
     const role = headerPayload.get("x-user-role");
     const id = headerPayload.get("x-user-id");
-    const workspaceId = headerPayload.get("x-workspace-id");
-
     if (id && role) {
-        return { id, role: role as "SUPER_ADMIN" | "USER", workspaceId: workspaceId || "" };
+        return { id, role: role as "SUPER_ADMIN" | "USER" };
     }
 
     const session = (await cookies()).get("session")?.value;
@@ -128,7 +125,6 @@ export async function getLightSession(): Promise<Partial<SessionUser> | null> {
             id: payload.id as string,
             email: payload.email as string,
             role: payload.role as "SUPER_ADMIN" | "USER",
-            workspaceId: payload.workspaceId as string,
             name: payload.name as string,
         };
     } catch {

@@ -21,8 +21,8 @@ function isInvalidSupplier(name: string): boolean {
 export async function POST(request: Request) {
   try {
     const session = await getSession() as SessionUser | null;
-    const workspaceId = session?.workspaceId;
-    if (!session || !workspaceId) {
+    const userId = session?.id;
+    if (!session || !userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -138,12 +138,12 @@ export async function POST(request: Request) {
                 // Handle supplier update
                 if (supplierName && !isInvalidSupplier(supplierName)) {
                     let supplier = await prisma.supplier.findFirst({
-                        where: { name: supplierName, workspaceId }
+                        where: { name: supplierName, userId }
                     });
                     if (!supplier) {
                         // Generate code
                         const lastSupplier = await prisma.supplier.findFirst({
-                            where: { workspaceId, code: { startsWith: 'SUP-' } },
+                            where: { userId, code: { startsWith: 'SUP-' } },
                             orderBy: { code: 'desc' }
                         });
                         let nextNumber = 1;
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
                             data: { 
                                 name: supplierName, 
                                 code: newCode,
-                                workspaceId, 
+                                userId, 
                                 contact: "", phone: "", email: "", address: "" 
                             }
                         });
@@ -204,7 +204,7 @@ export async function POST(request: Request) {
                                 data: {
                                     url: cleanedUrl,
                                     productId: product.id,
-                                    workspaceId,
+                                    userId,
                                     isPublic: true
                                 }
                             });
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
                     
                     if (!category) {
                         category = await prisma.category.create({
-                            data: { name: categoryName, workspaceId }
+                            data: { name: categoryName, userId }
                         });
                     }
                     finalCategoryId = category.id;
@@ -249,7 +249,7 @@ export async function POST(request: Request) {
                         finalCategoryId = defaultCat.id;
                     } else {
                         const newDefaultCat = await prisma.category.create({
-                            data: { name: "其他分类", workspaceId }
+                            data: { name: "其他分类", userId }
                         });
                         finalCategoryId = newDefaultCat.id;
                     }
@@ -270,12 +270,12 @@ export async function POST(request: Request) {
                 let finalSupplierId: string | undefined = undefined;
                 if (supplierName && !isInvalidSupplier(supplierName)) {
                     let supplier = await prisma.supplier.findFirst({
-                        where: { name: supplierName, workspaceId }
+                        where: { name: supplierName, userId }
                     });
                     if (!supplier) {
                         // Generate code
                         const lastSupplier = await prisma.supplier.findFirst({
-                            where: { workspaceId, code: { startsWith: 'SUP-' } },
+                            where: { userId, code: { startsWith: 'SUP-' } },
                             orderBy: { code: 'desc' }
                         });
                         let nextNumber = 1;
@@ -289,7 +289,7 @@ export async function POST(request: Request) {
                             data: { 
                                 name: supplierName, 
                                 code: newCode,
-                                workspaceId, 
+                                userId, 
                                 contact: "", phone: "", email: "", address: "" 
                             }
                         });
@@ -308,7 +308,7 @@ export async function POST(request: Request) {
                         stock: quantity > 0 ? quantity : 0,
                         image: finalMainImage,
                         pinyin: generatePinyinSearchText(name),
-                        workspaceId,
+                        userId,
                         isPublic,
                         isDiscontinued,
                         remark: remarkText || undefined,
@@ -330,7 +330,7 @@ export async function POST(request: Request) {
                         data: {
                             url: cleanedUrl,
                             productId: newProduct.id,
-                            workspaceId,
+                            userId,
                             isPublic: true
                         }
                     });
@@ -362,7 +362,7 @@ export async function POST(request: Request) {
                 type: "Inbound",
                 status: "Received",
                 date: new Date(),
-                workspaceId,
+                userId,
                 totalAmount: importedItems.reduce((acc, curr) => acc + (curr.quantity * curr.costPrice), 0),
                 items: {
                     create: importedItems.map(item => ({

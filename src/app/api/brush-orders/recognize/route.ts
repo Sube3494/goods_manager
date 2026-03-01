@@ -16,7 +16,7 @@ interface RecognitionResult {
 export async function POST(req: NextRequest) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

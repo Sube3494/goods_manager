@@ -58,19 +58,21 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
     return () => clearTimeout(timer);
   }, []);
 
-  // 2. Body Scroll logic - Removed to prevent scroll-to-top jump issue in some browsers
-  /*
+  // 2. Body Scroll logic - Lock scroll when modal is open to prevent scroll-through
   useEffect(() => {
     if (isOpen) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
       document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
+      document.documentElement.style.overflow = "hidden";
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+      };
     }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
   }, [isOpen]);
-  */
 
   // 3. Form Data Synchronization
   const [prevId, setPrevId] = useState<string | undefined>(undefined);
@@ -113,6 +115,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
       if (!currentProductIds.includes(product.id)) {
         newItems.push({
           productId: product.id,
+          product: product,
           quantity: 1,
         });
       }

@@ -6,6 +6,9 @@ import { useToast } from "@/components/ui/Toast";
 import { SubmissionCard } from "./SubmissionCard";
 import { SubmissionReviewModal } from "./SubmissionReviewModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { useUser } from "@/hooks/useUser";
+import { hasPermission, SessionUser } from "@/lib/permissions";
+import { ShieldAlert } from "lucide-react";
 
 export interface Submission {
     id: string;
@@ -29,9 +32,11 @@ export function SubmissionsReviewPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("pending"); // Default to pending
 
+    const { user, isLoading: isUserLoading } = useUser();
     const { showToast } = useToast();
 
     const fetchSubmissions = useCallback(async () => {
+        if (!user || !hasPermission(user as SessionUser, "gallery:audit")) return;
         setIsLoading(true);
         try {
             const res = await fetch(`/api/gallery/submissions?status=${statusFilter}`);
@@ -45,7 +50,7 @@ export function SubmissionsReviewPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [showToast, statusFilter]);
+    }, [showToast, statusFilter, user]);
 
     useEffect(() => {
         fetchSubmissions();
@@ -125,6 +130,37 @@ export function SubmissionsReviewPage() {
             throw new Error("Failed");
         }
     };
+
+    if (isUserLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <RefreshCw className="animate-spin text-primary" size={40} />
+                <p className="text-muted-foreground animate-pulse text-sm">正在核验访问权限...</p>
+            </div>
+        );
+    }
+
+    if (!user || !hasPermission(user as SessionUser, "gallery:audit")) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center animate-in fade-in zoom-in-95 duration-500">
+                <div className="h-20 w-20 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-2">
+                    <ShieldAlert size={40} />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-foreground">访问受限</h2>
+                    <p className="text-muted-foreground mt-2 max-w-sm">
+                        此页面仅限具备实拍审核权限的管理员访问。请先登录或联系超级管理员分配权限。
+                    </p>
+                </div>
+                <button 
+                    onClick={() => window.location.href = "/login"}
+                    className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg hover:scale-105 transition-all outline-none"
+                >
+                    立即登录
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">

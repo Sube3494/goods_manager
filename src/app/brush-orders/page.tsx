@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { Plus, Search, Calendar, ShoppingBag, Upload, Download, Check, X as ClearIcon, ChevronDown, RotateCcw } from "lucide-react";
+import { Plus, Search, ShoppingBag, Upload, Download, Check, X as ClearIcon, ChevronDown, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { BrushOrderModal } from "@/components/BrushOrders/BrushOrderModal";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { BatchRecognitionModal } from "@/components/BrushOrders/BatchRecognitionModal";
 import { BatchEditOrderModal } from "@/components/BrushOrders/BatchEditOrderModal";
 import { BrushOrder } from "@/lib/types";
-import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
+import { formatLocalDateTime, formatLocalDate, formatLocalMonth } from "@/lib/dateUtils";
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,14 @@ export default function BrushOrdersPage() {
   });
   const [selectedType, setSelectedType] = useState("全部");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
+  
+  const toggleMonthExpansion = (month: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedMonths(prev => 
+      prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
+    );
+  };
   
   const toggleDateExpansion = (date: string, e?: React.MouseEvent) => {
     const nextValue = expandedDate === date ? null : date;
@@ -109,41 +117,79 @@ export default function BrushOrdersPage() {
   }, [orders, searchQuery, startDate, endDate, selectedType]);
 
   const groupedOrders = useMemo(() => {
-    const groups: { 
-        date: string; 
-        orders: (BrushOrder & { globalIndex: number })[]; 
+    // 结构: 月份 -> 天 -> 订单
+    const groups: {
+      month: string;
+      periodStats: { count: number; payment: number; received: number; commission: number };
+      days: {
+        date: string;
+        orders: (BrushOrder & { globalIndex: number })[];
         dailyStats: { count: number; payment: number; received: number; commission: number };
+      }[];
     }[] = [];
-    
+
+    // 第一步：按月分类，再按天分类
     filteredOrders.forEach(order => {
+      const monthStr = formatLocalMonth(order.date);
       const dateStr = formatLocalDate(order.date);
-      let group = groups.find(g => g.date === dateStr);
-      if (!group) {
-        group = { 
-          date: dateStr, 
-          orders: [], 
-          dailyStats: { count: 0, payment: 0, received: 0, commission: 0 } 
+
+      // 找月份
+      let monthGroup = groups.find(g => g.month === monthStr);
+      if (!monthGroup) {
+        monthGroup = {
+          month: monthStr,
+          periodStats: { count: 0, payment: 0, received: 0, commission: 0 },
+          days: []
         };
-        groups.push(group);
+        groups.push(monthGroup);
       }
-      group.orders.push(order as BrushOrder & { globalIndex: number });
-      group.dailyStats.count++;
-      group.dailyStats.payment += order.paymentAmount;
-      group.dailyStats.received += order.receivedAmount;
-      group.dailyStats.commission += order.commission;
+
+      // 月份统计
+      monthGroup.periodStats.count++;
+      monthGroup.periodStats.payment += order.paymentAmount;
+      monthGroup.periodStats.received += order.receivedAmount;
+      monthGroup.periodStats.commission += order.commission;
+
+      // 找具体的天
+      let dayGroup = monthGroup.days.find(d => d.date === dateStr);
+      if (!dayGroup) {
+        dayGroup = {
+          date: dateStr,
+          orders: [],
+          dailyStats: { count: 0, payment: 0, received: 0, commission: 0 }
+        };
+        monthGroup.days.push(dayGroup);
+      }
+
+      // 添加订单并进行每日统计
+      dayGroup.orders.push(order as BrushOrder & { globalIndex: number });
+      dayGroup.dailyStats.count++;
+      dayGroup.dailyStats.payment += order.paymentAmount;
+      dayGroup.dailyStats.received += order.receivedAmount;
+      dayGroup.dailyStats.commission += order.commission;
     });
 
-    // 对每个组内的订单进行时间升序排序（早的在前），重新编号
-    groups.forEach(group => {
-      group.orders.sort((a, b) => {
-        const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
-        const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
-        return timeA - timeB; // 升序：早的排前面
-      });
-      group.orders.forEach((order, index) => {
-         order.globalIndex = index + 1; // 每天从 1 开始
-      });
+    // 第二步：排序并编序号
+    groups.forEach(monthGroup => {
+        // 天数按时间倒序（或者升序）排序，这里保持越近的时间越在前面？
+        // 原本逻辑保持不变：按时间升序或自定义，这里让每天的订单：
+        monthGroup.days.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // 倒序天
+
+        monthGroup.days.forEach(dayGroup => {
+            dayGroup.orders.sort((a, b) => {
+                const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
+                const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
+                return timeB - timeA; // 单日内按照最新下单倒排
+            });
+            // 重新按序分配每天的内部序号
+            dayGroup.orders.forEach((order, index) => {
+                order.globalIndex = dayGroup.orders.length - index; // 保持新单在前的阅读习惯
+            });
+        });
     });
+    
+    // 月份也倒排
+    groups.sort((a, b) => b.month.localeCompare(a.month));
 
     return groups;
   }, [filteredOrders]);
@@ -570,25 +616,25 @@ export default function BrushOrdersPage() {
             {/* 全局表头已隐藏，改为在展开项内显示 */}
             {/* </thead> */}
              <tbody className="divide-y divide-border/50">
-                 {groupedOrders.map((group) => (
-                     <Fragment key={group.date}>
+                 {groupedOrders.map((monthGroup) => (
+                     <Fragment key={monthGroup.month}>
                          <tr 
-                            className="bg-muted/15 border-y border-border/50 cursor-pointer hover:bg-muted/25 transition-all sticky top-0 z-10 backdrop-blur-sm shadow-sm scroll-mt-[85px]"
-                            onClick={(e) => toggleDateExpansion(group.date, e)}
+                            className="bg-muted/15 border-y border-border/50 cursor-pointer hover:bg-muted/25 transition-all sticky top-0 z-20 backdrop-blur-sm shadow-sm scroll-mt-[85px]"
+                            onClick={(e) => toggleMonthExpansion(monthGroup.month, e)}
                          >
                              <td className="px-4 py-2.5 w-12" onClick={(e) => e.stopPropagation()}>
                                  <div className="flex justify-center">
                                      <button 
-                                       onClick={(e) => toggleGroupSelect(group.orders.map(o => o.id), e)}
+                                       onClick={(e) => toggleGroupSelect(monthGroup.days.flatMap(d => d.orders).map(o => o.id), e)}
                                        className={cn(
                                            "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center cursor-pointer",
-                                           group.orders.length > 0 && group.orders.every(o => selectedIds.includes(o.id))
+                                           monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id))
                                            ? "bg-foreground border-foreground text-background scale-110" 
                                            : "border-muted-foreground/30 hover:border-foreground/50 bg-white dark:bg-black"
                                        )}
-                                       title="全选本日订单"
+                                       title="全选本月订单"
                                      >
-                                       {group.orders.length > 0 && group.orders.every(o => selectedIds.includes(o.id)) && (
+                                       {monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id)) && (
                                            <Check size={12} strokeWidth={4} />
                                        )}
                                      </button>
@@ -599,122 +645,178 @@ export default function BrushOrdersPage() {
                                      <div 
                                         className={cn(
                                             "flex items-center justify-center w-6 h-6 rounded-lg bg-white dark:bg-white/10 border border-border/50 text-muted-foreground hover:text-primary transition-all duration-300",
-                                            expandedDate === group.date && "rotate-0",
-                                            expandedDate !== group.date && "-rotate-90 text-primary"
+                                            expandedMonths.includes(monthGroup.month) && "rotate-0",
+                                            !expandedMonths.includes(monthGroup.month) && "-rotate-90 text-primary"
                                         )}
                                       >
                                          <ChevronDown size={14} />
                                      </div>
-                                     <span className="text-sm font-black text-foreground tracking-tight ml-1">{group.date}</span>
+                                     <span className="text-sm font-black text-foreground tracking-tight ml-1">{monthGroup.month}</span>
                                      <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-white/10 border border-border/50 text-[10px] font-bold text-muted-foreground">
-                                        {group.dailyStats.count} 单
+                                        {monthGroup.periodStats.count} 单
                                      </span>
                                  </div>
                              </td>
-                             <td className="px-6 py-2.5 text-center">
+                             <td className="px-6 py-2.5 text-center whitespace-nowrap">
                                  <div className="flex items-center justify-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">总实付</span>
-                                    <span className="text-xs font-mono font-bold text-foreground">¥{group.dailyStats.payment.toFixed(2)}</span>
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">总实付</span>
+                                    <span className="text-xs font-mono font-bold text-foreground whitespace-nowrap">¥{monthGroup.periodStats.payment.toFixed(2)}</span>
                                  </div>
                              </td>
-                             <td className="px-6 py-2.5 text-center">
+                             <td className="px-6 py-2.5 text-center whitespace-nowrap">
                                  <div className="flex items-center justify-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">总到手</span>
-                                    <span className="text-xs font-mono font-bold text-emerald-500">¥{group.dailyStats.received.toFixed(2)}</span>
+                                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider whitespace-nowrap">总到手</span>
+                                    <span className="text-xs font-mono font-bold text-emerald-500 whitespace-nowrap">¥{monthGroup.periodStats.received.toFixed(2)}</span>
                                  </div>
                              </td>
-                             <td className="px-6 py-2.5 text-center">
+                             <td className="px-6 py-2.5 text-center whitespace-nowrap">
                                  <div className="flex items-center justify-center gap-1.5">
-                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">总佣金</span>
-                                    <span className="text-xs font-mono font-bold text-orange-500">¥{group.dailyStats.commission.toFixed(2)}</span>
+                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider whitespace-nowrap">总佣金</span>
+                                    <span className="text-xs font-mono font-bold text-orange-500 whitespace-nowrap">¥{monthGroup.periodStats.commission.toFixed(2)}</span>
                                  </div>
                              </td>
                              <td className="px-6 py-2.5 text-center"></td>
                          </tr>
-                         {expandedDate === group.date && (
-                             <>
-                                 <tr className="border-b border-border/30 bg-muted/10">
-                                     <th className="px-4 py-3"></th>
-                                     <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase text-center">#</th>
-                                     <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-left">商品</th>
-                                     <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center">时间</th>
-                                     <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center">平台</th>
-                                     <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center">实付</th>
-                                     <th className="px-6 py-3 text-xs font-bold text-emerald-500 uppercase text-center">到手</th>
-                                     <th className="px-6 py-3 text-xs font-bold text-orange-500 uppercase text-center">佣金</th>
-                                     <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center">备注</th>
+                         
+                         {expandedMonths.includes(monthGroup.month) && monthGroup.days.map((dayGroup) => (
+                             <Fragment key={dayGroup.date}>
+                                 <tr 
+                                    className="bg-muted/5 border-y border-border/30 cursor-pointer hover:bg-muted/10 transition-all sticky top-[45px] z-10 backdrop-blur-sm scroll-mt-[130px]"
+                                    onClick={(e) => toggleDateExpansion(dayGroup.date, e)}
+                                 >
+                                     <td className="px-4 py-2 w-12" onClick={(e) => e.stopPropagation()}>
+                                         <div className="flex justify-center">
+                                             <button 
+                                               onClick={(e) => toggleGroupSelect(dayGroup.orders.map(o => o.id), e)}
+                                               className={cn(
+                                                   "relative h-4 w-4 rounded-full border-2 transition-all duration-300 flex items-center justify-center cursor-pointer",
+                                                   dayGroup.orders.length > 0 && dayGroup.orders.every(o => selectedIds.includes(o.id))
+                                                   ? "bg-foreground border-foreground text-background scale-110" 
+                                                   : "border-muted-foreground/30 hover:border-foreground/50 bg-white dark:bg-black"
+                                               )}
+                                               title="全选本日订单"
+                                             >
+                                               {dayGroup.orders.length > 0 && dayGroup.orders.every(o => selectedIds.includes(o.id)) && (
+                                                   <Check size={10} strokeWidth={4} />
+                                               )}
+                                             </button>
+                                         </div>
+                                     </td>
+                                     <td colSpan={4} className="py-2 px-3 pl-8">
+                                         <div className="flex items-center gap-2">
+                                             <div 
+                                                className={cn(
+                                                    "flex items-center justify-center w-5 h-5 rounded-md bg-white dark:bg-white/5 border border-border/40 text-muted-foreground hover:text-primary transition-all duration-300",
+                                                    expandedDate === dayGroup.date && "rotate-0",
+                                                    expandedDate !== dayGroup.date && "-rotate-90 text-primary"
+                                                )}
+                                              >
+                                                 <ChevronDown size={12} />
+                                             </div>
+                                             <span className="text-xs font-bold text-foreground tracking-tight">{dayGroup.date}</span>
+                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold text-muted-foreground bg-muted">
+                                                {dayGroup.dailyStats.count} 单
+                                             </span>
+                                         </div>
+                                     </td>
+                                     <td className="px-6 py-2 text-center text-xs">
+                                         <span className="font-mono font-medium text-foreground">¥{dayGroup.dailyStats.payment.toFixed(2)}</span>
+                                     </td>
+                                     <td className="px-6 py-2 text-center text-xs">
+                                         <span className="font-mono font-medium text-emerald-500">¥{dayGroup.dailyStats.received.toFixed(2)}</span>
+                                     </td>
+                                     <td className="px-6 py-2 text-center text-xs">
+                                         <span className="font-mono font-medium text-orange-500">¥{dayGroup.dailyStats.commission.toFixed(2)}</span>
+                                     </td>
+                                     <td className="px-6 py-2 text-center"></td>
                                  </tr>
-                                 {group.orders.map(order => (
-                            <tr 
-                             key={order.id}
-                             onClick={() => handleEdit(order)}
-                             className={`hover:bg-muted/20 transition-colors cursor-pointer group ${selectedIds.includes(order.id) ? 'bg-primary/5' : ''}`}
-                            >
-                               <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                                 <div className="flex justify-center">
-                                   <button 
-                                     onClick={() => toggleSelect(order.id)}
-                                     className={cn(
-                                         "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
-                                         selectedIds.includes(order.id)
-                                         ? "bg-foreground border-foreground text-background scale-110" 
-                                         : "border-muted-foreground/30 hover:border-foreground/50"
-                                     )}
-                                   >
-                                     {selectedIds.includes(order.id) && (
-                                         <Check size={12} strokeWidth={4} />
-                                     )}
-                                   </button>
-                                 </div>
-                               </td>
-                               <td className="px-3 py-4 text-center">
-                                   <span className="text-[10px] font-mono font-bold text-muted-foreground/50 group-hover:text-primary transition-colors">
-                                       {String(order.globalIndex).padStart(2, '0')}
-                                   </span>
-                               </td>
-                              <td className="px-6 py-4">
-                                 <div className="flex items-center gap-3">
-                                     <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border dark:border-white/10 overflow-hidden shrink-0 relative">
-                                         {order.items[0]?.product?.image ? (
-                                             /* eslint-disable-next-line @next/next/no-img-element */
-                                          <img src={order.items[0].product.image} className="w-full h-full object-cover" alt="Product" />
-                                         ) : (
-                                             <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
-                                                 <ShoppingBag size={16} />
+
+                                 {expandedDate === dayGroup.date && (
+                                     <>
+                                         <tr className="border-b border-border/30 bg-muted/10">
+                                             <th className="px-4 py-3"></th>
+                                             <th className="px-3 py-3 text-xs font-bold text-muted-foreground uppercase text-center">#</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-left">商品</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center">时间</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center whitespace-nowrap">平台</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center whitespace-nowrap">实付</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-emerald-500 uppercase text-center whitespace-nowrap">到手</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-orange-500 uppercase text-center whitespace-nowrap">佣金</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center whitespace-nowrap">备注</th>
+                                         </tr>
+                                         {dayGroup.orders.map(order => (
+                                    <tr 
+                                     key={order.id}
+                                     onClick={() => handleEdit(order)}
+                                     className={`hover:bg-muted/20 transition-colors cursor-pointer group ${selectedIds.includes(order.id) ? 'bg-primary/5' : ''}`}
+                                    >
+                                       <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                         <div className="flex justify-center">
+                                           <button 
+                                             onClick={() => toggleSelect(order.id)}
+                                             className={cn(
+                                                 "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
+                                                 selectedIds.includes(order.id)
+                                                 ? "bg-foreground border-foreground text-background scale-110" 
+                                                 : "border-muted-foreground/30 hover:border-foreground/50"
+                                             )}
+                                           >
+                                             {selectedIds.includes(order.id) && (
+                                                 <Check size={12} strokeWidth={4} />
+                                             )}
+                                           </button>
+                                         </div>
+                                       </td>
+                                       <td className="px-3 py-4 text-center">
+                                           <span className="text-[10px] font-mono font-bold text-muted-foreground/50 group-hover:text-primary transition-colors">
+                                               {String(order.globalIndex).padStart(2, '0')}
+                                           </span>
+                                       </td>
+                                      <td className="px-6 py-4">
+                                         <div className="flex items-center gap-3">
+                                             <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-white/5 border dark:border-white/10 overflow-hidden shrink-0 relative">
+                                                 {order.items[0]?.product?.image ? (
+                                                     /* eslint-disable-next-line @next/next/no-img-element */
+                                                  <img src={order.items[0].product.image} className="w-full h-full object-cover" alt="Product" />
+                                                 ) : (
+                                                     <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+                                                         <ShoppingBag size={16} />
+                                                     </div>
+                                                 )}
+                                                 {order.items.length > 1 && (
+                                                     <div className="absolute top-0 right-0 bg-primary/90 text-primary-foreground text-[8px] font-bold px-1 rounded-bl-md shadow-sm">
+                                                         {order.items.length}
+                                                     </div>
+                                                 )}
                                              </div>
-                                         )}
-                                         {order.items.length > 1 && (
-                                             <div className="absolute top-0 right-0 bg-primary/90 text-primary-foreground text-[8px] font-bold px-1 rounded-bl-md shadow-sm">
-                                                 {order.items.length}
-                                             </div>
-                                         )}
-                                     </div>
-                                     <p className="text-sm font-medium line-clamp-1 max-w-[200px]" title={order.items.map(i => i.product?.name).join("\n")}>
-                                         {order.items[0]?.product?.name || "未绑定商品"}
-                                         {order.items.length > 1 && <span className="text-muted-foreground ml-1 text-xs">等{order.items.length}件</span>}
-                                     </p>
-                                 </div>
-                              </td>
-                              <td className="px-6 py-4 text-sm font-mono text-muted-foreground whitespace-nowrap text-center">
-                                 {formatLocalDateTime(order.date).split(' ')[1]}
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                      <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20 uppercase">
-                                          {order.type}
-                                      </span>
-                              </td>
-                              <td className="px-6 py-4 font-number font-medium text-center text-sm">¥{order.paymentAmount.toFixed(2)}</td>
-                              <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm">¥{order.receivedAmount.toFixed(2)}</td>
-                              <td className="px-6 py-4 font-number font-bold text-orange-500 text-center text-sm">¥{order.commission.toFixed(2)}</td>
-                              <td className="px-6 py-4 text-center">
-                                 <p className="text-xs text-muted-foreground line-clamp-1 max-w-[150px] mx-auto" title={order.note}>
-                                     {order.note || "-"}
-                                  </p>
-                              </td>
-                            </tr>
-                                 ))}
-                             </>
-                         )}
+                                             <p className="text-sm font-medium line-clamp-1 max-w-[200px]" title={order.items.map(i => i.product?.name).join("\n")}>
+                                                 {order.items[0]?.product?.name || "未绑定商品"}
+                                                 {order.items.length > 1 && <span className="text-muted-foreground ml-1 text-xs">等{order.items.length}件</span>}
+                                             </p>
+                                         </div>
+                                      </td>
+                                      <td className="px-6 py-4 text-sm font-mono text-muted-foreground whitespace-nowrap text-center">
+                                         {formatLocalDateTime(order.date).substring(5, 16)}
+                                      </td>
+                                      <td className="px-6 py-4 text-center whitespace-nowrap">
+                                              <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20 uppercase whitespace-nowrap">
+                                                  {order.type}
+                                              </span>
+                                      </td>
+                                      <td className="px-6 py-4 font-number font-medium text-center text-sm whitespace-nowrap">¥{order.paymentAmount.toFixed(2)}</td>
+                                      <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm whitespace-nowrap">¥{order.receivedAmount.toFixed(2)}</td>
+                                      <td className="px-6 py-4 font-number font-bold text-orange-500 text-center text-sm whitespace-nowrap">¥{order.commission.toFixed(2)}</td>
+                                      <td className="px-6 py-4 text-center whitespace-nowrap">
+                                         <p className="text-xs text-muted-foreground line-clamp-1 max-w-[150px] mx-auto whitespace-normal" title={order.note}>
+                                             {order.note || "-"}
+                                          </p>
+                                      </td>
+                                    </tr>
+                                         ))}
+                                     </>
+                                 )}
+                             </Fragment>
+                         ))}
                      </Fragment>
                  ))}
              </tbody>
@@ -732,149 +834,151 @@ export default function BrushOrdersPage() {
 
         <div className="md:hidden rounded-3xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
           <div className="p-3 space-y-6">
-            {groupedOrders.map((group) => (
-                <div key={group.date} className="space-y-3">
+            {groupedOrders.map((monthGroup) => (
+                <div key={monthGroup.month} className="space-y-3">
+                    {/* 月份 Header */}
                     <div 
-                        className="flex items-center justify-between px-3 py-3 bg-muted/20 dark:bg-white/5 rounded-2xl active:scale-[0.98] transition-all border border-border/40 shadow-sm scroll-mt-[85px]"
-                        onClick={(e) => toggleDateExpansion(group.date, e)}
+                        className="flex items-center justify-between px-4 py-3 bg-primary/5 dark:bg-primary/10 rounded-2xl border border-primary/10 shadow-sm sticky top-0 z-10 backdrop-blur-md"
+                        onClick={(e) => toggleMonthExpansion(monthGroup.month, e)}
                     >
                         <div className="flex items-center gap-3">
                             <button 
-                              onClick={(e) => toggleGroupSelect(group.orders.map(o => o.id), e)}
-                              className={cn(
-                                  "relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer",
-                                  group.orders.length > 0 && group.orders.every(o => selectedIds.includes(o.id))
-                                  ? "bg-foreground border-foreground text-background scale-110" 
-                                  : "bg-black/10 border-black/20 dark:bg-black/30 dark:border-white/30 hover:border-black/40 dark:hover:border-white/50"
-                              )}
+                                onClick={(e) => toggleGroupSelect(monthGroup.days.flatMap(d => d.orders).map(o => o.id), e)}
+                                className={cn(
+                                    "relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer",
+                                    monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id))
+                                    ? "bg-primary border-primary text-white scale-110" 
+                                    : "bg-white/50 border-primary/20"
+                                )}
                             >
-                              {group.orders.length > 0 && group.orders.every(o => selectedIds.includes(o.id)) && (
-                                  <Check size={14} strokeWidth={4} />
-                              )}
+                                {monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id)) && (
+                                    <Check size={14} strokeWidth={4} />
+                                )}
                             </button>
                             <div className={cn(
-                                "flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-white/10 border border-border/50 text-primary shadow-sm transition-transform duration-300",
-                                expandedDate === group.date ? "rotate-0" : "-rotate-90"
+                                "flex items-center justify-center w-8 h-8 rounded-xl bg-white dark:bg-white/5 border border-primary/10 text-primary shadow-sm transition-transform duration-300",
+                                expandedMonths.includes(monthGroup.month) ? "rotate-0" : "-rotate-90"
                             )}>
                                 <ChevronDown size={18} />
                             </div>
-                            <div>
-                                <h3 className="text-sm font-black text-foreground tracking-tight">{group.date}</h3>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary uppercase">
-                                        {group.dailyStats.count}单
-                                    </span>
-                                </div>
-                            </div>
+                            <h3 className="text-base font-black text-foreground tracking-tight">{monthGroup.month}</h3>
                         </div>
-                        <div className="flex flex-col items-end gap-0.5">
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] text-muted-foreground font-bold">总实付</span>
-                                <span className="text-xs font-mono font-bold text-foreground">¥{group.dailyStats.payment.toFixed(2)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] text-muted-foreground font-bold">总到手</span>
-                                <span className="text-xs font-mono font-bold text-emerald-500">¥{group.dailyStats.received.toFixed(2)}</span>
-                            </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[10px] font-bold text-primary uppercase bg-primary/10 px-1.5 py-0.5 rounded-md mb-1">
+                                {monthGroup.periodStats.count}单
+                            </span>
+                            <span className="text-xs font-mono font-bold text-foreground">
+                                ¥{monthGroup.periodStats.received.toFixed(2)}
+                            </span>
                         </div>
                     </div>
 
-                    {expandedDate === group.date && (
-                        <div className="overflow-hidden space-y-3">
-                            {group.orders.map(order => (
-                                <div 
-                                    key={order.id} 
-                                    onClick={() => handleEdit(order)}
-                                    className={cn(
-                                        "bg-white/50 dark:bg-white/5 p-3.5 rounded-2xl border border-border/50 shadow-sm cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden",
-                                        selectedIds.includes(order.id) ? 'ring-2 ring-primary ring-inset' : ''
-                                    )}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        {/* 选择框 */}
-                                        <div 
-                                            className="shrink-0"
-                                            onClick={(e) => toggleSelect(order.id, e)}
-                                        >
-                                            <button 
-                                                className={cn(
-                                                    "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
-                                                    selectedIds.includes(order.id)
-                                                    ? "bg-foreground border-foreground text-background scale-110" 
-                                                    : "bg-black/20 dark:bg-black/40 backdrop-blur-md border-white/40 hover:border-white/60"
-                                                )}
-                                            >
-                                                {selectedIds.includes(order.id) && (
-                                                    <Check size={12} strokeWidth={4} />
-                                                )}
-                                            </button>
-                                        </div>
-
-                                        <div className="w-14 h-14 rounded-xl bg-gray-100 dark:bg-white/5 border dark:border-white/10 overflow-hidden shrink-0 relative">
-                                            {order.items[0]?.product?.image ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img src={order.items[0].product.image} className="w-full h-full object-cover" alt="Product" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
-                                                    <ShoppingBag size={22} />
-                                                </div>
-                                            )}
-                                            {order.items.length > 1 && (
-                                                <div className="absolute top-0 right-0 bg-primary/90 text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-bl-xl shadow-md">
-                                                    {order.items.length}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-mono">
-                                                        <Calendar size={11} />
-                                                        {formatLocalDateTime(order.date).split(' ')[1]}
-                                                    </div>
-                                                    <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-500 text-[9px] font-bold border border-blue-500/20 uppercase">
-                                                        {order.type}
-                                                     </span>
-
-                                                </div>
-                                                <div className="bg-muted/30 text-muted-foreground/50 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold border border-border/20">
-                                                    #{String(order.globalIndex).padStart(2, '0')}
-                                                </div>
-                                            </div>
-                                            <p className="text-sm font-bold text-foreground line-clamp-2 leading-snug mt-1 pr-6">
-                                                {order.items[0]?.product?.name || "未绑定商品"}
-                                                {order.items.length > 1 && <span className="text-muted-foreground font-normal ml-1 text-[11px]">等{order.items.length}件</span>}
-                                            </p>
-                                            {/* 备注 */}
-                                            {order.note && (
-                                                <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1 opacity-60">
-                                                    &quot;{order.note}&quot;
-                                                </p>
-                                            )}
-                                        </div>
+                    {expandedMonths.includes(monthGroup.month) && monthGroup.days.map((dayGroup) => (
+                        <div key={dayGroup.date} className="space-y-2 pl-2 border-l-2 border-primary/5 ml-4 my-2">
+                            <div 
+                                className="flex items-center justify-between px-3 py-2.5 bg-muted/20 dark:bg-white/5 rounded-xl border border-border/40 shadow-sm"
+                                onClick={(e) => toggleDateExpansion(dayGroup.date, e)}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={(e) => toggleGroupSelect(dayGroup.orders.map(o => o.id), e)}
+                                      className={cn(
+                                          "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer",
+                                          dayGroup.orders.length > 0 && dayGroup.orders.every(o => selectedIds.includes(o.id))
+                                          ? "bg-foreground border-foreground text-background scale-110" 
+                                          : "bg-black/5 border-black/10 dark:bg-black/20 dark:border-white/20"
+                                      )}
+                                    >
+                                      {dayGroup.orders.length > 0 && dayGroup.orders.every(o => selectedIds.includes(o.id)) && (
+                                          <Check size={12} strokeWidth={4} />
+                                      )}
+                                    </button>
+                                    <div className={cn(
+                                        "flex items-center justify-center w-7 h-7 rounded-lg bg-white dark:bg-white/10 border border-border/50 text-muted-foreground transition-transform duration-300",
+                                        expandedDate === dayGroup.date ? "rotate-0" : "-rotate-90"
+                                    )}>
+                                        <ChevronDown size={16} />
                                     </div>
-
-                                    <div className={cn("grid gap-2 mt-3 pt-3 border-t border-border/20", order.commission > 0 ? "grid-cols-3" : "grid-cols-2")}>
-                                        <div className="bg-blue-500/8 rounded-xl px-2 py-2 text-center border border-blue-500/10">
-                                            <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wide mb-0.5">实付</p>
-                                            <p className="font-mono text-sm font-bold text-foreground">¥{order.paymentAmount.toFixed(2)}</p>
-                                        </div>
-                                        <div className="bg-emerald-500/8 rounded-xl px-2 py-2 text-center border border-emerald-500/10">
-                                            <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wide mb-0.5">到手</p>
-                                            <p className="font-mono text-sm font-bold text-emerald-500">¥{order.receivedAmount.toFixed(2)}</p>
-                                        </div>
-                                        {order.commission > 0 && (
-                                            <div className="bg-orange-500/8 rounded-xl px-2 py-2 text-center border border-orange-500/10">
-                                                <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wide mb-0.5">佣金</p>
-                                                <p className="font-mono text-sm font-bold text-orange-500">¥{order.commission.toFixed(2)}</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <h4 className="text-sm font-bold text-foreground">{dayGroup.date}</h4>
+                                    <span className="text-[10px] text-muted-foreground font-medium ml-1">
+                                        {dayGroup.dailyStats.count}单
+                                    </span>
                                 </div>
-                            ))}
+                                <div className="text-right">
+                                    <p className="text-xs font-mono font-bold text-emerald-500">¥{dayGroup.dailyStats.received.toFixed(2)}</p>
+                                </div>
+                            </div>
+
+                            {expandedDate === dayGroup.date && (
+                                <div className="space-y-2 mt-2">
+                                    {dayGroup.orders.map(order => (
+                                        <div 
+                                            key={order.id} 
+                                            onClick={() => handleEdit(order)}
+                                            className={cn(
+                                                "bg-white dark:bg-white/5 p-3 rounded-xl border border-border/50 shadow-sm relative overflow-hidden",
+                                                selectedIds.includes(order.id) ? 'ring-2 ring-primary ring-inset' : ''
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div 
+                                                    className="shrink-0"
+                                                    onClick={(e) => toggleSelect(order.id, e)}
+                                                >
+                                                    <button 
+                                                        className={cn(
+                                                            "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
+                                                            selectedIds.includes(order.id)
+                                                            ? "bg-foreground border-foreground text-background scale-110" 
+                                                            : "bg-black/5 dark:bg-black/20 border-border"
+                                                        )}
+                                                    >
+                                                        {selectedIds.includes(order.id) && (
+                                                            <Check size={12} strokeWidth={4} />
+                                                        )}
+                                                    </button>
+                                                </div>
+
+                                                <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-white/5 border dark:border-white/10 overflow-hidden shrink-0 relative">
+                                                    {order.items[0]?.product?.image ? (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img src={order.items[0].product.image} className="w-full h-full object-cover" alt="Product" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+                                                            <ShoppingBag size={18} />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-mono font-bold text-muted-foreground/30">
+                                                            #{String(order.globalIndex).padStart(2, '0')}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-muted-foreground">
+                                                            {formatLocalDateTime(order.date).substring(5, 16)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs font-bold text-foreground line-clamp-1 mt-0.5">
+                                                        {order.items[0]?.product?.name || "未绑定商品"}
+                                                        {order.items.length > 1 && <span className="text-muted-foreground font-normal ml-1">等{order.items.length}件</span>}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="px-1 py-0 rounded bg-blue-500/10 text-blue-500 text-[9px] font-bold border border-blue-500/20 uppercase">
+                                                            {order.type}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono font-bold text-emerald-500">
+                                                            ¥{order.receivedAmount.toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
+                    ))}
                 </div>
             ))}
            

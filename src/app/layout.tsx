@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PickNote",
+  title: "库存管理系统",
   description: "专业库存管理系统",
 };
 

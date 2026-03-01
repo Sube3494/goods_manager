@@ -587,7 +587,7 @@ function SettingsContent() {
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement("a");
                             a.href = url;
-                            a.download = `PickNote_Backup_${new Date().toISOString().split('T')[0]}.pnk`;
+                            a.download = `库存管理系统_备份数据_${new Date().toISOString().split('T')[0]}.pnk`;
                             a.click();
                         } else {
                             if (!backupConfig.file) return;
@@ -787,7 +787,7 @@ function SettingsContent() {
                                           type="text"
                                           value={minioBucket}
                                           onChange={(e) => { setMinioBucket(e.target.value); saveSettings({ minioBucket: e.target.value }, { silent: true }); }}
-                                          placeholder="例如: picknote-assets"
+                                          placeholder="例如: storage-assets"
                                           className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none font-bold"
                                       />
                                   </div>

@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getFreshSession } from "@/lib/auth";
 
 // 获取首页仪表盘统计数据
 export async function GET() {
   try {
-    // 1. 获取系统设置
-    const settings = await prisma.systemSetting.findUnique({
-      where: { id: "system" }
+    const session = await getFreshSession();
+    if (!session || !session.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 1. 获取系统设置 (基于用户或全局)
+    const settings = await prisma.systemSetting.findFirst({
+      where: { userId: session.id }
     });
     const threshold = settings?.lowStockThreshold ?? 10;
 
@@ -18,14 +24,18 @@ export async function GET() {
       recentInboundItems,
       pendingOrderCount
     ] = await Promise.all([
-      prisma.product.count(),
+      prisma.product.count({
+        where: { userId: session.id }
+      }),
       prisma.product.aggregate({
+        where: { userId: session.id },
         _sum: {
           stock: true
         }
       }),
       prisma.product.count({
         where: {
+          userId: session.id,
           stock: {
             lt: threshold
           }
@@ -34,7 +44,10 @@ export async function GET() {
       prisma.purchaseOrderItem.findMany({
         where: {
           remainingQuantity: { gt: 0 },
-          purchaseOrder: { status: "Received" }
+          purchaseOrder: { 
+            userId: session.id,
+            status: "Received" 
+          }
         },
         select: {
           costPrice: true,
@@ -46,6 +59,7 @@ export async function GET() {
         take: 10,
         where: {
           purchaseOrder: {
+            userId: session.id,
             status: "Received"
           }
         },
@@ -81,6 +95,7 @@ export async function GET() {
       // 获取待入库订单数量 (Status = Ordered)
       prisma.purchaseOrder.count({
         where: {
+          userId: session.id,
           status: "Ordered"
         }
       })
@@ -109,7 +124,11 @@ export async function GET() {
       pendingInboundCount: pendingOrderCount
     });
   } catch (error) {
-    console.error("Failed to fetch stats:", error);
+    if (error instanceof Error) {
+        console.error("Failed to fetch stats (Detailed):", error.message, error.stack);
+    } else {
+        console.error("Failed to fetch stats (Detailed):", error);
+    }
     return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
   }
 }

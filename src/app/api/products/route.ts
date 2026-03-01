@@ -38,8 +38,13 @@ export async function GET(request: Request) {
 
     // 构建查询条件
     const andConditions: Array<Record<string, unknown>> = [];
-    if (session?.workspaceId) {
-      andConditions.push({ workspaceId: session.workspaceId });
+    if (session?.id) {
+      andConditions.push({
+        OR: [
+          { userId: session.id },
+          { isPublic: true }
+        ]
+      });
     }
 
     if (search) {
@@ -157,7 +162,7 @@ async function formatResponse(products: unknown[], total: number, page: number, 
 export async function POST(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -184,7 +189,7 @@ export async function POST(request: Request) {
         isDiscontinued: isDiscontinued ?? false,
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         remark: remark || null,
-        workspaceId: session.workspaceId,
+        userId: session.id,
       },
       include: {
         category: true,
@@ -202,7 +207,7 @@ export async function POST(request: Request) {
           status: "Received",
           totalAmount: 0,
           date: new Date(),
-          workspaceId: session.workspaceId,
+          userId: session.id,
           items: {
             create: [{
               productId: product.id,
@@ -245,7 +250,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -261,7 +266,7 @@ export async function PUT(request: Request) {
     }
 
     const existing = await prisma.product.findFirst({
-      where: { id }
+      where: { id, userId: session.id }
     });
 
     if (!existing) {
@@ -316,7 +321,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -333,7 +338,7 @@ export async function DELETE(request: Request) {
 
     // Security check: Global access
     const product = await prisma.product.findFirst({
-      where: { id }
+      where: { id, userId: session.id }
     });
 
     if (!product) {

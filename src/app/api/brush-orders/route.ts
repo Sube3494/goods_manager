@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 1000);
   const skip = (page - 1) * limit;
 
-  if (!session || !session.workspaceId) {
+  if (!session || !session.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   try {
     const [orders, total] = await Promise.all([
       prisma.brushOrder.findMany({
-        where: { workspaceId: session.workspaceId },
+        where: { userId: session.id },
         skip,
         take: limit,
         orderBy: { date: 'desc' },
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
         },
       }),
       prisma.brushOrder.count({
-        where: { workspaceId: session.workspaceId }
+        where: { userId: session.id }
       }),
     ]);
 
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
   try {
     const { getLightSession } = await import("@/lib/auth");
     const session = await getLightSession();
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     if (platformOrderId) {
       const existing = await prisma.brushOrder.findFirst({
         where: {
-          workspaceId: session.workspaceId,
+          userId: session.id,
           platformOrderId: platformOrderId,
         }
       });
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       data: {
         date: new Date(date),
         type,
-        workspaceId: session.workspaceId,
+        userId: session.id,
         paymentAmount: parseFloat(paymentAmount || 0),
         receivedAmount: parseFloat(receivedAmount || 0),
         commission: parseFloat(commission || 0),

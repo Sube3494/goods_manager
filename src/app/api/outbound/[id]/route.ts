@@ -14,7 +14,7 @@ export async function POST(
   try {
     const { id } = await params;
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -27,7 +27,7 @@ export async function POST(
     // Use a transaction to reverse stock and update status
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.outboundOrder.findUnique({
-        where: { id, workspaceId: session.workspaceId },
+        where: { id, userId: session.id },
         include: { items: true }
       });
 
@@ -103,7 +103,7 @@ export async function POST(
           status: "Received",
           date: new Date(),
           totalAmount: 0, // Returns don't necessarily have a transaction amount in this context
-          workspaceId: session.workspaceId,
+          userId: session.id,
           note: `单据由出库退回自动产生。关联出库单: ${order.id}`,
           items: {
             create: order.items.map(item => ({

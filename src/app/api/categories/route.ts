@@ -5,12 +5,11 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export async function GET() {
   const session = await getFreshSession() as SessionUser | null;
-  const workspaceId = session?.workspaceId;
 
   try {
     const categories = await prisma.category.findMany({
       where: session ? {
-        workspaceId
+        userId: session.id
       } : {},
       include: {
         _count: {
@@ -39,7 +38,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -52,7 +51,7 @@ export async function POST(request: Request) {
       data: {
         name: body.name,
         description: body.description,
-        workspaceId: session.workspaceId,
+        userId: session.id,
       }
     });
     return NextResponse.json(category);

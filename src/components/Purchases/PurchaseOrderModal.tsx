@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ExternalLink, ShoppingBag, Download, AlertCircle, MapPin } from "lucide-react";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin } from "lucide-react";
 import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -14,27 +14,6 @@ import { useUser } from "@/hooks/useUser";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-
-const COURIER_CODES: Record<string, string> = {
-  "顺丰速运": "shunfeng",
-  "圆通速递": "yuantong",
-  "中通快递": "zhongtong",
-  "申通快递": "shentong",
-  "韵达快递": "yunda",
-  "极兔速递": "jtexpress",
-  "EMS": "ems",
-  "邮政快递": "youzhengguonei",
-  "京东快递": "jd",
-  "德邦快递": "debangwuliu",
-  "安能物流": "annengwuliu",
-  "跨越速运": "kuayue"
-};
-
-const getTrackingUrl = (num: string, courierName?: string) => {
-  const code = courierName ? COURIER_CODES[courierName] : "";
-  if (!num || !code) return null;
-  return `https://www.kuaidi100.com/chaxun?com=${code}&nu=${num.trim()}`;
-};
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -71,7 +50,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   }, [typedUser]);
 
 
-  const effectiveReadOnly = readOnly || (initialData?.status !== "Draft" && !!initialData);
+  // Only 'Received' status or system-generated records are truly read-only for core product/price info
+  const effectiveReadOnly = readOnly || formData.status === "Received" || (initialData?.status === "Received");
+  
   // Derived: system-generated records (auto-created from outbound returns) are always locked
   const isSystemGenerated = formData.type === "Return" || formData.type === "InternalReturn";
 
@@ -98,6 +79,26 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     images: [],
     currentIndex: 0
   });
+
+  // State for two-step inline delete confirmations
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
+  const [confirmingDeleteIndex, setConfirmingDeleteIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+      let clearTba: NodeJS.Timeout;
+      if (isConfirmingClear) {
+          clearTba = setTimeout(() => setIsConfirmingClear(false), 3000);
+      }
+      return () => clearTimeout(clearTba);
+  }, [isConfirmingClear]);
+
+  useEffect(() => {
+      let deleteTba: NodeJS.Timeout;
+      if (confirmingDeleteIndex !== null) {
+          deleteTba = setTimeout(() => setConfirmingDeleteIndex(null), 3000);
+      }
+      return () => clearTimeout(deleteTba);
+  }, [confirmingDeleteIndex]);
 
   const selectedProductIds = useMemo(() => {
     return formData.items.map(item => item.productId);
@@ -301,10 +302,45 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     setFormData({ ...formData, items: newItems });
   };
 
-  const handleAction = (status: PurchaseStatus) => {
+  const inferStatus = (currentData: PurchaseOrder): PurchaseStatus => {
+    // If it's already received, don't auto-downgrade status
+    if (currentData.status === "Received") return "Received";
+
+    const hasTracking = currentData.trackingData && 
+                       currentData.trackingData.length > 0 && 
+                       currentData.trackingData.some(td => td.number.trim());
+    
+    // If there's tracking info, it should be Shipped
+    if (hasTracking) return "Shipped";
+    
+    // If there are items but no tracking, it's at least Confirmed (Ordered)
+    if (currentData.items.length > 0) return "Confirmed";
+    
+    // Otherwise keep as Draft
+    return "Draft";
+  };
+
+  const handleAction = (status: PurchaseStatus, isDraftManual: boolean = false) => {
     if (formData.items.length === 0) return;
 
-    if (formData.type === "Purchase" && status !== "Draft") {
+    let targetStatus = status;
+    
+    // Logic for "Draft" button:
+    // If user explicitly clicks "Save as Draft" (isDraftManual)
+    if (isDraftManual) {
+        // Only allow status to be "Draft" if it was already "Draft" or it's a new order
+        // Otherwise, keep the current status (e.g., if it's "Shipped", keep it "Shipped")
+        if (formData.status !== "Draft") {
+            targetStatus = formData.status;
+        } else {
+            targetStatus = "Draft";
+        }
+    } else if (status !== "Received") {
+        // Normal "Submit/Save" button: auto-infer status unless it's formal receipt
+        targetStatus = inferStatus(formData);
+    }
+
+    if (formData.type === "Purchase" && targetStatus !== "Draft") {
       if (!formData.shippingAddress) {
         showToast("请先选择或配置收货地址，才可提交采购单", "error");
         return;
@@ -314,7 +350,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     onSubmit({
       ...formData,
       totalAmount: calculateTotal(),
-      status
+      status: targetStatus
     });
   };
 
@@ -821,202 +857,234 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                     物流包裹 & 进货凭证
                                 </label>
                                 {!readOnly && formData.status !== "Received" && (
-                                    <button
-                                        type="button"
-                                        onClick={addTrackingRow}
-                                        className="text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors flex items-center gap-1"
-                                    >
-                                        <Plus size={12} />
-                                        添加包裹
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        {formData.trackingData && formData.trackingData.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isConfirmingClear) {
+                                                        setFormData({ ...formData, trackingData: [] });
+                                                        setIsConfirmingClear(false);
+                                                    } else {
+                                                        setIsConfirmingClear(true);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "text-[10px] font-bold transition-all flex items-center gap-1 rounded-md px-2 py-1",
+                                                    isConfirmingClear 
+                                                        ? "bg-destructive text-white hover:bg-destructive/90" 
+                                                        : "text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                                                )}
+                                            >
+                                                <Trash2 size={12} />
+                                                {isConfirmingClear ? "确认清空?" : "清空包裹"}
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={addTrackingRow}
+                                            className="text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors flex items-center gap-1"
+                                        >
+                                            <Plus size={12} />
+                                            添加包裹
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                             
                             <div className="space-y-4">
                                 {(formData.trackingData || [])
                                   .filter(tracking => !readOnly || (tracking.number || (tracking.waybillImages && tracking.waybillImages.length > 0) || tracking.waybillImage))
-                                  .map((tracking, index) => (
-                                        readOnly ? (
-                                            /* Enhanced Compact Parcel Card for ReadOnly */
-                                            <div key={index} className="flex flex-col sm:flex-row gap-3 sm:gap-4 bg-muted/20 dark:bg-white/5 p-3 sm:p-4 rounded-2xl border border-border/40 group/parcel">
-                                                {/* Left: Tracking Info */}
-                                                <div className="flex-1 space-y-2 sm:space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500">
-                                                                <Package size={12} />
-                                                            </div>
-                                                            <span className="text-[10px] font-black uppercase text-muted-foreground/40 tracking-widest">包裹 #{index + 1}</span>
-                                                        </div>
-                                                    </div>
+                                  .map((tracking, index) => {
+                                      const isEditable = !readOnly && formData.status !== "Received";
+                                      return (
+                                          /* Responsive Tracking Bar */
+                                          <div key={index} className="group/tbar relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 sm:p-2.5 rounded-2xl bg-muted/30 dark:bg-white/5 border border-border/40 hover:bg-muted/40 dark:hover:bg-white/10 transition-all duration-300 shadow-sm backdrop-blur-sm">
+                                              
+                                              {/* Mobile Top Row / Desktop Flex Items */}
+                                              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0">
+                                                  {/* 1. Package Label */}
+                                                  <div className="flex items-center gap-1.5 shrink-0 pl-1 w-auto sm:w-[80px]">
+                                                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary shrink-0">
+                                                          <Package size={12} />
+                                                      </div>
+                                                      <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60 truncate">#{index + 1}</span>
+                                                  </div>
 
-                                                    <div className="flex flex-col gap-2 sm:gap-2.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold text-muted-foreground/60 w-12 shrink-0">快递公司</span>
-                                                            <span className="text-xs font-black text-foreground">{tracking.courier}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold text-muted-foreground/60 w-12 shrink-0">运单号</span>
-                                                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                                <span className="text-xs font-mono font-bold bg-background px-2 py-0.5 rounded border border-border/50 truncate">
-                                                                    {tracking.number || "暂无单号"}
-                                                                </span>
-                                                                {tracking.number && (
-                                                                    <div className="flex items-center gap-1 shrink-0">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                navigator.clipboard.writeText(tracking.number);
-                                                                                showToast("单号已复制", "success");
-                                                                            }}
-                                                                            className="p-1 rounded-md text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all"
-                                                                            title="复制单号"
-                                                                        >
-                                                                            <Copy size={12} />
-                                                                        </button>
-                                                                        {(() => {
-                                                                            const url = getTrackingUrl(tracking.number, tracking.courier);
-                                                                            if (!url) return null;
-                                                                            return (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => window.open(url, '_blank')}
-                                                                                    className="p-1 rounded-md text-muted-foreground/40 hover:text-orange-500 hover:bg-orange-500/10 transition-all"
-                                                                                    title="物流查询"
-                                                                                >
-                                                                                    <ExternalLink size={12} />
-                                                                                </button>
-                                                                            );
-                                                                        })()}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                  {/* Courier Select */}
+                                                  <div className="flex-1 sm:flex-none sm:w-[120px] min-w-[100px] shrink-0">
+                                                      <div className="relative">
+                                                          {isEditable ? (
+                                                              <CustomSelect
+                                                                  className="h-9 w-full"
+                                                                  value={tracking.courier}
+                                                                  onChange={(val) => updateTrackingData(index, "courier", val)}
+                                                                  options={["顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", "极兔速递", "EMS", "京东快递", "德邦快递", "安能物流", "顺心捷达"].map(opt => ({
+                                                                      value: opt,
+                                                                      label: opt
+                                                                  }))}
+                                                                  triggerClassName="bg-white dark:bg-white/5 border-border dark:border-white/10 rounded-xl text-xs font-bold text-foreground hover:bg-muted dark:hover:bg-white/10 transition-all px-3"
+                                                              />
+                                                          ) : (
+                                                              <div className="h-9 flex items-center px-3 bg-white/50 dark:bg-white/2 border border-border/50 dark:border-white/3 rounded-xl text-xs font-bold text-foreground/60">
+                                                                  {tracking.courier}
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  </div>
 
-                                                {/* Right: Waybill Thumbnails */}
-                                                <div className="flex flex-wrap gap-1.5 sm:gap-2 min-w-0 sm:min-w-[120px] justify-start sm:justify-end items-start pt-1">
-                                                    {(tracking.waybillImages || (tracking.waybillImage ? [tracking.waybillImage] : [])).map((img, imgIdx) => (
-                                                        <div key={imgIdx} className="relative h-12 w-16 sm:h-14 sm:w-20 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm transition-all hover:ring-2 hover:ring-primary/40 group/waybill">
-                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                            <img 
-                                                                src={img} 
-                                                                alt="" 
-                                                                className="h-full w-full object-cover cursor-zoom-in" 
-                                                                onClick={() => {
-                                                                    const flatImages = formData.trackingData?.flatMap(t => 
-                                                                        t.waybillImages && t.waybillImages.length > 0 
-                                                                            ? t.waybillImages 
-                                                                            : (t.waybillImage ? [t.waybillImage] : [])
-                                                                    ) || [];
-                                                                    const targetIndex = flatImages.indexOf(img);
-                                                                    setGalleryState({ isOpen: true, images: flatImages, currentIndex: targetIndex });
-                                                                }}
-                                                            />
-                                                            {!readOnly && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        const current = [...(formData.trackingData || [])];
-                                                                        const images = current[index].waybillImages || (current[index].waybillImage ? [current[index].waybillImage] : []);
-                                          const newImages = images.filter((url): url is string => url !== undefined).filter((_, i) => i !== imgIdx);
-                                          current[index] = { ...current[index], waybillImages: newImages };
-                                                                        setFormData({ ...formData, trackingData: current });
-                                                                    }}
-                                                                    className="absolute top-1 right-1 p-0.5 rounded bg-black/40 text-white opacity-0 group-hover/waybill:opacity-100 transition-opacity"
-                                                                >
-                                                                    <X size={10} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {!readOnly && (
-                                                        <label 
-                                                            className="h-12 w-16 sm:h-14 sm:w-20 rounded-lg border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex items-center justify-center bg-muted/10 active:scale-95"
-                                                            onDragOver={(e) => {
-                                                                e.preventDefault();
-                                                                e.currentTarget.classList.add('border-primary', 'bg-primary/10');
-                                                            }}
-                                                            onDragLeave={(e) => {
-                                                                e.preventDefault();
-                                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
-                                                            }}
-                                                            onDrop={(e) => {
-                                                                e.preventDefault();
-                                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
-                                                                const files = e.dataTransfer.files;
-                                                                if (files && files.length > 0) {
-                                                                    handleFileUpload(files, 'waybill', index);
-                                                                }
-                                                            }}
-                                                        >
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*"
-                                                                multiple
-                                                                className="hidden"
-                                                                onChange={(e) => handleFileUpload(e.target.files!, 'waybill', index)}
-                                                            />
-                                                            <Camera size={18} className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
-                                                        </label>
-                                                    )}
-                                                    {(!tracking.waybillImages && !tracking.waybillImage) && readOnly && (
-                                                        <div className="h-14 w-20 rounded-lg border border-dashed border-border/60 flex items-center justify-center bg-muted/10">
-                                                            <Camera size={14} className="text-muted-foreground/30" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            /* Input Mode */
-                                            <div key={index} className="p-4 rounded-3xl bg-white dark:bg-white/5 border border-border/50 space-y-4 relative group">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
-                                                            <Package size={16} />
-                                                        </div>
-                                                        <span className="text-xs font-bold text-foreground">包裹 #{index + 1}</span>
-                                                    </div>
-                                                    {!readOnly && formData.status !== "Received" && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeTrackingRow(index)}
-                                                            className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1.5 text-left">
-                                                        <label className="text-[10px] font-black uppercase text-muted-foreground/40 ml-1">快递公司</label>
-                                                        <select
-                                                            disabled={readOnly || formData.status === "Received"}
-                                                            value={tracking.courier}
-                                                            onChange={(e) => updateTrackingData(index, "courier", e.target.value)}
-                                                            className="w-full h-10 rounded-xl bg-background border border-border/50 px-3 text-xs outline-none focus:ring-2 focus:ring-orange-500/20 disabled:opacity-60"
-                                                        >
-                                                            {["顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", "极兔速递", "EMS", "京东快递", "德邦快递", "其他"].map(opt => (
-                                                                <option key={opt} value={opt}>{opt}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-1.5 text-left">
-                                                        <label className="text-[10px] font-black uppercase text-muted-foreground/40 ml-1">快递单号</label>
-                                                        <input
-                                                            readOnly={readOnly || formData.status === "Received"}
-                                                            type="text"
-                                                            value={tracking.number}
-                                                            onChange={(e) => updateTrackingData(index, "number", e.target.value)}
-                                                            className="w-full h-10 rounded-xl bg-background border border-border/50 px-3 text-xs font-mono outline-none focus:ring-2 focus:ring-orange-500/20 read-only:opacity-60"
-                                                            placeholder={readOnly ? "暂无单号" : "请输入单号..."}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
-                                 ))}
+                                                  {/* Tracking Number Input */}
+                                                  <div className="w-full sm:w-[160px] md:w-[220px] shrink-0">
+                                                      <div className="relative group/input">
+                                                          {isEditable ? (
+                                                              <input
+                                                                  type="text"
+                                                                  value={tracking.number}
+                                                                  onChange={(e) => updateTrackingData(index, "number", e.target.value)}
+                                                                  className="w-full h-9 bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-3 text-xs font-mono font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/30"
+                                                                  placeholder="输入物流单号"
+                                                              />
+                                                          ) : (
+                                                              <div className="h-9 flex items-center px-3 bg-white/50 dark:bg-white/2 border border-border/50 dark:border-white/3 rounded-xl text-xs font-mono font-bold text-foreground/60 min-w-0">
+                                                                  <span className="flex-1 truncate tracking-wider">{tracking.number || "无单号"}</span>
+                                                                  {tracking.number && (
+                                                                      <button
+                                                                          type="button"
+                                                                          onClick={() => {
+                                                                              navigator.clipboard.writeText(tracking.number);
+                                                                              showToast("单号已复制", "success");
+                                                                          }}
+                                                                          className="p-1.5 rounded-md bg-background/50 dark:bg-white/5 text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all ml-2 shrink-0"
+                                                                      >
+                                                                          <Copy size={12} />
+                                                                      </button>
+                                                                  )}
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                              </div>
+
+                                              {/* 3. Horizontal Waybills List & Delete */}
+                                              <div className="flex flex-row items-center gap-2 w-full sm:flex-1 sm:min-w-[80px] shrink-0 sm:justify-end mt-2 sm:mt-0 pt-2 sm:pt-0 border-t border-border/20 sm:border-0 border-dashed">
+                                                  <div 
+                                                      className="flex items-center sm:justify-end gap-2 flex-1 overflow-x-auto no-scrollbar scroll-smooth h-10"
+                                                      onDragOver={(e) => {
+                                                          if (!isEditable) return;
+                                                          e.preventDefault();
+                                                      }}
+                                                      onDrop={(e) => {
+                                                          if (!isEditable) return;
+                                                          e.preventDefault();
+                                                          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                                              handleFileUpload(e.dataTransfer.files, 'waybill', index);
+                                                          }
+                                                      }}
+                                                  >
+                                                      {(() => {
+                                                          const images = tracking.waybillImages || (tracking.waybillImage ? [tracking.waybillImage] : []);
+                                                          return (
+                                                              <>
+                                                                  {/* Render existing images horizontally */}
+                                                                  {images.map((img, imgIndex) => (
+                                                                      <div key={imgIndex} className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden shrink-0 group/thumbnail border border-border/20 shadow-sm">
+                                                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                          <img 
+                                                                              src={img} 
+                                                                              alt={`Waybill ${imgIndex + 1}`} 
+                                                                              className="w-full h-full object-cover cursor-zoom-in hover:scale-110 transition-transform"
+                                                                              onClick={() => {
+                                                                                  const flatImages = formData.trackingData?.flatMap(t => 
+                                                                                      t.waybillImages && t.waybillImages.length > 0 ? t.waybillImages : (t.waybillImage ? [t.waybillImage] : [])
+                                                                                  ) || [];
+                                                                                  const targetIndex = flatImages.indexOf(img);
+                                                                                  setGalleryState({ isOpen: true, images: flatImages, currentIndex: targetIndex });
+                                                                              }}
+                                                                          />
+                                                                          {isEditable && (
+                                                                              <button
+                                                                                  type="button"
+                                                                                  onClick={(e) => {
+                                                                                      e.stopPropagation();
+                                                                                      const current = [...(formData.trackingData || [])];
+                                                                                      const originalImages = current[index].waybillImages || (current[index].waybillImage ? [current[index].waybillImage as string] : []);
+                                                                                      const newImages = [...originalImages];
+                                                                                      newImages.splice(imgIndex, 1);
+                                                                                      current[index] = { ...current[index], waybillImages: newImages };
+                                                                                      if (newImages.length === 0) current[index].waybillImage = undefined;
+                                                                                      setFormData({ ...formData, trackingData: current });
+                                                                                  }}
+                                                                                  className="absolute top-0.5 right-0.5 bg-red-500/90 text-white flex items-center justify-center p-0.5 rounded-md opacity-0 group-hover/thumbnail:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                                                                                  title="删除此面单"
+                                                                              >
+                                                                                  <X size={12} />
+                                                                              </button>
+                                                                          )}
+                                                                      </div>
+                                                                  ))}
+
+                                                                  {/* Upload Dropzone / Trigger */}
+                                                                  {isEditable && (
+                                                                      <label 
+                                                                          className={cn(
+                                                                              "flex items-center justify-center shrink-0 h-9 sm:h-10 rounded-xl transition-all duration-300 cursor-pointer group/up bg-muted/30",
+                                                                              images.length > 0 
+                                                                                  ? "w-9 sm:w-10 border border-dashed border-border/60 hover:border-primary/50 hover:bg-primary/5" 
+                                                                                  : "flex-1 max-w-[120px] border border-dashed border-border/80 hover:border-primary/50 hover:bg-primary/5"
+                                                                          )}
+                                                                          title="点击或拖拽上传面单"
+                                                                      >
+                                                                          <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files!, 'waybill', index)} />
+                                                                          <div className="flex items-center justify-center gap-1.5 px-2">
+                                                                              <Camera size={14} className="text-muted-foreground/40 group-hover/up:text-primary transition-colors shrink-0" />
+                                                                              {images.length === 0 && (
+                                                                                  <span className="text-[10px] font-bold text-muted-foreground/40 group-hover/up:text-primary/70 truncate hidden sm:inline-block">面单凭证</span>
+                                                                              )}
+                                                                          </div>
+                                                                      </label>
+                                                                  )}
+                                                                  
+                                                                  {/* Read-only empty state */}
+                                                                  {!isEditable && images.length === 0 && (
+                                                                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center bg-muted/50 border border-border/20 shrink-0">
+                                                                          <Camera size={14} className="text-muted-foreground/20" />
+                                                                      </div>
+                                                                  )}
+                                                              </>
+                                                          );
+                                                      })()}
+                                                  </div>
+
+                                                  {isEditable && (
+                                                      <div className="shrink-0 flex items-center justify-center absolute sm:relative top-2 sm:top-0 right-2 sm:right-0">
+                                                          <button
+                                                              type="button"
+                                                              onClick={() => {
+                                                                  if (confirmingDeleteIndex === index) {
+                                                                      removeTrackingRow(index);
+                                                                      setConfirmingDeleteIndex(null);
+                                                                  } else {
+                                                                      setConfirmingDeleteIndex(index);
+                                                                  }
+                                                              }}
+                                                              className={cn(
+                                                                  "w-auto min-w-[32px] h-8 px-2 rounded-xl transition-all flex items-center justify-center gap-1",
+                                                                  confirmingDeleteIndex === index
+                                                                      ? "bg-red-500 text-white shadow-sm opacity-100"
+                                                                      : "text-red-500/40 hover:text-red-500 hover:bg-red-500/10 sm:opacity-0 group-hover/tbar:opacity-100"
+                                                              )}
+                                                              title={confirmingDeleteIndex === index ? "点击确定删除" : "移除包裹"}
+                                                          >
+                                                              <Trash2 size={14} />
+                                                              {confirmingDeleteIndex === index && <span className="text-[10px] font-bold">确认删除</span>}
+                                                          </button>
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          </div>
+                                      );
+                                  })
+                                }
                                 {(!formData.trackingData || formData.trackingData.length === 0 || (readOnly && (formData.trackingData || []).filter(t => t.number || (t.waybillImages && t.waybillImages.length > 0) || t.waybillImage).length === 0)) && (
                                     <div className="py-8 rounded-2xl border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-2 opacity-40">
                                         <Truck size={24} className="text-muted-foreground" />
@@ -1128,70 +1196,44 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                             {/* Actions Container */}
                             {!readOnly && (
                                 <div className="flex items-center gap-2 sm:border-l sm:border-border/10 sm:pl-6 h-9 sm:h-10">
-                                    {formData.status === "Draft" && (
+                                    {(formData.status === "Draft" || (formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered" || formData.status === "Shipped") && (
                                         <>
                                             <button
                                                 type="button"
-                                                onClick={() => handleAction("Draft")}
+                                                onClick={() => handleAction("Draft", true)}
                                                 className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
                                             >
-                                                暂存
+                                                {formData.status === "Draft" ? "暂存草稿" : "保存修改"}
                                             </button>
-                                            <button
-                                                type="submit"
-                                                className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2"
-                                            >
-                                                <CheckCircle size={14} className="hidden sm:block" />
-                                                确认下单
-                                            </button>
-                                        </>
-                                    )}
-
-                                    {((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered") && (
-                                        <>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction("Confirmed")}
-                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
-                                            >
-                                                暂存
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const hasTracking = formData.trackingData && formData.trackingData.length > 0;
-                                                    handleAction(hasTracking ? "Shipped" : "Confirmed");
-                                                }}
-                                                className="px-5 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-1.5 sm:gap-2"
-                                            >
-                                                <Truck size={14} className="hidden sm:block" />
-                                                保存并完成发货
-                                            </button>
-                                        </>
-                                    )}
-
-                                    {formData.status === "Shipped" && (
-                                        <>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction("Shipped")}
-                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
-                                            >
-                                                暂存
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction("Received")}
-                                                disabled={!isShippedAndReady}
-                                                className={cn(
-                                                    "px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg",
-                                                    isShippedAndReady 
-                                                        ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]" 
-                                                        : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                                                )}
-                                            >
-                                                确认入库
-                                            </button>
+                                            
+                                            {formData.status === "Shipped" ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAction("Received")}
+                                                    disabled={!isShippedAndReady}
+                                                    className={cn(
+                                                        "px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg",
+                                                        isShippedAndReady 
+                                                            ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]" 
+                                                            : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    确认入库
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="submit"
+                                                    className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2"
+                                                >
+                                                    <CheckCircle size={14} className="hidden sm:block" />
+                                                    {(() => {
+                                                        const inferred = inferStatus(formData);
+                                                        if (inferred === "Shipped") return "保存并完成发货";
+                                                        if (inferred === "Confirmed") return "确认下单";
+                                                        return "保存修改";
+                                                    })()}
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                 </div>

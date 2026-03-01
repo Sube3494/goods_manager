@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
-import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink, Volume2, VolumeX, Maximize } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -31,29 +31,152 @@ import { GestureImage } from "@/components/ui/GestureImage";
 
 const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [isPlaying, setIsPlaying] = useState(true);
+    const [progress, setProgress] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [isMuted, setIsMuted] = useState(true);
 
     useEffect(() => {
         if (item.type === 'video' && videoRef.current) {
             videoRef.current.currentTime = 0;
-            videoRef.current.play().catch(() => {});
+            videoRef.current.play().then(() => {
+                setIsPlaying(true);
+            }).catch(() => {
+                setIsPlaying(false);
+            });
+            setProgress(0);
         }
     }, [item.type, item.url]);
+
+    const togglePlay = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (videoRef.current) {
+            if (videoRef.current.paused) {
+                videoRef.current.play();
+                setIsPlaying(true);
+            } else {
+                videoRef.current.pause();
+                setIsPlaying(false);
+            }
+        }
+    };
+
+    const isVideo = item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url);
 
     return (
         <motion.div
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
             <div className="w-full h-full flex items-center justify-center pointer-events-auto overflow-hidden">
-                <div className="w-full h-full flex items-center justify-center">
-                    {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
-                        <video 
-                            ref={videoRef}
-                            src={item.url} 
-                            className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
-                            controls
-                            muted
-                            playsInline
-                        />
+                <div className="w-full h-full flex items-center justify-center relative group">
+                    {isVideo ? (
+                        <div className="relative max-w-[90%] max-h-[75%] flex items-center justify-center">
+                            <video 
+                                ref={videoRef}
+                                src={item.url} 
+                                className="w-full h-full object-contain rounded-lg shadow-2xl mx-auto cursor-pointer"
+                                disablePictureInPicture
+                                disableRemotePlayback
+                                autoPlay
+                                muted={isMuted}
+                                controlsList="nodownload noplaybackrate"
+                                loop
+                                onContextMenu={(e) => e.preventDefault()}
+                                onClick={togglePlay}
+                                onTimeUpdate={() => {
+                                    if (videoRef.current) {
+                                        const current = videoRef.current.currentTime;
+                                        const p = (current / videoRef.current.duration) * 100;
+                                        setProgress(isNaN(p) ? 0 : p);
+                                        setCurrentTime(current);
+                                    }
+                                }}
+                                onEnded={() => setIsPlaying(false)}
+                                playsInline
+                            />
+                            
+                            {/* Central Play Toggle Overlay */}
+                            <AnimatePresence>
+                                {!isPlaying && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.8 }}
+                                        className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+                                    >
+                                        <div 
+                                            className="flex items-center justify-center text-white cursor-pointer pointer-events-auto hover:scale-110 transition-transform active:scale-95 drop-shadow-[0_0_20px_rgba(0,0,0,0.6)]"
+                                            onClick={togglePlay}
+                                        >
+                                            <Play size={80} fill="currentColor" strokeWidth={0} />
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* Custom Bottom Controls - Enhanced for Mobile Visibility */}
+                            <div className="absolute bottom-6 left-4 right-4 opacity-100 transition-opacity duration-300 pointer-events-none z-1001">
+                                <div className="backdrop-blur-2xl bg-black/70 px-4 py-3 rounded-2xl border border-white/20 flex items-center gap-4 pointer-events-auto shadow-2xl">
+                                    <div 
+                                        className="flex-1 h-3 flex items-center cursor-pointer pointer-events-auto group/progress"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (videoRef.current && videoRef.current.duration) {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const x = e.clientX - rect.left;
+                                                const pct = Math.max(0, Math.min(1, x / rect.width));
+                                                
+                                                // 1. 立即更新 UI 状态，不等待 onTimeUpdate
+                                                setProgress(pct * 100);
+                                                
+                                                // 2. 执行视频跳转
+                                                videoRef.current.currentTime = pct * videoRef.current.duration;
+                                            }
+                                        }}
+                                    >
+                                        <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden relative">
+                                            <motion.div 
+                                                className="absolute inset-y-0 left-0 bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)] group-hover/progress:bg-primary transition-colors"
+                                                style={{ width: `${progress}%` }}
+                                                transition={{ duration: 0 }} // 关键：确保进度条跟随跳转是瞬间的，不产生过渡动画
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="text-[11px] font-mono text-white/90 min-w-[50px] text-right font-bold tracking-tighter">
+                                        {`${Math.floor(currentTime / 60)}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`}
+                                    </div>
+                                    <div className="flex items-center gap-2 md:gap-3 ml-1 border-l border-white/20 pl-2 md:pl-3">
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsMuted(!isMuted);
+                                            }}
+                                            className="text-white/80 hover:text-white transition-colors"
+                                            title={isMuted ? "取消静音" : "静音"}
+                                        >
+                                            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                                        </button>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (videoRef.current) {
+                                                    if (document.fullscreenElement) {
+                                                        document.exitFullscreen();
+                                                    } else {
+                                                        videoRef.current.requestFullscreen();
+                                                    }
+                                                }
+                                            }}
+                                            className="text-white/80 hover:text-white transition-colors"
+                                            title="全屏"
+                                        >
+                                            <Maximize size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     ) : (
                         <GestureImage 
                             src={item.url} 
@@ -83,6 +206,7 @@ function GalleryContent() {
   const itemsRef = useRef<GalleryItem[]>([]);
   const currentPageRef = useRef(1);
   const thumbnailContainerRef = useRef<HTMLDivElement>(null);
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -283,9 +407,11 @@ function GalleryContent() {
     fetchData(true);
   }, [debouncedSearchQuery, selectedCategory, fetchData]);
 
-  // Infinite Scroll Observer
+  // Infinite Scroll Observer (Main Page)
   useEffect(() => {
     if (!hasMore || isLoading || isNextPageLoading) return;
+    const target = scrollAnchorRef.current;
+    if (!target) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -296,13 +422,11 @@ function GalleryContent() {
       { rootMargin: "200px" } // Load a bit before reaching bottom
     );
 
-    const target = document.querySelector("#gallery-scroll-anchor");
-    if (target) {
-      observer.observe(target);
-    }
+    observer.observe(target);
 
     return () => observer.disconnect();
   }, [fetchData, hasMore, isLoading, isNextPageLoading]);
+
 
   useEffect(() => {
     if (selectedImage || isUploadModalOpen) {
@@ -508,6 +632,12 @@ function GalleryContent() {
   }, [filteredItems]);
 
   const handleOpenProductPreview = (group: { product: Product; items: GalleryItem[] }) => {
+    // Check login state: If not logged in, redirect to login
+    if (!user) {
+        window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        return;
+    }
+    
     // Prefer the product's main image item; fall back to first non-video, then first item
     const mainImageItem = group.product.image
       ? group.items.find(item => item.url === group.product.image)
@@ -795,7 +925,7 @@ function GalleryContent() {
         </div>
 
         {/* Infinite Scroll Anchor */}
-        <div id="gallery-scroll-anchor" className="h-[2px] w-full" />
+        <div ref={scrollAnchorRef} className="h-[2px] w-full" />
 
         {/* Next Page Loading State */}
         {isNextPageLoading && (

@@ -28,11 +28,10 @@ export async function POST(request: Request) {
     // Find user
     let user = await prisma.user.findUnique({
       where: { email },
-      include: { workspace: true }
+      include: { roleProfile: true }
     });
 
     if (!user) {
-        // User doesn't exist? Check authorization sources
         const initialAdminEmail = process.env.INITIAL_ADMIN_EMAIL;
         const superAdminExists = await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } });
         
@@ -51,57 +50,28 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Unauthorized registration" }, { status: 401 });
         }
 
+        let role: "USER" | "SUPER_ADMIN" = "USER";
+        let roleProfileId: string | null = null;
+        
         // Determine initial role and permissions
-        let role: any = "USER";
-        let permissions: any = {};
-        let targetWorkspaceId = undefined;
-
         if (isInitialAdmin) {
             role = "SUPER_ADMIN";
-            permissions = { all: true };
         } else if (invitation) {
-            role = invitation.role;
-            permissions = invitation.permissions || {};
-            targetWorkspaceId = invitation.targetWorkspaceId || undefined;
+            role = "USER";
+            roleProfileId = invitation.roleProfileId;
         } else if (whitelisted) {
-            role = whitelisted.role;
-            permissions = whitelisted.permissions || {};
-            targetWorkspaceId = whitelisted.targetWorkspaceId || undefined;
+            role = "USER";
+            roleProfileId = whitelisted.roleProfileId;
         }
 
-        // Create user and their workspace
-        user = await prisma.$transaction(async (tx) => {
-            const newUser = await tx.user.create({
-                data: {
-                    email,
-                    role,
-                    permissions,
-                    workspaceId: targetWorkspaceId
-                }
-            });
-
-            // If no target workspace, create a new one
-            if (!targetWorkspaceId) {
-                const workspace = await tx.workspace.create({
-                    data: {
-                        name: `${newUser.email}'s Workspace`,
-                        ownerId: newUser.id,
-                    }
-                });
-
-                // Update user with workspaceId
-                return await tx.user.update({
-                    where: { id: newUser.id },
-                    data: { workspaceId: workspace.id },
-                    include: { workspace: true }
-                });
-            }
-
-            // If joined existing workspace, return user with included workspace
-            return await tx.user.findUnique({
-                where: { id: newUser.id },
-                include: { workspace: true }
-            });
+        // Create user
+        user = await prisma.user.create({
+            data: {
+                email,
+                role,
+                roleProfileId,
+            },
+            include: { roleProfile: true }
         });
 
         // Mark invitation as used if applicable
@@ -114,24 +84,7 @@ export async function POST(request: Request) {
     }
 
 
-    // Ensure every user has a workspace (Fix for legacy or improperly initialized accounts)
-    if (user && !user.workspaceId) {
-        console.log(`User ${user.email} missing workspaceId, creating default...`);
-        user = await prisma.$transaction(async (tx) => {
-            const workspace = await tx.workspace.create({
-                data: {
-                    name: `${user!.email}'s Workspace`,
-                    ownerId: user!.id,
-                }
-            });
 
-            return await tx.user.update({
-                where: { id: user!.id },
-                data: { workspaceId: workspace.id },
-                include: { workspace: true }
-            });
-        });
-    }
 
     if (!user) {
         return NextResponse.json({ error: "Authentication failed" }, { status: 500 });
@@ -147,7 +100,6 @@ export async function POST(request: Request) {
         email: user.email,
         name: user.name,
         role: user.role,
-        workspaceId: user.workspaceId || ""
     });
 
     // Delete used code

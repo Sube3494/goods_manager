@@ -5,9 +5,8 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export async function GET() {
   const session = await getFreshSession() as SessionUser | null;
-  const workspaceId = session?.workspaceId;
 
-  if (!session || !workspaceId) {
+  if (!session || !session.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -18,7 +17,7 @@ export async function GET() {
 
     const suppliers = await prisma.supplier.findMany({
       where: {
-        workspaceId
+        userId: session.id
       },
       orderBy: { code: 'asc' },
       include: {
@@ -38,9 +37,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    const workspaceId = session?.workspaceId;
 
-    if (!session || !workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -54,7 +52,7 @@ export async function POST(request: Request) {
     if (!body.code) {
       const lastSupplier = await prisma.supplier.findFirst({
         where: { 
-            workspaceId,
+            userId: session.id,
             code: { startsWith: 'SUP-' } 
         },
         orderBy: { code: 'desc' }
@@ -73,7 +71,7 @@ export async function POST(request: Request) {
     const supplier = await prisma.supplier.create({
       data: {
           ...body,
-          workspaceId
+          userId: session.id
       }
     });
     return NextResponse.json(supplier);
@@ -81,7 +79,7 @@ export async function POST(request: Request) {
     console.error("Failed to create supplier:", error);
     
     if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2002') {
-        return NextResponse.json({ error: "供应商代码在该工作区已存在" }, { status: 400 });
+        return NextResponse.json({ error: "供应商代码已存在" }, { status: 400 });
     }
 
     return NextResponse.json({ error: "Failed to create supplier" }, { status: 500 });

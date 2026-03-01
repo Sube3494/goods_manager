@@ -90,11 +90,15 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   // Robust scroll lock logic: standard overflow hidden
   useEffect(() => {
     if (isOpen) {
-      const originalStyle = document.body.style.overflow;
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
       
       return () => {
-        document.body.style.overflow = originalStyle;
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
       };
     }
   }, [isOpen]);

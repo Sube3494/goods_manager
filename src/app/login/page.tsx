@@ -165,7 +165,7 @@ export default function LoginPage() {
             >
               <Image 
                 src="/picknote.png" 
-                alt="PickNote Logo" 
+                alt="Logo" 
                 width={140} 
                 height={50} 
                 priority
@@ -179,7 +179,7 @@ export default function LoginPage() {
               transition={{ delay: 0.3 }}
               className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70"
             >
-              PickNote Admin
+              后台管理中心
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0 }}
@@ -213,7 +213,7 @@ export default function LoginPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full rounded-2xl bg-white/5 pl-12 pr-4 py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30"
-                        placeholder="name@company.com"
+                        placeholder="admin@example.com"
                         autoFocus
                       />
                     </div>
@@ -364,7 +364,7 @@ export default function LoginPage() {
             className="mt-8 text-center"
         >
             <p className="text-xs text-muted-foreground opacity-60">
-                &copy; {new Date().getFullYear()} PickNote · 此系统仅限授权人员访问
+                &copy; {new Date().getFullYear()} 库存管理系统 · 此系统仅限授权人员访问
             </p>
         </motion.div>
       </motion.div>

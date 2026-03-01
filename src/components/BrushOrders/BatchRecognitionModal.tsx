@@ -164,7 +164,8 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
     });
     if (nameMatch) return nameMatch;
 
-    // 第三阶段：基于字符覆盖率的重合度评分 (仅针对名称)
+    // 第三阶段：计算最长公共子串 (LCS - Longest Common Subsequence 的变种或简单的连续子串匹配)
+    // 这里我们使用一种基于连续重合片段和整体字符覆盖率的综合评分
     let bestScore = 0;
     let bestProduct: Product | null = null;
 
@@ -172,7 +173,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
       const normName = normalize(p.name);
       if (!normName) return;
 
-      // 计算 normName 中有多少个字符出现在了 normRecognized 中
+      // 1. 基础字符覆盖率 (之前的方法，但权重降低)
       let matchCount = 0;
       const chars = normName.split("");
       chars.forEach(char => {
@@ -180,16 +181,39 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
           matchCount++;
         }
       });
+      const charCoverage = matchCount / normName.length;
 
-      const score = matchCount / normName.length;
+      // 2. 连续子串加权 (寻找最长连续匹配片段)
+      let maxConsecutiveMatch = 0;
+      for (let i = 0; i < normName.length; i++) {
+        for (let j = i + 1; j <= normName.length; j++) {
+            const sub = normName.substring(i, j);
+            if (normRecognized.includes(sub)) {
+                if (sub.length > maxConsecutiveMatch) {
+                    maxConsecutiveMatch = sub.length;
+                }
+            } else {
+                break; // 如果当前子串不包含，更长的肯定也不包含
+            }
+        }
+      }
+      
+      // 综合评分：连续片段占比权重更高
+      const consecutiveScore = maxConsecutiveMatch / normName.length;
+      // 避免超长无关文本因为个别较长产品名而高分，同时除以两者的最大长度作为惩罚项
+      const penalty = Math.min(normName.length, normRecognized.length) / Math.max(normName.length, normRecognized.length);
+      
+      // 70% 看连续匹配，30% 看离散字符匹配，乘以长度惩罚
+      const score = (consecutiveScore * 0.7 + charCoverage * 0.3) * penalty;
+
       if (score > bestScore) {
         bestScore = score;
         bestProduct = p;
       }
     });
 
-    // 设定阈值（重合度超过 60%）
-    if (bestScore >= 0.6) {
+    // 提高阈值，要求更严格的匹配 (例如综合评分 >= 0.4)
+    if (bestScore >= 0.4) {
       return bestProduct;
     }
 

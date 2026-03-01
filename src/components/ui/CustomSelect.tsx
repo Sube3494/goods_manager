@@ -27,15 +27,16 @@ interface CustomSelectProps {
   addNewLabel?: string;
 }
 
-export function CustomSelect({ options, value, onChange, placeholder = "Select...", className, triggerClassName, onAddNew, addNewLabel }: CustomSelectProps) {
+export function CustomSelect({ options, value, onChange, placeholder = "请选择...", className, triggerClassName, onAddNew, addNewLabel }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
     left: number;
     width: number;
-    showAbove?: boolean;
-  }>({ top: 0, left: 0, width: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
+    showAbove: boolean;
+    isReady: boolean;
+  }>({ top: 0, left: 0, width: 0, showAbove: false, isReady: false });
+  const containerRef = useRef<HTMLButtonElement>(null);
   const [mounted, setMounted] = useState(false);
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label || placeholder;
@@ -47,7 +48,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (containerRef.current && !containerRef.current.parentElement?.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -59,17 +60,16 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
     if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
-      const dropdownHeight = 240; // max-h-60 is 240px
+      const dropdownHeight = 300; 
       const spaceBelow = windowHeight - rect.bottom;
       const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
       setDropdownPosition({
-        top: showAbove 
-          ? rect.top - 8 
-          : rect.bottom + 8,
+        top: showAbove ? rect.top - 8 : rect.bottom + 8,
         left: rect.left,
         width: rect.width,
-        showAbove
+        showAbove,
+        isReady: true
       });
     }
   }, [isOpen]);
@@ -77,22 +77,19 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
   useEffect(() => {
     if (isOpen) {
       updatePosition();
-      document.body.style.overflow = "hidden";
       window.addEventListener("scroll", updatePosition, true);
       window.addEventListener("resize", updatePosition);
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    } 
     return () => {
-      document.body.style.overflow = "unset";
       window.removeEventListener("scroll", updatePosition, true);
       window.removeEventListener("resize", updatePosition);
     };
   }, [isOpen, updatePosition]);
 
   return (
-    <div className={cn("relative", className)} ref={containerRef}>
+    <div className={cn("relative w-full h-full", className)}>
       <button
+        ref={containerRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
@@ -101,30 +98,31 @@ export function CustomSelect({ options, value, onChange, placeholder = "Select..
           triggerClassName
         )}
       >
-        <span className={cn("truncate", !value && "text-muted-foreground")}>{selectedLabel}</span>
+        <span className={cn("truncate font-bold", !value && "text-muted-foreground")}>{selectedLabel}</span>
         <ChevronDown
           size={16}
           className={cn("text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")}
         />
       </button>
 
-      {mounted && createPortal(
+      {mounted && dropdownPosition.isReady && createPortal(
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              initial={{ opacity: 0, y: dropdownPosition.showAbove ? 10 : -10 }}
+              initial={{ opacity: 0, y: dropdownPosition.showAbove ? 8 : -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: dropdownPosition.showAbove ? 10 : -10 }}
+              exit={{ opacity: 0, y: dropdownPosition.showAbove ? 8 : -8 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
               style={{
                 position: 'fixed',
                 top: `${dropdownPosition.top}px`,
                 left: `${dropdownPosition.left}px`,
                 width: `${dropdownPosition.width}px`,
-                transform: dropdownPosition.showAbove ? 'translateY(-100%)' : 'none',
-                pointerEvents: 'auto'
-              }}
-              className="z-99999 rounded-2xl glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
+                zIndex: 99999,
+                transformOrigin: dropdownPosition.showAbove ? 'bottom' : 'top',
+                translateY: dropdownPosition.showAbove ? '-100%' : '0%'
+              } as React.CSSProperties}
+              className="rounded-2xl glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
             >
               <div className="max-h-60 overflow-auto p-1 py-1.5 custom-scrollbar">
                 {options.length > 0 ? (

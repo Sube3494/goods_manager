@@ -16,112 +16,106 @@ export async function GET(request: Request) {
 
     const session = await getFreshSession() as SessionUser | null;
     
-    // Build efficient where clause
-    const productFilter: Record<string, unknown> = {};
-    if (categoryName && categoryName !== "All") {
-      productFilter.category = { name: categoryName };
-    }
-    if (!session) {
-      productFilter.isPublic = true;
-    }
-
-    const where = {
-      workspaceId: session?.workspaceId || undefined,
-      productId: productId || undefined,
-      ...(Object.keys(productFilter).length > 0 ? { product: productFilter } : {}),
+    // 1. Build product-level filters
+    const productWhere = {
+      OR: [
+        { userId: session?.id || undefined },
+        { isPublic: true }
+      ],
+      id: productId || undefined,
+      ...(categoryName && categoryName !== "All" ? { category: { name: categoryName } } : {}),
       ...(query ? {
-        OR: [
-          { product: { name: { contains: query } } },
-          { product: { sku: { contains: query } } },
-          { product: { pinyin: { contains: query } } },
-          { tags: { has: query } }
+        AND: [
+          {
+            OR: [
+              { name: { contains: query } },
+              { sku: { contains: query } },
+              { pinyin: { contains: query } }
+            ]
+          }
         ]
       } : {}),
-      // Default to public if no session
-      ...(!session ? { isPublic: true } : {})
+      // Only include products that have gallery items matching visibility
+      gallery: {
+        some: {
+          ...(session ? {} : { isPublic: true })
+        }
+      }
     };
+
+    // 2. Add gallery-specific filters if any (e.g. tags)
+    // If tags are provided in query, we might need a more complex nested filter
+    // For now, simple query handles it via product fields.
+
+    // 3. Get all matching products for natural sort + pagination
+    const allMatchingProducts = await prisma.product.findMany({
+      where: productWhere,
+      select: {
+        id: true,
+        sku: true,
+        createdAt: true
+      }
+    });
+
+    // 4. Perform natural sort for products in memory
+    allMatchingProducts.sort((a, b) => {
+      const skuA = a.sku || "";
+      const skuB = b.sku || "";
+      return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    const total = allMatchingProducts.length;
+    const skip = (page - 1) * pageSize;
+    const pagedProducts = allMatchingProducts.slice(skip, skip + pageSize);
+    const productIds = pagedProducts.map(p => p.id);
 
     const storage = await getStorageStrategy();
 
-    // 1. Get all IDs and SKUs for global natural sort
-    const allMatchingItems = await prisma.galleryItem.findMany({
-      where,
-      select: {
-        id: true,
-        sortOrder: true,
-        createdAt: true,
-        product: {
-          select: {
-            sku: true
-          }
-        }
-      }
-    });
-
-    // 2. Perform natural sort in memory
-    allMatchingItems.sort((a, b) => {
-      const skuA = a.product?.sku || "";
-      const skuB = b.product?.sku || "";
-      if (skuA !== skuB) {
-        return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
-      }
-      
-      // Secondary sort: sortOrder ASC
-      if (a.sortOrder !== b.sortOrder) {
-        return a.sortOrder - b.sortOrder;
-      }
-
-      // Tertiary sort: createdAt DESC
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-
-    const total = allMatchingItems.length;
-    const skip = (page - 1) * pageSize;
-    const pageIds = allMatchingItems.slice(skip, skip + pageSize).map(i => i.id);
-
-    // 3. Fetch full data for the current page IDs
-    const itemsRaw = await prisma.galleryItem.findMany({
+    // 5. Fetch full data for these products including their gallery items
+    const productsData = await prisma.product.findMany({
       where: {
-        id: { in: pageIds }
+        id: { in: productIds }
       },
       include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sku: true,
-            image: true,
-            stock: true,
-            specs: true,
-            isDiscontinued: true,
-            category: {
-              select: {
-                name: true
-              }
-            }
-          }
+        category: { select: { name: true } },
+        gallery: {
+          where: {
+            ...(session ? {} : { isPublic: true })
+          },
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'desc' }
+          ]
         }
       }
     });
 
-    // 4. Re-order results to match pageIds sorting
-    const sortedItems = pageIds.map(id => itemsRaw.find(item => item.id === id)).filter(Boolean);
+    // 6. Sort results back to match pagedProducts order
+    const sortedProducts = productIds.map(id => productsData.find(p => p.id === id)).filter(Boolean);
 
-    const items = sortedItems.map(item => ({
-      ...item,
-      url: storage.resolveUrl(item!.url),
-      product: item!.product ? {
-        ...item!.product,
-        image: item!.product.image ? storage.resolveUrl(item!.product.image) : null
-      } : null
-    }));
+    // 7. Flatten to "items" structure for frontend compatibility
+    const flattenedItems: (import("@prisma/client").GalleryItem & { product: Record<string, unknown> })[] = [];
+    sortedProducts.forEach(product => {
+      if (!product) return;
+      product.gallery.forEach(item => {
+        flattenedItems.push({
+          ...item,
+          url: storage.resolveUrl(item.url),
+          product: {
+            ...product,
+            gallery: undefined, 
+            image: product.image ? storage.resolveUrl(product.image) : null
+          } as Record<string, unknown>
+        });
+      });
+    });
 
     return NextResponse.json({
-      items,
-      total,
+      items: flattenedItems,
+      total, // Now total represents product groups
       page,
       pageSize,
-      hasMore: skip + items.length < total
+      hasMore: skip + pagedProducts.length < total
     });
   } catch (error) {
     console.error("Failed to fetch gallery items:", error);
@@ -133,7 +127,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -152,7 +146,7 @@ export async function POST(request: Request) {
             tags: tags || [],
             isPublic: isPublic ?? true,
             type: (typeof u !== 'string' && u.type) ? u.type : "image",
-            workspaceId: session.workspaceId // Assign workspaceId
+            userId: session.id
         }));
 
         const result = await prisma.galleryItem.createMany({
@@ -170,7 +164,7 @@ export async function POST(request: Request) {
         tags: tags || [],
         isPublic: isPublic ?? true,
         type: type || "image",
-        workspaceId: session.workspaceId // Assign workspaceId
+        userId: session.id
       }
     });
 

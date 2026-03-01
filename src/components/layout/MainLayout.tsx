@@ -11,6 +11,8 @@ import { LogIn } from "lucide-react";
 import { useState, useEffect } from "react";
 import { MobileHeader } from "./MobileHeader";
 import { PageGuard } from "./PageGuard";
+import { getVisibleNavItems } from "@/lib/navigation";
+import { SessionUser } from "@/lib/permissions";
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,7 +32,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const isFullScreenPage = isLoginPage || isSharePage;
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
-  const showSidebar = !isFullScreenPage && !!user;
+  const visibleItems = getVisibleNavItems(user as SessionUser | null);
+  const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 1;
 
   // Track initialization to prevent initial mount transition
   useEffect(() => {
@@ -48,21 +51,34 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isCollapsed, showSidebar]);
 
-  // Disable number input scrolling globally
+  // Disable number input scrolling globally, and block global right-click
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'number') {
-        // Only prevent default if the input is currently focused
-        // This allows scrolling the page/container when mouse is just hovering over the input
         if (document.activeElement === target) {
           e.preventDefault();
         }
       }
     };
 
+    const handleContextMenu = (e: MouseEvent) => {
+      // Allow right-click on specific elements if needed later, but globally prevent by default
+      if (process.env.NODE_ENV !== 'development') {
+        e.preventDefault();
+      } else {
+        // In development, still block it to test, unless holding Shift 
+        if (!e.shiftKey) e.preventDefault();
+      }
+    };
+
     window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
+    document.addEventListener('contextmenu', handleContextMenu);
+    
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
   }, []);
 
   const toggleCollapse = () => {
@@ -98,7 +114,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <MobileHeader 
                 isOpen={isSidebarOpen} 
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
-                showMenu={!!user}
+                showMenu={showSidebar}
               />
             )}
             {!isFullScreenPage && (

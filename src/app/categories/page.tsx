@@ -165,13 +165,13 @@ export default function CategoriesPage() {
 
       {/* Grid */}
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {[1, 2, 3, 4, 5].map(i => (
             <div key={i} className="h-32 rounded-2xl bg-muted/20 animate-pulse border border-border" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {filteredCategories.map((category) => {
                 const isSelected = selectedIds.includes(category.id);
                 const color = CATEGORY_COLOR;

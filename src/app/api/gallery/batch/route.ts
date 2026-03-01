@@ -14,7 +14,7 @@ import { getStorageStrategy } from "@/lib/storage";
 export async function DELETE(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

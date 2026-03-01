@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       prisma.purchaseOrder.findMany({
         where: {
           ...where,
-          workspaceId: session.workspaceId
+          userId: session.id
         },
         include: {
           items: {
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
       prisma.purchaseOrder.count({
         where: {
           ...where,
-          workspaceId: session.workspaceId
+          userId: session.id
         }
       })
     ]);
@@ -114,7 +114,7 @@ function generateOrderId() {
 export async function POST(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
           paymentVouchers: paymentVouchers || [],
           trackingData: trackingData || [],
           shippingAddress: shippingAddress || "",
-          workspaceId: session.workspaceId,
+          userId: session.id,
           items: {
             create: items.map((item: PurchaseOrderItem) => ({
               productId: item.productId,

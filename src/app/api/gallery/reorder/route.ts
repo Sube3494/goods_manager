@@ -6,7 +6,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 export async function POST(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         prisma.galleryItem.update({
           where: { 
             id: item.id,
-            workspaceId: session.workspaceId 
+            userId: session.id 
           },
           data: { sortOrder: item.sortOrder },
         })

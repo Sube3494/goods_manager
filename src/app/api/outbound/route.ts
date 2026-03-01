@@ -7,7 +7,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 export async function GET() {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -17,7 +17,7 @@ export async function GET() {
 
     const orders = await prisma.outboundOrder.findMany({
       where: {
-        workspaceId: session.workspaceId
+        userId: session.id
       },
       include: {
         items: {
@@ -40,7 +40,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.workspaceId) {
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
           type: type || "Sale",
           date: date ? new Date(date) : new Date(),
           note: note || "",
-          workspaceId: session.workspaceId,
+          userId: session.id,
           items: {
             create: items.map((item: OutboundOrderItem) => ({
               productId: item.productId,

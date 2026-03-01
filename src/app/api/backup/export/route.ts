@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const session = await getSession() as SessionUser | null;
-    const workspaceId = session?.workspaceId;
-    if (!session || !workspaceId) {
+    const userId = session?.id;
+    if (!session || !userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -23,25 +23,25 @@ export async function POST(request: Request) {
     const database = {
       version: "1.0",
       timestamp: new Date().toISOString(),
-      workspaceId,
-      categories: await prisma.category.findMany({ where: { workspaceId } }),
-      products: await prisma.product.findMany({ where: { workspaceId } }),
-      suppliers: await prisma.supplier.findMany({ where: { workspaceId } }),
+      userId,
+      categories: await prisma.category.findMany({ where: { userId } }),
+      products: await prisma.product.findMany({ where: { userId } }),
+      suppliers: await prisma.supplier.findMany({ where: { userId } }),
       purchaseOrders: await prisma.purchaseOrder.findMany({ 
-          where: { workspaceId },
+          where: { userId },
           include: { items: true } 
       }),
       outboundOrders: await prisma.outboundOrder.findMany({ 
-          where: { workspaceId },
+          where: { userId },
           include: { items: true } 
       }),
       brushOrders: await prisma.brushOrder.findMany({ 
-          where: { workspaceId },
+          where: { userId },
           include: { items: true } 
       }),
-      galleryItems: await prisma.galleryItem.findMany({ where: { workspaceId } }),
-      systemSettings: await prisma.systemSetting.findMany({ where: { workspaceId } }),
-      users: await prisma.user.findMany({ where: { workspaceId } }),
+      galleryItems: await prisma.galleryItem.findMany({ where: { userId } }),
+      systemSettings: await prisma.systemSetting.findMany({ where: { userId } }),
+      users: await prisma.user.findMany({ where: { id: userId } }),
       whitelists: await prisma.emailWhitelist.findMany(),
     };
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="PickNote_Backup_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
+        'Content-Disposition': `attachment; filename="库存管理系统_备份数据_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     });

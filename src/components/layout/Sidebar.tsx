@@ -11,8 +11,8 @@ import { motion } from "framer-motion";
 import { useUser } from "@/hooks/useUser";
 import md5 from "blueimp-md5";
 
-import { navItems, NavItem } from "@/lib/navigation";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getVisibleNavItems, NavItem } from "@/lib/navigation";
+import { SessionUser } from "@/lib/permissions";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -44,12 +44,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
   if (isLoading) return null; // Or a skeleton
   if (pathname === "/login") return null;
 
-  const visibleNavItems = navItems.filter((item) => {
-    if (item.superAdminOnly && user?.role !== "SUPER_ADMIN") return false;
-    if (item.permission && !hasPermission(user as SessionUser | null, item.permission)) return false;
-    if (item.adminOnly && !item.permission && user?.role !== "SUPER_ADMIN" && user?.role !== "USER") return false;
-    return true;
-  });
+  const visibleNavItems = getVisibleNavItems(user as SessionUser | null);
 
   return (
     <>
@@ -90,7 +85,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
               title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
             >
               <div className="h-9 w-9 shrink-0">
-                <Image src="/picknote.png" alt="PickNote Logo" width={36} height={36} className="rounded-xl" />
+                <Image src="/picknote.png" alt="Logo" width={36} height={36} className="rounded-xl" />
               </div>
               {!isCollapsed && (
                 <motion.div 
@@ -99,7 +94,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                     className="flex flex-col whitespace-nowrap"
                 >
                     <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
-                    PickNote
+                    库存管理系统
                     </span>
                 </motion.div>
               )}
@@ -116,9 +111,9 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
               )}
               style={{
                   height: '40px',
-                  top: `calc(${visibleNavItems.findIndex((item) => pathname === item.href) * (40 + 6)}px)`
+                  top: `calc(${visibleNavItems.findIndex((item: NavItem) => pathname === item.href) * (40 + 6)}px)`
               }}
-              hidden={visibleNavItems.findIndex((item) => pathname === item.href) === -1}
+              hidden={visibleNavItems.findIndex((item: NavItem) => pathname === item.href) === -1}
             />
 
             {visibleNavItems.map((item: NavItem) => {
@@ -192,7 +187,9 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                             <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                                 {user.name || user.email}
                             </p>
-                            <p className="text-[10px] text-muted-foreground/60 truncate">{user.role === 'SUPER_ADMIN' ? '超级管理员' : (user.role === 'ADMIN' ? '工作区管理员' : '普通成员')}</p>
+                            <p className="text-[10px] text-muted-foreground/60 truncate">
+                                {user.role === 'SUPER_ADMIN' ? '超级管理员' : (user.roleProfile?.name || '普通成员')}
+                            </p>
                         </motion.div>
                         )}
                     </Link>

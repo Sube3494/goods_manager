@@ -8,17 +8,16 @@ export type Permission =
   | "inbound:read" | "inbound:create"
   | "outbound:read" | "outbound:create"
   | "brush:read" | "brush:create"
-  | "gallery:upload" | "gallery:delete" | "gallery:audit" | "gallery:manage"
+  | "gallery:upload" | "gallery:delete" | "gallery:audit"
   | "system:manage"
-  | "whitelist:manage" // Only for SUPER_ADMIN
   | "all";
 
 export interface SessionUser extends JWTPayload {
   id: string;
   email: string;
   role: "SUPER_ADMIN" | "USER";
-  workspaceId: string;
-  permissions?: Record<string, boolean>;
+  permissions?: Record<string, boolean> | unknown;
+  roleProfile?: { permissions?: Record<string, boolean> | unknown } | null;
 }
 
 export const PERMISSION_TREE = [
@@ -107,9 +106,12 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   // SUPER_ADMIN has all permissions
   if (user.role === "SUPER_ADMIN") return true;
   
-  const perms = user.permissions || {};
-  
-  // Check explicit permission or 'all' shortcut
+  // 1. Check from dynamic RoleProfile (New System)
+  const profilePerms = (user.roleProfile?.permissions as Record<string, boolean>) || {};
+  if (profilePerms[permission] || profilePerms["all"]) return true;
+
+  // 2. Check from explicit user permissions (Legacy/Override)
+  const perms = (user.permissions as Record<string, boolean>) || {};
   return !!(perms[permission] || perms["all"]);
 }
 /**
@@ -140,6 +142,17 @@ export const ROLE_TEMPLATES: Record<string, Record<string, boolean>> = {
     "gallery:upload": true,
     "gallery:delete": true,
   },
+  ALBUM_VISITOR: {
+    "product:read": true,
+    "purchase:read": true,
+    "purchase:create": true,
+    "inbound:read": true,
+    "inbound:create": true,
+    "outbound:read": true,
+    "outbound:create": true,
+    "brush:read": true,
+    "brush:create": true,
+  },
   FULL_ACCESS: {
     "all": true
   }
@@ -149,5 +162,6 @@ export const TEMPLATE_LABELS: Record<string, string> = {
   WAREHOUSE_ADMIN: "仓库管理员",
   PURCHASER: "采购员",
   OPERATOR: "运营人员",
+  ALBUM_VISITOR: "相册访客",
   FULL_ACCESS: "全功能访问"
 };
