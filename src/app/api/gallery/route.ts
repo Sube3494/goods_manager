@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { getStorageStrategy } from "@/lib/storage";
+import { GalleryItem } from "../../../../prisma/generated-client";
 
 // 获取相册图片
 export async function GET(request: Request) {
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
     const sortedProducts = productIds.map(id => productsData.find(p => p.id === id)).filter(Boolean);
 
     // 7. Flatten to "items" structure for frontend compatibility
-    const flattenedItems: (import("@prisma/client").GalleryItem & { product: Record<string, unknown> })[] = [];
+    const flattenedItems: (GalleryItem & { product: Record<string, unknown> })[] = [];
     sortedProducts.forEach(product => {
       if (!product) return;
       product.gallery.forEach(item => {
