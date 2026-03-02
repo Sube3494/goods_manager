@@ -61,8 +61,8 @@ export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: Mobil
           }}
           title="退出登录"
           message="确定要退出当前账号吗？"
-          confirmText="退出"
-          cancelText="取消"
+          confirmLabel="退出"
+          cancelLabel="取消"
       />
     </header>
   );

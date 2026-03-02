@@ -46,7 +46,7 @@ function PurchasesContent() {
   const { showToast } = useToast();
   const { user } = useUser();
   const typedUser = user as unknown as UserType;
-  const canCreate = hasPermission(user as SessionUser | null, "purchase:create");
+  const canCreate = hasPermission(user as SessionUser | null, "purchase:manage");
   const canEdit = canCreate; // For now assuming create permission allows editing drafts
   const router = useRouter();
   const searchParams = useSearchParams();

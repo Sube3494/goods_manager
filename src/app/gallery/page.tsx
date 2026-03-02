@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
 import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink, Volume2, VolumeX, Maximize } from "lucide-react";
 
@@ -25,9 +25,10 @@ import { useCallback } from "react";
 interface LightboxMediaItemProps {
     item: GalleryItem;
     onScaleChange: (scale: number) => void;
+    isVisible?: boolean;
 }
 
-const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
+const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMediaItemProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(true);
     const [progress, setProgress] = useState(0);
@@ -114,7 +115,10 @@ const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
                             </div>
 
                             {/* Unified Custom Controls - Always strictly below and near video */}
-                            <div className="w-full max-w-[600px] transition-all duration-500 pointer-events-auto z-1001 shrink-0 opacity-100 translate-y-0">
+                            <div className={cn(
+                                "w-full max-w-[600px] transition-all duration-500 pointer-events-auto z-1001 shrink-0",
+                                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                            )}>
                                 <div className="bg-zinc-900/95 backdrop-blur-2xl px-4 md:px-5 py-3 rounded-2xl flex items-center gap-3 md:gap-4 pointer-events-auto border border-white/20 ring-1 ring-white/10 shadow-2xl mx-auto">
                                     <div 
                                         className="flex-1 h-3 flex items-center cursor-pointer pointer-events-auto group/progress"

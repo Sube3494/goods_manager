@@ -37,7 +37,7 @@ interface ProductShareClientProps {
   description: string;
 }
 
-const LightboxMediaItem = ({ item, onScaleChange }: { item: ShareItem, onScaleChange: (v: number) => void }) => {
+const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: ShareItem, onScaleChange: (v: number) => void, isVisible?: boolean }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(true);
     const [progress, setProgress] = useState(0);
@@ -122,7 +122,10 @@ const LightboxMediaItem = ({ item, onScaleChange }: { item: ShareItem, onScaleCh
                         </div>
 
                         {/* Unified Custom Controls - Always strictly below and near video */}
-                        <div className="w-full max-w-[600px] transition-all duration-500 pointer-events-auto z-1001 shrink-0 opacity-100 translate-y-0">
+                        <div className={cn(
+                            "w-full max-w-[600px] transition-all duration-500 pointer-events-auto z-1001 shrink-0",
+                            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                        )}>
                             <div className="bg-zinc-900/95 backdrop-blur-2xl px-4 md:px-5 py-3 rounded-2xl flex items-center gap-3 md:gap-4 pointer-events-auto border border-white/20 ring-1 ring-white/10 shadow-2xl mx-auto">
                                 <div 
                                     className="flex-1 h-3 flex items-center cursor-pointer pointer-events-auto group/progress"
@@ -408,6 +411,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
                     key={selectedImage.id}
                     item={selectedImage}
                     onScaleChange={(v) => activeScale.set(v)}
+                    isVisible={true} // In share page we currently don't have UI hide logic like gallery
                 />
             </motion.div>
       </div>

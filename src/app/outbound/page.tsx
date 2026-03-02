@@ -40,7 +40,7 @@ export default function OutboundPage() {
   
   const { showToast } = useToast();
   const { user } = useUser();
-  const canCreate = hasPermission(user as SessionUser | null, "outbound:create");
+  const canCreate = hasPermission(user as SessionUser | null, "outbound:manage");
 
   useEffect(() => {
     fetchOrders();

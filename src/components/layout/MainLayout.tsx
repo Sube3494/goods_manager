@@ -154,8 +154,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 }}
                 title="退出登录"
                 message="确定要退出当前账号吗？"
-                confirmText="退出"
-                cancelText="取消"
+                confirmLabel="退出"
+                cancelLabel="取消"
             />
             <main className={cn(
                 "flex-1 w-full",

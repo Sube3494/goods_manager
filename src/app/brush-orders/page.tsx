@@ -24,7 +24,7 @@ import { SessionUser } from "@/lib/permissions";
 export default function BrushOrdersPage() {
   const { showToast } = useToast();
   const { user } = useUser();
-  const canBrush = hasPermission(user as SessionUser | null, "brush:create");
+  const canBrush = hasPermission(user as SessionUser | null, "brush:manage");
   const [orders, setOrders] = useState<BrushOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<BrushOrder | null>(null);
