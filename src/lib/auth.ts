@@ -3,7 +3,7 @@ import { cookies, headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "./prisma";
 import { SessionUser } from "./permissions";
-import { SystemSetting } from "@prisma/client";
+import { SystemSetting } from "../../prisma/generated-client";
 
 const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
 const key = new TextEncoder().encode(secretKey);
