@@ -227,8 +227,8 @@ export default function BrushOrdersPage() {
   useEffect(() => {
     setMounted(true);
     fetchData();
-    // 增加商品加载逻辑供批量识别使用
-    fetch("/api/products?pageSize=1000")
+    // 增加商品加载逻辑供批量识别使用（all=true 绕过分页上限）
+    fetch("/api/products?all=true")
       .then(res => res.json())
       .then(data => {
         if (data && Array.isArray(data.items)) {

@@ -587,7 +587,7 @@ function SettingsContent() {
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement("a");
                             a.href = url;
-                            a.download = `库存管理系统_备份数据_${new Date().toISOString().split('T')[0]}.pnk`;
+                            a.download = `PickNote_备份数据_${new Date().toISOString().split('T')[0]}.pnk`;
                             a.click();
                         } else {
                             if (!backupConfig.file) return;

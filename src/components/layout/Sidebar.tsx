@@ -94,7 +94,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                     className="flex flex-col whitespace-nowrap"
                 >
                     <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
-                    库存管理系统
+                    PickNote
                     </span>
                 </motion.div>
               )}

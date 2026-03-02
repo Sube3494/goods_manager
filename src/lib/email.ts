@@ -5,7 +5,7 @@ const SMTP_HOST = process.env.SMTP_HOST || "smtp.qq.com";
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 465;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM || `"库存管理系统" <${SMTP_USER}>`;
+const SMTP_FROM = process.env.SMTP_FROM || `"PickNote" <${SMTP_USER}>`;
 const SMTP_SECURE = process.env.SMTP_SECURE === "true";
 
 const transporter = nodemailer.createTransport({

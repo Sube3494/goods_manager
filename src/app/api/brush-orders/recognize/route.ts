@@ -84,38 +84,53 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API Error: ${response.status} ${errorText}`);
+      console.error("AI API Error:", errorText);
+      throw new Error(`API Error: ${response.status}`);
     }
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content;
     
+    // 记录 AI 的原始返回内容
+    console.log('[AI Recognition] Raw AI Response Content:', content);
+
     if (!content) {
       throw new Error("No content received from AI model");
     }
 
     let result: RecognitionResult;
     try {
-      // 深度清理 Markdown 标记（处理可能出现的 ```json 或 ```）
-      const jsonStr = content.replace(/```json\n?|```/g, '').trim();
+      // 更加鲁棒的 JSON 提取逻辑：寻找最外层的大括号
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Could not find JSON object in AI response");
+      }
+      const jsonStr = jsonMatch[0];
       const parsed = JSON.parse(jsonStr);
+
+      // 记录解析后的 JSON 对象
+      console.log('[AI Recognition] Parsed JSON Object:', parsed);
 
       // 检查日期是否是占位日期（00:00:00）或回退日期
       const rawDateStr = String(parsed.date || "");
       const isPlaceholderTime = rawDateStr.includes("00:00:00") || !rawDateStr.includes(" ");
       const isValidDate = parsed.date && !isNaN(new Date(parsed.date).getTime());
 
-      // 安全的回退机制，防止 AI 返回错误类型导致 Prisma 500
+      // 安全的回退机制
       result = {
         platformOrderId: String(parsed.orderId || ""),
         date: (() => {
           if (!isValidDate) return new Date().toISOString();
           const rawDate = String(parsed.date);
-          // 如果没有设定时区，补全为中国标准时间 (+08:00)
+          // 补全 ISO 格式
           const dateStr = (rawDate.includes('+') || rawDate.includes('Z')) 
             ? rawDate 
             : `${rawDate.replace(' ', 'T')}+08:00`;
-          return new Date(dateStr).toISOString();
+          try {
+            return new Date(dateStr).toISOString();
+          } catch {
+            return new Date().toISOString();
+          }
         })(),
         paymentAmount: Number(parsed.paymentAmount) || 0,
         receivedAmount: Number(parsed.receivedAmount) || 0,
@@ -126,12 +141,12 @@ export async function POST(req: NextRequest) {
             })) 
           : [],
         note: parsed.note ? String(parsed.note) : undefined,
-        // @ts-expect-error - 动态添加标记，前端处理
+        // @ts-expect-error - 动态标记
         timeMissing: isPlaceholderTime || !isValidDate
       };
     } catch (parseError: unknown) {
-      console.error("Failed to parse JSON from AI response:", content, parseError);
-      return NextResponse.json({ error: "Failed to parse recognition result", raw: content }, { status: 500 });
+      console.error("JSON Parsing Error. Content:", content);
+      return NextResponse.json({ error: "解析识别结果失败", raw: content }, { status: 500 });
     }
 
     return NextResponse.json(result);

@@ -8,7 +8,6 @@ import { X, Wand2, Loader2, Image as ImageIcon, CheckCircle2, AlertCircle, Trash
 import { cn } from "@/lib/utils";
 import { Product } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { CustomSelect } from "@/components/ui/CustomSelect";
 import { GestureImage } from "@/components/ui/GestureImage";
 
 interface BatchItem {
@@ -57,6 +56,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
       items.forEach(item => URL.revokeObjectURL(item.preview));
       setItems([]);
       setIsProcessing(false);
+      setEditingItemId(null);
       return;
     }
 
@@ -143,29 +143,63 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
   const findBestMatch = (recognizedName: string, products: Product[]) => {
     if (!recognizedName || !products.length) return null;
 
+    // 归一化：只移除标点和空格，不过滤关键词（过滤太激进反而有副作用）
     const normalize = (str: string) => {
       if (!str) return "";
       return str.toLowerCase()
-        .replace(/[\[\]【】\(\)（）\s!@#\$%\^&\*\-_=\+\\\|;:'",<\.>\/\?？。，]/g, "") // 移除标点符号和空格
-        .replace(/美团|淘宝|京东|拼多多|点我达/g, ""); // 移除常见平台词
+        .replace(/[\[\]【】\(\)（）\s!@#\$%\^&\*\-_=\+\\\|;:'",<\.>\/\?？。，]/g, "")
+        .replace(/美团|淘宝|京东|拼多多|点我达/g, ""); // 仅移除平台词
     };
 
     const normRecognized = normalize(recognizedName);
     if (!normRecognized) return null;
 
-    // 第一阶段：找 SKU 完全匹配
+    console.log(`[Product Match] Input: "${recognizedName}"`);
+    console.log(`[Product Match] Normalized Input: "${normRecognized}"`);
+    console.log(`[Product Match] Total products to match against: ${products.length}`);
+
+    // 第一阶段：SKU 精确匹配
     const skuMatch = products.find(p => p.sku && normalize(p.sku) === normRecognized);
-    if (skuMatch) return skuMatch;
+    if (skuMatch) {
+      console.log(`[Product Match] SKU Exact Match: ${skuMatch.name}`);
+      return skuMatch;
+    }
 
-    // 第二阶段：找名称完全匹配或被包含
-    const nameMatch = products.find(p => {
+    // 第二阶段：名称精确或包含匹配（双向）
+    // 详细打印每个商品名的归一化结果及包含关系，诊断问题
+    let nameMatch: Product | undefined;
+    for (const p of products) {
       const normName = normalize(p.name);
-      return normName === normRecognized || normName.includes(normRecognized) || normRecognized.includes(normName);
-    });
-    if (nameMatch) return nameMatch;
+      const isExact = normName === normRecognized;
+      const recognizedInProduct = normName.includes(normRecognized);
+      const productInRecognized = normRecognized.includes(normName);
+      if (isExact || recognizedInProduct || productInRecognized) {
+        console.log(`[Product Match] Name Inclusion Match: "${p.name}"`);
+        console.log(`  - exact: ${isExact}, recognizedInProduct: ${recognizedInProduct}, productInRecognized: ${productInRecognized}`);
+        nameMatch = p;
+        break;
+      }
+    }
+    if (nameMatch) {
+      return nameMatch;
+    }
+    console.log('[Product Match] No name match found. Falling through to keyword match.');
 
-    // 第三阶段：计算最长公共子串 (LCS - Longest Common Subsequence 的变种或简单的连续子串匹配)
-    // 这里我们使用一种基于连续重合片段和整体字符覆盖率的综合评分
+    // 第三阶段：基于关键词的模糊匹配
+    // 提取有意义的词组（连续的中文词、英文词、数字）
+    const extractKeywords = (str: string): string[] => {
+      const segments: string[] = [];
+      // 提取连续中文（长度 >= 2）
+      const chineseMatches = str.match(/[\u4e00-\u9fa5]{2,}/g) || [];
+      // 提取连续英文+数字（长度 >= 2）
+      const alphaMatches = str.match(/[a-zA-Z0-9]{2,}/g) || [];
+      segments.push(...chineseMatches, ...alphaMatches);
+      return segments;
+    };
+
+    const recognizedKeywords = extractKeywords(normRecognized);
+    console.log(`[Product Match] Keywords from AI: ${recognizedKeywords.join(', ')}`);
+
     let bestScore = 0;
     let bestProduct: Product | null = null;
 
@@ -173,52 +207,40 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
       const normName = normalize(p.name);
       if (!normName) return;
 
-      // 1. 基础字符覆盖率 (之前的方法，但权重降低)
-      let matchCount = 0;
-      const chars = normName.split("");
-      chars.forEach(char => {
-        if (normRecognized.includes(char)) {
-          matchCount++;
+      const productKeywords = extractKeywords(normName);
+      if (!productKeywords.length) return;
+
+      // 计算关键词命中率：有多少个商品关键词在识别结果里能找到
+      let hitCount = 0;
+      productKeywords.forEach(kw => {
+        if (normRecognized.includes(kw)) {
+          hitCount++;
         }
       });
-      const charCoverage = matchCount / normName.length;
 
-      // 2. 连续子串加权 (寻找最长连续匹配片段)
-      let maxConsecutiveMatch = 0;
-      for (let i = 0; i < normName.length; i++) {
-        for (let j = i + 1; j <= normName.length; j++) {
-            const sub = normName.substring(i, j);
-            if (normRecognized.includes(sub)) {
-                if (sub.length > maxConsecutiveMatch) {
-                    maxConsecutiveMatch = sub.length;
-                }
-            } else {
-                break; // 如果当前子串不包含，更长的肯定也不包含
-            }
-        }
-      }
-      
-      // 综合评分：连续片段占比权重更高
-      const consecutiveScore = maxConsecutiveMatch / normName.length;
-      // 避免超长无关文本因为个别较长产品名而高分，同时除以两者的最大长度作为惩罚项
-      const penalty = Math.min(normName.length, normRecognized.length) / Math.max(normName.length, normRecognized.length);
-      
-      // 70% 看连续匹配，30% 看离散字符匹配，乘以长度惩罚
-      const score = (consecutiveScore * 0.7 + charCoverage * 0.3) * penalty;
+      const score = hitCount / productKeywords.length;
 
       if (score > bestScore) {
         bestScore = score;
         bestProduct = p;
       }
+
+      if (hitCount > 0) {
+        console.log(`[Product Match] "${p.name}" hit ${hitCount}/${productKeywords.length} keywords, score: ${score.toFixed(2)}`);
+      }
     });
 
-    // 提高阈值，要求更严格的匹配 (例如综合评分 >= 0.4)
-    if (bestScore >= 0.4) {
+    console.log(`[Product Match] Best: "${(bestProduct as any as Product)?.name}" Score: ${bestScore.toFixed(2)} (Threshold: 0.6)`);
+
+    if (bestScore >= 0.6) {
       return bestProduct;
     }
 
+    console.log('[Product Match] No match found.');
     return null;
   };
+
+
 
   const processBatch = async () => {
     if (isProcessing || items.length === 0) return;
@@ -409,16 +431,16 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             
             <div className="flex items-center gap-2 sm:pl-6 sm:border-l border-gray-200 dark:border-white/10 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbars-hide">
               <span className="text-xs font-bold text-gray-400 shrink-0">平台:</span>
-              <div className="flex bg-gray-100/50 dark:bg-white/5 rounded-lg p-0.5 shrink-0">
+              <div className="flex bg-black/10 dark:bg-black/40 backdrop-blur-md rounded-xl p-1 shrink-0">
                 {['美团', '淘宝', '京东'].map(p => (
                   <button
                     key={p}
                     onClick={() => setSelectedPlatform(p)}
                     className={cn(
-                      "px-2.5 sm:px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap",
+                      "px-3 sm:px-4 py-1.5 sm:py-1 text-xs font-black rounded-lg transition-all duration-200 whitespace-nowrap",
                       selectedPlatform === p 
-                        ? "bg-white dark:bg-gray-800 text-primary shadow-sm" 
-                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105" 
+                        : "text-white/40 hover:text-white/70 hover:bg-white/5"
                     )}
                   >
                     {p}
@@ -426,6 +448,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                 ))}
               </div>
             </div>
+
           </div>
           <button onClick={onClose} className="absolute right-4 top-4 sm:static sm:p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200 transition-colors rounded-xl z-10">
             <X size={20} className="sm:w-6 sm:h-6" />
@@ -433,23 +456,28 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+        <div className={cn(
+          "flex-1 overflow-hidden flex flex-col",
+          editingItemId && "md:flex-row"
+        )}>
           {/* Left: List/Grid */}
           <div className={cn(
             "overflow-y-auto p-4 sm:p-6 transition-all duration-300",
-            editingItemId ? "hidden md:block w-full md:w-80 lg:w-96 border-r border-gray-100 dark:border-white/10 bg-gray-50/30" : "w-full"
+            editingItemId ? "hidden md:block w-full md:w-80 lg:w-96 border-r border-gray-100 dark:border-white/10" : "flex flex-col flex-1 w-full"
           )}>
             {items.length === 0 ? (
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="h-64 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group"
-              >
-                <div className="p-5 rounded-full bg-gray-50 dark:bg-white/5 group-hover:scale-110 transition-transform">
-                  <ImageIcon size={40} className="text-gray-400 group-hover:text-primary" />
-                </div>
-                <div className="text-center">
-                  <p className="font-bold text-lg">点击、拖拽或粘贴订单截图</p>
-                  <p className="text-sm text-gray-500">支持多张图片同时处理</p>
+              <div className="flex-1 flex items-center justify-center min-h-[400px]">
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full max-w-lg h-64 border-2 border-dashed border-border dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                >
+                  <div className="p-5 rounded-full bg-muted/50 dark:bg-white/5 group-hover:scale-110 transition-transform">
+                    <ImageIcon size={40} className="text-muted-foreground group-hover:text-primary" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-bold text-lg">点击、拖拽或粘贴订单截图</p>
+                    <p className="text-sm text-muted-foreground">支持多张图片同时处理</p>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -595,49 +623,28 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                      </div>
 
                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                           <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                                <Calendar size={10} /> 订单日期
-                              </label>
-                                <DatePicker 
-                                  value={editingItem.result.date || ""} 
-                                  onChange={(val) => {
-                                    setItems(prev => prev.map(it => it.id === editingItemId ? {
-                                      ...it,
-                                      result: { ...it.result!, date: val, timeMissing: false }
-                                    } : it));
-                                  }}
-                                  isCompact
-                                  triggerClassName={cn(editingItem.result.timeMissing && "border-orange-500 ring-1 ring-orange-500/50 bg-orange-500/5")}
-                                />
-                                {editingItem.result.timeMissing && (
-                                  <p className="text-[9px] text-orange-600 dark:text-orange-400 font-bold mt-1 flex items-center gap-1">
-                                    <AlertCircle size={10} /> 未能精确识别时间，默认设为 00:00:00
-                                  </p>
-                                )}
-                             </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                                <ShoppingBag size={10} /> 平台
-                              </label>
-                              <CustomSelect 
-                                value={editingItem.result.platform || ""} 
-                                options={[
-                                  { value: "美团", label: "美团" },
-                                  { value: "淘宝", label: "淘宝" },
-                                  { value: "京东", label: "京东" }
-                                ]}
-                                onChange={(val) => {
-                                  setItems(prev => prev.map(it => it.id === editingItemId ? {
-                                    ...it,
-                                    result: { ...it.result!, platform: val }
-                                  } : it));
-                                }}
-                                triggerClassName="h-9 px-3 rounded-xl text-xs"
-                              />
-                           </div>
-                        </div>
+                         <div className="space-y-1.5">
+                               <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                 <Calendar size={10} /> 订单日期
+                               </label>
+                                 <DatePicker 
+                                   value={editingItem.result.date || ""} 
+                                   onChange={(val) => {
+                                     setItems(prev => prev.map(it => it.id === editingItemId ? {
+                                       ...it,
+                                       result: { ...it.result!, date: val, timeMissing: false }
+                                     } : it));
+                                   }}
+                                   isCompact
+                                   triggerClassName={cn(editingItem.result.timeMissing && "border-orange-500 ring-1 ring-orange-500/50 bg-orange-500/5")}
+                                 />
+                                 {editingItem.result.timeMissing && (
+                                   <p className="text-[9px] text-orange-600 dark:text-orange-400 font-bold mt-1 flex items-center gap-1">
+                                     <AlertCircle size={10} /> 未能精确识别时间，默认设为 00:00:00
+                                   </p>
+                                 )}
+                              </div>
+
 
                         <div className="grid grid-cols-2 gap-3">
                            <div className="space-y-1.5">

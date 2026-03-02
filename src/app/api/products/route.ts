@@ -26,7 +26,9 @@ export async function GET(request: Request) {
     
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const pageSize = Math.min(parseInt(searchParams.get("pageSize") || "20"), 100); // Limit max page size to 100
+    const allMode = searchParams.get("all") === "true";
+    const pageSize = allMode ? 999999 : Math.min(parseInt(searchParams.get("pageSize") || "20"), 2000);
+
     const search = searchParams.get("search") || "";
     const categoryName = searchParams.get("category") || "all";
     const status = searchParams.get("status") || "all";

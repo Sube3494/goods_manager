@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-15 09:50:56
+ * @Author: Sube
+ * @FilePath: route.ts
+ * @LastEditTime: 2026-03-02 18:47:00
+ * @Description: 
+ */
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -59,7 +66,7 @@ export async function POST(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="库存管理系统_备份数据_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
+        'Content-Disposition': `attachment; filename="PickNote_备份数据_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     });

@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-07 00:08:33
+ * @Author: Sube
+ * @FilePath: layout.tsx
+ * @LastEditTime: 2026-03-02 18:45:57
+ * @Description: 
+ */
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -10,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "库存管理系统",
+  title: "PickNote",
   description: "专业库存管理系统",
 };
 

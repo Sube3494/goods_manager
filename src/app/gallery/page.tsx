@@ -44,7 +44,6 @@ const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
             }).catch(() => {
                 setIsPlaying(false);
             });
-            setProgress(0);
         }
     }, [item.type, item.url]);
 
