@@ -41,12 +41,12 @@ export default function RolesPage() {
   }
 
   return (
-    <div className="space-y-8 text-foreground">
+    <div className="space-y-6 text-foreground">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-border/50 pb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-border/50 pb-5">
         <div className="space-y-1">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <ShieldAlert className="text-primary" size={32} />
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <ShieldAlert className="text-primary" size={28} />
             系统角色与权限
           </h1>
           <p className="text-muted-foreground text-sm sm:text-base max-w-2xl">
@@ -56,7 +56,7 @@ export default function RolesPage() {
 
         <button
           onClick={() => roleManagerRef.current?.openCreateModal()}
-          className="group relative px-8 h-14 rounded-2xl bg-primary text-primary-foreground font-black shadow-2xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all overflow-hidden shrink-0"
+          className="group relative px-6 h-11 rounded-xl bg-primary text-primary-foreground font-black shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all overflow-hidden shrink-0"
         >
           <div className="relative z-10 flex items-center gap-3">
             <Plus size={22} strokeWidth={3} />

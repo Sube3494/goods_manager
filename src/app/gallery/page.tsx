@@ -14,7 +14,7 @@ import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-
+import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { Product, GalleryItem, Category } from "@/lib/types";
@@ -24,10 +24,8 @@ import { useCallback } from "react";
 
 interface LightboxMediaItemProps {
     item: GalleryItem;
-    onScaleChange: (v: number) => void;
+    onScaleChange: (scale: number) => void;
 }
-
-import { GestureImage } from "@/components/ui/GestureImage";
 
 const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -66,56 +64,58 @@ const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
         <motion.div
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
         >
-            <div className="w-full h-full flex items-center justify-center pointer-events-auto overflow-hidden">
-                <div className="w-full h-full flex items-center justify-center relative group">
+                <div className="w-full h-full flex flex-col items-center justify-center p-4 pb-28 md:p-8 md:pb-36 pointer-events-auto overflow-hidden">
                     {isVideo ? (
-                        <div className="relative max-w-[90%] max-h-[75%] flex items-center justify-center">
-                            <video 
-                                ref={videoRef}
-                                src={item.url} 
-                                className="w-full h-full object-contain rounded-lg shadow-2xl mx-auto cursor-pointer"
-                                disablePictureInPicture
-                                disableRemotePlayback
-                                autoPlay
-                                muted={isMuted}
-                                controlsList="nodownload noplaybackrate"
-                                loop
-                                onContextMenu={(e) => e.preventDefault()}
-                                onClick={togglePlay}
-                                onTimeUpdate={() => {
-                                    if (videoRef.current) {
-                                        const current = videoRef.current.currentTime;
-                                        const p = (current / videoRef.current.duration) * 100;
-                                        setProgress(isNaN(p) ? 0 : p);
-                                        setCurrentTime(current);
-                                    }
-                                }}
-                                onEnded={() => setIsPlaying(false)}
-                                playsInline
-                            />
-                            
-                            {/* Central Play Toggle Overlay */}
-                            <AnimatePresence>
-                                {!isPlaying && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.8 }}
-                                        className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
-                                    >
-                                        <div 
-                                            className="flex items-center justify-center text-white cursor-pointer pointer-events-auto hover:scale-110 transition-transform active:scale-95 drop-shadow-[0_0_20px_rgba(0,0,0,0.6)]"
-                                            onClick={togglePlay}
+                        <div className="flex flex-col items-center justify-center w-full h-full max-w-6xl mx-auto gap-2 relative">
+                            {/* Video Container - Compact sizing */}
+                            <div className="relative flex items-center justify-center w-full min-h-0 bg-transparent rounded-xl overflow-hidden shadow-2xl shrink-0">
+                                <video 
+                                    ref={videoRef}
+                                    src={item.url} 
+                                    className="max-w-full max-h-[70vh] w-auto h-auto object-contain cursor-pointer"
+                                    disablePictureInPicture
+                                    disableRemotePlayback
+                                    autoPlay
+                                    muted={isMuted}
+                                    controlsList="nodownload noplaybackrate"
+                                    loop
+                                    onContextMenu={(e) => e.preventDefault()}
+                                    onClick={togglePlay}
+                                    onTimeUpdate={() => {
+                                        if (videoRef.current) {
+                                            const current = videoRef.current.currentTime;
+                                            const p = (current / videoRef.current.duration) * 100;
+                                            setProgress(isNaN(p) ? 0 : p);
+                                            setCurrentTime(current);
+                                        }
+                                    }}
+                                    onEnded={() => setIsPlaying(false)}
+                                    playsInline
+                                />
+                                
+                                {/* Central Play Toggle Overlay */}
+                                <AnimatePresence>
+                                    {!isPlaying && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.8 }}
+                                            className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
                                         >
-                                            <Play size={80} fill="currentColor" strokeWidth={0} />
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                                            <div 
+                                                className="flex items-center justify-center text-white cursor-pointer pointer-events-auto hover:scale-110 transition-transform active:scale-95 drop-shadow-[0_0_20px_rgba(0,0,0,0.6)]"
+                                                onClick={togglePlay}
+                                            >
+                                                <Play size={80} fill="currentColor" strokeWidth={0} />
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
 
-                            {/* Custom Bottom Controls - Enhanced for Mobile Visibility */}
-                            <div className="absolute bottom-6 left-4 right-4 opacity-100 transition-opacity duration-300 pointer-events-none z-1001">
-                                <div className="backdrop-blur-2xl bg-black/70 px-4 py-3 rounded-2xl border border-white/20 flex items-center gap-4 pointer-events-auto shadow-2xl">
+                            {/* Unified Custom Controls - Always strictly below and near video */}
+                            <div className="w-full max-w-[600px] transition-all duration-500 pointer-events-auto z-1001 shrink-0 opacity-100 translate-y-0">
+                                <div className="bg-zinc-900/95 backdrop-blur-2xl px-4 md:px-5 py-3 rounded-2xl flex items-center gap-3 md:gap-4 pointer-events-auto border border-white/20 ring-1 ring-white/10 shadow-2xl mx-auto">
                                     <div 
                                         className="flex-1 h-3 flex items-center cursor-pointer pointer-events-auto group/progress"
                                         onClick={(e) => {
@@ -124,34 +124,30 @@ const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
                                                 const rect = e.currentTarget.getBoundingClientRect();
                                                 const x = e.clientX - rect.left;
                                                 const pct = Math.max(0, Math.min(1, x / rect.width));
-                                                
-                                                // 1. 立即更新 UI 状态，不等待 onTimeUpdate
                                                 setProgress(pct * 100);
-                                                
-                                                // 2. 执行视频跳转
                                                 videoRef.current.currentTime = pct * videoRef.current.duration;
                                             }
                                         }}
                                     >
                                         <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden relative">
                                             <motion.div 
-                                                className="absolute inset-y-0 left-0 bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)] group-hover/progress:bg-primary transition-colors"
+                                                className="absolute inset-y-0 left-0 bg-white shadow-[0_0_12px_rgba(255,255,255,0.6)]"
                                                 style={{ width: `${progress}%` }}
-                                                transition={{ duration: 0 }} // 关键：确保进度条跟随跳转是瞬间的，不产生过渡动画
+                                                transition={{ duration: 0 }}
                                             />
                                         </div>
                                     </div>
 
-                                    <div className="text-[11px] font-mono text-white/90 min-w-[50px] text-right font-bold tracking-tighter">
+                                    <div className="text-[11px] font-mono text-white/90 min-w-[45px] text-right font-bold tracking-tight">
                                         {`${Math.floor(currentTime / 60)}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`}
                                     </div>
-                                    <div className="flex items-center gap-2 md:gap-3 ml-1 border-l border-white/20 pl-2 md:pl-3">
+                                    <div className="flex items-center gap-3 border-l border-white/10 pl-3">
                                         <button 
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setIsMuted(!isMuted);
                                             }}
-                                            className="text-white/80 hover:text-white transition-colors"
+                                            className="text-white/70 hover:text-white transition-colors"
                                             title={isMuted ? "取消静音" : "静音"}
                                         >
                                             {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -167,7 +163,7 @@ const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
                                                     }
                                                 }
                                             }}
-                                            className="text-white/80 hover:text-white transition-colors"
+                                            className="text-white/70 hover:text-white transition-colors"
                                             title="全屏"
                                         >
                                             <Maximize size={16} />
@@ -177,14 +173,15 @@ const LightboxMediaItem = ({ item, onScaleChange }: LightboxMediaItemProps) => {
                             </div>
                         </div>
                     ) : (
-                        <GestureImage 
-                            src={item.url} 
-                            onScaleChange={onScaleChange}
-                            className="w-full h-full"
-                        />
+                        <div className="flex items-center justify-center w-full h-full">
+                            <GestureImage 
+                                src={item.url} 
+                                onScaleChange={onScaleChange}
+                                className="max-w-full max-h-full object-contain"
+                            />
+                        </div>
                     )}
                 </div>
-            </div>
         </motion.div>
     );
 };
@@ -248,16 +245,78 @@ function GalleryContent() {
     return () => window.removeEventListener("scroll", handleScroll, true);
   }, []);
   const { showToast } = useToast();
-  const canUpload = isAdmin ? hasPermission(user as SessionUser | null, "gallery:upload") : isUploadAllowed;
-  const canDelete = hasPermission(user as SessionUser | null, "gallery:delete");
+  
+  // 基础权限检查，不再用于隐藏按钮，仅用于业务逻辑拦截
+  const canUploadRef = isAdmin ? hasPermission(user as SessionUser | null, "gallery:upload") : isUploadAllowed;
+
+  // 统一权限拦截与游客引导逻辑
+  const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy", action: () => void) => {
+    if (!user) {
+      // 游客身份：引导登录
+      setConfirmConfig({
+        isOpen: true,
+        title: "登录后使用",
+        message: "您当前为游客身份，登录后即可使用下载、分享、复制链接及上传等完整功能。",
+        onConfirm: () => {
+          window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+        },
+      });
+      return;
+    }
+
+    // 已登录：检查具体权限
+    const hasPerm = hasPermission(user as SessionUser | null, permissionKey);
+    if (!hasPerm && permissionKey === "gallery:upload" && !isUploadAllowed) {
+        showToast("当前系统已关闭上传权限", "error");
+        return;
+    }
+    
+    if (hasPerm) {
+      action();
+    } else {
+      showToast("您的账号暂无此功能操作权限", "error");
+    }
+  }, [user, isUploadAllowed, showToast]);
   
   // Lightbox Enhancements
   const activeScale = useMotionValue(1);
-  const uiOpacity = useTransform(activeScale, [1, 1.05], [1, 0]);
-  const uiYOffset = useTransform(activeScale, [1, 1.05], [0, -20]);
-  const bottomUiYOffset = useTransform(activeScale, [1, 1.05], [0, 20]);
+  
+  // UI 自动隐藏逻辑
+  const [isUIVisible, setIsUIVisible] = useState(true);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const pointerEvents = useTransform(activeScale, (v) => v > 1.05 ? "none" as const : "auto" as const);
+  const handleInteraction = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+    // 处理点击切换
+    if (e?.type === 'click') {
+        const target = e.target as HTMLElement;
+        // 如果点击的是非按钮、非控制条的可选区域（即空白背景区域）
+        if (!target.closest('button, .pointer-events-auto')) {
+            setIsUIVisible(prev => !prev);
+        } else {
+            setIsUIVisible(true);
+        }
+    } else {
+        // 鼠标移动或触摸，显示 UI
+        setIsUIVisible(true);
+    }
+
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (selectedImage) {
+        idleTimerRef.current = setTimeout(() => {
+            setIsUIVisible(false);
+        }, 1200);
+    }
+  }, [selectedImage]);
+
+  useEffect(() => {
+    if (selectedImage) {
+        handleInteraction();
+    } else {
+        setIsUIVisible(true);
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    }
+    return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
+  }, [selectedImage, handleInteraction]);
 
   const [showInfo, setShowInfo] = useState(false);
 
@@ -631,12 +690,6 @@ function GalleryContent() {
   }, [filteredItems]);
 
   const handleOpenProductPreview = (group: { product: Product; items: GalleryItem[] }) => {
-    // Check login state: If not logged in, redirect to login
-    if (!user) {
-        window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-        return;
-    }
-    
     // Prefer the product's main image item; fall back to first non-video, then first item
     const mainImageItem = group.product.image
       ? group.items.find(item => item.url === group.product.image)
@@ -736,38 +789,34 @@ function GalleryContent() {
         {/* Header section with unified style */}
         <div className={cn(
           "flex items-center justify-between transition-all relative z-10 gap-4",
-          canUpload ? "mb-6 sm:mb-8" : "mb-2 sm:mb-4"
+          canUploadRef ? "mb-6 sm:mb-8" : "mb-2 sm:mb-4"
         )}>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
                 <span>实物<span className="text-primary">相册</span></span>
             </h1>
             <p className="text-muted-foreground mt-0.5 sm:mt-1.5 text-[10px] sm:text-lg truncate opacity-80 font-medium">
-                {isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示"}
+                {user ? (isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示") : "登录可探索更多实拍详情与下载功能"}
             </p>
           </div>
 
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-               {(isUploadAllowed || isAdmin) && canUpload && (
                  <button 
                    onClick={() => {
-                     setIsUploadModalOpen(true);
-                     // Reset form if on main gallery page to avoid stale state
-                     setUploadForm({ productId: "", urls: [], tags: "" });
+                     checkAction("gallery:upload", () => {
+                         setIsUploadModalOpen(true);
+                         setUploadForm({ productId: "", urls: [], tags: "" });
+                     });
                    }}
                    className="h-9 w-9 sm:h-10 sm:w-auto sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center sm:gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap shrink-0"
                  >
                    <Plus size={20} className="shrink-0" />
                    <span className="hidden sm:inline">上传实物</span>
                  </button>
-               )}
              </div>
           </div>
 
-        <div className={cn(
-            "flex flex-row gap-2 items-center w-full transition-all",
-            canUpload ? "mb-6 md:mb-10" : "mb-6 sm:mb-10"
-        )}>
+        <div className="flex flex-row gap-2 items-center w-full transition-all mb-6 md:mb-10">
               <div className="h-10 sm:h-11 px-3 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
                 <Search size={16} className="text-muted-foreground shrink-0 sm:w-[18px] sm:h-[18px]" />
                 <input 
@@ -906,7 +955,7 @@ function GalleryContent() {
                                 
                                 {/* 媒体数量 (Media Count) - 完美契合右上角 */}
                                 {group.items.length > 1 && (
-                                    <div className="absolute top-0 right-0 z-20 h-7 min-w-[32px] px-2 flex items-center justify-center bg-black/60 backdrop-blur-md text-white text-[11px] font-black leading-none pointer-events-none rounded-bl-2xl border-b border-l border-white/10" style={{ borderTopRightRadius: 'inherit' }}>
+                                    <div className="absolute top-0 right-0 z-20 h-6 min-w-[24px] px-2 flex items-center justify-center bg-black/50 text-white text-[12px] font-bold leading-none pointer-events-none rounded-bl-[16px] rounded-tr-[16px]">
                                         {group.items.length}
                                     </div>
                                 )}
@@ -1316,9 +1365,13 @@ function GalleryContent() {
                         <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.15, ease: "linear" }}
-                            className="fixed inset-0 z-12000 bg-black overflow-hidden touch-none pointer-events-auto flex flex-col"
+                            className="fixed inset-0 z-12000 bg-black overflow-hidden touch-none pointer-events-auto flex flex-col cursor-none"
+                            style={{ cursor: isUIVisible ? 'default' : 'none' }}
+                            onMouseMove={handleInteraction}
+                            onTouchStart={handleInteraction}
+                            onClick={handleInteraction}
                         >
                             {/* Layer 0: Ambient Background */}
                             <AnimatePresence mode="wait">
@@ -1344,18 +1397,20 @@ function GalleryContent() {
 
                             {/* Background Overlay - Click to Close */}
                             <div 
-                                className="absolute inset-0 -z-10" 
+                                className="absolute inset-0 -z-10 cursor-alias" 
                                 onClick={() => setSelectedImage(null)} 
                             />
 
-                            {/* Top Bar Overlay */}
+                             {/* Top Bar Overlay */}
                             <motion.div 
-                                style={{ 
-                                    opacity: uiOpacity, 
-                                    y: uiYOffset,
-                                    pointerEvents: pointerEvents
+                                animate={{ 
+                                    opacity: isUIVisible ? 1 : 0, 
+                                    y: isUIVisible ? 0 : -20 
                                 }}
-                                className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55 pointer-events-none"
+                                style={{ 
+                                    pointerEvents: isUIVisible ? "auto" : "none"
+                                }}
+                                className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55"
                             >
                                 <div className="flex items-center gap-2 pointer-events-auto">
                                     <button
@@ -1442,9 +1497,9 @@ function GalleryContent() {
                                 </AnimatePresence>
 
                                 <div className="flex items-center gap-2 pointer-events-auto">
-                                    {(isUploadAllowed || isAdmin) && canUpload && (
-                                        <button 
-                                            onClick={() => {
+                                    <button 
+                                        onClick={() => {
+                                            checkAction("gallery:upload", () => {
                                                 const product = selectedImage?.product;
                                                 setUploadForm({ 
                                                     productId: product?.id || "", 
@@ -1452,64 +1507,73 @@ function GalleryContent() {
                                                     tags: "" 
                                                 });
                                                 setIsUploadModalOpen(true);
-                                            }}
-                                            className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
-                                            title="为此商品上传新实拍"
-                                        >
-                                            <Plus size={20} strokeWidth={2.5} />
-                                        </button>
-                                    )}
+                                            });
+                                        }}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
+                                        title="为此商品上传新实拍"
+                                    >
+                                        <Plus size={20} strokeWidth={2.5} />
+                                    </button>
+                                    
                                     <button 
-                                        onClick={async () => {
-                                            try {
-                                                const res = await fetch(`/api/share/sign?id=${selectedImage.id}`);
-                                                if (!res.ok) throw new Error("Sign failed");
-                                                const { expires, signature, expireText } = await res.json();
-                                                const url = new URL(`/share/${selectedImage.id}?e=${expires}&s=${signature}`, window.location.origin).href;
-                                                navigator.clipboard.writeText(url).then(() => {
-                                                    showToast(`链接已复制，${expireText}内有效`, "success");
-                                                }).catch(() => {
-                                                    showToast("复制失败", "error");
-                                                });
-                                            } catch {
-                                                showToast("生成链接失败", "error");
-                                            }
+                                        onClick={() => {
+                                            checkAction("gallery:copy", async () => {
+                                                try {
+                                                    const res = await fetch(`/api/share/sign?id=${selectedImage!.id}`);
+                                                    if (!res.ok) throw new Error("Sign failed");
+                                                    const { expires, signature, expireText } = await res.json();
+                                                    const url = new URL(`/share/${selectedImage!.id}?e=${expires}&s=${signature}`, window.location.origin).href;
+                                                    navigator.clipboard.writeText(url).then(() => {
+                                                        showToast(`链接已复制，${expireText}内有效`, "success");
+                                                    }).catch(() => {
+                                                        showToast("复制失败", "error");
+                                                    });
+                                                } catch {
+                                                    showToast("生成链接失败", "error");
+                                                }
+                                            });
                                         }}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl shadow-xl"
                                         title="复制媒体链接"
                                     >
                                         <Link2 size={18} />
                                     </button>
+
                                     <button 
-                                        onClick={async () => {
-                                            try {
-                                                const productId = selectedImage.productId;
-                                                const res = await fetch(`/api/share/sign?productId=${productId}`);
-                                                if (!res.ok) throw new Error("Sign failed");
-                                                const { expires, signature, expireText } = await res.json();
-                                                const url = new URL(`/share/product/${productId}?e=${expires}&s=${signature}`, window.location.origin).href;
-                                                navigator.clipboard.writeText(url).then(() => {
-                                                    showToast(`相册链接已复制，${expireText}内有效`, "success");
-                                                }).catch(() => {
-                                                    showToast("复制失败", "error");
-                                                });
-                                            } catch {
-                                                showToast("生成链接失败", "error");
-                                            }
+                                        onClick={() => {
+                                            checkAction("gallery:share", async () => {
+                                                try {
+                                                    const productId = selectedImage!.productId;
+                                                    const res = await fetch(`/api/share/sign?productId=${productId}`);
+                                                    if (!res.ok) throw new Error("Sign failed");
+                                                    const { expires, signature, expireText } = await res.json();
+                                                    const url = new URL(`/share/product/${productId}?e=${expires}&s=${signature}`, window.location.origin).href;
+                                                    navigator.clipboard.writeText(url).then(() => {
+                                                        showToast(`相册链接已复制，${expireText}内有效`, "success");
+                                                    }).catch(() => {
+                                                        showToast("复制失败", "error");
+                                                    });
+                                                } catch {
+                                                    showToast("生成链接失败", "error");
+                                                }
+                                            });
                                         }}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
                                         title="转发（分享全套实拍）"
                                     >
                                         <ExternalLink size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                                     </button>
+
                                     <button 
                                         onClick={() => {
-                                            const product = selectedImage.product;
-                                            const timestamp = new Date().getTime();
-                                            const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
-                                            const ext = isVideo ? 'mp4' : 'jpg';
-                                            const fileName = `${product?.sku || 'MEDIA'}_${timestamp}.${ext}`;
-                                            handleDownload(selectedImage.url, fileName);
+                                            checkAction("gallery:download", () => {
+                                                const product = selectedImage!.product;
+                                                const timestamp = new Date().getTime();
+                                                const isVideo = selectedImage!.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage!.url);
+                                                const ext = isVideo ? 'mp4' : 'jpg';
+                                                const fileName = `${product?.sku || 'MEDIA'}_${timestamp}.${ext}`;
+                                                handleDownload(selectedImage!.url, fileName);
+                                            });
                                         }}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
                                         title="下载原始文件"
@@ -1527,47 +1591,45 @@ function GalleryContent() {
 
                             {/* Main Interaction Area */}
                             <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
-                                {relatedImages.length > 1 && (
+                                 {relatedImages.length > 1 && (
                                     <motion.div
-                                        style={{ 
-                                            opacity: uiOpacity,
-                                            pointerEvents: pointerEvents
-                                        }}
+                                        animate={{ opacity: isUIVisible ? 1 : 0 }}
+                                        style={{ pointerEvents: isUIVisible ? "auto" : "none" }}
                                         className="hidden md:contents"
                                     >
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(-1); }}
                                             disabled={currentIndex === 0}
-                                            className="absolute left-4 md:left-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary hover:text-primary-foreground transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
+                                            className="absolute left-8 z-55 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
                                         >
                                             <ChevronRight size={32} className="rotate-180" />
                                         </button>
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(1); }}
                                             disabled={currentIndex === relatedImages.length - 1}
-                                            className="absolute right-4 md:right-8 z-55 rounded-full p-4 md:p-6 bg-black/20 text-white hover:bg-primary hover:text-primary-foreground transition-all border border-white/10 group/btn backdrop-blur-md pointer-events-auto focus:outline-hidden disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-white/5"
+                                            className="absolute right-8 z-55 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
                                         >
                                             <ChevronRight size={32} />
                                         </button>
                                     </motion.div>
                                 )}
 
-                                <LightboxMediaItem 
+                                 <LightboxMediaItem 
                                     key={selectedImage!.id}
                                     item={selectedImage!}
                                     onScaleChange={(v) => activeScale.set(v)}
+                                    isVisible={isUIVisible}
                                 />
                             </div>
 
                         {/* Bottom Bar Overlay (Minimalist Float) */}
-                        <div className="absolute bottom-6 left-0 right-0 flex justify-center z-55 pointer-events-none px-4">
+                        {/* Bottom Bar Overlay (Immersive Float) */}
+                         <div className="absolute bottom-6 left-0 right-0 flex justify-center z-55 pointer-events-none px-4">
                             <motion.div 
+                                className="bg-zinc-900/40 backdrop-blur-3xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 max-w-full overflow-hidden transition-all duration-700 ring-1 ring-white/5 opacity-100 translate-y-0"
                                 style={{ 
-                                    opacity: uiOpacity, 
-                                    y: bottomUiYOffset,
-                                    pointerEvents: pointerEvents
+                                    pointerEvents: "auto"
                                 }}
-                                className="bg-black/40 backdrop-blur-xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-full overflow-hidden"
                             >
                                 {relatedImages.length > 1 && (
                                     <button 
@@ -1595,7 +1657,7 @@ function GalleryContent() {
                                                 }
                                             }}
                                             className={cn(
-                                                "relative h-12 w-12 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border shrink-0 group",
+                                                "relative h-11 w-11 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border shrink-0 group",
                                                 isSelected 
                                                 ? "border-white scale-110 z-10 ring-2 ring-white/40 shadow-lg shadow-white/20" 
                                                 : "border-white/5 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100"
@@ -1643,34 +1705,32 @@ function GalleryContent() {
             document.body
         )}
 
-    {isAdmin && (
-      <>
-        <ConfirmModal 
-            isOpen={confirmConfig.isOpen}
-            onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
-            onConfirm={confirmConfig.onConfirm}
-            message={confirmConfig.message}
-            title={confirmConfig.title}
-            confirmLabel="确认删除"
-            variant="danger"
-            className="z-31000"
-        />
+    <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        message={confirmConfig.message}
+        title={confirmConfig.title}
+        confirmLabel={confirmConfig.title === "登录后使用" ? "立即登录" : "确认删除"}
+        variant={confirmConfig.title === "登录后使用" ? "primary" : "danger"}
+        className="z-31000"
+    />
 
-        <ActionBar 
-            selectedCount={selectedIds.length}
-            totalCount={filteredItems.length}
-            onToggleSelectAll={() => {
-                if (selectedIds.length === filteredItems.length) {
-                    setSelectedIds([]);
-                } else {
-                    setSelectedIds(filteredItems.map(i => i.id));
-                }
-            }}
-            onClear={() => setSelectedIds([])}
-            label="个项目"
-            onDelete={canDelete ? handleBatchDelete : undefined}
-        />
-      </>
+    {isAdmin && (
+      <ActionBar 
+          selectedCount={selectedIds.length}
+          totalCount={filteredItems.length}
+          onToggleSelectAll={() => {
+              if (selectedIds.length === filteredItems.length) {
+                  setSelectedIds([]);
+              } else {
+                  setSelectedIds(filteredItems.map(i => i.id));
+              }
+          }}
+          onClear={() => setSelectedIds([])}
+          label="个项目"
+          onDelete={handleBatchDelete}
+      />
     )}
 
     {/* Back to Top Button */}

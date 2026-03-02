@@ -7,6 +7,7 @@ import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft, QrCode }
 import { useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
+import md5 from "blueimp-md5";
 
 export default function LoginPage() {
   const { showToast } = useToast();
@@ -80,8 +81,36 @@ export default function LoginPage() {
 
       if (res.ok) {
         showToast("登录成功", "success");
+        // 获取 URL 里的 callbackUrl
+        const params = new URLSearchParams(window.location.search);
+        let targetUrl = params.get("callbackUrl");
+
+        if (!targetUrl) {
+            // 如果没有明确的目的地，查一下当前用户的权限决定默认去哪
+            try {
+                const meRes = await fetch("/api/auth/me");
+                if (meRes.ok) {
+                    const meData = await meRes.json();
+                    const user = meData.user;
+                    if (user) {
+                        const isSuperAdmin = user.role === "SUPER_ADMIN";
+                        const hasProductRead = user.roleProfile?.permissions?.["product:read"] || user.permissions?.["product:read"] || user.roleProfile?.permissions?.["all"] || user.permissions?.["all"];
+                        
+                        // 只有超管或具备查看商品权限的才能进后台首页，否则默认进相册
+                        targetUrl = (isSuperAdmin || hasProductRead) ? "/" : "/gallery";
+                    } else {
+                        targetUrl = "/gallery";
+                    }
+                } else {
+                    targetUrl = "/gallery";
+                }
+            } catch {
+                targetUrl = "/gallery";
+            }
+        }
+        
         // Use window.location for hard refresh to ensure all states (sidebar, middleware) are clean
-        window.location.href = "/"; 
+        window.location.href = targetUrl || "/"; 
       } else {
         showToast(data.error || "登录失败", "error");
       }
@@ -177,9 +206,9 @@ export default function LoginPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70"
+              className="text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70"
             >
-              后台管理中心
+              PickNote
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0 }}
@@ -187,7 +216,7 @@ export default function LoginPage() {
               transition={{ delay: 0.3 }}
               className="mt-3 text-muted-foreground text-lg"
             >
-              安全登录您的管理控制台
+              安全登录您的账户
             </motion.p>
           </div>
 
@@ -204,7 +233,7 @@ export default function LoginPage() {
                     className="space-y-6"
                 >
                   <div className="space-y-1.5 flex flex-col">
-                    <label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/60 ml-1">管理员邮箱</label>
+                    <label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/60 ml-1">登录邮箱</label>
                     <div className="relative group/input">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
                       <input
@@ -248,8 +277,16 @@ export default function LoginPage() {
                             {/* 悬停微信号/二维码气泡 */}
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 opacity-0 pointer-events-none group-hover/wechat:opacity-100 group-hover/wechat:pointer-events-auto transition-all duration-300 translate-y-2 group-hover/wechat:translate-y-0 z-50 origin-bottom scale-95 group-hover/wechat:scale-100">
                             <div className="bg-zinc-900/95 dark:bg-zinc-800/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-4 flex flex-col items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#07C160]/20 flex items-center justify-center mb-1">
-                                <QrCode size={16} className="text-[#07C160]" />
+                                <div className="w-10 h-10 rounded-full border-2 border-primary/30 p-0.5 mb-1 overflow-hidden shrink-0 shadow-lg shadow-primary/20">
+                                    <div className="relative w-full h-full rounded-full overflow-hidden bg-primary/10">
+                                        <Image 
+                                            src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
+                                            alt="Admin Avatar"
+                                            fill
+                                            sizes="40px"
+                                            className="object-cover"
+                                        />
+                                    </div>
                                 </div>
                                 <p className="text-xs text-white/90 text-center font-medium leading-relaxed">
                                 管理员微信号<br/>
@@ -364,7 +401,7 @@ export default function LoginPage() {
             className="mt-8 text-center"
         >
             <p className="text-xs text-muted-foreground opacity-60">
-                &copy; {new Date().getFullYear()} 库存管理系统 · 此系统仅限授权人员访问
+                &copy; {new Date().getFullYear()} PickNote · 此系统仅限授权人员访问
             </p>
         </motion.div>
       </motion.div>

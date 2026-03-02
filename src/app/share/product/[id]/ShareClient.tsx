@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
-import { ChevronRight, PlayCircle, Download, Info } from "lucide-react";
+import { ChevronRight, PlayCircle, Download, Info, Volume2, VolumeX, Maximize } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { GestureImage } from "@/components/ui/GestureImage";
+import { useUser } from "@/hooks/useUser";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 const handleDownload = async (url: string, fileName: string) => {
     try {
@@ -37,35 +39,156 @@ interface ProductShareClientProps {
 
 const LightboxMediaItem = ({ item, onScaleChange }: { item: ShareItem, onScaleChange: (v: number) => void }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [isPlaying, setIsPlaying] = useState(true);
+    const [progress, setProgress] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [isMuted, setIsMuted] = useState(true);
 
     useEffect(() => {
         if (item.type === 'video' && videoRef.current) {
             videoRef.current.currentTime = 0;
-            videoRef.current.play().catch(() => {});
+            videoRef.current.play().then(() => {
+                setIsPlaying(true);
+            }).catch(() => {
+                setIsPlaying(false);
+            });
         }
     }, [item.type, item.url]);
 
+    const togglePlay = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (videoRef.current) {
+            if (videoRef.current.paused) {
+                videoRef.current.play();
+                setIsPlaying(true);
+            } else {
+                videoRef.current.pause();
+                setIsPlaying(false);
+            }
+        }
+    };
+
+    const isVideo = item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url);
+
     return (
         <motion.div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-full h-full flex items-center justify-center pointer-events-auto overflow-hidden">
-                <div className="w-full h-full flex items-center justify-center">
-                    {item.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(item.url) ? (
-                        <video 
-                            ref={videoRef}
-                            src={item.url} 
-                            className="max-w-[90%] max-h-[75%] object-contain rounded-lg shadow-2xl mx-auto"
-                            controls
-                            muted
-                            playsInline
-                        />
-                    ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 pb-28 md:p-8 md:pb-36 pointer-events-auto overflow-hidden">
+                {isVideo ? (
+                    <div className="flex flex-col items-center justify-center w-full h-full max-w-6xl mx-auto gap-2 relative">
+                        {/* Video Container - Compact sizing */}
+                        <div className="relative flex items-center justify-center w-full min-h-0 bg-transparent rounded-xl overflow-hidden shadow-2xl shrink-0">
+                            <video 
+                                ref={videoRef}
+                                src={item.url} 
+                                className="max-w-full max-h-[70vh] w-auto h-auto object-contain cursor-pointer"
+                                disablePictureInPicture
+                                disableRemotePlayback
+                                autoPlay
+                                muted={isMuted}
+                                controlsList="nodownload noplaybackrate"
+                                loop
+                                onContextMenu={(e) => e.preventDefault()}
+                                onClick={togglePlay}
+                                onTimeUpdate={() => {
+                                    if (videoRef.current) {
+                                        const current = videoRef.current.currentTime;
+                                        const p = (current / videoRef.current.duration) * 100;
+                                        setProgress(isNaN(p) ? 0 : p);
+                                        setCurrentTime(current);
+                                    }
+                                }}
+                                onEnded={() => setIsPlaying(false)}
+                                playsInline
+                            />
+                            
+                            {/* Central Play Toggle Overlay */}
+                            <AnimatePresence>
+                                {!isPlaying && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.8 }}
+                                        className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+                                    >
+                                        <div 
+                                            className="flex items-center justify-center text-white cursor-pointer pointer-events-auto hover:scale-110 transition-transform active:scale-95 drop-shadow-[0_0_20px_rgba(0,0,0,0.6)]"
+                                            onClick={togglePlay}
+                                        >
+                                            <PlayCircle size={80} fill="currentColor" strokeWidth={0} className="opacity-80" />
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* Unified Custom Controls - Always strictly below and near video */}
+                        <div className="w-full max-w-[600px] transition-all duration-500 pointer-events-auto z-1001 shrink-0 opacity-100 translate-y-0">
+                            <div className="bg-zinc-900/95 backdrop-blur-2xl px-4 md:px-5 py-3 rounded-2xl flex items-center gap-3 md:gap-4 pointer-events-auto border border-white/20 ring-1 ring-white/10 shadow-2xl mx-auto">
+                                <div 
+                                    className="flex-1 h-3 flex items-center cursor-pointer pointer-events-auto group/progress"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (videoRef.current && videoRef.current.duration) {
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const x = e.clientX - rect.left;
+                                            const pct = Math.max(0, Math.min(1, x / rect.width));
+                                            setProgress(pct * 100);
+                                            videoRef.current.currentTime = pct * videoRef.current.duration;
+                                        }
+                                    }}
+                                >
+                                    <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden relative">
+                                        <motion.div 
+                                            className="absolute inset-y-0 left-0 bg-white shadow-[0_0_12px_rgba(255,255,255,0.6)]"
+                                            style={{ width: `${progress}%` }}
+                                            transition={{ duration: 0 }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="text-[11px] font-mono text-white/90 min-w-[45px] text-right font-bold tracking-tight">
+                                    {`${Math.floor(currentTime / 60)}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`}
+                                </div>
+                                <div className="flex items-center gap-3 border-l border-white/10 pl-3">
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsMuted(!isMuted);
+                                        }}
+                                        className="text-white/70 hover:text-white transition-colors"
+                                        title={isMuted ? "取消静音" : "静音"}
+                                    >
+                                        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                                    </button>
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (videoRef.current) {
+                                                if (document.fullscreenElement) {
+                                                    document.exitFullscreen();
+                                                } else {
+                                                    videoRef.current.requestFullscreen();
+                                                }
+                                            }
+                                        }}
+                                        className="text-white/70 hover:text-white transition-colors"
+                                        title="全屏"
+                                    >
+                                        <Maximize size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex items-center justify-center w-full h-full">
                         <GestureImage 
                             src={item.url} 
                             onScaleChange={onScaleChange}
-                            className="w-full h-full"
+                            className="max-w-full max-h-full object-contain"
                         />
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </motion.div>
     );
@@ -82,6 +205,34 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   const pointerEvents = useTransform(activeScale, (v) => v > 1.05 ? "none" as const : "auto" as const);
   
   const thumbnailContainerRef = useRef<HTMLDivElement>(null);
+
+  const { user } = useUser();
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const checkAction = useCallback((action: () => void) => {
+    if (!user) {
+      setConfirmConfig({
+        isOpen: true,
+        title: "登录后下载",
+        message: "您当前为游客身份，登录后即可下载高清媒体素材。",
+        onConfirm: () => {
+          window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+        },
+      });
+      return;
+    }
+    action();
+  }, [user]);
 
   const navigate = (dir: number) => {
     const nextIndex = currentIndex + dir;
@@ -154,7 +305,8 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
                 <motion.div
                     animate={{ 
                         scale: showInfo ? 1.15 : 1,
-                        opacity: showInfo ? 1 : 0.9
+                        opacity: showInfo ? 1 : 0.9,
+                        rotate: showInfo ? 90 : 0
                     }}
                     transition={{ type: "spring", stiffness: 500, damping: 25 }}
                 >
@@ -214,11 +366,13 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
         <div className="flex items-center gap-2 pointer-events-auto">
             <button 
                 onClick={() => {
-                    const timestamp = new Date().getTime();
-                    const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
-                    const ext = isVideo ? 'mp4' : 'jpg';
-                    const fileName = `${sku || 'MEDIA'}_${timestamp}.${ext}`;
-                    handleDownload(selectedImage.url, fileName);
+                    checkAction(() => {
+                        const timestamp = new Date().getTime();
+                        const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
+                        const ext = isVideo ? 'mp4' : 'jpg';
+                        const fileName = `${sku || 'MEDIA'}_${timestamp}.${ext}`;
+                        handleDownload(selectedImage.url, fileName);
+                    });
                 }}
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
                 title="下载"
@@ -324,6 +478,16 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
       </motion.div>
 
       {/* Modal removed in favor of popover */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        confirmLabel="立即登录"
+        variant="primary"
+        className="z-31000"
+      />
     </div>
   );
 }

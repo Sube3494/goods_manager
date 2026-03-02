@@ -11,7 +11,7 @@ export async function GET() {
   }
 
   try {
-    if (!hasPermission(session, "supplier:read")) {
+    if (!hasPermission(session, "supplier:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 

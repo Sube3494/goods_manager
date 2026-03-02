@@ -116,12 +116,12 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
             </div>
  
             <div className="space-y-3">
-               <div className="flex items-baseline gap-2">
-                 <span className="text-2xl sm:text-4xl font-black tracking-tighter text-foreground font-mono">
-                   {stat.value}
-                 </span>
-                 {stat.title.includes("货值") && <span className="text-xs font-bold text-muted-foreground">CNY</span>}
-               </div>
+                <div className="flex flex-wrap lg:flex-nowrap items-baseline gap-1.5 leading-none overflow-hidden">
+                  <span className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tighter text-foreground font-mono truncate">
+                    {stat.value}
+                  </span>
+                  {stat.title.includes("货值") && <span className="text-[10px] font-black text-muted-foreground/30 shrink-0 uppercase tracking-tight">CNY</span>}
+                </div>
                
                <div className="flex items-center gap-3">
                  <div className={cn(

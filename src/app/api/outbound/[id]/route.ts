@@ -18,7 +18,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "outbound:create")) {
+    if (!hasPermission(session, "outbound:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 

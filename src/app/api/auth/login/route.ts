@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     });
 
     if (!verification) {
-      return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
+      return NextResponse.json({ error: "验证码无效或已过期" }, { status: 400 });
     }
 
     // Find user
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     }
 
     if (user.status === "DISABLED") {
-        return NextResponse.json({ error: "Your account is disabled" }, { status: 403 });
+        return NextResponse.json({ error: "您的账号已被禁用" }, { status: 403 });
     }
 
     // Login (create session)
@@ -100,6 +100,7 @@ export async function POST(request: Request) {
         email: user.email,
         name: user.name,
         role: user.role,
+        roleProfile: user.roleProfile,
     });
 
     // Delete used code

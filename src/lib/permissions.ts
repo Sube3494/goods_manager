@@ -2,13 +2,13 @@ import { JWTPayload } from "jose";
 
 export type Permission = 
   | "product:read" | "product:create" | "product:update" | "product:delete"
-  | "category:read" | "category:manage"
-  | "supplier:read" | "supplier:manage"
-  | "purchase:read" | "purchase:create"
-  | "inbound:read" | "inbound:create"
-  | "outbound:read" | "outbound:create"
-  | "brush:read" | "brush:create"
-  | "gallery:upload" | "gallery:delete" | "gallery:audit"
+  | "category:manage"
+  | "supplier:manage"
+  | "purchase:manage"
+  | "inbound:manage"
+  | "outbound:manage"
+  | "brush:manage"
+  | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy" | "gallery:audit"
   | "system:manage"
   | "all";
 
@@ -35,50 +35,52 @@ export const PERMISSION_TREE = [
     key: "categories",
     label: "分类管理",
     children: [
-      { key: "category:read", label: "查看分类" },
-      { key: "category:manage", label: "管理分类" },
+      { key: "category:manage", label: "分类管理" },
     ]
   },
   {
     key: "suppliers",
     label: "供应商管理",
     children: [
-      { key: "supplier:read", label: "查看供应商" },
-      { key: "supplier:manage", label: "管理供应商" },
+      { key: "supplier:manage", label: "供应商管理" },
     ]
   },
   {
     key: "purchases",
     label: "采购管理",
     children: [
-      { key: "purchase:read", label: "查看采购单" },
-      { key: "purchase:create", label: "创建采购单" },
+      { key: "purchase:manage", label: "采购管理" },
     ]
   },
   {
-    key: "store_management",
-    label: "库房管理",
+    key: "inbound",
+    label: "入库管理",
     children: [
-      { key: "inbound:read", label: "查看入库记录" },
-      { key: "inbound:create", label: "创建入库单" },
-      { key: "outbound:read", label: "查看出库记录" },
-      { key: "outbound:create", label: "创建出库单" },
+      { key: "inbound:manage", label: "入库管理" },
+    ]
+  },
+  {
+    key: "outbound",
+    label: "出库管理",
+    children: [
+      { key: "outbound:manage", label: "出库管理" },
     ]
   },
   {
     key: "brush_orders",
     label: "刷单管理",
     children: [
-      { key: "brush:read", label: "查看刷单" },
-      { key: "brush:create", label: "创建刷单" },
+      { key: "brush:manage", label: "刷单管理" },
     ]
   },
   {
     key: "gallery",
     label: "实物相册",
     children: [
-      { key: "gallery:upload", label: "上传图片" },
-      { key: "gallery:delete", label: "删除图片" },
+      { key: "gallery:upload", label: "上传媒体" },
+      { key: "gallery:download", label: "下载媒体" },
+      { key: "gallery:share", label: "分享相册" },
+      { key: "gallery:copy", label: "复制链接" },
     ]
   },
   {
@@ -118,50 +120,13 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
  * Predefined permission templates for common roles
  */
 export const ROLE_TEMPLATES: Record<string, Record<string, boolean>> = {
-  WAREHOUSE_ADMIN: {
-    "product:read": true,
-    "product:update": true,
-    "inbound:read": true,
-    "inbound:create": true,
-    "outbound:read": true,
-    "outbound:create": true,
-    "gallery:upload": true,
-  },
-  PURCHASER: {
-    "product:read": true,
-    "purchase:read": true,
-    "purchase:create": true,
-    "supplier:read": true,
-  },
-  OPERATOR: {
-    "product:read": true,
-    "product:create": true,
-    "product:update": true,
-    "category:read": true,
-    "category:manage": true,
-    "gallery:upload": true,
-    "gallery:delete": true,
-  },
-  ALBUM_VISITOR: {
-    "product:read": true,
-    "purchase:read": true,
-    "purchase:create": true,
-    "inbound:read": true,
-    "inbound:create": true,
-    "outbound:read": true,
-    "outbound:create": true,
-    "brush:read": true,
-    "brush:create": true,
-  },
-  FULL_ACCESS: {
-    "all": true
+  BASIC_VISITOR: {
+    "gallery:download": true,
+    "gallery:share": true,
+    "gallery:copy": true,
   }
 };
 
 export const TEMPLATE_LABELS: Record<string, string> = {
-  WAREHOUSE_ADMIN: "仓库管理员",
-  PURCHASER: "采购员",
-  OPERATOR: "运营人员",
-  ALBUM_VISITOR: "相册访客",
-  FULL_ACCESS: "全功能访问"
+  BASIC_VISITOR: "基础访客",
 };

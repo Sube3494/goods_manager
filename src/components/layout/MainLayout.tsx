@@ -7,10 +7,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ToastProvider } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
-import { LogIn } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import { MobileHeader } from "./MobileHeader";
 import { PageGuard } from "./PageGuard";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getVisibleNavItems } from "@/lib/navigation";
 import { SessionUser } from "@/lib/permissions";
 
@@ -24,6 +25,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
     return false;
   });
+
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const [canAnimate, setCanAnimate] = useState(false);
 
@@ -129,10 +132,31 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                                 登录
                             </Link>
                         )}
+                        {user && !isLoading && !showSidebar && (
+                            <button
+                                onClick={() => setIsLogoutModalOpen(true)}
+                                className="h-9 w-9 rounded-full text-red-500 hover:text-red-600 hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center transition-all bg-white dark:bg-white/5 border border-border dark:border-white/10"
+                                title="退出登录"
+                            >
+                                <LogOut size={16} />
+                            </button>
+                        )}
                         <ThemeToggle className="h-9 w-9" />
                     </div>
                 </header>
-            )}            
+            )}
+            <ConfirmModal
+                isOpen={isLogoutModalOpen}
+                onClose={() => setIsLogoutModalOpen(false)}
+                onConfirm={async () => {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                    window.location.href = "/login";
+                }}
+                title="退出登录"
+                message="确定要退出当前账号吗？"
+                confirmText="退出"
+                cancelText="取消"
+            />
             <main className={cn(
                 "flex-1 w-full",
                 !isFullScreenPage && "px-4 sm:px-6 lg:px-10 pb-10",

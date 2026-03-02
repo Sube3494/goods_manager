@@ -16,7 +16,7 @@ export async function GET() {
     include: { roleProfile: true }
   });
 
-  if (!user) {
+  if (!user || user.status === "DISABLED") {
     return NextResponse.json({ user: null });
   }
 

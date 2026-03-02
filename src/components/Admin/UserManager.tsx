@@ -223,42 +223,42 @@ export function UserManager() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Invite Section */}
-      <div className="glass-panel p-8 rounded-3xl border border-border">
-        <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
-          <Mail className="text-primary" size={20} />
+      <div className="glass-panel p-5 md:p-6 rounded-3xl border border-border">
+        <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
+          <Mail className="text-primary" size={18} />
           邀请新成员
         </h3>
-        <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-4 relative">
+        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex-1 w-full sm:w-auto relative">
             <input
               type="email"
               placeholder="输入受邀者邮箱..."
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
               required
-              className="w-full h-11 px-6 rounded-2xl bg-white dark:bg-white/5 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+              className="w-full h-10 px-5 rounded-xl bg-white dark:bg-white/5 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
             />
           </div>
           
-          <div className="md:col-span-6">
+          <div className="w-full sm:w-48 shrink-0">
             <CustomSelect 
               value={targetRoleId}
               onChange={setTargetRoleId}
               options={roles.map(r => ({ value: r.id, label: r.name }))}
               placeholder="分配角色模板..."
-              triggerClassName="w-full h-11 rounded-2xl bg-white dark:bg-white/5 border border-border px-6 text-sm"
+              triggerClassName="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-5 text-sm"
             />
           </div>
-
-          <div className="md:col-span-2">
+ 
+          <div className="w-full sm:w-auto shrink-0">
             <button
               type="submit"
               disabled={isInviting}
-              className="w-full h-11 px-6 rounded-2xl bg-primary text-primary-foreground font-bold text-sm shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full h-10 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isInviting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={18} />}
+              {isInviting ? <Loader2 className="animate-spin" size={14} /> : <Plus size={16} />}
               发送邀请
             </button>
           </div>
@@ -275,10 +275,10 @@ export function UserManager() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-muted/30 border-b border-border">
-                <th className="px-6 py-5 text-sm font-bold text-foreground">成员信息</th>
-                <th className="px-6 py-5 text-sm font-bold text-foreground text-center">系统角色</th>
-                <th className="px-6 py-5 text-sm font-bold text-foreground text-center">状态</th>
-                <th className="px-6 py-5 text-sm font-bold text-foreground text-center">操作</th>
+                <th className="px-5 py-3 text-xs font-bold text-foreground">成员信息</th>
+                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">系统角色</th>
+                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">状态</th>
+                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -298,26 +298,26 @@ export function UserManager() {
                   
                   return (
                     <tr key={entry.id} className="hover:bg-muted/20 transition-colors group">
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-4">
-                          <div className={`h-11 w-11 rounded-2xl flex items-center justify-center ${isRegistered ? 'bg-primary/10 text-primary' : 'bg-muted/50 border border-dashed border-muted-foreground/30 text-muted-foreground'}`}>
-                             {isRegistered ? <UserIcon size={20} /> : <Mail size={18} />}
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${isRegistered ? 'bg-primary/10 text-primary' : 'bg-muted/30 border border-dashed border-muted-foreground/30 text-muted-foreground'}`}>
+                             {isRegistered ? <UserIcon size={16} /> : <Mail size={14} />}
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
-                            <span className="text-xs text-muted-foreground font-mono">{entry.email}</span>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono truncate">{entry.email}</span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-center">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-primary/5 text-primary border border-primary/10">
-                            <Shield size={12} />
+                      <td className="px-5 py-3 text-center">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 whitespace-nowrap">
+                            <Shield size={10} />
                             {roleName || "未分配"}
                           </span>
                       </td>
-                      <td className="px-6 py-5 text-center">
+                      <td className="px-5 py-3 text-center">
                          {isRegistered ? (
-                             <div className="flex justify-center">
+                             <div className="flex justify-center shrink-0">
                                  <Switch
                                      checked={entry.user?.status === 'ACTIVE'}
                                      onChange={() => handleStatusToggle(entry.email, entry.user?.status || 'ACTIVE')}

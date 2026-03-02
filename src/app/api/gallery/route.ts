@@ -131,8 +131,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "gallery:upload")) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    if (session.role !== "SUPER_ADMIN") {
+      const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+      if (settings && !settings.allowGalleryUpload) {
+        return NextResponse.json({ error: "System upload is currently disabled" }, { status: 403 });
+      }
+
+      if (!hasPermission(session, "gallery:upload")) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
     }
 
     const body = await request.json();

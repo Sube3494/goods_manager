@@ -11,7 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "outbound:read")) {
+    if (!hasPermission(session, "outbound:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "outbound:create")) {
+    if (!hasPermission(session, "outbound:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 

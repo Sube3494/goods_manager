@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   }
 
   // 权限检查
-  const permission = type === "Inbound" ? "inbound:read" : "purchase:read";
+  const permission = type === "Inbound" ? "inbound:manage" : "purchase:manage";
   if (!hasPermission(session, permission)) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
 
     // 权限检查
-    const permission = type === "Inbound" ? "inbound:create" : "purchase:create";
+    const permission = type === "Inbound" ? "inbound:manage" : "purchase:manage";
     if (!hasPermission(session, permission)) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }

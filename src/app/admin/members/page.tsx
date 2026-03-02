@@ -39,12 +39,12 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <Users className="text-primary" size={32} />
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <Users className="text-primary" size={28} />
             成员管理中心
           </h1>
           <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-2xl">

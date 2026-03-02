@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "PickNote",
-  description: "专业库存管理系统",
+  description: "PickNote 专业管理平台",
 };
 
 export default function RootLayout({

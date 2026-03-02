@@ -11,6 +11,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (session.role !== "SUPER_ADMIN") {
+      const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+      if (settings && !settings.allowDataImport) {
+        return NextResponse.json({ error: "System data import is currently disabled" }, { status: 403 });
+      }
+    }
+
     const data = await req.json();
     if (!Array.isArray(data)) {
       return NextResponse.json({ error: "数据格式不正确" }, { status: 400 });

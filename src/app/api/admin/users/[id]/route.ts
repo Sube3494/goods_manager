@@ -18,12 +18,13 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const { role, permissions } = await request.json();
+    const { role, permissions, roleProfileId } = await request.json();
 
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
         role: role !== undefined ? role : undefined,
+        roleProfileId: roleProfileId !== undefined ? roleProfileId : undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         permissions: permissions !== undefined ? (permissions as any) : undefined,
       },

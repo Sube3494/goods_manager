@@ -47,7 +47,7 @@ export async function getFreshSession() {
     include: { roleProfile: true }
   });
 
-  if (!user) return null;
+  if (!user || user.status === "DISABLED") return null;
 
   return {
     ...session,

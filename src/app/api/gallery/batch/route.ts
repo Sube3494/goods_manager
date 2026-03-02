@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { SessionUser } from "@/lib/permissions";
 import { getStorageStrategy } from "@/lib/storage";
 
 export async function DELETE(request: Request) {
@@ -18,7 +18,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "gallery:delete")) {
+    if (session.role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 

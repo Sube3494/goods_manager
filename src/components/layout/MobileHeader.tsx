@@ -1,9 +1,11 @@
 "use client";
 
-import { Menu, X, LogIn } from "lucide-react";
+import { Menu, X, LogIn, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUser } from "@/hooks/useUser";
 import Link from "next/link";
+import { useState } from "react";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 interface MobileHeaderProps {
   onToggleSidebar: () => void;
@@ -13,6 +15,7 @@ interface MobileHeaderProps {
 
 export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: MobileHeaderProps) {
   const { user, isLoading } = useUser();
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   return (
     <header className="lg:hidden relative px-4 py-2 flex items-center justify-between">
@@ -38,8 +41,29 @@ export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: Mobil
                 登录
             </Link>
         )}
+        {user && !isLoading && !showMenu && (
+            <button
+                onClick={() => setIsLogoutModalOpen(true)}
+                className="h-9 w-9 rounded-full text-red-500 hover:text-red-600 hover:bg-black/5 dark:hover:bg-white/10 flex items-center justify-center transition-all bg-white dark:bg-white/5 border border-border dark:border-white/10"
+                title="退出登录"
+            >
+                <LogOut size={16} />
+            </button>
+        )}
         <ThemeToggle />
       </div>
+      <ConfirmModal
+          isOpen={isLogoutModalOpen}
+          onClose={() => setIsLogoutModalOpen(false)}
+          onConfirm={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+          }}
+          title="退出登录"
+          message="确定要退出当前账号吗？"
+          confirmText="退出"
+          cancelText="取消"
+      />
     </header>
   );
 }

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "brush:create")) {
+    if (!hasPermission(session, "brush:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
         // @ts-expect-error - 动态标记
         timeMissing: isPlaceholderTime || !isValidDate
       };
-    } catch (parseError: unknown) {
+    } catch {
       console.error("JSON Parsing Error. Content:", content);
       return NextResponse.json({ error: "解析识别结果失败", raw: content }, { status: 500 });
     }

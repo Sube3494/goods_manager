@@ -37,7 +37,6 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
-  const [allowDataImport, setAllowDataImport] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
@@ -121,7 +120,6 @@ function SettingsContent() {
                 const data = await settingsRes.json();
                 setLowStockThreshold(data.lowStockThreshold);
                 setAllowGalleryUpload(data.allowGalleryUpload ?? true);
-                setAllowDataImport(data.allowDataImport ?? true);
                 
                 // Storage settings
                 setStorageType(data.storageType || "local");
@@ -163,7 +161,6 @@ function SettingsContent() {
     const payload = {
         lowStockThreshold,
         allowGalleryUpload,
-        allowDataImport,
         storageType,
         minioEndpoint,
         minioPort,
@@ -201,7 +198,6 @@ function SettingsContent() {
   }, [
     lowStockThreshold, 
     allowGalleryUpload, 
-    allowDataImport,
     storageType, 
     minioEndpoint, 
     minioPort, 
@@ -245,12 +241,6 @@ function SettingsContent() {
     saveSettings({ allowGalleryUpload: newValue });
   };
 
-  const toggleDataImport = () => {
-    const newValue = !allowDataImport;
-    setAllowDataImport(newValue);
-    saveSettings({ allowDataImport: newValue });
-  };
-
 
   if (isLoading) {
     return (
@@ -261,37 +251,37 @@ function SettingsContent() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-700">
+    <div className="w-full max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-top-4 duration-700">
       {/* Unified Header with Auto-save Status */}
-      <div className="relative flex flex-col gap-4 mb-8 transition-all">
-        <div className="flex-1 min-w-0 pr-32 sm:pr-0">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+      <div className="relative flex flex-col gap-2 mb-6 transition-all">
+        <div className="flex-1 min-w-0 pr-24 sm:pr-0">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
             系统管理
           </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
             配置全局核心逻辑、文件仓库与数据安全。
           </p>
         </div>
-        <div className="absolute top-0 right-0 flex items-center gap-2.5 bg-muted/30 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-2xl border border-border/50 backdrop-blur-sm shrink-0 shadow-sm">
+        <div className="absolute top-0 right-0 flex items-center gap-2 bg-muted/30 px-2.5 py-1.5 rounded-xl border border-border/50 backdrop-blur-sm shrink-0 shadow-sm">
           {saveStatus === "saving" && (
-            <div className="flex items-center gap-2 text-primary font-bold text-[10px] sm:text-xs">
-              <div className="h-1.5 w-1.5 bg-primary rounded-full animate-ping" />
-              正在同步...
+            <div className="flex items-center gap-1.5 text-primary font-bold text-[10px]">
+              <div className="h-1 w-1 bg-primary rounded-full animate-ping" />
+              正在同步
             </div>
           )}
           {saveStatus === "saved" && (
-            <div className="flex items-center gap-2 text-muted-foreground/80 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
-              <ShieldCheck size={14} className="text-emerald-500" />
+            <div className="flex items-center gap-1.5 text-muted-foreground/80 text-[10px] font-bold uppercase tracking-wider">
+              <ShieldCheck size={12} className="text-emerald-500" />
               已同步
             </div>
           )}
-          {saveStatus === "error" && <span className="text-[10px] sm:text-xs text-red-500 font-bold">同步失败</span>}
+          {saveStatus === "error" && <span className="text-[10px] text-red-500 font-bold">同步失败</span>}
         </div>
       </div>
 
       {/* Tab Navigation - Segmented Control Style */}
-      <div className="flex p-1.5 bg-muted/40 backdrop-blur-md rounded-2xl border border-border/50 w-fit max-w-full overflow-x-auto scrollbar-hide">
-        <div className="flex items-center min-w-max">
+      <div className="flex p-1 bg-muted/40 backdrop-blur-md rounded-xl border border-border/50 max-w-full overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1 min-w-max">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -299,28 +289,28 @@ function SettingsContent() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "relative flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 whitespace-nowrap",
+                  "relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-300",
                   isActive 
-                    ? "text-primary-foreground shadow-lg shadow-primary/20" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    ? "text-white dark:text-slate-900" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
                 )}
               >
+                <tab.icon size={14} className={isActive ? "text-white dark:text-slate-900" : "text-muted-foreground/60"} />
+                <span>{tab.label}</span>
                 {isActive && (
                   <motion.div
                     layoutId="activeSettingTab"
-                    className="absolute inset-0 bg-primary z-0 rounded-xl"
+                    className="absolute inset-0 bg-slate-900 dark:bg-white rounded-lg -z-10 shadow-md ring-1 ring-black/5"
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
-                <tab.icon size={18} className={cn("relative z-10", isActive ? "" : "opacity-70")} />
-                <span className="relative z-10">{tab.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="grid gap-8">
+      <div className="grid gap-6">
         {/* Content sections will be rendered here based on activeTab */}
 
         <AnimatePresence mode="wait">
@@ -333,29 +323,25 @@ function SettingsContent() {
               className="space-y-6"
             >
               {/* Personalization Section */}
-              <div className="glass-panel rounded-3xl border border-border overflow-hidden">
-                <div className="p-8 border-b border-border/50 bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-2xl bg-purple-500/10 text-purple-500 ring-1 ring-purple-500/30">
-                      <Monitor size={20} />
+              <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500 ring-1 ring-purple-500/30">
+                      <Monitor size={16} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">个性化设置</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">定制你的工作环境视觉风格</p>
+                      <h3 className="text-base font-bold text-foreground">个性化设置</h3>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">定制你的工作环境视觉风格</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-8">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl bg-muted/20 border border-border/40">
+                <div className="p-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 hover:bg-muted/5 transition-colors">
                     <div className="max-w-md">
-                      <h4 className="font-bold text-foreground flex items-center gap-2">
-                        界面主题
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        切换系统外观模式，适应不同的光照环境。
-                      </p>
+                      <h4 className="text-sm font-bold text-foreground">界面主题</h4>
+                      <p className="text-xs text-muted-foreground mt-1">切换系统外观模式，适应不同的光照环境。</p>
                     </div>
-                    <div className="flex bg-muted/50 p-1 rounded-2xl w-fit shrink-0 backdrop-blur-sm">
+                    <div className="flex bg-muted/50 p-1 rounded-xl w-fit shrink-0 backdrop-blur-sm self-start sm:self-center">
                       {[
                         { id: 'light', label: '浅色', icon: Sun },
                         { id: 'dark', label: '深色', icon: Moon }
@@ -364,8 +350,7 @@ function SettingsContent() {
                           key={t.id}
                           onClick={(e) => {
                             if (theme === t.id) return;
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const doc = document as any;
+                            const doc = document as Document & { startViewTransition?: (cb: () => void) => { ready: Promise<void> } };
                             if (!doc.startViewTransition) {
                               setTheme(t.id);
                               return;
@@ -375,8 +360,7 @@ function SettingsContent() {
                               const x = e.clientX;
                               const y = e.clientY;
                               const endRadius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              (transition as any).ready.then(() => {
+                              transition.ready.then(() => {
                                 const clipPath = [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`];
                                 document.documentElement.animate(
                                   { clipPath: clipPath },
@@ -386,13 +370,13 @@ function SettingsContent() {
                             }
                           }}
                           className={cn(
-                            "flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl transition-all duration-300 text-sm font-medium",
+                            "flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg transition-all duration-300 text-xs font-bold",
                             theme === t.id 
-                              ? 'bg-white dark:bg-white/10 shadow-md text-primary dark:text-foreground' 
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' 
                               : 'text-muted-foreground hover:text-foreground'
                           )}
                         >
-                          <t.icon size={18} className={theme === t.id ? "fill-current" : ""} />
+                          <t.icon size={14} className={theme === t.id ? "text-white dark:text-slate-900" : ""} />
                           <span>{t.label}</span>
                         </button>
                       ))}
@@ -402,41 +386,39 @@ function SettingsContent() {
               </div>
 
               {/* Inventory Logic Section */}
-              <div className="glass-panel rounded-3xl border border-border overflow-hidden">
-                <div className="p-8 border-b border-border/50 bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-2xl bg-orange-500/10 text-orange-500 ring-1 ring-orange-500/30">
-                      <AlertTriangle size={20} />
+              <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                <div className="p-4 md:p-5 border-b border-border/50 bg-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500 ring-1 ring-orange-500/30">
+                      <AlertTriangle size={16} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">库存逻辑</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">定义全局财务与缺货预警规则</p>
+                      <h3 className="text-base font-bold text-foreground">库存逻辑</h3>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">定义全局财务与缺货预警规则</p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="p-8">
-                  <div className="p-6 rounded-2xl bg-muted/20 border border-border/40 space-y-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="max-w-md">
-                        <label className="text-sm font-bold text-foreground">库存低位预警阈值</label>
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                          当商品库存数量低于此数值时，系统将会在首页及库存列表中标记为“预警”状态。
-                        </p>
-                      </div>
-                      <div className="relative w-full md:w-48 shrink-0">
-                        <input
-                          type="number"
-                          value={lowStockThreshold || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setLowStockThreshold(val === "" ? 0 : parseInt(val) || 0);
-                          }}
-                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 pr-12 text-lg font-mono font-bold focus:ring-2 focus:ring-primary/20 transition-all outline-none no-spinner text-center"
-                        />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground/30 pointer-events-none">
-                          件
-                        </div>
+                <div className="p-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 hover:bg-muted/5 transition-colors">
+                    <div className="max-w-md">
+                      <label className="text-sm font-bold text-foreground">库存低位预警阈值</label>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        当商品库存数量低于此数值时，系统将会在首页及库存列表中标记为“预警”状态。
+                      </p>
+                    </div>
+                    <div className="relative w-full sm:w-32 shrink-0">
+                      <input
+                        type="number"
+                        value={lowStockThreshold || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLowStockThreshold(val === "" ? 0 : parseInt(val) || 0);
+                        }}
+                        className="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-3 pr-10 text-base font-mono font-bold focus:ring-2 focus:ring-primary/20 transition-all outline-none no-spinner text-center"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground/40 pointer-events-none">
+                        件
                       </div>
                     </div>
                   </div>
@@ -455,37 +437,39 @@ function SettingsContent() {
               className="space-y-6"
             >
               {/* Data Management Section */}
-              <div className="glass-panel rounded-3xl border border-border overflow-hidden">
-                <div className="p-8 border-b border-border/50 bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30">
-                      <Database size={20} />
+              <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30">
+                      <Database size={16} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">数据逻辑控制</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">控制业务数据的导入权限与备份机制</p>
+                      <h3 className="text-base font-bold text-foreground">数据逻辑控制</h3>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">控制业务数据的导入权限与备份机制</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-8 space-y-8">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl bg-muted/20 border border-border/40">
+                <div className="p-0 divide-y divide-border/40">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 hover:bg-muted/5 transition-colors">
                     <div className="max-w-md">
-                      <h4 className="font-bold text-foreground">允许实物照片上传</h4>
-                      <p className="text-sm text-muted-foreground mt-1">开启后，应用前端及管理台将允许用户向后端存储上传物理文件。</p>
+                      <h4 className="text-sm font-bold text-foreground">允许实物照片上传</h4>
+                      <p className="text-xs text-muted-foreground mt-1 text-pretty">开启后，应用前端及管理台将允许用户向后端存储上传物理文件。</p>
                     </div>
-                    <Switch
-                      checked={allowGalleryUpload}
-                      onChange={toggleGalleryUpload}
-                    />
+                    <div className="shrink-0 self-start sm:self-center">
+                      <Switch
+                        checked={allowGalleryUpload}
+                        onChange={toggleGalleryUpload}
+                      />
+                    </div>
                   </div>
 
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl bg-muted/20 border border-border/40">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 hover:bg-muted/5 transition-colors">
                     <div className="max-w-md">
-                      <h4 className="font-bold text-foreground">分享链接时效</h4>
-                      <p className="text-sm text-muted-foreground mt-1">配置分享给外部的图片及视频链接多久后自动失效。</p>
+                      <h4 className="text-sm font-bold text-foreground">分享链接时效</h4>
+                      <p className="text-xs text-muted-foreground mt-1">配置分享给外部的图片及视频链接多久后自动失效。</p>
                     </div>
-                    <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="flex items-center gap-2 w-fit">
                       <input
                         type="number"
                         min="1"
@@ -495,14 +479,13 @@ function SettingsContent() {
                           setShareExpireDuration(val);
                           saveSettings({ shareExpireDuration: val }, { silent: true });
                         }}
-                        className="w-20 h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border px-3 text-center transition-all focus:ring-2 focus:ring-primary/20 outline-none"
+                        className="w-16 h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-2 text-center text-sm transition-all focus:ring-2 focus:ring-primary/20 outline-none"
                       />
                       <CustomSelect
                         value={shareExpireUnit}
-                        triggerClassName="h-[42px] w-24 rounded-xl border-border bg-white dark:bg-white/5"
+                        triggerClassName="h-9 w-24 rounded-lg border-border bg-white dark:bg-white/5 text-xs"
                         onChange={(val) => {
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          setShareExpireUnit(val as any);
+                          setShareExpireUnit(val as "minutes" | "hours" | "days");
                           saveSettings({ shareExpireUnit: val });
                         }}
                         options={[
@@ -514,50 +497,44 @@ function SettingsContent() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl bg-muted/20 border border-border/40">
-                    <div className="max-w-md">
-                      <h4 className="font-bold text-foreground">允许 Excel 批量中转导入</h4>
-                      <p className="text-sm text-muted-foreground mt-1">启用全局 Excel 解析引擎，适用于大规模同步历史库存或供应商数据。</p>
-                    </div>
-                    <Switch
-                      checked={allowDataImport}
-                      onChange={toggleDataImport}
-                    />
-                  </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-8 px-6 border-t border-border/50">
-                    <div className="flex-1">
-                      <h4 className="font-bold text-foreground">系统级加密备份与数据恢复</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                          通过 AES-256-GCM 高强度加密技术，全量导出系统所有业务模型。恢复时需严格匹配备份密码。
-                      </p>
-                    </div>
-                    <div className="flex flex-col xs:flex-row items-center gap-3 shrink-0">
-                      <button
-                        onClick={() => {
+                  <div className="p-4 md:p-5 bg-muted/5 backdrop-blur-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-foreground">系统级备份与恢复</h4>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                          通过 AES-256-GCM 加密，全量导出业务模型。
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => {
                             const input = document.createElement("input");
                             input.type = "file";
                             input.accept = ".pnk";
                             input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) setBackupConfig({ isOpen: true, type: "import", file });
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) setBackupConfig({ isOpen: true, type: "import", file });
                             };
                             input.click();
-                        }}
-                        className="w-full xs:w-auto h-12 px-8 rounded-2xl bg-white dark:bg-white/5 border border-border hover:bg-muted font-bold transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center justify-center gap-2"
-                      >
-                        <Upload size={18} className="text-emerald-500" />
-                        系统恢复
-                      </button>
-                      <button
-                        onClick={() => setBackupConfig({ isOpen: true, type: "export" })}
-                        className="w-full xs:w-auto h-12 px-8 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-95 font-bold transition-all hover:-translate-y-0.5 whitespace-nowrap flex items-center justify-center gap-2"
-                      >
-                        <Download size={18} />
-                        立即备份
-                      </button>
+                          }}
+                          className="h-9 px-4 rounded-xl bg-white dark:bg-white/5 border border-border hover:bg-muted text-xs font-bold transition-all flex items-center gap-2"
+                        >
+                          <Upload size={14} className="text-emerald-500" />
+                          恢复
+                        </button>
+                        <button
+                          onClick={() => setBackupConfig({ isOpen: true, type: "export" })}
+                          className="h-9 px-4 rounded-xl bg-primary text-primary-foreground shadow-sm hover:opacity-95 text-xs font-bold transition-all flex items-center gap-2"
+                        >
+                          <Download size={14} />
+                          备份
+                        </button>
+                      </div>
                     </div>
                   </div>
+                </div>
+              </div>
 
                   <BackupModal 
                     key={backupConfig.isOpen ? "open" : "closed"}
@@ -610,22 +587,21 @@ function SettingsContent() {
                     }}
                   />
 
-                  </div>
-                </div>
+
 
               {/* Security Placeholder */}
-              <div className="glass-panel rounded-3xl border border-border p-8 opacity-60 grayscale hover:grayscale-0 transition-all hover:opacity-100 bg-white/5 border-dashed">
+              <div className="glass-panel rounded-2xl border border-border-dashed p-6 opacity-60 grayscale hover:grayscale-0 transition-all hover:opacity-100 bg-white/5 border-dashed">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-500">
-                      <ShieldCheck size={20} />
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30">
+                      <ShieldCheck size={16} />
                     </div>
                     <div>
-                      <h3 className="font-bold">高级访问许可</h3>
-                      <p className="text-xs text-muted-foreground">多级管理员 RBAC 权限分配 (即将推出)</p>
+                      <h4 className="text-sm font-bold text-foreground">高级访问许可</h4>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">多级管理员 RBAC 权限分配 (即将推出)</p>
                     </div>
                   </div>
-                  <Zap size={20} className="text-muted-foreground/20" />
+                  <Zap size={16} className="text-muted-foreground/20" />
                 </div>
               </div>
             </motion.div>
@@ -640,186 +616,168 @@ function SettingsContent() {
               className="space-y-6"
             >
               {/* Storage Section */}
-              <div className="glass-panel rounded-3xl border border-border overflow-hidden bg-white/5 backdrop-blur-xl transition-all">
-                  <div className="p-8 border-b border-border/50 bg-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                      <div className="flex items-center gap-3">
-                          <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/30">
-                              <Database size={20} />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold">存储中心</h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">管理系统附件与静态文件存储后端</p>
-                          </div>
-                      </div>
-                      <button
-                          onClick={testConnection}
-                          disabled={isTesting}
-                          className="group relative flex items-center justify-center gap-2 h-12 px-8 rounded-2xl bg-primary text-primary-foreground font-medium transition-all hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0 whitespace-nowrap overflow-hidden"
-                      >
-                          <div className="absolute inset-0 bg-linear-to-tr from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                          {isTesting ? (
-                              <div className="h-5 w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                              <Zap size={18} className="transition-transform group-hover:scale-125 group-hover:rotate-12" />
+              <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/30">
+                      <Database size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-foreground">存储中心</h3>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">管理系统附件与静态文件存储后端</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={testConnection}
+                    disabled={isTesting}
+                    className="h-9 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isTesting ? (
+                      <div className="h-3 w-3 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Zap size={14} />
+                    )}
+                    测试连接
+                  </button>
+                </div>
+
+                <div className="p-0 divide-y divide-border/40">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 hover:bg-muted/5 transition-colors">
+                    <div className="max-w-md">
+                      <h4 className="text-sm font-bold text-foreground">存储驱动</h4>
+                      <p className="text-xs text-muted-foreground mt-1">选择系统如何存储和访问物理文件。</p>
+                    </div>
+                    <div className="flex bg-muted/50 p-1 rounded-xl w-full sm:w-64">
+                      {[
+                        { id: 'local', label: '本地' },
+                        { id: 'minio', label: 'MinIO' }
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          onClick={() => { setStorageType(mode.id as "local" | "minio"); saveSettings({ storageType: mode.id }); }}
+                          className={cn(
+                            "flex-1 flex items-center justify-center px-4 py-1.5 rounded-lg transition-all duration-300 text-xs font-bold",
+                            storageType === mode.id 
+                              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' 
+                              : 'text-muted-foreground hover:bg-white/5'
                           )}
-                          <span className="relative z-10">测试连接</span>
-                      </button>
+                        >
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="p-8 space-y-8">
-                      {/* Storage Type & Strategy */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                          {/* Storage Type */}
-                          <div className="space-y-5">
-                              <div>
-                                  <h4 className="font-bold text-foreground flex items-center gap-2">
-                                      存储驱动
-                                  </h4>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                      选择系统如何存储和访问物理文件。
-                                  </p>
-                              </div>
-                              <div className="flex bg-muted/50 p-1.5 rounded-2xl w-full">
-                                  {[
-                                    { id: 'local', label: '本地存储' },
-                                    { id: 'minio', label: 'MinIO 对象存储' }
-                                  ].map((mode) => (
-                                    <button
-                                      key={mode.id}
-                                      onClick={() => { setStorageType(mode.id as "local" | "minio"); saveSettings({ storageType: mode.id }); }}
-                                      className={cn(
-                                        "flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl transition-all duration-300 text-sm font-medium",
-                                        storageType === mode.id 
-                                          ? 'bg-white dark:bg-white/10 shadow-md text-primary dark:text-white' 
-                                          : 'text-muted-foreground hover:bg-white/50 dark:hover:bg-white/5'
-                                      )}
-                                    >
-                                      {mode.label}
-                                    </button>
-                                  ))}
-                              </div>
-                          </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 hover:bg-muted/5 transition-colors">
+                    <div className="max-w-md">
+                      <h4 className="text-sm font-bold text-foreground">同名文件处理逻辑</h4>
+                      <p className="text-xs text-muted-foreground mt-1">重复文件名上传时的系统行为。</p>
+                    </div>
+                    <CustomSelect
+                      value={uploadConflictStrategy}
+                      triggerClassName="h-9 w-full sm:w-64 rounded-xl border-border bg-white dark:bg-white/5 text-xs"
+                      onChange={(val) => {
+                        setUploadConflictStrategy(val as "overwrite" | "rename" | "skip");
+                        saveSettings({ uploadConflictStrategy: val });
+                      }}
+                      options={[
+                        { value: "overwrite", label: "直接覆盖" },
+                        { value: "rename", label: "自动重命名" },
+                        { value: "skip", label: "跳过上传" }
+                      ]}
+                    />
+                  </div>
 
-                          {/* Conflict Strategy */}
-                          <div className="space-y-5">
-                              <div>
-                                  <h4 className="font-bold text-foreground">同名文件处理逻辑</h4>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                      当上传的文件名与现有文件重复时的行为。
-                                  </p>
-                              </div>
-                              <div className="w-full">
-                                  <CustomSelect
-                                      value={uploadConflictStrategy}
-                                      triggerClassName="h-[54px] rounded-2xl border-border bg-muted/20"
-                                      onChange={(val) => {
-                                          setUploadConflictStrategy(val as "overwrite" | "rename" | "skip");
-                                          saveSettings({ uploadConflictStrategy: val });
-                                      }}
-                                      options={[
-                                          { value: "overwrite", label: "直接覆盖 (覆盖现有文件)" },
-                                          { value: "rename", label: "自动重命名 (加数字序号)" },
-                                          { value: "skip", label: "跳过上传 (保持现有文件)" }
-                                      ]}
-                                  />
-                              </div>
-                          </div>
+                  {storageType === "minio" && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="p-4 md:p-5 bg-muted/5 space-y-4"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground px-1">服务端点 (Endpoint)</label>
+                          <input
+                            type="text"
+                            value={minioEndpoint}
+                            onChange={(e) => { setMinioEndpoint(e.target.value); saveSettings({ minioEndpoint: e.target.value }, { silent: true }); }}
+                            placeholder="127.0.0.1 或 api.example.com"
+                            className="w-full h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground px-1">服务端口 (Port)</label>
+                          <input
+                            type="number"
+                            value={minioPort}
+                            onChange={(e) => { 
+                              const val = e.target.value === "" ? "" : Number(e.target.value);
+                              setMinioPort(val); 
+                              saveSettings({ minioPort: val }, { silent: true }); 
+                            }}
+                            placeholder="9000"
+                            className="w-full h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all no-spinner"
+                          />
+                        </div>
                       </div>
 
-                      {storageType === "minio" && (
-                          <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="space-y-8 p-8 rounded-3xl bg-black/2 dark:bg-white/2 border border-black/5 dark:border-white/5"
-                          >
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                  <div className="space-y-2.5">
-                                      <label className="text-sm font-bold text-foreground ml-1">Endpoint (服务器地址)</label>
-                                      <input
-                                          type="text"
-                                          value={minioEndpoint}
-                                          onChange={(e) => { setMinioEndpoint(e.target.value); saveSettings({ minioEndpoint: e.target.value }, { silent: true }); }}
-                                          placeholder="例如: 127.0.0.1"
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none"
-                                      />
-                                  </div>
-                                  <div className="space-y-2.5">
-                                      <label className="text-sm font-bold text-foreground ml-1">Port (通讯端口)</label>
-                                      <input
-                                          type="number"
-                                          value={minioPort}
-                                          onChange={(e) => { 
-                                              const val = e.target.value === "" ? "" : Number(e.target.value);
-                                              setMinioPort(val); 
-                                              saveSettings({ minioPort: val }, { silent: true }); 
-                                          }}
-                                          placeholder="例如: 9000"
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all no-spinner focus:ring-2 focus:ring-primary/20 outline-none"
-                                      />
-                                  </div>
-                              </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground px-1">访问密钥 (Access Key)</label>
+                          <input
+                            type="text"
+                            value={minioAccessKey}
+                            onChange={(e) => { setMinioAccessKey(e.target.value); saveSettings({ minioAccessKey: e.target.value }, { silent: true }); }}
+                            className="w-full h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all font-mono"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground px-1">密钥凭证 (Secret Key)</label>
+                          <input
+                            type="password"
+                            value={minioSecretKey}
+                            onChange={(e) => { setMinioSecretKey(e.target.value); saveSettings({ minioSecretKey: e.target.value }, { silent: true }); }}
+                            className="w-full h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all font-mono"
+                          />
+                        </div>
+                      </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                  <div className="space-y-2.5">
-                                      <label className="text-sm font-bold text-foreground ml-1">Access Key ID</label>
-                                      <input
-                                          type="text"
-                                          value={minioAccessKey}
-                                          onChange={(e) => { setMinioAccessKey(e.target.value); saveSettings({ minioAccessKey: e.target.value }, { silent: true }); }}
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none font-mono"
-                                      />
-                                  </div>
-                                  <div className="space-y-2.5">
-                                      <label className="text-sm font-bold text-foreground ml-1">Secret Access Key</label>
-                                      <input
-                                          type="password"
-                                          value={minioSecretKey}
-                                          onChange={(e) => { setMinioSecretKey(e.target.value); saveSettings({ minioSecretKey: e.target.value }, { silent: true }); }}
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none font-mono"
-                                      />
-                                  </div>
-                              </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground px-1">存储桶名称 (Bucket Name)</label>
+                          <input
+                            type="text"
+                            value={minioBucket}
+                            onChange={(e) => { setMinioBucket(e.target.value); saveSettings({ minioBucket: e.target.value }, { silent: true }); }}
+                            placeholder="my-bucket"
+                            className="w-full h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground px-1">安全连接 (HTTPS)</label>
+                          <div className="h-9 flex items-center px-1">
+                            <Switch
+                              checked={minioUseSSL}
+                              onChange={(val) => { setMinioUseSSL(val); saveSettings({ minioUseSSL: val }); }}
+                            />
+                            <span className="ml-3 text-xs text-muted-foreground">{minioUseSSL ? "已启用加密传输" : "使用明文传输"}</span>
+                          </div>
+                        </div>
+                      </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                  <div className="space-y-2.5">
-                                      <label className="text-sm font-bold text-foreground ml-1">Bucket Name (存储桶)</label>
-                                      <input
-                                          type="text"
-                                          value={minioBucket}
-                                          onChange={(e) => { setMinioBucket(e.target.value); saveSettings({ minioBucket: e.target.value }, { silent: true }); }}
-                                          placeholder="例如: storage-assets"
-                                          className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none font-bold"
-                                      />
-                                  </div>
-                                  <div className="space-y-2.5">
-                                      <label className="text-sm font-bold text-foreground ml-1">连接安全性</label>
-                                      <div className="flex items-center justify-between px-5 h-12 rounded-xl border border-border bg-white dark:bg-white/5">
-                                          <span className="text-sm text-muted-foreground">启用 SSL (HTTPS)</span>
-                                          <Switch
-                                              checked={minioUseSSL}
-                                              onChange={(val) => {
-                                                  setMinioUseSSL(val);
-                                                  saveSettings({ minioUseSSL: val });
-                                              }}
-                                          />
-                                      </div>
-                                  </div>
-                              </div>
-
-                              <div className="space-y-2.5">
-                                  <label className="text-sm font-bold text-foreground ml-1">CDN 访问节点 (可选)</label>
-                                  <input
-                                      type="text"
-                                      value={minioPublicUrl}
-                                      onChange={(e) => { setMinioPublicUrl(e.target.value); saveSettings({ minioPublicUrl: e.target.value }, { silent: true }); }}
-                                      placeholder="例如: https://static.your-domain.com"
-                                      className="w-full h-12 rounded-xl bg-white dark:bg-white/5 border border-border px-4 transition-all focus:ring-2 focus:ring-primary/20 outline-none"
-                                  />
-                                  <p className="text-xs text-muted-foreground/60 px-1">如果你在服务器前置了 Nginx 或 CDN 反向代理，请填写对外公开的域名。</p>
-                              </div>
-                          </motion.div>
-                      )}
-                  </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground px-1">CDN 分发地址 / 公开直连地址 (选填)</label>
+                        <input
+                          type="text"
+                          value={minioPublicUrl}
+                          onChange={(e) => { setMinioPublicUrl(e.target.value); saveSettings({ minioPublicUrl: e.target.value }, { silent: true }); }}
+                          placeholder="https://static.example.com"
+                          className="w-full h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
@@ -832,42 +790,39 @@ function SettingsContent() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <div className="glass-panel rounded-3xl border border-border overflow-hidden">
-                <div className="p-8 border-b border-border/50 bg-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-2xl bg-slate-500/10 text-slate-500 ring-1 ring-slate-500/30">
-                      <Info size={20} />
+              <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                <div className="p-4 md:p-5 border-b border-border/50 bg-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-slate-500/10 text-slate-500 ring-1 ring-slate-500/30">
+                      <Info size={16} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">关于系统</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">软件版本、环境信息与运行诊断</p>
+                      <h3 className="text-base font-bold text-foreground">关于系统</h3>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">软件版本、环境信息与运行诊断</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-8">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                    <div className="p-6 rounded-2xl bg-muted/20 border border-border/40 space-y-2">
-                      <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">核心版本</p>
-                      <p className="text-xl font-mono font-bold text-primary">{systemInfo?.version || "v1.2.4-stable"}</p>
-                    </div>
-                    <div className="p-6 rounded-2xl bg-muted/20 border border-border/40 space-y-2">
-                      <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">数据库</p>
-                      <p className="text-xl font-mono font-bold truncate">{systemInfo?.dbType || "PostgreSQL"}</p>
-                    </div>
-                    <div className="p-6 rounded-2xl bg-muted/20 border border-border/40 space-y-2">
-                      <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">运行环境</p>
-                      <p className="text-xl font-mono font-bold truncate">Node {systemInfo?.nodeVersion || "v20.x"}</p>
-                    </div>
-                    <div className="p-6 rounded-2xl bg-muted/20 border border-border/40 space-y-2">
-                      <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">最后全备</p>
-                      <p className="text-xl font-mono font-bold text-muted-foreground/30">{systemInfo?.lastBackup || "未执行"}</p>
-                    </div>
+                <div className="p-4 md:p-5">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { label: "核心版本", value: systemInfo?.version || "v1.2.4-stable", color: "text-primary" },
+                      { label: "数据库", value: systemInfo?.dbType || "PostgreSQL" },
+                      { label: "运行环境", value: `Node ${systemInfo?.nodeVersion || "v20.x"}` },
+                      { label: "最后全备", value: systemInfo?.lastBackup || "未执行", muted: true }
+                    ].map((item, i) => (
+                      <div key={i} className="p-4 rounded-xl bg-muted/10 border border-border/30 space-y-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">{item.label}</p>
+                        <p className={cn("text-sm font-mono font-bold truncate", item.color, item.muted && "text-muted-foreground/40")}>
+                          {item.value}
+                        </p>
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="mt-8 p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-4">
-                    <AlertTriangle className="text-amber-500 shrink-0 mt-1" size={18} />
-                    <div className="text-xs text-muted-foreground leading-relaxed">
-                      <p className="font-bold text-amber-500/80 mb-1">系统诊断提示：</p>
+                  <div className="mt-6 p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-3">
+                    <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={14} />
+                    <div className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
+                      <p className="font-bold text-amber-500/80 mb-0.5">系统诊断提示：</p>
                       GoodsManager 正在生产环境下运行。请定期执行数据备份。
                     </div>
                   </div>

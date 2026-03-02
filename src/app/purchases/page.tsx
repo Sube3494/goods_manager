@@ -103,8 +103,8 @@ function PurchasesContent() {
     return () => cancelAnimationFrame(handle);
   }, []);
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const pRes = await fetch("/api/purchases");
       
@@ -124,7 +124,7 @@ function PurchasesContent() {
   // 1. Initial Data Fetch & Mounted Status
   useEffect(() => {
     const handle = requestAnimationFrame(() => {
-        fetchData();
+        fetchData(true);
         
         // Sync filter from URL on mount
         const statusParam = searchParams.get('status');
@@ -255,7 +255,7 @@ function PurchasesContent() {
       });
 
       if (res.ok) {
-        fetchData();
+        fetchData(true);
         const msg = data.status === "Draft" ? "草稿已暂存" : (isEdit ? "采购单已更新" : "采购单已创建");
         showToast(msg, "success");
         setIsModalOpen(false);

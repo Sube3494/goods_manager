@@ -48,7 +48,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "gallery:delete")) {
+    if (session.role !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 

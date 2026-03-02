@@ -15,6 +15,10 @@ export async function POST(request: Request) {
       where: { email },
     });
 
+    if (user && user.status === 'DISABLED') {
+        return NextResponse.json({ error: "账户已被禁用，无法发送验证码" }, { status: 403 });
+    }
+
     if (!user) {
         // 1. Initial Admin setup via Environment Variable (Safest)
         const initialAdmin = process.env.INITIAL_ADMIN_EMAIL;

@@ -82,7 +82,7 @@ export async function PUT(request: Request) {
     const role = await prisma.roleProfile.update({
       where: { id },
       data: {
-        name: existing.isSystem ? undefined : name,
+        name,
         description,
         permissions: permissions || undefined,
       }
@@ -119,9 +119,6 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Role not found" }, { status: 404 });
     }
 
-    if (role.isSystem) {
-      return NextResponse.json({ error: "System roles cannot be deleted" }, { status: 403 });
-    }
 
     if (role._count.users > 0) {
       return NextResponse.json({ error: "Cannot delete role while it has active users" }, { status: 400 });

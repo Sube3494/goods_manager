@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   // Cast to SessionUser because getLightSession provides the required role/id
   const user = session as import("@/lib/permissions").SessionUser;
 
-  if (!hasPermission(user, "brush:read")) {
+  if (!hasPermission(user, "brush:manage")) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
 
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
     const user = session as import("@/lib/permissions").SessionUser;
 
-    if (!hasPermission(user, "brush:create")) {
+    if (!hasPermission(user, "brush:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
