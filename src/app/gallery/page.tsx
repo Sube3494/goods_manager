@@ -796,7 +796,7 @@ function GalleryContent() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 -translate-y-1">
             {/* Developer & Contributors Avatar Group - Capsule Styled */}
             {(user === null || user.roleProfile?.name === "基础访客") && (
               <div 
