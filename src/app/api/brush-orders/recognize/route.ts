@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
             content: [
               {
                 type: "text",
-                text: `请分析这张截图，严格按照前面定义的 JSON 结构返回数据。要求：\n- date 必须是截图中显示的真实交易时间。如果截图中的时间缺少跨度（例如只有 "02-24 18:24"），请默认使用当前年份 "${todayYear}" 补充为完整的 "YYYY-MM-DD HH:mm:ss"。如果截图只有日期没有时间，请返回 "YYYY-MM-DD 00:00:00"。如果截图中**没有明确指出任何交易日期或时间**，请发挥你的推断返回 "${todayStr} 00:00:00" 而不是随便编造日期。\n- 金额字段（paymentAmount, receivedAmount）必须是数字，不要带货币符号。注意定义：\n    - \`paymentAmount\`（实付）：指买家/顾客端实际支付的金额。\n    - \`receivedAmount\`（到手/本金）：指商家端实际或预计能收到的结算金额（例如图中的“预计收入”）。\n- 返回的字符串必须是纯粹的 JSON 文本，严禁使用 \`\`\`json 等代码块包裹。`
+                text: `请分析这张截图，严格按照前面定义的 JSON 结构返回数据。要求：\n- date 必须是截图中显示的真实交易时间。如果截图中的时间缺少跨度（例如只有 "02-24 18:24"），请默认使用当前年份 "${todayYear}" 补充为完整的 "YYYY-MM-DD HH:mm:ss"。如果截图只有日期没有时间，请返回 "YYYY-MM-DD 00:00:00"。如果截图中**没有明确指出任何交易日期或时间**，请发挥你的推断返回 "${todayStr} 00:00:00" 而不是随便编造日期。\n- 金额字段（paymentAmount, receivedAmount）必须是数字，不要带货币符号。注意定义：\n    - \`paymentAmount\`（实付）：指买家/顾客端实际支付的金额。**强烈提示：在截图中，该金额通常紧跟在“顾客实际支付”或“实付”文字后面，请务必以此为准。**\n    - \`receivedAmount\`（到手/本金）：指商家端实际或预计能收到的结算金额（例如图中的“预计收入”或“结算金额”）。\n- 返回的字符串必须是纯粹的 JSON 文本，严禁使用 \`\`\`json 等代码块包裹。`
               },
               {
                 type: "image_url",
@@ -91,8 +91,6 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
     const content = data.choices[0]?.message?.content;
     
-    // 记录 AI 的原始返回内容
-    console.log('[AI Recognition] Raw AI Response Content:', content);
 
     if (!content) {
       throw new Error("No content received from AI model");
@@ -108,8 +106,6 @@ export async function POST(req: NextRequest) {
       const jsonStr = jsonMatch[0];
       const parsed = JSON.parse(jsonStr);
 
-      // 记录解析后的 JSON 对象
-      console.log('[AI Recognition] Parsed JSON Object:', parsed);
 
       // 检查日期是否是占位日期（00:00:00）或回退日期
       const rawDateStr = String(parsed.date || "");
@@ -145,8 +141,7 @@ export async function POST(req: NextRequest) {
         timeMissing: isPlaceholderTime || !isValidDate
       };
     } catch {
-      console.error("JSON Parsing Error. Content:", content);
-      return NextResponse.json({ error: "解析识别结果失败", raw: content }, { status: 500 });
+      return NextResponse.json({ error: "解析识别结果失败" }, { status: 500 });
     }
 
     return NextResponse.json(result);

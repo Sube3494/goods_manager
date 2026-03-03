@@ -315,6 +315,17 @@ model BrushOrderItem {
   product      Product    @relation(fields: [productId], references: [id])
 }
 
+model PageView {
+  id        String   @id @default(cuid())
+  date      DateTime @default(now())
+  path      String   @default("/")
+  visitorId String   // 匿名访客 ID（来自 cookie）
+  isUnique  Boolean  @default(false) // 当天该访客首次访问
+
+  @@index([date])
+  @@index([visitorId, date])
+}
+
 enum Role {
   USER
   SUPER_ADMIN

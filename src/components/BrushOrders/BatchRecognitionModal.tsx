@@ -160,14 +160,10 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
     const normRecognized = normalize(recognizedName);
     if (!normRecognized) return null;
 
-    console.log(`[Product Match] Input: "${recognizedName}"`);
-    console.log(`[Product Match] Normalized Input: "${normRecognized}"`);
-    console.log(`[Product Match] Total products to match against: ${products.length}`);
 
     // 第一阶段：SKU 精确匹配
     const skuMatch = products.find(p => p.sku && normalize(p.sku) === normRecognized);
     if (skuMatch) {
-      console.log(`[Product Match] SKU Exact Match: ${skuMatch.name}`);
       return skuMatch;
     }
 
@@ -180,8 +176,6 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
       const recognizedInProduct = normName.includes(normRecognized);
       const productInRecognized = normRecognized.includes(normName);
       if (isExact || recognizedInProduct || productInRecognized) {
-        console.log(`[Product Match] Name Inclusion Match: "${p.name}"`);
-        console.log(`  - exact: ${isExact}, recognizedInProduct: ${recognizedInProduct}, productInRecognized: ${productInRecognized}`);
         nameMatch = p;
         break;
       }
@@ -189,7 +183,6 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
     if (nameMatch) {
       return nameMatch;
     }
-    console.log('[Product Match] No name match found. Falling through to keyword match.');
 
     // 第三阶段：基于关键词的模糊匹配
     // 提取有意义的词组（连续的中文词、英文词、数字）
@@ -203,8 +196,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
       return segments;
     };
 
-    const recognizedKeywords = extractKeywords(normRecognized);
-    console.log(`[Product Match] Keywords from AI: ${recognizedKeywords.join(', ')}`);
+    extractKeywords(normRecognized);
 
     let bestScore = 0;
     let bestProduct: Product | null = null;
@@ -231,18 +223,13 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         bestProduct = p;
       }
 
-      if (hitCount > 0) {
-        console.log(`[Product Match] "${p.name}" hit ${hitCount}/${productKeywords.length} keywords, score: ${score.toFixed(2)}`);
-      }
     });
 
-    console.log(`[Product Match] Best: "${(bestProduct as Product | null)?.name || "None"}" Score: ${bestScore.toFixed(2)} (Threshold: 0.6)`);
 
     if (bestScore >= 0.6) {
       return bestProduct;
     }
 
-    console.log('[Product Match] No match found.');
     return null;
   };
 
@@ -325,6 +312,8 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
 
     setIsProcessing(true);
     let successCount = 0;
+    let duplicateCount = 0;
+    let errorCount = 0;
 
     try {
       for (const item of successItems) {
@@ -349,29 +338,36 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
           });
 
           if (res.status === 409) {
-            console.warn(`Item ${item.file.name} ignored: duplicate order.`);
+            duplicateCount++;
             continue;
           }
 
           if (!res.ok) {
             console.error(`Failed to save item ${item.file.name}:`, await res.text());
+            errorCount++;
             continue;
           }
           
           successCount++;
         } catch (err) {
           console.error(`Exception saving item ${item.file.name}:`, err);
+          errorCount++;
         }
       }
 
-      if (successCount === 0) {
-        showToast("没有任何订单被成功导入，请刷新重试", "error");
-        return;
+      if (successCount > 0) {
+        const msg = duplicateCount > 0 
+          ? `成功导入 ${successCount} 条，跳过 ${duplicateCount} 条重复订单`
+          : `成功导入 ${successCount} 条订单`;
+        showToast(msg, "success");
+        onBatchComplete();
+        onClose();
+      } else if (duplicateCount > 0 && errorCount === 0) {
+        showToast(`订单已存在 (${duplicateCount} 条)，无需重复导入`, "info");
+        onClose();
+      } else {
+        showToast("导入失败，订单可能已存在或发生系统错误", "error");
       }
-
-      showToast(`成功导入 ${successCount}/${successItems.length} 条订单`, "success");
-      onBatchComplete();
-      onClose();
     } catch (err) {
       console.error("Batch save parent error:", err);
     } finally {
@@ -560,16 +556,28 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                       </div>
 
                       {/* Bottom-Left: Warning Indicators */}
-                      {item.status === 'success' && item.result?.timeMissing && (
-                        <div className="absolute bottom-2 left-2 z-10">
-                          <motion.div 
-                            initial={{ scale: 0 }} 
-                            animate={{ scale: 1 }}
-                            className="h-6 w-6 flex items-center justify-center rounded-lg bg-orange-500 backdrop-blur-md border border-orange-400/50 text-white shadow-lg shadow-orange-500/20" 
-                            title="时间未能识别，请核对"
-                          >
-                             <Calendar size={12} />
-                          </motion.div>
+                      {item.status === 'success' && (
+                        <div className="absolute bottom-2 left-2 z-10 flex flex-col gap-1">
+                          {item.result?.timeMissing && (
+                            <motion.div 
+                              initial={{ scale: 0 }} 
+                              animate={{ scale: 1 }}
+                              className="h-6 w-6 flex items-center justify-center rounded-lg bg-orange-500 backdrop-blur-md border border-orange-400/50 text-white shadow-lg shadow-orange-500/20" 
+                              title="时间未能识别，请核对"
+                            >
+                              <Calendar size={12} />
+                            </motion.div>
+                          )}
+                          {(!item.result?.matchedItems || item.result.matchedItems.length === 0) && (
+                            <motion.div 
+                              initial={{ scale: 0 }} 
+                              animate={{ scale: 1 }}
+                              className="h-6 w-6 flex items-center justify-center rounded-lg bg-red-500 backdrop-blur-md border border-red-400/50 text-white shadow-lg shadow-red-500/20" 
+                              title="未识别到匹配商品，请手动添加"
+                            >
+                              <ShoppingBag size={12} />
+                            </motion.div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -677,7 +685,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                                     result: { ...it.result!, paymentAmount: val }
                                   } : it));
                                 }}
-                                className="w-full h-9 rounded-xl bg-zinc-50/50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:bg-white outline-none transition-all"
+                                className="w-full h-9 rounded-xl bg-zinc-100/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white dark:focus:bg-white/10 outline-none transition-all"
                               />
                            </div>
                            <div className="space-y-1.5">
@@ -695,7 +703,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                                     result: { ...it.result!, receivedAmount: val }
                                   } : it));
                                 }}
-                                className="w-full h-9 rounded-xl bg-zinc-50/50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:bg-white outline-none transition-all"
+                                className="w-full h-9 rounded-xl bg-zinc-100/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white dark:focus:bg-white/10 outline-none transition-all"
                               />
                            </div>
                         </div>
@@ -706,10 +714,19 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                   <div className="space-y-4">
                      <div className="flex items-center justify-between border-b border-border/50 pb-2">
                         <label className="text-xs font-bold text-foreground flex items-center gap-2">
-                          <ShoppingBag size={14} className="text-primary" />
+                          <ShoppingBag size={14} className={cn("text-primary", (!editingItem.result.matchedItems || editingItem.result.matchedItems.length === 0) && "text-red-500")} />
                           匹配商品清单
                         </label>
-                        <span className="text-[10px] text-muted-foreground">AI 匹配到 {editingItem.result.matchedItems?.length || 0} 件商品</span>
+                        <span className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                          (!editingItem.result.matchedItems || editingItem.result.matchedItems.length === 0) 
+                            ? "bg-red-500/10 text-red-500 animate-pulse" 
+                            : "bg-emerald-500/10 text-emerald-500"
+                        )}>
+                          {(!editingItem.result.matchedItems || editingItem.result.matchedItems.length === 0) 
+                            ? "未识别到匹配商品" 
+                            : `已自动匹配 ${editingItem.result.matchedItems.length} 件商品`}
+                        </span>
                      </div>
 
                      <div className="space-y-3">
@@ -776,7 +793,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                               placeholder="搜索系统商品以添加..."
                               value={productSearch}
                               onChange={(e) => setProductSearch(e.target.value)}
-                              className="w-full h-10 rounded-xl bg-zinc-50/50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 pl-9 pr-10 text-xs focus:ring-2 focus:ring-primary focus:bg-white outline-none transition-all"
+                              className="w-full h-10 rounded-xl bg-zinc-100/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 pl-9 pr-10 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white dark:focus:bg-white/10 outline-none transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                            />
                            
                            {productSearch && (

@@ -262,7 +262,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           try {
             // 前端大小校验 (Frontend size validation - 50MB)
             if (file.size > 50 * 1024 * 1024) {
-              showToast(`文件 "${file.name}" 超过 50MB 限制, 无法上传`, "error");
+              showToast(`"${file.name.length > 16 ? file.name.slice(0, 16) + '…' : file.name}" 超过 50MB 限制`, "error");
               return;
             }
 
@@ -284,12 +284,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             });
 
             if (isDuplicate) {
-              showToast(`该媒体 "${file.name}" 已在相册中`, "info");
+              showToast(`"${file.name.length > 16 ? file.name.slice(0, 16) + '…' : file.name}" 已在相册中`, "info");
               return;
             }
 
             if (skipped) {
-              showToast(`文件 "${file.name}" 已存在, 已复用现有文件`, "success");
+              showToast(`"${file.name.length > 16 ? file.name.slice(0, 16) + '…' : file.name}" 已存在，已复用`, "success");
             }
             
             const isVideoType = type === 'video';

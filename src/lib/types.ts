@@ -177,6 +177,7 @@ export interface BrushOrder {
   receivedAmount: number;  // 到手金额
   commission: number;      // 佣金
   note?: string;           // 备注
+  platformOrderId?: string; // 平台订单号
   items: BrushOrderItem[];
   workspaceId?: string;
   createdAt?: string;

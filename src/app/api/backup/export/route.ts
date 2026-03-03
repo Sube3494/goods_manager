@@ -56,20 +56,23 @@ export async function POST(request: Request) {
     const jsonString = JSON.stringify(database);
     const encryptedBuffer = BackupCrypto.encrypt(jsonString, password);
 
-    // 3. 更新最后备份时间并返回加密后的 PNK 备份包
-    await prisma.systemSetting.update({
-      where: { id: "system" },
-      data: { lastBackup: new Date() }
-    });
-
-    return new Response(new Uint8Array(encryptedBuffer), {
+    // 3. 先返回备份文件，异步更新最后备份时间（不阻塞响应）
+    const response = new Response(Buffer.from(encryptedBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="PickNote_备份数据_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
+        'Content-Disposition': `attachment; filename="PickNote_Backup_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     });
+
+    // 异步更新备份时间，失败不影响备份文件下载
+    prisma.systemSetting.updateMany({
+      where: { userId },
+      data: { lastBackup: new Date() }
+    }).catch(() => {});
+
+    return response;
 
   } catch (error) {
     console.error("Encryption backup export failed:", error);

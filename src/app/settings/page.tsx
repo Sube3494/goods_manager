@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Upload, Info } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Upload, Info, BarChart2, Users, Eye, TrendingUp } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -17,6 +17,14 @@ interface SystemInfo {
   dbType: string;
   nodeVersion: string;
   lastBackup: string;
+}
+
+interface TrendPoint { label: string; pv: number; uv: number; }
+interface AnalyticsData {
+  today: { pv: number; uv: number };
+  month: { pv: number; uv: number };
+  total: { pv: number; uv: number };
+  trend: TrendPoint[];
 }
 
 // View transitions types are built into modern TS versions, but we'll use a safer approach for the animation logic below.
@@ -41,6 +49,9 @@ function SettingsContent() {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [analyticsRange, setAnalyticsRange] = useState<"7d" | "30d" | "12m">("7d");
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   
   // Initialize tab based on search params
   const initialTab = (searchParams.get("tab") as "general" | "storage" | "data" | "system") || "general";
@@ -108,6 +119,16 @@ function SettingsContent() {
     }
   };
 
+  const fetchAnalytics = async (range: "7d" | "30d" | "12m") => {
+    setIsLoadingAnalytics(true);
+    try {
+      const res = await fetch(`/api/analytics/stats?range=${range}`);
+      if (res.ok) setAnalytics(await res.json());
+    } catch { /* 静默失败 */ } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
   useEffect(() => {
     const initData = async () => {
         try {
@@ -153,6 +174,11 @@ function SettingsContent() {
     };
     initData();
   }, [showToast]);
+
+  // 当切换到「数据管理」tab 或切换 range 时加载 analytics
+  useEffect(() => {
+    if (activeTab === "data") fetchAnalytics(analyticsRange);
+  }, [activeTab, analyticsRange]);
 
   const saveSettings = useCallback(async (newSettings: Record<string, unknown>, options: { silent?: boolean } = {}) => {
     setSaveStatus("saving");
@@ -436,7 +462,188 @@ function SettingsContent() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
+              {/* Analytics Panel */}
+              {(() => {
+                const maxPV = analytics?.trend?.length
+                  ? Math.max(...analytics.trend.map((p) => p.pv), 1)
+                  : 1;
+                const maxUV = analytics?.trend?.length
+                  ? Math.max(...analytics.trend.map((p) => p.uv), 1)
+                  : 1;
+                const W = 400, H = 80, pts = analytics?.trend ?? [];
+                const toX = (i: number) => pts.length > 1 ? (i / (pts.length - 1)) * W : W / 2;
+                const toPVY = (v: number) => H - (v / maxPV) * (H - 8);
+                const toUVY = (v: number) => H - (v / maxUV) * (H - 8);
+                const pvPath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toPVY(p.pv).toFixed(1)}`).join(" ");
+                const uvPath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toUVY(p.uv).toFixed(1)}`).join(" ");
+
+                return (
+                  <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                    {/* Header */}
+                    <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className="p-2 rounded-xl bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/30 shrink-0">
+                          <BarChart2 size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-base font-bold text-foreground">访问量统计</h3>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">全站 PV / UV 统计</p>
+                        </div>
+                      </div>
+                      {/* Range Switcher */}
+                      <div className="flex bg-muted/50 p-0.5 rounded-lg self-start sm:self-auto shrink-0">
+                        {(["7d", "30d", "12m"] as const).map((r) => (
+                          <button
+                            key={r}
+                            onClick={() => setAnalyticsRange(r)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-md text-[10px] font-bold transition-all",
+                              analyticsRange === r
+                                ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {r === "7d" ? "近7天" : r === "30d" ? "近30天" : "近12月"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-4 md:p-5 space-y-5">
+                      {/* 三个数字卡片 */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {[
+                          {
+                            label: "今日访问",
+                            icon: Eye,
+                            color: "text-violet-500",
+                            bg: "bg-violet-500/10",
+                            ring: "ring-violet-500/20",
+                            pv: analytics?.today.pv ?? 0,
+                            uv: analytics?.today.uv ?? 0,
+                          },
+                          {
+                            label: "本月访问",
+                            icon: TrendingUp,
+                            color: "text-blue-500",
+                            bg: "bg-blue-500/10",
+                            ring: "ring-blue-500/20",
+                            pv: analytics?.month.pv ?? 0,
+                            uv: analytics?.month.uv ?? 0,
+                          },
+                          {
+                            label: "累计总量",
+                            icon: Users,
+                            color: "text-emerald-500",
+                            bg: "bg-emerald-500/10",
+                            ring: "ring-emerald-500/20",
+                            pv: analytics?.total.pv ?? 0,
+                            uv: analytics?.total.uv ?? 0,
+                          },
+                        ].map((card, idx) => (
+                          <div
+                            key={card.label}
+                            className={cn(
+                              "relative rounded-xl border border-border p-3 space-y-2 overflow-hidden bg-white/5 dark:bg-white/3 transition-all",
+                              isLoadingAnalytics && "animate-pulse",
+                              idx === 2 && "col-span-2 sm:col-span-1"
+                            )}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <div className={cn("p-1 rounded-lg ring-1", card.bg, card.ring)}>
+                                <card.icon size={11} className={card.color} />
+                              </div>
+                              <span className="text-[10px] font-bold text-muted-foreground">{card.label}</span>
+                            </div>
+                            <div className="space-y-0.5">
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-xl font-black text-foreground tabular-nums">
+                                  {card.pv.toLocaleString()}
+                                </span>
+                                <span className="text-[9px] font-bold text-muted-foreground/60">PV</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs font-bold text-muted-foreground tabular-nums">
+                                  {card.uv.toLocaleString()}
+                                </span>
+                                <span className="text-[9px] font-bold text-muted-foreground/50">UV</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* SVG 趋势图 */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground">
+                          <div className="flex items-center gap-1.5">
+                            <div className="h-0.5 w-4 rounded bg-violet-500" />
+                            PV 浏览量
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-4 border-t-2 border-dashed border-emerald-500/70" />
+                            UV 独立访客
+                          </div>
+                        </div>
+                        <div className="relative w-full overflow-hidden rounded-xl bg-muted/30 border border-border/40 p-3">
+                          {isLoadingAnalytics ? (
+                            <div className="h-20 flex items-center justify-center">
+                              <div className="h-4 w-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+                            </div>
+                          ) : pts.length === 0 ? (
+                            <div className="h-20 flex items-center justify-center text-xs text-muted-foreground/50">暂无数据</div>
+                          ) : (
+                            <>
+                              <svg
+                                viewBox={`0 0 ${W} ${H}`}
+                                className="w-full"
+                                style={{ height: 80 }}
+                                preserveAspectRatio="none"
+                              >
+                                <defs>
+                                  <linearGradient id="pvGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
+                                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                                  </linearGradient>
+                                </defs>
+                                {/* PV area fill */}
+                                {pts.length > 1 && (
+                                  <path
+                                    d={`${pvPath} L${toX(pts.length - 1).toFixed(1)},${H} L${toX(0).toFixed(1)},${H} Z`}
+                                    fill="url(#pvGrad)"
+                                  />
+                                )}
+                                {/* PV line */}
+                                <path d={pvPath} fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                {/* UV line */}
+                                <path d={uvPath} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3" />
+                                {/* PV dots */}
+                                {pts.map((p, i) => (
+                                  <circle key={i} cx={toX(i)} cy={toPVY(p.pv)} r="2.5" fill="#8b5cf6" />
+                                ))}
+                              </svg>
+                              {/* X 轴标签（只显示首尾及中间部分） */}
+                              <div className="flex justify-between mt-1 px-0.5">
+                                {pts.map((p, i) => {
+                                  const show = i === 0 || i === pts.length - 1 || (pts.length <= 12 && i % Math.ceil(pts.length / 6) === 0);
+                                  return (
+                                    <span key={i} className={cn("text-[9px] text-muted-foreground/50 font-medium", !show && "invisible")}>
+                                      {p.label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Data Management Section */}
+
               <div className="glass-panel rounded-2xl border border-border overflow-hidden">
                 <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">

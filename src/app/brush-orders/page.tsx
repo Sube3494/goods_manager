@@ -97,6 +97,7 @@ export default function BrushOrdersPage() {
           pinyinMatch(o.id, query) ||
           pinyinMatch(o.type, query) ||
           pinyinMatch(o.note || "", query) ||
+          pinyinMatch(o.platformOrderId || "", query) ||
           o.items.some(i => i.product?.name && pinyinMatch(i.product.name, query)) 
       );
 
@@ -116,7 +117,7 @@ export default function BrushOrdersPage() {
     }).sort((a, b) => {
         const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
         const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
-        return timeA - timeB;
+        return timeB - timeA;
     });
   }, [orders, searchQuery, startDate, endDate, selectedType]);
 
@@ -175,24 +176,24 @@ export default function BrushOrdersPage() {
 
     // 第二步：排序并编序号
     groups.forEach(monthGroup => {
-        // 天数按时间正序排列
-        monthGroup.days.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        // 天数按时间倒序排列（最新的在前）
+        monthGroup.days.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         monthGroup.days.forEach(dayGroup => {
             dayGroup.orders.sort((a, b) => {
                 const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
                 const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
-                return timeA - timeB; // 单日内按照下单顺序正排
+                return timeB - timeA; // 单日内按照下单顺序倒排
             });
-            // 重新按序分配每天的内部序号
+            // 重新按序分配每天的内部序号（保持从 1 开始，也可以考虑从当前总数倒数，但业务上通常正序编号即可）
             dayGroup.orders.forEach((order, index) => {
-                order.globalIndex = index + 1; // 保持从 1 开始的正向流水号
+                order.globalIndex = index + 1; 
             });
         });
     });
     
-    // 月份也改为正排（最早在前）
-    groups.sort((a, b) => a.month.localeCompare(b.month));
+    // 月份也改为倒排（最新的在前）
+    groups.sort((a, b) => b.month.localeCompare(a.month));
 
     return groups;
   }, [filteredOrders]);
