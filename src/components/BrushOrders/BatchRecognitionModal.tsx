@@ -399,8 +399,8 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-            "relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden bg-white/90 dark:bg-gray-900/70 backdrop-blur-xl rounded-3xl shadow-2xl border transition-all flex flex-col",
-            isDragging ? "border-primary scale-[1.01] ring-4 ring-primary/10" : "border-gray-200 dark:border-white/10"
+            "relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-900/80 backdrop-blur-2xl rounded-3xl shadow-2xl border transition-all flex flex-col",
+            isDragging ? "border-primary scale-[1.01] ring-4 ring-primary/10" : "border-zinc-200 dark:border-white/10"
         )}
       >
         {/* Drag Overlay */}
@@ -421,7 +421,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         </AnimatePresence>
         {/* Header */}
         <div className={cn(
-          "p-4 sm:p-6 border-b border-gray-100 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-gray-50/50 dark:bg-white/5 relative",
+          "p-4 sm:p-6 border-b border-zinc-100 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-white dark:bg-white/5 relative",
           editingItemId && "hidden sm:flex" // 在移动端编辑时隐藏主页眉，或者保持精简
         )}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 pr-8 w-full sm:w-auto">
@@ -436,8 +436,8 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             </div>
             
             <div className="flex items-center gap-2 sm:pl-6 sm:border-l border-gray-200 dark:border-white/10 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbars-hide">
-              <span className="text-xs font-bold text-gray-400 shrink-0">平台:</span>
-              <div className="flex bg-black/10 dark:bg-black/40 backdrop-blur-md rounded-xl p-1 shrink-0">
+              <span className="text-xs font-bold text-zinc-400 shrink-0">平台:</span>
+              <div className="flex bg-zinc-100/50 dark:bg-black/40 backdrop-blur-md rounded-xl p-1 shrink-0 border border-zinc-200/50 dark:border-transparent">
                 {['美团', '淘宝', '京东'].map(p => (
                   <button
                     key={p}
@@ -445,8 +445,8 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                     className={cn(
                       "px-3 sm:px-4 py-1.5 sm:py-1 text-xs font-black rounded-lg transition-all duration-200 whitespace-nowrap",
                       selectedPlatform === p 
-                        ? "bg-foreground text-background dark:text-black shadow-lg shadow-black/10 scale-105" 
-                        : "text-muted-foreground/70 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+                        ? "bg-zinc-900 dark:bg-foreground text-zinc-50 dark:text-black shadow-md scale-105" 
+                        : "text-zinc-500/70 hover:text-foreground hover:bg-white/50 dark:hover:bg-white/5"
                     )}
                   >
                     {p}
@@ -475,10 +475,10 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
               <div className="flex-1 flex items-center justify-center min-h-[400px]">
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full max-w-lg h-64 border-2 border-dashed border-border dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                  className="w-full max-w-lg h-64 border-2 border-dashed border-zinc-100 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/30 hover:bg-primary/[0.02] transition-all group"
                 >
-                  <div className="p-5 rounded-full bg-muted/50 dark:bg-white/5 group-hover:scale-110 transition-transform">
-                    <ImageIcon size={40} className="text-muted-foreground group-hover:text-primary" />
+                  <div className="p-5 rounded-full bg-zinc-50 dark:bg-white/5 group-hover:scale-110 transition-transform">
+                    <ImageIcon size={40} className="text-zinc-300 group-hover:text-primary" />
                   </div>
                   <div className="text-center">
                     <p className="font-bold text-lg">点击、拖拽或粘贴订单截图</p>
@@ -543,8 +543,8 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                           </div>
                         )}
                         {item.status === 'processing' && (
-                          <div className="h-6 w-6 flex items-center justify-center rounded-lg bg-primary/20 backdrop-blur-md border border-primary/30 text-primary shadow-lg shadow-primary/10">
-                            <Loader2 size={13} className="animate-spin" />
+                          <div className="h-6 w-6 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-xl">
+                            <Loader2 size={14} className="animate-spin" />
                           </div>
                         )}
                         {item.status === 'success' && (
@@ -647,8 +647,11 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                                        result: { ...it.result!, date: val, timeMissing: false }
                                      } : it));
                                    }}
-                                   isCompact
-                                   triggerClassName={cn(editingItem.result.timeMissing && "border-orange-500 ring-1 ring-orange-500/50 bg-orange-500/5")}
+                                   className="h-9"
+                                   triggerClassName={cn(
+                                     "justify-start px-3",
+                                     editingItem.result.timeMissing && "border-orange-500 ring-1 ring-orange-500/50 bg-orange-500/5"
+                                   )}
                                  />
                                  {editingItem.result.timeMissing && (
                                    <p className="text-[9px] text-orange-600 dark:text-orange-400 font-bold mt-1 flex items-center gap-1">
@@ -674,7 +677,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                                     result: { ...it.result!, paymentAmount: val }
                                   } : it));
                                 }}
-                                className="w-full h-9 rounded-xl bg-muted/30 border border-border/50 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+                                className="w-full h-9 rounded-xl bg-zinc-50/50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:bg-white outline-none transition-all"
                               />
                            </div>
                            <div className="space-y-1.5">
@@ -692,7 +695,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                                     result: { ...it.result!, receivedAmount: val }
                                   } : it));
                                 }}
-                                className="w-full h-9 rounded-xl bg-muted/30 border border-border/50 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+                                className="w-full h-9 rounded-xl bg-zinc-50/50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 px-3 text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:bg-white outline-none transition-all"
                               />
                            </div>
                         </div>
@@ -711,7 +714,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
 
                      <div className="space-y-3">
                         {editingItem.result.matchedItems?.map((mi, idx) => (
-                           <div key={idx} className="flex items-center gap-3 p-3 rounded-2xl bg-muted/20 border border-border group">
+                           <div key={idx} className="flex items-center gap-3 p-3 rounded-2xl bg-zinc-50/30 dark:bg-white/5 border border-zinc-100 dark:border-white/10 group">
                               <div className="w-10 h-10 rounded-lg bg-white dark:bg-white/5 border border-border overflow-hidden shrink-0">
                                  {mi.product.image ? (
                                    <Image 
@@ -773,7 +776,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                               placeholder="搜索系统商品以添加..."
                               value={productSearch}
                               onChange={(e) => setProductSearch(e.target.value)}
-                              className="w-full h-10 rounded-xl bg-muted/30 border border-border/50 pl-9 pr-10 text-xs focus:ring-2 focus:ring-primary outline-none"
+                              className="w-full h-10 rounded-xl bg-zinc-50/50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 pl-9 pr-10 text-xs focus:ring-2 focus:ring-primary focus:bg-white outline-none transition-all"
                            />
                            
                            {productSearch && (
@@ -802,7 +805,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                                        } : it));
                                        setProductSearch("");
                                      }}
-                                      className="w-full flex items-center gap-3 p-2.5 hover:bg-muted/50 text-left transition-colors"
+                                       className="w-full flex items-center gap-3 p-2.5 hover:bg-zinc-50 dark:hover:bg-white/10 text-left transition-colors"
                                     >
                                       <div className="w-8 h-8 rounded bg-gray-100 overflow-hidden shrink-0 relative">
                                         {p.image && (
@@ -846,7 +849,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                           } : it));
                         }}
                         placeholder="修正识别偏差或补充备注..."
-                        className="w-full rounded-2xl bg-muted/30 border border-border/50 p-4 text-xs min-h-[80px] focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none"
+                        className="w-full rounded-2xl bg-zinc-50/50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 p-4 text-xs min-h-[80px] focus:ring-2 focus:ring-primary focus:bg-white focus:border-transparent outline-none transition-all resize-none"
                      />
                   </div>
                 </div>
@@ -856,7 +859,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+        <div className="p-4 sm:p-6 border-t border-zinc-100 dark:border-white/10 bg-white dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-medium hidden sm:block">
             {items.length > 0 && (
               <span>已添加 {items.length} 张图片</span>
