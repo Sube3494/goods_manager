@@ -71,15 +71,16 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       setSelectedProducts([]);
       setSearchQuery("");
       setSelectedSupplierId("");
-      setProducts([]); 
-      setIsLoading(true);
-      setIsDataStale(true);
+      // 不再清空 products，除非是首次初始化或需要强制刷新
+      // setProducts([]); 
+      setIsLoading(products.length === 0);
+      setIsDataStale(products.length > 0);
       pageRef.current = 1;
       setIsInitialized(true);
     } else {
       setIsInitialized(false);
     }
-  }, [isOpen, selectedIds]);
+  }, [isOpen]); // 移除对 selectedIds 的依赖，因为它可能由于父组件重渲染而导致意外重置
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -319,7 +320,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                         ))}
                     </div>
                  ) : (
-                    <div className={cn("space-y-2 transition-opacity duration-200", (isSearching || isDataStale) && "opacity-60 pointer-events-none")}>
+                    <div className={cn("space-y-2 transition-all duration-300", (isSearching || isDataStale) && "opacity-60 grayscale-[0.2] pointer-events-none")}>
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
                       return (

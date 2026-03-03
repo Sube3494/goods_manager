@@ -255,7 +255,21 @@ function PurchasesContent() {
       });
 
       if (res.ok) {
-        fetchData(true);
+        const savedPO = await res.json();
+        
+        // 由于返回的数据可能没有经过 URL resolve，我们在这里执行一次静默获取或者手动维护状态
+        // 为了保险起见（图片 resolve 等），我们使用显式的刷新，但采用不带 loading 的方式
+        if (isEdit) {
+            setPurchases(prev => prev.map(p => p.id === savedPO.id ? { ...p, ...savedPO } : p));
+        } else {
+            setPurchases(prev => [savedPO, ...prev]);
+        }
+        
+        // 延迟后台同步，确保本地插入/更新动画流程不被刷新数据打断
+        setTimeout(() => {
+           fetchData(true);
+        }, 500);
+        
         const msg = data.status === "Draft" ? "草稿已暂存" : (isEdit ? "采购单已更新" : "采购单已创建");
         showToast(msg, "success");
         setIsModalOpen(false);
@@ -633,7 +647,7 @@ function PurchasesContent() {
       {/* Desktop Table View */}
       <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[calc(100vh-220px)]">
-          {isLoading ? (
+          {isLoading && purchases.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center text-center">
                <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
                <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
@@ -651,13 +665,17 @@ function PurchasesContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence>
                 {filteredPurchases.map((po) => (
                    <motion.tr 
                     key={po.id}
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: isPending ? 0.6 : 1 }}
+                    animate={{ 
+                      opacity: (isPending || (isLoading && purchases.length > 0)) ? 0.6 : 1,
+                      y: 0 
+                    }}
                     exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
                     className="hover:bg-muted/20 transition-colors group"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -770,9 +788,12 @@ function PurchasesContent() {
       </div>
 
       {/* Mobile Card View */}
-      <div className="grid grid-cols-1 gap-4 md:hidden pb-20">
+      <div className={cn(
+        "grid grid-cols-1 gap-4 md:hidden pb-20 transition-opacity duration-300",
+        (isPending || (isLoading && purchases.length > 0)) && "opacity-50"
+      )}>
         <AnimatePresence mode="popLayout">
-          {isLoading ? (
+          {isLoading && purchases.length === 0 ? (
              <div className="py-12 flex flex-col items-center justify-center text-center">
                 <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
                 <p className="text-muted-foreground text-sm font-medium">加载中...</p>

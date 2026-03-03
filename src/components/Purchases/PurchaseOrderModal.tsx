@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin } from "lucide-react";
@@ -25,25 +25,231 @@ interface PurchaseOrderModalProps {
   readOnly?: boolean;
 }
 
+const PurchaseItemRow = memo(({ 
+    item, 
+    index, 
+    readOnly, 
+    products, 
+    suppliers, 
+    onUpdate, 
+    onRemove 
+}: { 
+    item: PurchaseOrderItem; 
+    index: number; 
+    readOnly: boolean; 
+    products: Product[]; 
+    suppliers: Supplier[];
+    onUpdate: (index: number, field: keyof PurchaseOrderItem, value: string | number) => void;
+    onRemove: (index: number) => void;
+}) => {
+    const imageUrl = item.image || item.product?.image || products.find(g => g.id === item.productId)?.image;
+    const productName = item.product?.name || products.find(g => g.id === item.productId)?.name || "加载中...";
+    const productSku = item.product?.sku || products.find(g => g.id === item.productId)?.sku;
+    const supplierId = item.product?.supplierId || item.supplierId;
+    const supplierName = suppliers.find(s => s.id === supplierId)?.name;
+    const remark = item.product?.remark || products.find(g => g.id === item.productId)?.remark;
+
+    return (
+        <motion.div 
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className={cn(
+                "group relative flex flex-col sm:grid items-center gap-4 p-4 rounded-2xl bg-white dark:bg-white/10 border border-border dark:border-white/5 shadow-sm transition-all",
+                readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_80px_120px_120px_40px]'
+            )}
+        >
+            {/* Product Info Column */}
+            <div className="flex w-full items-center gap-3">
+                <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50">
+                    {imageUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img 
+                            src={imageUrl} 
+                            alt="product" 
+                            className="h-full w-full object-cover" 
+                        />
+                    ) : (
+                        <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
+                            <Package size={14} />
+                        </div>
+                    )}
+                </div>
+                <div className="flex-1 space-y-1 min-w-0">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
+                                {productName}
+                            </span>
+                            {!readOnly && (
+                                <button 
+                                    type="button"
+                                    onClick={() => onRemove(index)}
+                                    className="sm:hidden shrink-0 flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
+                                    title="移除商品"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            {productSku && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                    #{productSku}
+                                </span>
+                            )}
+                            {supplierName && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                    • {supplierName}
+                                </span>
+                            )}
+                            {remark && (
+                                <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
+                                    <span className="font-bold opacity-70 shrink-0">注:</span>
+                                    <span className="truncate leading-none">{remark}</span>
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Mobile Stats Row / Desktop Columns */}
+            <div className="grid grid-cols-3 sm:contents gap-2 w-full pt-3 sm:pt-0 border-t border-border/10 sm:border-0 items-center">
+                {/* Quantity Column */}
+                <div className="flex flex-col sm:block items-center justify-center">
+                    <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">数量</label>
+                    {readOnly ? (
+                        <div className="w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm font-mono font-bold text-foreground">
+                            {item.quantity}
+                        </div>
+                    ) : (
+                        <input 
+                            type="number" 
+                            min="1"
+                            value={item.quantity || ""}
+                            onChange={(e) => onUpdate(index, "quantity", e.target.value)}
+                            className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
+                        />
+                    )}
+                </div>
+
+                {/* Price Column */}
+                <div className="flex flex-col sm:block items-center justify-center">
+                    <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">单价</label>
+                    {readOnly ? (
+                        <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm font-mono text-foreground">
+                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
+                            {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                        </div>
+                    ) : (
+                        <div className="relative w-full">
+                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                value={item.costPrice || ""}
+                                onChange={(e) => onUpdate(index, "costPrice", e.target.value)}
+                                className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-[10px] sm:text-xs no-spinner"
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Total Column */}
+                <div className="flex flex-col sm:block items-end justify-center">
+                    <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">小计</label>
+                    <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs sm:text-sm overflow-hidden whitespace-nowrap">
+                        <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
+                        {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                    </div>
+                </div>
+                {!readOnly && (
+                    <div className="hidden sm:flex w-full sm:w-auto pt-2 sm:pt-0 justify-end">
+                        <button 
+                            type="button"
+                            onClick={() => onRemove(index)}
+                            className="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
+                            title="移除商品"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
+                )}
+            </div>
+        </motion.div>
+    );
+});
+
+PurchaseItemRow.displayName = "PurchaseItemRow";
+
+const FeePill = memo(({ 
+    icon: Icon, 
+    label, 
+    value, 
+    inputValue, 
+    onChange, 
+    readOnly, 
+    colorClass, 
+    prefix = "￥" 
+}: { 
+    icon: React.ComponentType<{ size?: number; className?: string }>; 
+    label: string; 
+    value: number; 
+    inputValue: string; 
+    onChange: (val: string) => void; 
+    readOnly: boolean; 
+    colorClass: string;
+    prefix?: string;
+}) => (
+    <div className={cn("flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/50 dark:bg-white/5 border border-border/50 shadow-sm transition-all hover:border-orange-500/30 group", colorClass)}>
+        <div className={cn("p-1 rounded-full", colorClass.replace('border-', 'bg-').replace('/30', '/10'))}>
+            <Icon size={10} />
+        </div>
+        <span className="text-[10px] font-bold text-muted-foreground/60">{label}</span>
+        {readOnly ? (
+            <span className="text-xs font-mono font-black text-foreground">{prefix}{value}</span>
+        ) : (
+            <div className="flex items-center text-xs font-mono font-black border-none outline-none">
+                <span className="text-[9px] opacity-40">{prefix}</span>
+                <input 
+                    type="number" 
+                    value={inputValue}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="w-10 sm:w-12 bg-transparent text-foreground outline-none no-spinner p-0 h-auto"
+                />
+            </div>
+        )}
+    </div>
+));
+FeePill.displayName = "FeePill";
+
 export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOverview, initialData, readOnly = false }: PurchaseOrderModalProps) {
   const { showToast } = useToast();
   const { user } = useUser();
   const router = useRouter();
   const typedUser = user as unknown as UserType;
   
-  const [formData, setFormData] = useState<PurchaseOrder>(() => ({
-    id: initialData?.id || `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
-    status: initialData?.status || "Draft",
-    // New orders are always 'Purchase'; only existing records can have other types
-    type: initialData?.type || "Purchase",
-    date: initialData?.date || new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
-    items: initialData?.items || [],
-    shippingFees: initialData?.shippingFees || 0,
-    extraFees: initialData?.extraFees || 0,
-    totalAmount: initialData?.totalAmount || 0,
-    trackingData: initialData?.trackingData,
-    shippingAddress: initialData?.shippingAddress || ""
-  }));
+  const [formData, setFormData] = useState<PurchaseOrder>(() => {
+    if (initialData) return initialData;
+    const today = new Date();
+    return {
+      id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
+      status: "Draft",
+      type: "Purchase",
+      date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
+      items: [],
+      shippingFees: 0,
+      extraFees: 0,
+      totalAmount: 0,
+      discountAmount: 0,
+      shippingAddress: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.address || (user as unknown as UserType)?.shippingAddresses?.[0]?.address || ""
+    };
+  });
+  
+  // Data fetch status to avoid redundant calls
+  const [hasFetchedData, setHasFetchedData] = useState(false);
 
   const addressList = useMemo(() => {
     return typedUser?.shippingAddresses || [];
@@ -125,6 +331,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     const handle = requestAnimationFrame(() => setMounted(true));
     
     const fetchData = async () => {
+      if (hasFetchedData) return;
       try {
         const [pRes, sRes] = await Promise.all([
           fetch("/api/products"),
@@ -141,6 +348,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
           const sData = await sRes.json();
           setSuppliers(sData);
         }
+        setHasFetchedData(true);
       } catch (error) {
         console.error("Failed to fetch data:", error);
       }
@@ -148,7 +356,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
 
     if (isOpen) fetchData();
     return () => cancelAnimationFrame(handle);
-  }, [isOpen]);
+  }, [isOpen, hasFetchedData]);
 
   // Sync data and reset form when modal opens or initialData changes
   useEffect(() => {
@@ -602,141 +810,16 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                             )}
 
                             {formData.items.map((item, index) => (
-                                <div key={index} className={`group relative flex flex-col sm:grid ${readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_80px_120px_120px_40px]'} items-center gap-4 p-4 rounded-2xl bg-white dark:bg-white/10 border border-border dark:border-white/5 shadow-sm transition-all animate-in fade-in slide-in-from-top-2`}>
-                                    {/* Product Info Column */}
-                                    <div className="flex w-full items-center gap-3">
-                                        <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50">
-                                            {(() => {
-                                                const imageUrl = item.image || item.product?.image || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.image;
-                                                return imageUrl ? (
-                                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                                    <img 
-                                                        src={imageUrl} 
-                                                        alt="product" 
-                                                        className="h-full w-full object-cover" 
-                                                    />
-                                                ) : (
-                                                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
-                                                        <Package size={14} />
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-                                        <div className="flex-1 space-y-1 min-w-0">
-                                            <div className="flex flex-col gap-0.5 min-w-0">
-                                                    <div className="flex items-start justify-between gap-2">
-                                                    <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
-                                                        {item.product?.name || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.name || "加载中..."}
-                                                    </span>
-                                                    {!readOnly && (
-                                                        <button 
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                removeItem(index);
-                                                            }}
-                                                            className="sm:hidden shrink-0 flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
-                                                            title="移除商品"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                 <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                                    {(item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku) && (
-                                                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                                          #{item.product?.sku || (Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.sku}
-                                                      </span>
-                                                    )}
-                                                    {(() => {
-                                                      const supplierId = item.product?.supplierId || item.supplierId;
-                                                      const supplierName = suppliers.find(s => s.id === supplierId)?.name;
-                                                      return supplierName ? (
-                                                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                                            • {supplierName}
-                                                        </span>
-                                                      ) : null;
-                                                     })()}
-                                                       
-                                                     {/* Remarks Display in purchase rows */}
-                                                     {((Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.remark || item.product?.remark) && (
-                                                        <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
-                                                            <span className="font-bold opacity-70 shrink-0">注:</span>
-                                                            <span className="truncate leading-none">{(Array.isArray(products) ? products : []).find(g => g.id === item.productId)?.remark || item.product?.remark}</span>
-                                                        </span>
-                                                     )}
-                                                 </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Mobile Stats Row / Desktop Columns */}
-                                    <div className="grid grid-cols-3 sm:contents gap-2 w-full pt-3 sm:pt-0 border-t border-border/10 sm:border-0 items-center">
-                                        {/* Quantity Column */}
-                                        <div className="flex flex-col sm:block items-center justify-center">
-                                            <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">数量</label>
-                                            {readOnly ? (
-                                                <div className="w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm font-mono font-bold text-foreground">
-                                                    {item.quantity}
-                                                </div>
-                                            ) : (
-                                                <input 
-                                                    type="number" 
-                                                    min="1"
-                                                    value={item.quantity || ""}
-                                                    onChange={(e) => updateItem(index, "quantity", e.target.value)}
-                                                    className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
-                                                />
-                                            )}
-                                        </div>
-
-                                        {/* Price Column */}
-                                        <div className="flex flex-col sm:block items-center justify-center">
-                                            <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">单价</label>
-                                            {readOnly ? (
-                                                <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm font-mono text-foreground">
-                                                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
-                                                    {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 1 })}
-                                                </div>
-                                            ) : (
-                                                <div className="relative w-full">
-                                                    <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
-                                                    <input 
-                                                        type="number" 
-                                                        step="0.01"
-                                                        value={item.costPrice || ""}
-                                                        onChange={(e) => updateItem(index, "costPrice", e.target.value)}
-                                                        className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-[10px] sm:text-xs no-spinner"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Total Column */}
-                                        <div className="flex flex-col sm:block items-end justify-center">
-                                            <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">小计</label>
-                                            <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs sm:text-sm overflow-hidden whitespace-nowrap">
-                                                <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
-                                                {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1 })}
-                                            </div>
-                                        </div>
-                                        {!readOnly && (
-                                            <div className="hidden sm:flex w-full sm:w-auto pt-2 sm:pt-0 justify-end">
-                                                <button 
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        removeItem(index);
-                                                    }}
-                                                    className="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
-                                                    title="移除商品"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                <PurchaseItemRow 
+                                    key={`${item.productId}-${index}`}
+                                    item={item}
+                                    index={index}
+                                    readOnly={effectiveReadOnly}
+                                    products={products}
+                                    suppliers={suppliers}
+                                    onUpdate={updateItem}
+                                    onRemove={removeItem}
+                                />
                             ))}
                             
                             {formData.items.length === 0 && (
@@ -1103,80 +1186,42 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                         {/* Fee Pills Group - Horizontal Scroll on Mobile */}
                         {!isSystemGenerated && formData.type !== "Inbound" && (
                             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-2 px-2 py-0.5 sm:mx-0 sm:px-0 sm:py-0">
-                                {/* Shipping Pill */}
-                                <div className="flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/50 dark:bg-white/5 border border-border/50 shadow-sm transition-all hover:border-orange-500/30 group">
-                                    <div className="p-1 rounded-full bg-orange-500/10 text-orange-500">
-                                        <Truck size={10} />
-                                    </div>
-                                    <span className="text-[10px] font-bold text-muted-foreground/60">运费</span>
-                                    {readOnly ? (
-                                        <span className="text-xs font-mono font-black text-foreground">￥{formData.shippingFees}</span>
-                                    ) : (
-                                        <div className="flex items-center text-xs font-mono font-black border-none outline-none">
-                                            <span className="text-[9px] opacity-40">￥</span>
-                                            <input 
-                                                type="number" 
-                                                value={shippingFeeInput}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setShippingFeeInput(val);
-                                                    setFormData({...formData, shippingFees: parseFloat(val) || 0});
-                                                }}
-                                                className="w-10 sm:w-12 bg-transparent text-foreground outline-none no-spinner p-0 h-auto"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Extra Pill */}
-                                <div className="flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/50 dark:bg-white/5 border border-border/50 shadow-sm transition-all hover:border-blue-500/30 group">
-                                    <div className="p-1 rounded-full bg-blue-500/10 text-blue-500">
-                                        <Plus size={10} />
-                                    </div>
-                                    <span className="text-[10px] font-bold text-muted-foreground/60">其它</span>
-                                    {readOnly ? (
-                                        <span className="text-xs font-mono font-black text-foreground">￥{formData.extraFees}</span>
-                                    ) : (
-                                        <div className="flex items-center text-xs font-mono font-black border-none outline-none">
-                                            <span className="text-[9px] opacity-40">￥</span>
-                                            <input 
-                                                type="number" 
-                                                value={extraFeeInput}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setExtraFeeInput(val);
-                                                    setFormData({...formData, extraFees: parseFloat(val) || 0});
-                                                }}
-                                                className="w-10 sm:w-12 bg-transparent text-foreground outline-none no-spinner p-0 h-auto"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Discount Pill */}
-                                <div className="flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/5 border border-amber-500/20 shadow-sm transition-all hover:border-amber-500/40 group">
-                                    <div className="p-1 rounded-full bg-amber-500/10 text-amber-500">
-                                        <Minus size={10} />
-                                    </div>
-                                    <span className="text-[10px] font-bold text-amber-600/60 dark:text-amber-400/40">折扣</span>
-                                    {readOnly ? (
-                                        <span className="text-xs font-mono font-black text-amber-600 dark:text-amber-400">￥{formData.discountAmount || 0}</span>
-                                    ) : (
-                                        <div className="flex items-center text-xs font-mono font-black border-none outline-none">
-                                            <span className="text-[9px] opacity-40 text-amber-500/50">￥</span>
-                                            <input 
-                                                type="number" 
-                                                value={discountInput}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setDiscountInput(val);
-                                                    setFormData({...formData, discountAmount: parseFloat(val) || 0});
-                                                }}
-                                                className="w-10 sm:w-12 bg-transparent text-amber-700 dark:text-amber-300 outline-none no-spinner p-0 h-auto"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
+                                <FeePill 
+                                    icon={Truck}
+                                    label="运费"
+                                    value={formData.shippingFees}
+                                    inputValue={shippingFeeInput}
+                                    onChange={(val: string) => {
+                                        setShippingFeeInput(val);
+                                        setFormData(prev => ({...prev, shippingFees: parseFloat(val) || 0}));
+                                    }}
+                                    readOnly={readOnly}
+                                    colorClass="hover:border-orange-500/30"
+                                />
+                                <FeePill 
+                                    icon={Plus}
+                                    label="其它"
+                                    value={formData.extraFees}
+                                    inputValue={extraFeeInput}
+                                    onChange={(val: string) => {
+                                        setExtraFeeInput(val);
+                                        setFormData(prev => ({...prev, extraFees: parseFloat(val) || 0}));
+                                    }}
+                                    readOnly={readOnly}
+                                    colorClass="hover:border-blue-500/30"
+                                />
+                                <FeePill 
+                                    icon={Minus}
+                                    label="折扣"
+                                    value={formData.discountAmount || 0}
+                                    inputValue={discountInput}
+                                    onChange={(val: string) => {
+                                        setDiscountInput(val);
+                                        setFormData(prev => ({...prev, discountAmount: parseFloat(val) || 0}));
+                                    }}
+                                    readOnly={readOnly}
+                                    colorClass="bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40"
+                                />
                             </div>
                         )}
 

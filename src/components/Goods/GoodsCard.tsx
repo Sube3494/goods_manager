@@ -54,12 +54,11 @@ export const GoodsCard = memo(function GoodsCard({
       {/* Full Card Discontinued Overlay */}
       {product.isDiscontinued && (
         <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden">
-          {/* Grayscale/Faded backdrop mask that sits behind the red text but covers the whole card */}
-          <div className="absolute inset-0 bg-white/40 dark:bg-black/40 backdrop-grayscale-[0.8]"></div>
+          {/* 使用普通的半透明遮罩代替昂贵的 backdrop-grayscale 滤镜 */}
+          <div className="absolute inset-0 bg-white/60 dark:bg-black/80"></div>
           
           <div 
-             className="relative z-10 transform -rotate-45 font-black text-red-600/70 dark:text-red-500/70 text-5xl sm:text-7xl lg:text-6xl xl:text-5xl tracking-widest whitespace-nowrap select-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)] dark:drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]"
-             style={{ WebkitTextStroke: '2px rgba(255, 255, 255, 0.5)' }}
+             className="relative z-10 transform -rotate-45 font-black text-red-600/40 dark:text-red-500/30 text-5xl sm:text-7xl lg:text-6xl xl:text-5xl tracking-widest whitespace-nowrap select-none"
           >
             已停产
           </div>

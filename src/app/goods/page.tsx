@@ -376,8 +376,11 @@ export default function GoodsPage() {
           // 静默更新本地数据，避免页面滚动到顶部
           setItems(prev => prev.map(item => item.id === product.id ? { ...item, ...product } : item));
         } else {
-          // 新建商品还是维持刷新逻辑
-          fetchGoods(true);
+          // 新建商品：将其插入到列表最前面，避免全量刷新
+          setItems(prev => [product, ...prev]);
+          setTotalResults(prev => prev + 1);
+          // 如果列表是按某种顺序排列的，且后端返回的数据可能不在首位，
+          // 可以在一段时间后静默同步一次
         }
       } else {
         showToast("操作失败", "error");
@@ -661,14 +664,17 @@ export default function GoodsPage() {
 
 
       {/* Grid */}
-      {(isLoading && items.length === 0) || isPending ? (
+      {isLoading && items.length === 0 ? (
         <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
              <GoodsCardSkeleton key={i} />
           ))}
         </div>
       ) : (
-        <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className={cn(
+          "grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 transition-opacity duration-300",
+          isPending && "opacity-50 pointer-events-none"
+        )}>
           {filteredGoods.map((product, index) => (
             <GoodsCard 
               key={product.id} 
