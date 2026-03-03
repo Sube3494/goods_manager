@@ -475,7 +475,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
               <div className="flex-1 flex items-center justify-center min-h-[400px]">
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full max-w-lg h-64 border-2 border-dashed border-zinc-100 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/30 hover:bg-primary/[0.02] transition-all group"
+                  className="w-full max-w-lg h-64 border-2 border-dashed border-zinc-100 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/30 hover:bg-primary/2 transition-all group"
                 >
                   <div className="p-5 rounded-full bg-zinc-50 dark:bg-white/5 group-hover:scale-110 transition-transform">
                     <ImageIcon size={40} className="text-zinc-300 group-hover:text-primary" />

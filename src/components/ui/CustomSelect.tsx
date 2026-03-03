@@ -64,12 +64,14 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
       const spaceBelow = windowHeight - rect.bottom;
       const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
-      setDropdownPosition({
-        top: showAbove ? rect.top - 8 : rect.bottom + 8,
-        left: rect.left,
-        width: rect.width,
-        showAbove,
-        isReady: true
+      requestAnimationFrame(() => {
+        setDropdownPosition({
+          top: showAbove ? rect.top - 8 : rect.bottom + 8,
+          left: rect.left,
+          width: rect.width,
+          showAbove,
+          isReady: true
+        });
       });
     }
   }, [isOpen]);
@@ -120,11 +122,14 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
                 width: `${dropdownPosition.width}px`,
                 zIndex: 99999,
                 transformOrigin: dropdownPosition.showAbove ? 'bottom' : 'top',
-                translateY: dropdownPosition.showAbove ? '-100%' : '0%'
+                translateY: dropdownPosition.showAbove ? '-100%' : '0%',
+                willChange: 'transform, opacity',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden'
               } as React.CSSProperties}
               className="rounded-2xl glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
             >
-              <div className="max-h-60 overflow-auto p-1 py-1.5 custom-scrollbar">
+              <div className="max-h-60 overflow-auto p-1 py-1.5">
                 {options.length > 0 ? (
                   options.map((option) => (
                     <button

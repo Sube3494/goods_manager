@@ -122,7 +122,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background relative overflow-hidden">
+    <div className="flex flex-col min-h-dvh w-full sm:items-center items-start justify-center bg-background relative overflow-y-auto overflow-x-hidden py-10 sm:py-0">
         {/* Dynamic Background */}
         <div className="absolute inset-0 w-full h-full bg-grid-white/[0.02] -z-10" />
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -180,7 +180,7 @@ export default function LoginPage() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className="w-full max-w-md relative z-10 px-4"
+        className="w-full max-w-md relative z-10 px-4 mt-16 sm:mt-0"
       >
         <div className="relative glass border-white/10 shadow-2xl rounded-[2.5rem] p-10 overflow-hidden group">
           <div className="absolute inset-0 bg-linear-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
@@ -297,7 +297,15 @@ export default function LoginPage() {
                                 <div className="w-full aspect-square bg-white rounded-xl p-2 relative flex flex-col items-center justify-center border border-white/20 overflow-hidden group/qr">
                                 <span className="text-xs text-zinc-400 font-bold text-center leading-relaxed z-0 absolute px-2">如果已放置 public/wechat.png <br/>请刷新页面</span>
                                 <div className="absolute inset-0 z-10 bg-white">
-                                    <Image src="/wechat.png" alt="WeChat QR" fill sizes="150px" className="object-cover rounded-lg" unoptimized />
+                                    <Image 
+                                        src="/wechat.png" 
+                                        alt="WeChat QR" 
+                                        fill 
+                                        sizes="150px" 
+                                        className="object-cover rounded-lg" 
+                                        priority
+                                        unoptimized 
+                                    />
                                 </div>
                                 </div>
                             </div>

@@ -159,8 +159,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             />
             <main className={cn(
                 "flex-1 w-full",
-                !isFullScreenPage && "px-4 sm:px-6 lg:px-10 pb-10",
-                !isFullScreenPage && (pathname === "/gallery" ? "pt-0 sm:pt-2" : "pt-4")
+                !isFullScreenPage && "pt-4 px-4 sm:px-6 lg:px-10 pb-10",
             )}>
                 <div className={cn(
                     "h-full animate-fade-in",

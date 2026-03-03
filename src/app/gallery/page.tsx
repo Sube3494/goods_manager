@@ -198,7 +198,6 @@ function GalleryContent() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [hoveredDev, setHoveredDev] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -231,6 +230,7 @@ function GalleryContent() {
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [hoveredDev, setHoveredDev] = useState(false);
 
   // Scroll listener for Back to Top button
   useEffect(() => {
@@ -253,7 +253,6 @@ function GalleryContent() {
   const { showToast } = useToast();
   
   // 基础权限检查，不再用于隐藏按钮，仅用于业务逻辑拦截
-  const canUploadRef = isAdmin ? hasPermission(user as SessionUser | null, "gallery:upload") : isUploadAllowed;
 
   // 统一权限拦截与游客引导逻辑
   const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy", action: () => void) => {
@@ -786,37 +785,67 @@ function GalleryContent() {
   };
 
   return (
-    <div className="w-full pb-12">
+    <div className="space-y-8">
         {/* Header */}
         {/* Header section with unified style */}
-        <div className={cn(
-          "flex items-center justify-between transition-all relative z-10 gap-4",
-          canUploadRef ? "mb-6 sm:mb-8" : "mb-2 sm:mb-4"
-        )}>
+        <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-                <span>实物<span className="text-primary">相册</span></span>
-            </h1>
-            <p className="text-muted-foreground mt-0.5 sm:mt-1.5 text-[10px] sm:text-lg truncate opacity-80 font-medium">
+            <h1 className="text-4xl sm:text-4xl font-bold tracking-tight text-foreground truncate">实物<span className="text-primary">相册</span></h1>
+            <p className="block text-muted-foreground mt-1 sm:mt-2 text-[10px] sm:text-lg truncate max-w-2xl opacity-80">
                 {user ? (isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示") : "登录可探索更多实拍详情与下载功能"}
             </p>
           </div>
 
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                 <button 
-                   onClick={() => {
-                     checkAction("gallery:upload", () => {
-                         setIsUploadModalOpen(true);
-                         setUploadForm({ productId: "", urls: [], tags: "" });
-                     });
-                   }}
-                   className="h-9 w-9 sm:h-10 sm:w-auto sm:px-6 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center sm:gap-2 transition-all font-bold shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap shrink-0"
-                 >
-                   <Plus size={20} className="shrink-0" />
-                   <span className="hidden sm:inline">上传实物</span>
-                 </button>
-             </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Developer & Contributors Avatar Group - Capsule Styled */}
+            {(user === null || user.roleProfile?.name === "基础访客") && (
+              <div 
+                className={cn(
+                    "flex items-center gap-3 px-4 py-2 rounded-full bg-white dark:bg-white/5 border transition-all shadow-sm",
+                    hoveredDev 
+                        ? "border-primary/50 bg-black/5 dark:bg-white/10 shadow-md ring-1 ring-primary/10" 
+                        : "border-border dark:border-white/10"
+                )}
+                onMouseEnter={() => setHoveredDev(true)}
+                onMouseLeave={() => setHoveredDev(false)}
+              >
+                <div className="flex -space-x-4 items-center">
+                  {/* Contributor Avatar */}
+                  <div className="relative h-10 w-10 sm:h-14 sm:w-14 rounded-full border-2 border-background ring-1 ring-zinc-200/50 dark:ring-white/10 overflow-hidden bg-muted transition-transform hover:z-20 hover:scale-110">
+                    <Image 
+                      src="/contributors/member.jpg" 
+                      alt="Contributor" 
+                      fill 
+                      className="object-cover"
+                    />
+                  </div>
+                  {/* Main Developer Avatar */}
+                  <div 
+                    className="relative h-10 w-10 sm:h-14 sm:w-14 rounded-full border-2 border-background ring-1 ring-zinc-200/50 dark:ring-white/10 overflow-hidden bg-muted transition-transform hover:z-20 hover:scale-110 cursor-pointer"
+                    onClick={() => {
+                      if (window.innerWidth >= 640) window.open('https://sube.top', '_blank');
+                    }}
+                    onDoubleClick={() => {
+                      if (window.innerWidth < 640) window.open('https://sube.top', '_blank');
+                    }}
+                    title="PC单击 / 移动端双击访问主页"
+                  >
+                    <Image 
+                      src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
+                      alt="Sube"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-0.5 justify-center items-center">
+                  <span className="text-[10px] sm:text-[13px] font-bold text-foreground/80 tracking-tight leading-none">素材提供 & 开发者</span>
+                  <span className="text-[8px] sm:text-[10px] font-black text-primary tracking-widest opacity-80 uppercase">CONTRIBUTORS</span>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
 
         <div className="flex flex-row gap-2 items-center w-full transition-all mb-6 md:mb-10">
               <div className="h-10 sm:h-11 px-3 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
@@ -1070,7 +1099,7 @@ function GalleryContent() {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.98 }}
                             transition={{ duration: 0.15 }}
-                            className="relative z-10 w-full max-w-lg rounded-3xl bg-white dark:bg-white/5 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col"
+                            className="relative z-10 w-full max-w-lg rounded-[32px] bg-white dark:bg-[#0b111e] backdrop-blur-3xl shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden flex flex-col font-rounded"
                         >
                             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
                                 <h2 className="text-xl font-bold text-foreground">上传实物内容</h2>
@@ -1190,16 +1219,16 @@ function GalleryContent() {
                                         )})}
 
                                         {/* Add Button */}
-                                         <label className="relative aspect-square rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer overflow-hidden group">
+                                         <label className="relative aspect-square rounded-2xl border-2 border-dashed border-zinc-200 dark:border-white/5 hover:border-primary/40 dark:hover:border-primary/40 bg-zinc-50 dark:bg-white/5 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer overflow-hidden group">
                                             <input type="file" className="hidden" accept="image/*,video/*" multiple onChange={handleFileUpload} />
-                                            <div className="p-2 rounded-full bg-muted group-hover:bg-primary/10 transition-colors">
+                                            <div className="p-3 rounded-2xl bg-white dark:bg-white/10 shadow-sm group-hover:bg-primary/10 transition-all duration-300">
                                                 {isUploading ? (
                                                     <div className="h-6 w-6 animate-spin border-2 border-primary border-t-transparent rounded-full" />
                                                 ) : (
-                                                    <Plus size={24} className="text-muted-foreground group-hover:text-primary transition-all" />
+                                                    <Plus size={24} className="text-zinc-400 dark:text-zinc-500 group-hover:text-primary transition-all scale-100 group-hover:scale-110" />
                                                 )}
                                             </div>
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-center px-2">
+                                            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center px-2">
                                                 {isUploading ? "上传中" : "添加"}
                                             </span>
                                         </label>
@@ -1216,7 +1245,7 @@ function GalleryContent() {
                                             </label>
                                             <div 
                                                 onClick={() => setIsProductSelectOpen(true)}
-                                                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border transition-colors flex items-center justify-between group cursor-pointer hover:bg-muted mb-2"
+                                                className="w-full px-4 py-4 rounded-[20px] bg-zinc-50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/5 transition-all duration-300 flex items-center justify-between group cursor-pointer hover:bg-zinc-100 dark:hover:bg-white/10 mb-2 hover:translate-x-1"
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
                                                     {uploadForm.productId ? (() => {
@@ -1254,7 +1283,7 @@ function GalleryContent() {
                                     ) : (
                                         <div className="space-y-4">
                                             {uploadForm.productId ? (
-                                                <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3 mb-4">
+                                                <div className="p-4 rounded-[20px] bg-zinc-50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/5 flex items-center gap-3 mb-4 shadow-sm">
                                                     <div className="h-10 w-10 rounded-lg overflow-hidden shrink-0 border border-black/10">
                                                         {products.find(p => p.id === uploadForm.productId)?.image ? (
                                                             /* eslint-disable-next-line @next/next/no-img-element */
@@ -1278,7 +1307,7 @@ function GalleryContent() {
                                                 </div>
                                             ) : (
                                                 <div className="space-y-4">
-                                            <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-start gap-3">
+                                            <div className="p-4 rounded-[20px] bg-zinc-50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/5 flex items-start gap-3 shadow-sm">
                                                 <Info size={18} className="text-primary shrink-0 mt-0.5" />
                                                 <div className="space-y-1">
                                                     <p className="text-sm text-primary">实拍审核说明</p>
@@ -1329,10 +1358,10 @@ function GalleryContent() {
                                     <button 
                                         type="submit" 
                                         disabled={uploadForm.urls.length === 0 || (isAdmin && !uploadForm.productId) || (!isAdmin && !uploadForm.productId && !uploadForm.tags.split(",")[0] && !uploadForm.tags.split(",")[1]) || !!isUploading}
-                                        className="flex items-center gap-2 rounded-xl bg-primary px-8 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all"
+                                        className="relative flex items-center gap-2 rounded-2xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all group overflow-hidden"
                                     >
-                                        <CheckCircle size={18} />
-                                        {isAdmin ? "确认发布" : "提交审核"} ({uploadForm.urls.length})
+                                        <CheckCircle size={18} className="relative z-10" />
+                                        <span className="relative z-10">{isAdmin ? "确认发布" : "提交审核"} ({uploadForm.urls.length})</span>
                                     </button>
                                 </div>
                             </form>
@@ -1758,73 +1787,6 @@ function GalleryContent() {
           )}
         </AnimatePresence>
 
-        {/* Developer & Contributors Avatar Group - Fixed Animation */}
-        {(user === null || user.roleProfile?.name === "基础访客") && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
-            onMouseEnter={() => setHoveredDev(true)}
-            onMouseLeave={() => setHoveredDev(false)}
-            onClick={() => {
-              if (window.innerWidth < 1024) { // Only toggle on mobile/tablet
-                setHoveredDev(!hoveredDev);
-              }
-            }}
-          >
-            {/* Avatar Stack Wrapper */}
-            <div className="relative flex items-center h-16 sm:h-20">
-              
-              {/* Contributor Avatar - Controlled by state */}
-              <motion.div 
-                className="absolute z-0"
-                initial={{ x: 0, opacity: 0 }}
-                animate={{ 
-                  x: hoveredDev ? (window.innerWidth < 640 ? -40 : -50) : 0, 
-                  opacity: hoveredDev ? 1 : 0 
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              >
-                <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-transparent overflow-hidden flex items-center justify-center">
-                    <Image 
-                        src="/contributors/member.jpg" 
-                        alt="Contributor" 
-                        fill 
-                        className="object-cover"
-                    />
-                    {/* Integrated Shadow Label for Material Provider */}
-                    <div className={`absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-black/80 to-transparent flex items-end justify-center pb-1.5 transition-opacity duration-500 pointer-events-none ${hoveredDev ? 'opacity-100' : 'opacity-0'}`}>
-                        <span className="text-[10px] sm:text-[11px] font-bold text-white tracking-widest whitespace-nowrap">素材提供</span>
-                    </div>
-                </div>
-              </motion.div>
-
-              {/* Main Developer Avatar - Frontend Layer */}
-              <div className="relative z-10">
-                {/* Removed glow to eliminate all outline artifacts */}
-                <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-transparent overflow-hidden flex items-center justify-center transition-transform duration-500 cursor-help">
-                    <Image 
-                        src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
-                        alt="Sube"
-                        fill
-                        className="object-cover transform group-hover:rotate-6 transition-transform duration-500"
-                    />
-                    {/* Integrated Shadow Label for Developer */}
-                    <div className={`absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-black/80 to-transparent flex items-end justify-center pb-1.5 transition-opacity duration-500 pointer-events-none ${hoveredDev ? 'opacity-100' : 'opacity-100 sm:opacity-0'}`}>
-                        <span className="text-[10px] sm:text-[11px] font-bold text-white tracking-widest">开发者</span>
-                    </div>
-                </div>
-
-                {/* "+1" Badge - Theme-aware contrast */}
-                {!hoveredDev && (
-                  <div className="absolute -top-0.5 -right-0.5 z-20 h-5 w-5 rounded-full bg-black/60 dark:bg-white/20 backdrop-blur-lg flex items-center justify-center pointer-events-none transition-all duration-300">
-                      <span className="text-[9px] font-black text-white">+1</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
       </div>,
       document.body
     )}
