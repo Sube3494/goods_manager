@@ -13,9 +13,9 @@ model Category {
   id          String    @id @default(cuid())
   name        String
   description String?
-  userId      String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  userId      String?
   user        User?     @relation(fields: [userId], references: [id])
   products    Product[]
 
@@ -32,7 +32,6 @@ model Product {
   image           String?
   categoryId      String
   supplierId      String?
-  userId          String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   isPublic        Boolean             @default(true)
@@ -40,6 +39,7 @@ model Product {
   pinyin          String?
   isDiscontinued  Boolean             @default(false)
   remark          String?
+  userId          String?
   brushOrderItems BrushOrderItem[]
   gallery         GalleryItem[]
   outboundItems   OutboundOrderItem[]
@@ -62,9 +62,9 @@ model Supplier {
   phone              String?
   email              String?
   address            String?
-  userId             String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  userId             String?
   products           Product[]
   purchaseOrderItems PurchaseOrderItem[]
   user               User?               @relation(fields: [userId], references: [id])
@@ -84,11 +84,11 @@ model PurchaseOrder {
   discountAmount  Float               @default(0)
   paymentVouchers Json?               @default("[]")
   trackingData    Json?               @default("[]")
-  userId          String?
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   note            String?
   shippingAddress String?
+  userId          String?
   user            User?               @relation(fields: [userId], references: [id])
   items           PurchaseOrderItem[]
 
@@ -116,10 +116,10 @@ model OutboundOrder {
   type      String              @default("Sale")
   date      DateTime            @default(now())
   note      String?
-  userId    String?
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
   status    String              @default("Normal")
+  userId    String?
   user      User?               @relation(fields: [userId], references: [id])
   items     OutboundOrderItem[]
 
@@ -144,9 +144,9 @@ model GalleryItem {
   isPublic  Boolean  @default(true)
   type      String   @default("image")
   sortOrder Int      @default(0)
-  userId    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String?
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User?    @relation(fields: [userId], references: [id])
 
@@ -163,9 +163,9 @@ model GallerySubmission {
   notes           String?
   productId       String?
   selectedIndices Json?
-  userId          String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  userId          String?
   user            User?    @relation(fields: [userId], references: [id])
 
   @@index([status])
@@ -179,35 +179,33 @@ model User {
   role               Role                @default(USER)
   status             String              @default("ACTIVE")
   permissions        Json?               @default("{}")
-  roleProfileId      String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   shippingAddresses  Json?               @default("[]")
-  roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
-  products           Product[]
+  roleProfileId      String?
+  brushOrders        BrushOrder[]
   categories         Category[]
-  suppliers          Supplier[]
-  purchaseOrders     PurchaseOrder[]
-  outboundOrders     OutboundOrder[]
   galleryItems       GalleryItem[]
   gallerySubmissions GallerySubmission[]
-  brushOrders        BrushOrder[]
+  outboundOrders     OutboundOrder[]
+  products           Product[]
+  purchaseOrders     PurchaseOrder[]
+  suppliers          Supplier[]
   systemSettings     SystemSetting[]
+  roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
 }
 
 model RoleProfile {
   id          String           @id @default(cuid())
-  name        String
+  name        String           @unique
   description String?
   permissions Json             @default("{}")
   isSystem    Boolean          @default(false)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  users       User[]
-  invitations Invitation[]
   whitelist   EmailWhitelist[]
-
-  @@unique([name])
+  invitations Invitation[]
+  users       User[]
 }
 
 model EmailWhitelist {
@@ -215,9 +213,9 @@ model EmailWhitelist {
   email         String       @unique
   role          Role         @default(USER)
   permissions   Json?        @default("{}")
-  roleProfileId String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+  roleProfileId String?
   roleProfile   RoleProfile? @relation(fields: [roleProfileId], references: [id])
 }
 
@@ -237,12 +235,12 @@ model Invitation {
   email         String
   role          Role         @default(USER)
   permissions   Json?        @default("{}")
-  roleProfileId String?
   inviterId     String
   expiresAt     DateTime
   usedAt        DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+  roleProfileId String?
   roleProfile   RoleProfile? @relation(fields: [roleProfileId], references: [id])
 
   @@index([token])
@@ -254,7 +252,7 @@ model RegistrationRequest {
   email     String   @unique
   name      String?
   reason    String?
-  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status    String   @default("PENDING")
   adminNote String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -264,7 +262,6 @@ model RegistrationRequest {
 
 model SystemSetting {
   id                     String    @id @default(cuid())
-  userId                 String?
   lowStockThreshold      Int       @default(10)
   allowDataImport        Boolean   @default(true)
   allowGalleryUpload     Boolean   @default(true)
@@ -281,6 +278,7 @@ model SystemSetting {
   shareExpireUnit        String    @default("hours")
   lastBackup             DateTime?
   updatedAt              DateTime  @updatedAt
+  userId                 String?
   user                   User?     @relation(fields: [userId], references: [id])
 
   @@index([userId])
@@ -295,10 +293,10 @@ model BrushOrder {
   receivedAmount  Float            @default(0)
   commission      Float            @default(0)
   note            String?
-  platformOrderId String?
-  userId          String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  platformOrderId String?
+  userId          String?
   user            User?            @relation(fields: [userId], references: [id])
   items           BrushOrderItem[]
 

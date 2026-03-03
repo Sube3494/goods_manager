@@ -52,5 +52,9 @@ next-env.d.ts
 /public/uploads/*
 !/public/uploads/.gitkeep
 
+# Contributors Avatars
+/public/contributors/*
+!/public/contributors/.gitkeep
+
 # Prisma Generated Client
 /prisma/generated-client*

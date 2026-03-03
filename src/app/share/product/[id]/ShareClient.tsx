@@ -77,10 +77,10 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
                     <div className="flex flex-col items-center justify-center w-full h-full max-w-6xl mx-auto gap-2 relative">
                         {/* Video Container - Compact sizing */}
                         <div className="relative flex items-center justify-center w-full min-h-0 bg-transparent rounded-xl overflow-hidden shadow-2xl shrink-0">
-                            <video 
-                                ref={videoRef}
-                                src={item.url} 
-                                className="max-w-full max-h-[70vh] w-auto h-auto object-contain cursor-pointer"
+                                <video 
+                                    ref={videoRef}
+                                    src={item.url} 
+                                    className="max-w-full max-h-[calc(100vh-320px)] w-auto h-auto object-contain cursor-pointer"
                                 disablePictureInPicture
                                 disableRemotePlayback
                                 autoPlay
@@ -188,7 +188,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
                         <GestureImage 
                             src={item.url} 
                             onScaleChange={onScaleChange}
-                            className="max-w-full max-h-full object-contain"
+                            className="max-w-full max-h-[calc(100vh-320px)] object-contain"
                         />
                     </div>
                 )}

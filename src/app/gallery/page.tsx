@@ -20,6 +20,7 @@ import { hasPermission } from "@/lib/permissions";
 import { Product, GalleryItem, Category } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
+import md5 from "blueimp-md5";
 
 
 interface LightboxMediaItemProps {
@@ -73,7 +74,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMe
                                 <video 
                                     ref={videoRef}
                                     src={item.url} 
-                                    className="max-w-full max-h-[70vh] w-auto h-auto object-contain cursor-pointer"
+                                    className="max-w-full max-h-[calc(100vh-320px)] w-auto h-auto object-contain cursor-pointer"
                                     disablePictureInPicture
                                     disableRemotePlayback
                                     autoPlay
@@ -181,7 +182,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMe
                             <GestureImage 
                                 src={item.url} 
                                 onScaleChange={onScaleChange}
-                                className="max-w-full max-h-full object-contain"
+                                className="max-w-full max-h-[calc(100vh-320px)] object-contain"
                             />
                         </div>
                     )}
@@ -197,6 +198,7 @@ function GalleryContent() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [hoveredDev, setHoveredDev] = useState(false);
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -304,22 +306,19 @@ function GalleryContent() {
         setIsUIVisible(true);
     }
 
+    // 移除自动隐藏逻辑，以满足用户“常显”以及不希望被突然隐藏干扰的需求
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    if (selectedImage) {
-        idleTimerRef.current = setTimeout(() => {
-            setIsUIVisible(false);
-        }, 1200);
-    }
-  }, [selectedImage]);
+  }, []);
 
   useEffect(() => {
+    const currentTimer = idleTimerRef.current;
     if (selectedImage) {
         handleInteraction();
     } else {
         setIsUIVisible(true);
-        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        if (currentTimer) clearTimeout(currentTimer);
     }
-    return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
+    return () => { if (currentTimer) clearTimeout(currentTimer); };
   }, [selectedImage, handleInteraction]);
 
   const [showInfo, setShowInfo] = useState(false);
@@ -1736,25 +1735,97 @@ function GalleryContent() {
       />
     )}
 
-    {/* Back to Top Button */}
+    {/* Floating Actions Stack (Back to Top + Dev Avatar) */}
     {typeof document !== "undefined" && createPortal(
-      <AnimatePresence>
-        {showBackToTop && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.5, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.5, y: 20 }}
+      <div className="fixed bottom-6 right-6 z-9999 flex flex-col items-center gap-5 pointer-events-none">
+        
+        {/* Back to Top Button */}
+        <AnimatePresence>
+          {showBackToTop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: 10 }}
+              onClick={() => {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+                  document.body.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center rounded-full bg-white dark:bg-zinc-800 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group pointer-events-auto"
+            >
+              <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Developer & Contributors Avatar Group - Fixed Animation */}
+        {(user === null || user.roleProfile?.name === "基础访客") && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative flex items-center justify-center pointer-events-auto cursor-pointer"
+            onMouseEnter={() => setHoveredDev(true)}
+            onMouseLeave={() => setHoveredDev(false)}
             onClick={() => {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-                document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
-                document.body.scrollTo({ top: 0, behavior: "smooth" });
+              if (window.innerWidth < 1024) { // Only toggle on mobile/tablet
+                setHoveredDev(!hoveredDev);
+              }
             }}
-            className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"
           >
-            <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
-          </motion.button>
+            {/* Avatar Stack Wrapper */}
+            <div className="relative flex items-center h-16 sm:h-20">
+              
+              {/* Contributor Avatar - Controlled by state */}
+              <motion.div 
+                className="absolute z-0"
+                initial={{ x: 0, opacity: 0 }}
+                animate={{ 
+                  x: hoveredDev ? (window.innerWidth < 640 ? -40 : -50) : 0, 
+                  opacity: hoveredDev ? 1 : 0 
+                }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              >
+                <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-transparent overflow-hidden flex items-center justify-center">
+                    <Image 
+                        src="/contributors/member.jpg" 
+                        alt="Contributor" 
+                        fill 
+                        className="object-cover"
+                    />
+                    {/* Integrated Shadow Label for Material Provider */}
+                    <div className={`absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-black/80 to-transparent flex items-end justify-center pb-1.5 transition-opacity duration-500 pointer-events-none ${hoveredDev ? 'opacity-100' : 'opacity-0'}`}>
+                        <span className="text-[10px] sm:text-[11px] font-bold text-white tracking-widest whitespace-nowrap">素材提供</span>
+                    </div>
+                </div>
+              </motion.div>
+
+              {/* Main Developer Avatar - Frontend Layer */}
+              <div className="relative z-10">
+                {/* Removed glow to eliminate all outline artifacts */}
+                <div className="relative h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-transparent overflow-hidden flex items-center justify-center transition-transform duration-500 cursor-help">
+                    <Image 
+                        src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
+                        alt="Sube"
+                        fill
+                        className="object-cover transform group-hover:rotate-6 transition-transform duration-500"
+                    />
+                    {/* Integrated Shadow Label for Developer */}
+                    <div className={`absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-black/80 to-transparent flex items-end justify-center pb-1.5 transition-opacity duration-500 pointer-events-none ${hoveredDev ? 'opacity-100' : 'opacity-100 sm:opacity-0'}`}>
+                        <span className="text-[10px] sm:text-[11px] font-bold text-white tracking-widest">开发者</span>
+                    </div>
+                </div>
+
+                {/* "+1" Badge - Theme-aware contrast */}
+                {!hoveredDev && (
+                  <div className="absolute -top-0.5 -right-0.5 z-20 h-5 w-5 rounded-full bg-black/60 dark:bg-white/20 backdrop-blur-lg flex items-center justify-center pointer-events-none transition-all duration-300">
+                      <span className="text-[9px] font-black text-white">+1</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
         )}
-      </AnimatePresence>,
+      </div>,
       document.body
     )}
 
