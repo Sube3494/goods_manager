@@ -271,7 +271,9 @@ function GalleryContent() {
 
     // 已登录：检查具体权限
     const hasPerm = hasPermission(user as SessionUser | null, permissionKey);
-    if (!hasPerm && permissionKey === "gallery:upload" && !isUploadAllowed) {
+
+    // 系统已关闭上传功能
+    if (permissionKey === "gallery:upload" && !isUploadAllowed) {
         showToast("当前系统已关闭上传权限", "error");
         return;
     }
@@ -1528,23 +1530,24 @@ function GalleryContent() {
                                 </AnimatePresence>
 
                                 <div className="flex items-center gap-2 pointer-events-auto">
+                                    {/* 上传按钮：仅系统开启上传功能且用户拥有 gallery:upload 权限时显示 */}
+                                    {isUploadAllowed && hasPermission(user as SessionUser | null, "gallery:upload") && (
                                     <button 
                                         onClick={() => {
-                                            checkAction("gallery:upload", () => {
-                                                const product = selectedImage?.product;
-                                                setUploadForm({ 
-                                                    productId: product?.id || "", 
-                                                    urls: [], 
-                                                    tags: "" 
-                                                });
-                                                setIsUploadModalOpen(true);
+                                            const product = selectedImage?.product;
+                                            setUploadForm({ 
+                                                productId: product?.id || "", 
+                                                urls: [], 
+                                                tags: "" 
                                             });
+                                            setIsUploadModalOpen(true);
                                         }}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
                                         title="为此商品上传新实拍"
                                     >
                                         <Plus size={20} strokeWidth={2.5} />
                                     </button>
+                                    )}
                                     
                                     <button 
                                         onClick={() => {
