@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useTransition } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
+import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { Search, Plus, Download, ArrowUp, X, RotateCcw } from "lucide-react";
@@ -562,12 +563,12 @@ export default function GoodsPage() {
                   className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
                 />
                 {searchQuery && (
-                  <button 
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
+                   <button 
+                     onClick={() => setSearchQuery("")}
+                     className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
+                   >
+                     <X size={14} />
+                   </button>
                 )}
               </div>
               {hasActiveFilters && (
@@ -660,10 +661,10 @@ export default function GoodsPage() {
 
 
       {/* Grid */}
-      {isLoading && items.length === 0 ? (
+      {(isLoading && items.length === 0) || isPending ? (
         <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-64 rounded-2xl bg-muted/20 animate-pulse border border-border" />
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
+             <GoodsCardSkeleton key={i} />
           ))}
         </div>
       ) : (
@@ -705,7 +706,7 @@ export default function GoodsPage() {
       )}
 
       {/* Empty State */}
-      {!isLoading && filteredGoods.length === 0 && (
+      {!isLoading && !isPending && filteredGoods.length === 0 && (
         <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center">
             <div className="rounded-full bg-muted/50 p-4 mb-4">
                 <Search size={32} className="text-muted-foreground" />

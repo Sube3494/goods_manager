@@ -42,7 +42,7 @@ export function ActionBar({
               onClick={onToggleSelectAll}
               className={`h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                 isAllSelected 
-                ? "bg-foreground border-foreground text-background" 
+                ? "bg-foreground border-foreground text-background dark:text-black" 
                 : "border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20"
               }`}
             >
@@ -60,7 +60,7 @@ export function ActionBar({
               {onEdit && (
                 <button
                   onClick={onEdit}
-                  className="h-9 sm:h-8 px-4 sm:px-6 rounded-full bg-foreground hover:bg-foreground/90 text-background text-[11px] sm:text-xs font-black shadow-lg shadow-black/10 active:scale-[0.98] transition-all whitespace-nowrap"
+                  className="h-9 sm:h-8 px-4 sm:px-6 rounded-full bg-foreground hover:bg-foreground/90 text-background dark:text-black text-[11px] sm:text-xs font-black shadow-lg shadow-black/10 active:scale-[0.98] transition-all whitespace-nowrap"
                 >
                   批量修改
                 </button>

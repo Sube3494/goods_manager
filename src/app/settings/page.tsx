@@ -823,7 +823,7 @@ function SettingsContent() {
                     <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={14} />
                     <div className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
                       <p className="font-bold text-amber-500/80 mb-0.5">系统诊断提示：</p>
-                      GoodsManager 正在生产环境下运行。请定期执行数据备份。
+                      PickNote 正在生产环境下运行。请定期执行数据备份。
                     </div>
                   </div>
                 </div>

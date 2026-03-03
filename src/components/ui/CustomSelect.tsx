@@ -87,7 +87,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
   }, [isOpen, updatePosition]);
 
   return (
-    <div className={cn("relative w-full h-full", className)}>
+    <div className={cn("relative w-full", className)}>
       <button
         ref={containerRef}
         type="button"
@@ -98,7 +98,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
           triggerClassName
         )}
       >
-        <span className={cn("truncate font-bold", !value && "text-muted-foreground")}>{selectedLabel}</span>
+        <span className={cn("truncate", !value && "text-muted-foreground")}>{selectedLabel}</span>
         <ChevronDown
           size={16}
           className={cn("text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")}

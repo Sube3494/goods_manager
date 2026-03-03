@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, ExternalLink, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2 } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
-import Link from "next/link";
+
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -629,6 +629,64 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     onClose();
   };
 
+  const handleRotateImage = async (img: GalleryItem) => {
+    try {
+      showToast("正在处理图片旋转...", "info");
+      
+      // 1. 加载并旋转
+      const imageNode = new window.Image();
+      imageNode.crossOrigin = "anonymous";
+      imageNode.src = img.url;
+      await new Promise((resolve, reject) => {
+        imageNode.onload = resolve;
+        imageNode.onerror = reject;
+      });
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context error");
+      
+      canvas.width = imageNode.height;
+      canvas.height = imageNode.width;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((90 * Math.PI) / 180);
+      ctx.drawImage(imageNode, -imageNode.width / 2, -imageNode.height / 2);
+
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b!), "image/jpeg", 0.9);
+      });
+
+      // 2. 上传
+      const rotatedFile = new File([blob], `rotated_${Date.now()}.jpg`, { type: "image/jpeg" });
+      const uploadRes = await uploadFileWithChunking(rotatedFile, "gallery");
+
+      // 3. 更新数据库 (如果是已保存的项)
+      if (!img.id.startsWith("temp-") && img.id !== 'cover-virtual') {
+        const res = await fetch(`/api/gallery/${img.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: uploadRes.url }),
+        });
+        if (!res.ok) throw new Error("Failed to update database");
+      }
+
+      // 4. 更新本地状态 (Update local state)
+      setGalleryImages(prev => prev.map(item => 
+        item.id === img.id ? { ...item, url: uploadRes.url } : item
+      ));
+
+      // 如果当前是封面，同步更新表单封面数据
+      if (formData.image === img.url) {
+        setFormData(prev => ({ ...prev, image: uploadRes.url }));
+      }
+
+      showToast("旋转已应用并保存", "success");
+    } catch (error) {
+      console.error("Rotation failed:", error);
+      showToast("图片旋转失败", "error");
+    }
+  };
+
   // --- Lightbox 增强功能 (Lightbox Enhancements) ---
   const resetTransform = () => setTransform({ scale: 1, x: 0, y: 0 });
 
@@ -796,7 +854,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 custom-scrollbar">
                     {/* SKU */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1046,7 +1104,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Tag size={16} /> 商品参数 (Specs)
+                                <Tag size={16} /> 商品参数
                             </label>
                             <button
                                 type="button"
@@ -1078,7 +1136,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                     <button
                                         type="button"
                                         onClick={() => handleRemoveSpec(key, index)}
-                                        className="p-2 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
+                                        className="p-2 text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all active:scale-90 shrink-0"
                                         title="删除此参数"
                                     >
                                         <X size={16} />
@@ -1106,7 +1164,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 {initialData?.id && (
                                     <>
                                         {isBatchMode ? (
-                                            <div className="flex items-center gap-3 whitespace-nowrap">
+                                            <div className="flex items-center gap-3 whitespace-nowrap ml-auto">
                                                 <button 
                                                     type="button"
                                                     onClick={toggleSelectAll}
@@ -1135,7 +1193,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 </button>
                                             </div>
                                         ) : isReorderMode ? (
-                                            <div className="flex items-center gap-3 whitespace-nowrap">
+                                            <div className="flex items-center gap-3 whitespace-nowrap ml-auto">
                                                 <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-tight">拖动箭头调整顺序</span>
                                                 <button
                                                     type="button"
@@ -1146,7 +1204,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-3 sm:gap-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-3 sm:gap-4 whitespace-nowrap ml-auto">
                                                 <button 
                                                     type="button"
                                                     onClick={enterBatchMode}
@@ -1163,12 +1221,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                         排序
                                                     </button>
                                                 )}
-                                                <Link 
-                                                    href={`/gallery?productId=${initialData.id}`}
-                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-tighter border-l border-white/10 pl-3 sm:pl-4"
-                                                >
-                                                    全部实拍 <ExternalLink size={10} />
-                                                </Link>
                                             </div>
                                         )}
                                     </>
@@ -1177,7 +1229,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
                         
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                                 {displayList.map((img, index) => {
                                     const isMain = formData.image === img.url;
                                     const isVideo = img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url);
@@ -1307,20 +1359,26 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             {/* Hover/Touch overlay：桌面 hover 显示，移动端排序模式时隐藏 */}
                                             {!isBatchMode && !isReorderMode && (
                                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-300 pointer-events-none">
-                                                    <div className="absolute top-1.5 right-1.5 flex flex-col gap-1.5 pointer-events-auto">
+                                                    <div className="absolute top-1 right-1 flex flex-col gap-1 pointer-events-auto">
                                                         <button
                                                             type="button"
                                                             onClick={(e) => { e.stopPropagation(); handleDeletePhoto(img); }}
-                                                            className="p-1.5 bg-zinc-900/70 hover:bg-zinc-800 active:bg-zinc-700 text-white rounded-full shadow-xl backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-colors"
+                                                            className="p-1 bg-zinc-900/70 hover:bg-zinc-800 active:bg-zinc-700 text-white rounded-full shadow-xl backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-colors"
                                                             title="移除实拍内容"
-                                                        ><X size={14} strokeWidth={2.5} /></button>
+                                                        ><Trash2 size={12} strokeWidth={2.5} /></button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); handleRotateImage(img); }}
+                                                            className="p-1 bg-zinc-900/70 hover:bg-zinc-800 active:bg-zinc-700 text-white rounded-full shadow-xl backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-colors"
+                                                            title="顺时针旋转 90°"
+                                                        ><RotateCw size={12} strokeWidth={2.5} /></button>
                                                         {!isMain && !isVideo && !isCover && (
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => { e.stopPropagation(); setAsMainImage(img.url); }}
-                                                                className="p-1.5 bg-zinc-900/70 hover:bg-zinc-800 active:bg-zinc-700 text-white rounded-full shadow-xl backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-colors"
+                                                                className="p-1 bg-zinc-900/70 hover:bg-zinc-800 active:bg-zinc-700 text-white rounded-full shadow-xl backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-95 transition-colors"
                                                                 title="设为主图"
-                                                            ><Crown size={14} strokeWidth={2.5} /></button>
+                                                            ><Crown size={12} strokeWidth={2.5} /></button>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1402,20 +1460,20 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
 
-                <div className="flex justify-end gap-4 border-t border-white/10 p-8 shrink-0">
+                <div className="flex flex-row justify-end items-center gap-3 sm:gap-4 border-t border-white/10 p-4 sm:p-8 shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-full px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all"
+                        className="flex-1 sm:flex-none rounded-full px-6 py-2.5 text-sm font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-secondary/50 transition-all active:scale-[0.97]"
                     >
                         取消
                     </button>
                     <button
                         type="submit"
-                        className="group flex items-center gap-2 rounded-full bg-primary px-10 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_20px_-4px_rgba(var(--primary-rgb),0.5)] transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_12px_24px_-4px_rgba(var(--primary-rgb),0.6)] hover:-translate-y-0.5 active:scale-[0.97]"
+                        className="flex-1 sm:flex-none group flex items-center justify-center gap-2 rounded-full bg-primary px-8 sm:px-10 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_20px_-4px_rgba(var(--primary-rgb),0.5)] transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_12px_24px_-4px_rgba(var(--primary-rgb),0.6)] hover:-translate-y-0.5 active:scale-[0.97]"
                     >
                         <CheckCircle size={18} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" />
-                        保存商品数据
+                        <span>保存数据</span>
                     </button>
                 </div>
             </form>

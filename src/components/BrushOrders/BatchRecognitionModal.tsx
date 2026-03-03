@@ -46,9 +46,15 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editingItem = items.find(i => i.id === editingItemId);
+
+  useEffect(() => {
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -230,7 +236,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
       }
     });
 
-    console.log(`[Product Match] Best: "${(bestProduct as any as Product)?.name}" Score: ${bestScore.toFixed(2)} (Threshold: 0.6)`);
+    console.log(`[Product Match] Best: "${(bestProduct as Product | null)?.name || "None"}" Score: ${bestScore.toFixed(2)} (Threshold: 0.6)`);
 
     if (bestScore >= 0.6) {
       return bestProduct;
@@ -373,7 +379,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
     }
   };
 
-  if (!isOpen) return null;
+  if (!mounted || !isOpen) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-70 flex items-center justify-center p-4">
@@ -439,8 +445,8 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                     className={cn(
                       "px-3 sm:px-4 py-1.5 sm:py-1 text-xs font-black rounded-lg transition-all duration-200 whitespace-nowrap",
                       selectedPlatform === p 
-                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105" 
-                        : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                        ? "bg-foreground text-background dark:text-black shadow-lg shadow-black/10 scale-105" 
+                        : "text-muted-foreground/70 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
                     )}
                   >
                     {p}
@@ -501,11 +507,12 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                     )}
                   >
                     <div className="relative w-full h-full">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
+                      <Image 
                         src={item.preview} 
                         alt="preview" 
+                        fill
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                        unoptimized
                       />
                       
                       {/* Top-Left: Index Badge (Glassmorphism) */}
@@ -610,8 +617,13 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                   {/* Top: Image Preview & Main Info */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                      <div className="relative group aspect-video rounded-2xl overflow-hidden border border-border shadow-sm">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={editingItem.preview} alt="Edit Preview" className="w-full h-full object-cover" />
+                        <Image 
+                          src={editingItem.preview} 
+                          alt="Edit Preview" 
+                          fill
+                          className="w-full h-full object-cover" 
+                          unoptimized
+                        />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                            <button 
                               onClick={() => setPreviewImage(editingItem.preview)}
@@ -702,8 +714,14 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                            <div key={idx} className="flex items-center gap-3 p-3 rounded-2xl bg-muted/20 border border-border group">
                               <div className="w-10 h-10 rounded-lg bg-white dark:bg-white/5 border border-border overflow-hidden shrink-0">
                                  {mi.product.image ? (
-                                   /* eslint-disable-next-line @next/next/no-img-element */
-                                   <img src={mi.product.image} alt="Match" className="w-full h-full object-cover" />
+                                   <Image 
+                                     src={mi.product.image} 
+                                     alt="Match" 
+                                     width={40} 
+                                     height={40} 
+                                     className="w-full h-full object-cover" 
+                                     unoptimized
+                                   />
                                  ) : <ShoppingBag size={16} className="m-auto mt-3 opacity-20" />}
                               </div>
                               <div className="flex-1 min-w-0">

@@ -113,6 +113,10 @@ export default function BrushOrdersPage() {
       }
 
       return matchesSearch && matchesType && matchesDate;
+    }).sort((a, b) => {
+        const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
+        const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
+        return timeA - timeB;
     });
   }, [orders, searchQuery, startDate, endDate, selectedType]);
 
@@ -171,25 +175,24 @@ export default function BrushOrdersPage() {
 
     // 第二步：排序并编序号
     groups.forEach(monthGroup => {
-        // 天数按时间倒序（或者升序）排序，这里保持越近的时间越在前面？
-        // 原本逻辑保持不变：按时间升序或自定义，这里让每天的订单：
-        monthGroup.days.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // 倒序天
+        // 天数按时间正序排列
+        monthGroup.days.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         monthGroup.days.forEach(dayGroup => {
             dayGroup.orders.sort((a, b) => {
                 const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
                 const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
-                return timeB - timeA; // 单日内按照最新下单倒排
+                return timeA - timeB; // 单日内按照下单顺序正排
             });
             // 重新按序分配每天的内部序号
             dayGroup.orders.forEach((order, index) => {
-                order.globalIndex = dayGroup.orders.length - index; // 保持新单在前的阅读习惯
+                order.globalIndex = index + 1; // 保持从 1 开始的正向流水号
             });
         });
     });
     
-    // 月份也倒排
-    groups.sort((a, b) => b.month.localeCompare(a.month));
+    // 月份也改为正排（最早在前）
+    groups.sort((a, b) => a.month.localeCompare(b.month));
 
     return groups;
   }, [filteredOrders]);
@@ -523,7 +526,7 @@ export default function BrushOrdersPage() {
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6 md:mb-8">
         {/* Search & Platform */}
         <div className="flex items-center gap-2 flex-1">
-          <div className="h-10 sm:h-11 px-5 flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm relative">
+          <div className="h-12 px-5 flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm relative">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -542,7 +545,7 @@ export default function BrushOrdersPage() {
             )}
           </div>
           
-          <div className="w-28 sm:w-36 shrink-0 h-10 sm:h-11">
+          <div className="w-28 sm:w-36 shrink-0 h-12">
               <CustomSelect
                   value={selectedType}
                   onChange={setSelectedType}
@@ -564,7 +567,7 @@ export default function BrushOrdersPage() {
 
         {/* Date Range & Reset */}
         <div className="flex items-center gap-2 w-full lg:w-auto">
-            <div className="flex-1 flex items-center gap-1.5 h-10 sm:h-11">
+            <div className="flex-1 flex items-center gap-1.5 h-12">
                 <DatePicker 
                     value={startDate} 
                     onChange={handleStartDateChange} 
@@ -629,7 +632,7 @@ export default function BrushOrdersPage() {
                                        className={cn(
                                            "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center cursor-pointer",
                                            monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id))
-                                           ? "bg-foreground border-foreground text-background scale-110" 
+                                           ? "bg-foreground border-foreground text-background dark:text-black scale-110" 
                                            : "border-muted-foreground/30 hover:border-foreground/50 bg-white dark:bg-black"
                                        )}
                                        title="全选本月订单"
@@ -652,7 +655,7 @@ export default function BrushOrdersPage() {
                                          <ChevronDown size={14} />
                                      </div>
                                      <span className="text-sm font-black text-foreground tracking-tight ml-1">{monthGroup.month}</span>
-                                     <span className="px-1.5 py-0.5 rounded-md bg-white dark:bg-white/10 border border-border/50 text-[10px] font-bold text-muted-foreground">
+                                     <span className="px-1.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-500">
                                         {monthGroup.periodStats.count} 单
                                      </span>
                                  </div>
@@ -691,7 +694,7 @@ export default function BrushOrdersPage() {
                                                className={cn(
                                                    "relative h-4 w-4 rounded-full border-2 transition-all duration-300 flex items-center justify-center cursor-pointer",
                                                    dayGroup.orders.length > 0 && dayGroup.orders.every(o => selectedIds.includes(o.id))
-                                                   ? "bg-foreground border-foreground text-background scale-110" 
+                                                   ? "bg-foreground border-foreground text-background dark:text-black scale-110" 
                                                    : "border-muted-foreground/30 hover:border-foreground/50 bg-white dark:bg-black"
                                                )}
                                                title="全选本日订单"
@@ -714,7 +717,7 @@ export default function BrushOrdersPage() {
                                                  <ChevronDown size={12} />
                                              </div>
                                              <span className="text-xs font-bold text-foreground tracking-tight">{dayGroup.date}</span>
-                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold text-muted-foreground bg-muted">
+                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold text-blue-500 bg-blue-500/10">
                                                 {dayGroup.dailyStats.count} 单
                                              </span>
                                          </div>
@@ -757,7 +760,7 @@ export default function BrushOrdersPage() {
                                              className={cn(
                                                  "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
                                                  selectedIds.includes(order.id)
-                                                 ? "bg-foreground border-foreground text-background scale-110" 
+                                                 ? "bg-foreground border-foreground text-background dark:text-black scale-110" 
                                                  : "border-muted-foreground/30 hover:border-foreground/50"
                                              )}
                                            >
@@ -838,7 +841,7 @@ export default function BrushOrdersPage() {
                 <div key={monthGroup.month} className="space-y-3">
                     {/* 月份 Header */}
                     <div 
-                        className="flex items-center justify-between px-4 py-3 bg-primary/5 dark:bg-primary/10 rounded-2xl border border-primary/10 shadow-sm sticky top-0 z-10 backdrop-blur-md"
+                        className="flex items-center justify-between px-3 py-3 bg-muted/30 dark:bg-white/5 rounded-2xl border border-border/50 sticky top-0 z-10 backdrop-blur-md"
                         onClick={(e) => toggleMonthExpansion(monthGroup.month, e)}
                     >
                         <div className="flex items-center gap-3">
@@ -847,8 +850,8 @@ export default function BrushOrdersPage() {
                                 className={cn(
                                     "relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer",
                                     monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id))
-                                    ? "bg-primary border-primary text-white scale-110" 
-                                    : "bg-white/50 border-primary/20"
+                                    ? "bg-foreground border-foreground text-background dark:text-black scale-110" 
+                                    : "bg-white/50 border-primary/20 dark:bg-white/10"
                                 )}
                             >
                                 {monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id)) && (
@@ -864,10 +867,10 @@ export default function BrushOrdersPage() {
                             <h3 className="text-base font-black text-foreground tracking-tight">{monthGroup.month}</h3>
                         </div>
                         <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-bold text-primary uppercase bg-primary/10 px-1.5 py-0.5 rounded-md mb-1">
+                            <span className="text-[10px] font-bold text-blue-500 uppercase bg-blue-500/10 px-1.5 py-0.5 rounded-md mb-1">
                                 {monthGroup.periodStats.count}单
                             </span>
-                            <span className="text-xs font-mono font-bold text-foreground">
+                            <span className="text-xs font-mono font-bold text-emerald-500">
                                 ¥{monthGroup.periodStats.received.toFixed(2)}
                             </span>
                         </div>
@@ -876,7 +879,7 @@ export default function BrushOrdersPage() {
                     {expandedMonths.includes(monthGroup.month) && monthGroup.days.map((dayGroup) => (
                         <div key={dayGroup.date} className="space-y-2 pl-2 border-l-2 border-primary/5 ml-4 my-2">
                             <div 
-                                className="flex items-center justify-between px-3 py-2.5 bg-muted/20 dark:bg-white/5 rounded-xl border border-border/40 shadow-sm"
+                                className="flex items-center justify-between px-2.5 py-2.5 bg-muted/20 dark:bg-white/5 rounded-xl border border-border/40"
                                 onClick={(e) => toggleDateExpansion(dayGroup.date, e)}
                             >
                                 <div className="flex items-center gap-2">
@@ -885,7 +888,7 @@ export default function BrushOrdersPage() {
                                       className={cn(
                                           "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer",
                                           dayGroup.orders.length > 0 && dayGroup.orders.every(o => selectedIds.includes(o.id))
-                                          ? "bg-foreground border-foreground text-background scale-110" 
+                                          ? "bg-foreground border-foreground text-background dark:text-black scale-110" 
                                           : "bg-black/5 border-black/10 dark:bg-black/20 dark:border-white/20"
                                       )}
                                     >
@@ -900,7 +903,7 @@ export default function BrushOrdersPage() {
                                         <ChevronDown size={16} />
                                     </div>
                                     <h4 className="text-sm font-bold text-foreground">{dayGroup.date}</h4>
-                                    <span className="text-[10px] text-muted-foreground font-medium ml-1">
+                                    <span className="text-[10px] text-blue-500 font-bold ml-1 bg-blue-500/10 px-1.5 py-0.5 rounded">
                                         {dayGroup.dailyStats.count}单
                                     </span>
                                 </div>
@@ -929,7 +932,7 @@ export default function BrushOrdersPage() {
                                                         className={cn(
                                                             "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
                                                             selectedIds.includes(order.id)
-                                                            ? "bg-foreground border-foreground text-background scale-110" 
+                                                            ? "bg-foreground border-foreground text-background dark:text-black scale-110" 
                                                             : "bg-black/5 dark:bg-black/20 border-border"
                                                         )}
                                                     >

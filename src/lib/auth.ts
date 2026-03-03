@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies, headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "./prisma";
-import { SessionUser } from "./permissions";
+import { SessionUser, hasPermission, Permission } from "./permissions";
 import { SystemSetting } from "../../prisma/generated-client";
 
 const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
@@ -144,4 +144,19 @@ export async function getCachedSettings() {
     settingsCache = await prisma.systemSetting.findFirst();
     lastSettingsFetch = now;
     return settingsCache;
+}
+
+/**
+ * 统一的 API 路由权限校验辅助函数
+ * @param permission 需要校验的权限点
+ */
+export async function getAuthorizedUser(permission?: Permission): Promise<SessionUser | null> {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.id) return null;
+    
+    if (permission && !hasPermission(session, permission)) {
+        return null;
+    }
+    
+    return session;
 }

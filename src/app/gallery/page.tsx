@@ -660,11 +660,10 @@ function GalleryContent() {
         showToast(data.error || "提交失败", "error");
       }
     } catch (error) {
-      console.error("Submission failed:", error);
-      showToast("提交失败", "error");
+      console.error("Gallery submit failed:", error);
+      showToast("发布失败", "error");
     }
   };
-
 
   // Server-side filtered items
   const filteredItems = items;
@@ -958,7 +957,7 @@ function GalleryContent() {
                                 )}
                                 
                                 {/* 媒体数量 (Media Count) - 完美契合右上角 */}
-                                {group.items.length > 1 && (
+                                 {group.items.length > 1 && (
                                     <div className="absolute top-0 right-0 z-20 h-6 min-w-[24px] px-2 flex items-center justify-center bg-black/50 text-white text-[12px] font-bold leading-none pointer-events-none rounded-bl-[16px] rounded-tr-[16px]">
                                         {group.items.length}
                                     </div>
@@ -1667,7 +1666,7 @@ function GalleryContent() {
                                                 : "border-white/5 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100"
                                             )}
                                         >
-                                            {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
+                                             {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
                                                 <div className="w-full h-full bg-black flex items-center justify-center relative">
                                                     <video 
                                                         src={`${img.url}#t=0.1`} 

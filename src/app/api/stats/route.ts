@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getFreshSession } from "@/lib/auth";
+import { getAuthorizedUser } from "@/lib/auth";
 
 // 获取首页仪表盘统计数据
 export async function GET() {
   try {
-    const session = await getFreshSession();
-    if (!session || !session.id) {
+    const user = await getAuthorizedUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 1. 获取系统设置 (基于用户或全局)
     const settings = await prisma.systemSetting.findFirst({
-      where: { userId: session.id }
+      where: { userId: user.id }
     });
     const threshold = settings?.lowStockThreshold ?? 10;
 
@@ -25,41 +25,37 @@ export async function GET() {
       pendingOrderCount
     ] = await Promise.all([
       prisma.product.count({
-        where: { userId: session.id }
+        where: { userId: user.id }
       }),
       prisma.product.aggregate({
-        where: { userId: session.id },
+        where: { userId: user.id },
         _sum: {
           stock: true
         }
       }),
       prisma.product.count({
         where: {
-          userId: session.id,
+          userId: user.id,
           stock: {
             lt: threshold
           }
         }
       }),
-      prisma.purchaseOrderItem.findMany({
-        where: {
-          remainingQuantity: { gt: 0 },
-          purchaseOrder: { 
-            userId: session.id,
-            status: "Received" 
-          }
-        },
-        select: {
-          costPrice: true,
-          remainingQuantity: true
-        }
-      }),
+      // OPTIMIZATION: Use raw query for multi-column aggregation (price * quantity)
+      prisma.$queryRaw<[{ sum: number | null }]>`
+        SELECT SUM("costPrice" * "remainingQuantity") as sum 
+        FROM "PurchaseOrderItem" poi
+        JOIN "PurchaseOrder" po ON poi."purchaseOrderId" = po.id
+        WHERE poi."remainingQuantity" > 0 
+        AND po."userId" = ${user.id}
+        AND po.status = 'Received'
+      `,
       // Query individual product items from received orders
       prisma.purchaseOrderItem.findMany({
         take: 10,
         where: {
           purchaseOrder: {
-            userId: session.id,
+            userId: user.id,
             status: "Received"
           }
         },
@@ -95,7 +91,7 @@ export async function GET() {
       // 获取待入库订单数量 (Status = Ordered)
       prisma.purchaseOrder.count({
         where: {
-          userId: session.id,
+          userId: user.id,
           status: "Ordered"
         }
       })
@@ -113,7 +109,7 @@ export async function GET() {
       subtotal: item.quantity * item.costPrice
     }));
 
-    const totalValue = totalValueResult.reduce((acc, curr) => acc + (curr.costPrice * (curr.remainingQuantity || 0)), 0);
+    const totalValue = Number(totalValueResult?.[0]?.sum || 0);
 
     return NextResponse.json({
       productCount,

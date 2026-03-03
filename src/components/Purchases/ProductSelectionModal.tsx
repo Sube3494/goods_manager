@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Check, Package, Truck, Plus } from "lucide-react";
@@ -56,6 +57,12 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { showToast } = useToast();
   const resultsVersion = useRef(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
+  }, []);
 
   // 初始化重置逻辑
   useEffect(() => {
@@ -237,7 +244,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     onClose();
   };
 
-  if (typeof document === "undefined") return null;
+  if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
     <AnimatePresence>
@@ -329,7 +336,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                           <div className={cn(
                             "absolute top-3 right-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110",
                             isSelected 
-                              ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20" 
+                              ? "bg-foreground border-foreground text-background dark:text-black shadow-sm shadow-foreground/10" 
                               : "bg-black/20 dark:bg-black/40 border-white/50 backdrop-blur-sm"
                           )}>
                             {isSelected && <Check size={14} strokeWidth={3.5} />}
@@ -337,7 +344,14 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
 
                           <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative">
                             {product.image ? (
-                                <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                                <Image 
+                                    src={product.image} 
+                                    alt={product.name} 
+                                    width={48} 
+                                    height={48} 
+                                    className="h-full w-full object-cover" 
+                                    unoptimized
+                                />
                             ) : (
                                 <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                                     <Package size={20} />
@@ -347,7 +361,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                           
                            <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pr-10">
                             <div className="flex items-center gap-2">
-                               <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary" : "text-foreground")}>{product.name}</span>
+                             <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
                             </div>
                              {(product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark) && (
                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
@@ -414,9 +428,9 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 >
                   取消
                 </button>
-                <button 
+                 <button 
                   onClick={handleConfirm}
-                  className="bg-primary text-primary-foreground px-5 sm:px-8 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all"
+                  className="bg-foreground text-background dark:text-black px-5 sm:px-8 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-foreground/10 active:scale-[0.98] transition-all"
                 >
                   确认添加
                 </button>

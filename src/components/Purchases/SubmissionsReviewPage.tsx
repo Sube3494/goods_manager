@@ -186,30 +186,30 @@ export function SubmissionsReviewPage() {
             </div>
 
             {/* Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full sm:flex-1 shrink-0">
-                    <Search size={18} className="text-muted-foreground shrink-0" />
+            <div className="flex flex-row gap-2">
+                <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 shrink-0">
+                    <Search size={16} className="text-muted-foreground shrink-0" />
                     <input
                         type="text"
-                        placeholder="搜索货号(SKU)或商品名称..."
+                        placeholder="搜索(SKU)或名称..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+                        className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-[13px] sm:text-sm h-full"
                     />
                 </div>
                 
-                <div className="w-full sm:w-48 h-10 sm:h-11">
+                <div className="w-[100px] sm:w-48 h-10 sm:h-11">
                      <CustomSelect 
                         value={statusFilter}
                         onChange={setStatusFilter}
                         options={[
                             { value: 'pending', label: '待审核' },
-                            { value: 'all', label: '所有状态' },
-                            { value: 'approved', label: '已批准' },
-                            { value: 'rejected', label: '已拒绝' }
+                            { value: 'all', label: '所有' },
+                            { value: 'approved', label: '已准' },
+                            { value: 'rejected', label: '已拒' }
                         ]}
                         className="h-full"
-                        triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-sm py-0"
+                        triggerClassName="h-full rounded-full bg-white dark:bg-white/5 border-border dark:border-white/10 text-[13px] sm:text-sm py-0 px-3"
                     />
                 </div>
             </div>

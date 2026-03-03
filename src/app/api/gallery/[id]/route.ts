@@ -1,3 +1,10 @@
+/*
+ * @Date: 2026-02-07 17:29:57
+ * @Author: Sube
+ * @FilePath: route.ts
+ * @LastEditTime: 2026-03-03 15:41:23
+ * @Description: 
+ */
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
@@ -20,12 +27,38 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { isPublic } = body;
+    const { isPublic, url: newUrl } = body;
+
+    // 获取旧数据用于清理文件
+    const oldItem = await prisma.galleryItem.findUnique({
+      where: { id },
+      select: { url: true }
+    });
 
     const updated = await prisma.galleryItem.update({
       where: { id },
-      data: { isPublic },
+      data: { 
+        ...(isPublic !== undefined ? { isPublic } : {}),
+        ...(newUrl ? { url: newUrl } : {})
+      },
     });
+
+    // 如果 URL 发生了变化，清理旧物理文件
+    if (newUrl && oldItem && oldItem.url !== newUrl) {
+      try {
+        const storage = await getStorageStrategy();
+        // 检查是否有其他记录仍在使用该旧 URL
+        const refCount = await prisma.galleryItem.count({
+          where: { url: oldItem.url }
+        });
+        
+        if (refCount === 0) {
+          await storage.delete(oldItem.url);
+        }
+      } catch (storageError) {
+        console.error("Failed to cleanup old file after rotation:", storageError);
+      }
+    }
 
     const storage = await getStorageStrategy();
     return NextResponse.json({

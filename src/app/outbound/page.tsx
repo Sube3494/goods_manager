@@ -150,8 +150,8 @@ export default function OutboundPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col lg:flex-row gap-3 mb-6 md:mb-8">
-        <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full lg:flex-1">
+      <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 md:mb-8 text-foreground">
+        <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full md:flex-1">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -162,44 +162,44 @@ export default function OutboundPage() {
           />
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-3 h-auto sm:h-10 w-full lg:w-auto">
+        <div className="flex flex-row items-center gap-2 sm:gap-3 h-10 sm:h-11 w-full md:w-auto">
             {/* Date Range Pickers */}
-            <div className="flex items-center gap-2 h-10 shrink-0 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 sm:gap-2 h-full shrink-0 flex-1 md:flex-none">
                 <DatePicker 
                     value={startDate} 
                     onChange={setStartDate} 
                     maxDate={endDate}
                     placeholder="起始日期" 
-                    className="h-full flex-1 md:w-36"
+                    className="h-full w-full md:w-32 lg:w-36"
                     triggerClassName="rounded-full shadow-sm"
                     isCompact
                 />
-                <span className="text-muted-foreground text-xs shrink-0 font-medium hidden sm:block">至</span>
+                <span className="text-muted-foreground text-[10px] sm:text-xs shrink-0 font-medium whitespace-nowrap">至</span>
                 <DatePicker 
                     value={endDate} 
                     onChange={setEndDate} 
                     minDate={startDate}
                     placeholder="截至日期" 
-                    className="h-full flex-1 md:w-36"
+                    className="h-full w-full md:w-32 lg:w-36"
                     triggerClassName="rounded-full shadow-sm"
                     isCompact
                 />
             </div>
 
-            <div className="w-full sm:w-40 h-10 shrink-0">
+            <div className="w-24 sm:w-40 h-full shrink-0">
                 <CustomSelect
                     value={typeFilter}
                     onChange={setTypeFilter}
                     options={[
-                        { value: "all", label: "所有类型" },
-                        { value: "Sale", label: "销售出库" },
-                        { value: "Sample", label: "样板/领用" },
-                        { value: "Loss", label: "库存损耗" },
-                        { value: "Return", label: "退货出库" }
+                        { value: "all", label: "所有" },
+                        { value: "Sale", label: "销售" },
+                        { value: "Sample", label: "样板" },
+                        { value: "Loss", label: "损耗" },
+                        { value: "Return", label: "退货" }
                     ]}
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full border text-sm font-medium transition-all",
+                        "h-full rounded-full border text-[10px] sm:text-sm font-medium transition-all px-2 sm:px-4",
                         typeFilter !== "all" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
                     )}
                 />

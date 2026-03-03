@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Package, Plus, Trash2, AlertTriangle, Wand2 } from "lucide-react";
+import Image from "next/image";
 import { BrushOrder, Product } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -42,9 +43,9 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
   // const [isRecognizing, setIsRecognizing] = useState(false);
   // const recognitionInputRef = useRef<HTMLInputElement>(null);
   
-  // 1. Data Fetching
+  // 1. Data Fetching & Lifecycle
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 0);
+    const handle = requestAnimationFrame(() => setMounted(true));
     fetch("/api/products?pageSize=1000")
       .then(res => res.json())
       .then(data => {
@@ -55,7 +56,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         }
       })
       .catch(console.error);
-    return () => clearTimeout(timer);
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   // 2. Body Scroll logic - Lock scroll when modal is open to prevent scroll-through
@@ -175,7 +176,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
     onSubmit(submissionData);
   };
 
-  if (!mounted) return null;
+  if (!mounted || !isOpen) return null;
 
   return (
     <>
@@ -359,8 +360,16 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
                                     <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border bg-gray-50/50 dark:bg-white/5 dark:border-white/10 backdrop-blur-md group hover:border-primary/30 transition-all shadow-sm">
                                         <div className="flex items-center gap-4 flex-1 min-w-0">
                                             <div className="w-12 h-12 rounded-xl bg-white dark:bg-gray-800 border dark:border-white/10 overflow-hidden shrink-0 shadow-sm transition-transform group-hover:scale-105">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                {product?.image ? <img src={product.image} className="w-full h-full object-cover" alt={product.name}/> : <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800"><Package size={16} /></div>}
+                                                {product?.image ? (
+                                                  <Image 
+                                                    src={product.image} 
+                                                    width={48} 
+                                                    height={48} 
+                                                    className="w-full h-full object-cover" 
+                                                    alt={product.name}
+                                                    unoptimized
+                                                  />
+                                                ) : <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800"><Package size={16} /></div>}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-bold truncate text-sm text-foreground">{product?.name || "加载中..."}</div>
@@ -426,7 +435,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
                                 </button>
                                 <button 
                                     type="submit"
-                                    className="h-11 px-8 sm:px-10 rounded-2xl bg-primary text-primary-foreground font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98] transition-all whitespace-nowrap"
+                                    className="h-11 px-8 sm:px-10 rounded-2xl bg-foreground text-background dark:text-black font-black shadow-xl shadow-foreground/10 hover:shadow-foreground/20 active:scale-[0.98] transition-all whitespace-nowrap"
                                 >
                                     {initialData && formData.status === "Completed" ? "保存修改" : "确认完成"}
                                 </button>

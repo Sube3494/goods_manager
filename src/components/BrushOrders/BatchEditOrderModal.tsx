@@ -26,9 +26,10 @@ export function BatchEditOrderModal({
   const [clearNote, setClearNote] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // 初始化挂载
+  // 初始化挂载 - 使用 requestAnimationFrame 异步化以消除同步 setState 导致的重绘警告
   useEffect(() => {
-    setMounted(true);
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   // 监听打开状态，仅处理正交的副作用（如滚动锁定）
@@ -133,10 +134,10 @@ export function BatchEditOrderModal({
                       type="button"
                       onClick={() => setType(type === p ? "" : p)}
                       className={cn(
-                        "flex-1 py-2 text-xs font-bold rounded-xl transition-all",
+                        "flex-1 py-1.5 text-xs font-black rounded-xl transition-all duration-200",
                         type === p 
-                          ? "bg-white dark:bg-gray-800 text-primary shadow-sm" 
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "bg-foreground text-background dark:text-black shadow-lg shadow-black/10 scale-105" 
+                          : "text-muted-foreground/80 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
                       )}
                     >
                       {p}
@@ -159,7 +160,7 @@ export function BatchEditOrderModal({
                     <div className={cn(
                       "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center",
                       clearNote 
-                        ? "bg-foreground border-foreground text-background scale-110 shadow-lg shadow-foreground/10" 
+                        ? "bg-foreground border-foreground text-background dark:text-black scale-110 shadow-lg shadow-foreground/10" 
                         : "border-muted-foreground/30 group-hover:border-foreground/50 bg-white dark:bg-black/20"
                     )}>
                       {clearNote && (
@@ -201,10 +202,10 @@ export function BatchEditOrderModal({
                 <button
                   type="submit"
                   disabled={commission.trim() === "" && note.trim() === "" && !clearNote && type === ""}
-                  className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                  className="flex-[1.5] rounded-2xl bg-foreground hover:bg-foreground/90 py-3 text-sm font-black text-background dark:text-black shadow-xl shadow-black/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale disabled:scale-100"
                 >
-                  <Check size={18} />
-                  确认修改
+                  <Check size={18} strokeWidth={3} />
+                  确认批量修改
                 </button>
               </div>
             </form>

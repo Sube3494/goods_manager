@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft, QrCode } from "lucide-react";
+import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";

@@ -144,6 +144,16 @@ export function UserManager() {
     fetchData();
   }, [fetchData]);
 
+  // Set default role "基础访客" once roles are loaded
+  useEffect(() => {
+    if (roles.length > 0 && !targetRoleId) {
+      const guestRole = roles.find(r => r.name === "基础访客");
+      if (guestRole) {
+        setTargetRoleId(guestRole.id);
+      }
+    }
+  }, [roles, targetRoleId]);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail || !targetRoleId) {
@@ -165,7 +175,8 @@ export function UserManager() {
       if (res.ok) {
         showToast("已发送邀请", "success");
         setNewEmail("");
-        setTargetRoleId("");
+        const guestRole = roles.find(r => r.name === "基础访客");
+        setTargetRoleId(guestRole ? guestRole.id : "");
         fetchData();
       } else {
         const err = await res.json();
@@ -230,26 +241,28 @@ export function UserManager() {
           <Mail className="text-primary" size={18} />
           邀请新成员
         </h3>
-        <form onSubmit={handleAdd} className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="flex-1 w-full sm:w-auto relative">
-            <input
-              type="email"
-              placeholder="输入受邀者邮箱..."
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              required
-              className="w-full h-10 px-5 rounded-xl bg-white dark:bg-white/5 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
-            />
-          </div>
-          
-          <div className="w-full sm:w-48 shrink-0">
-            <CustomSelect 
-              value={targetRoleId}
-              onChange={setTargetRoleId}
-              options={roles.map(r => ({ value: r.id, label: r.name }))}
-              placeholder="分配角色模板..."
-              triggerClassName="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-5 text-sm"
-            />
+        <form onSubmit={handleAdd} className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-3">
+          <div className="flex gap-2 flex-1">
+            <div className="flex-1 relative">
+              <input
+                type="email"
+                placeholder="输入受邀者邮箱..."
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                required
+                className="w-full h-10 px-4 rounded-xl bg-white dark:bg-white/5 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+              />
+            </div>
+            
+            <div className="w-[110px] sm:w-48 shrink-0">
+              <CustomSelect 
+                value={targetRoleId}
+                onChange={setTargetRoleId}
+                options={roles.map(r => ({ value: r.id, label: r.name }))}
+                placeholder="角色..."
+                triggerClassName="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-3 text-sm"
+              />
+            </div>
           </div>
  
           <div className="w-full sm:w-auto shrink-0">

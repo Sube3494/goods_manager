@@ -139,7 +139,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "flex w-full h-full items-center justify-between rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm transition-all outline-none ring-offset-background",
-          isCompact && "px-2 text-xs h-9",
+          isCompact && "px-2 text-xs",
           isOpen ? "ring-2 ring-primary/20 border-primary/20 shadow-lg" : "hover:bg-muted/50 dark:hover:bg-white/10",
           !selectedDate && "text-muted-foreground",
           triggerClassName

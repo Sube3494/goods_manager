@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle, Info, CheckCircle2, LogIn, Fingerprint, ShieldAlert } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -98,11 +98,11 @@ export function ConfirmModal({
           />
           
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 30, rotateX: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative z-10 w-full max-w-[420px] rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col perspective-1000"
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: "spring", damping: 25, stiffness: 350 }}
+            className="relative z-10 w-full max-w-[420px] rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Subtle Gradient Accent */}
             <div className={cn("absolute top-0 left-0 right-0 h-40 bg-linear-to-b opacity-20 pointer-events-none", currentStyle.accent)} />

@@ -153,12 +153,12 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
           <Loader2 className="animate-spin text-emerald-500 opacity-20" size={40} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {roles.map((role) => (
-          <div key={role.id} className="group relative bg-card dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-3xl p-6 hover:bg-muted/50 dark:hover:bg-white/10 transition-all overflow-hidden shadow-sm hover:shadow-xl">
-            <div className="flex items-start justify-between mb-4">
-              <div className="h-12 w-12 rounded-2xl bg-muted dark:bg-white/5 flex items-center justify-center text-foreground group-hover:scale-110 transition-transform">
-                <Shield size={24} />
+          <div key={role.id} className="group relative bg-card dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-3xl p-5 hover:bg-muted/50 dark:hover:bg-white/10 transition-all overflow-hidden shadow-sm hover:shadow-xl">
+            <div className="flex items-start justify-between mb-3">
+              <div className="h-10 w-10 rounded-2xl bg-muted dark:bg-white/5 flex items-center justify-center text-foreground group-hover:scale-110 transition-transform">
+                <Shield size={20} />
               </div>
               <div className="flex items-center gap-2">
                 {role.isSystem ? (
@@ -177,27 +177,27 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                 )}
               </div>
             </div>
-            <h3 className="text-lg font-black text-foreground mb-1">{role.name}</h3>
-            <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px] leading-relaxed opacity-60 group-hover:opacity-100 transition-opacity">
+            <h3 className="text-base font-black text-foreground mb-1">{role.name}</h3>
+            <p className="text-xs text-muted-foreground line-clamp-2 min-h-[32px] leading-relaxed opacity-60 group-hover:opacity-100 transition-opacity">
               {role.description || "暂无描述"}
             </p>
-            <div className="mt-6 flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 text-muted-foreground">
+            <div className="mt-4 flex items-center gap-4 text-[10px] font-black uppercase tracking-widest">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/5 dark:bg-white/5 text-muted-foreground">
                 <Users size={12} />
                 {role._count?.users || 0} 位成员
               </div>
             </div>
           </div>
         ))}
-
+ 
           <button 
             onClick={() => setEditingRole({ name: "", description: "", permissions: {} })}
-            className="h-full min-h-[200px] border-2 border-dashed border-black/5 dark:border-white/5 rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-black/20 dark:hover:border-white/20 hover:bg-muted/50 dark:hover:bg-white/5 transition-all group"
+            className="h-full min-h-[160px] border-2 border-dashed border-black/5 dark:border-white/5 rounded-3xl flex flex-col items-center justify-center gap-3 hover:border-black/20 dark:hover:border-white/20 hover:bg-muted/50 dark:hover:bg-white/5 transition-all group"
           >
-            <div className="h-14 w-14 rounded-full bg-muted dark:bg-white/5 flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-all">
-              <Plus size={28} />
+            <div className="h-12 w-12 rounded-full bg-muted dark:bg-white/5 flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-all">
+              <Plus size={24} />
             </div>
-            <span className="font-bold text-muted-foreground group-hover:text-foreground transition-colors">创建新角色</span>
+            <span className="font-bold text-sm text-muted-foreground group-hover:text-foreground transition-colors">创建新角色</span>
           </button>
         </div>
       )}

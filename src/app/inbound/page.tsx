@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Package, Calendar, Eye, RotateCcw, X } from "lucide-react";
+import { Search, Package, Calendar, Eye, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOrder } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatLocalDateTime } from "@/lib/dateUtils";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { startOfDay, endOfDay, parseISO, isWithinInterval } from "date-fns";
 
 import { Suspense } from "react";
 
@@ -20,11 +22,15 @@ function InboundContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-  const hasActiveFilters = searchQuery.trim() !== "";
+  const hasActiveFilters = searchQuery.trim() !== "" || startDate !== "" || endDate !== "";
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
+    setStartDate("");
+    setEndDate("");
   }, []);
 
   
@@ -57,9 +63,22 @@ function InboundContent() {
 
   const filteredInbounds = inbounds.filter(p => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return true;
-    return p.id.toLowerCase().includes(query) || 
+    
+    // Search query filter
+    const matchesSearch = !query || 
+           p.id.toLowerCase().includes(query) || 
            p.items.some(item => item.product?.name?.toLowerCase().includes(query));
+    
+    // Date filter
+    let matchesDate = true;
+    if (startDate || endDate) {
+      const orderDate = new Date(p.date);
+      const start = startDate ? startOfDay(parseISO(startDate)) : new Date(0);
+      const end = endDate ? endOfDay(parseISO(endDate)) : new Date(8640000000000000);
+      matchesDate = isWithinInterval(orderDate, { start, end });
+    }
+
+    return matchesSearch && matchesDate;
   });
 
   return (
@@ -75,35 +94,53 @@ function InboundContent() {
 
 
       {/* Search Box & Reset */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6 md:mb-8">
-        <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
+      <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 md:mb-8 text-foreground">
+        <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full md:flex-1">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
-            type="text"
-            placeholder="搜索入库单号或商品名称..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
+              type="text"
+              placeholder="搜索入库单号或商品名称..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
             />
-            {searchQuery && (
-                <button 
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
+        </div>
+
+        <div className="flex flex-row items-center gap-2 sm:gap-3 h-10 sm:h-11 w-full md:w-auto">
+            {/* Date Range Pickers */}
+            <div className="flex items-center gap-1.5 sm:gap-2 h-full shrink-0 flex-1 md:flex-none">
+                <DatePicker 
+                    value={startDate} 
+                    onChange={setStartDate} 
+                    maxDate={endDate}
+                    placeholder="起始日期" 
+                    className="h-full w-full md:w-32 lg:w-36"
+                    triggerClassName="rounded-full shadow-sm"
+                    isCompact
+                />
+                <span className="text-muted-foreground text-[10px] sm:text-xs shrink-0 font-medium whitespace-nowrap">至</span>
+                <DatePicker 
+                    value={endDate} 
+                    onChange={setEndDate} 
+                    minDate={startDate}
+                    placeholder="截至日期" 
+                    className="h-full w-full md:w-32 lg:w-36"
+                    triggerClassName="rounded-full shadow-sm"
+                    isCompact
+                />
+            </div>
+
+            {hasActiveFilters && (
+                <button
+                    onClick={resetFilters}
+                    className="h-full px-3 sm:px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
                 >
-                    <X size={14} />
+                    <RotateCcw size={14} />
+                    <span className="hidden sm:inline">重置</span>
+                    <span className="sm:hidden text-[10px]">重置</span>
                 </button>
             )}
         </div>
-
-        {hasActiveFilters && (
-            <button
-                onClick={resetFilters}
-                className="h-10 sm:h-11 px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap ml-auto sm:ml-0"
-            >
-                <RotateCcw size={14} />
-                <span>重置</span>
-            </button>
-        )}
       </div>
 
       {/* Desktop Table View */}

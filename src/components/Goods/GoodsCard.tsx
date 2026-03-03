@@ -109,7 +109,7 @@ export const GoodsCard = memo(function GoodsCard({
       {/* Content */}
       <div className="flex flex-1 flex-col p-3 sm:p-5">
         <div>
-          <h3 className="font-bold text-[12px] sm:text-[15px] leading-tight text-foreground mb-1.5 sm:mb-2.5 group-hover:text-primary transition-colors">
+          <h3 className="font-bold text-[13px] sm:text-[15px] leading-tight text-foreground mb-2 sm:mb-2.5 group-hover:text-primary transition-colors">
             {product.name}
             <button
                onClick={handleCopyName}
@@ -121,13 +121,13 @@ export const GoodsCard = memo(function GoodsCard({
                )}
                title="复制名称"
             >
-              {isCopied ? <Check size={12} strokeWidth={3} /> : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>}
+              {isCopied ? <Check size={14} strokeWidth={3} /> : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>}
             </button>
           </h3>
           
           <div className="flex flex-wrap items-center gap-1.5 min-h-[22px]">
             {product.sku && (
-              <span className="text-[10px] bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full text-muted-foreground font-mono shrink-0 leading-none flex items-center h-5">
+              <span className="text-[10px] bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full text-muted-foreground font-number shrink-0 leading-none flex items-center h-5" style={{ fontFamily: 'var(--font-mono)' }}>
                 {product.sku}
               </span>
             )}
@@ -171,17 +171,17 @@ export const GoodsCard = memo(function GoodsCard({
 
         {/* Mobile Actions Bar */}
         <div className="mt-4 flex sm:hidden items-center justify-end pt-3 border-t border-border/50">
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               {onEdit && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
                     onEdit?.(product);
                   }}
-                  className="text-muted-foreground hover:text-primary transition-colors"
+                  className="p-1 text-muted-foreground hover:text-primary transition-colors active:scale-95"
                   title="编辑"
                 >
-                  <Edit size={16} />
+                  <Edit size={20} />
                 </button>
               )}
               {onDelete && (
@@ -190,10 +190,10 @@ export const GoodsCard = memo(function GoodsCard({
                     e.stopPropagation();
                     onDelete?.(product.id, product.name);
                   }}
-                  className="text-destructive hover:opacity-80 transition-opacity"
+                  className="p-1 text-destructive hover:opacity-80 transition-opacity active:scale-95"
                   title="删除"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={20} />
                 </button>
               )}
             </div>

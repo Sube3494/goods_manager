@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { pinyin } from "pinyin-pro";
 import { getStorageStrategy } from "@/lib/storage";
-import { getFreshSession, getLightSession, getCachedSettings } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getLightSession, getCachedSettings, getAuthorizedUser } from "@/lib/auth";
 
 // ProductWithRelations and ProductWhereInput removed as unused or redundant with internal Prisma types
 
@@ -87,9 +86,9 @@ export async function GET(request: Request) {
         const totalCount = await prisma.product.count({ where });
         
         // PERFORMANCE SAFEGUARD: 
-        // Only perform in-memory natural sort if result set is manageable (< 2000)
-        // For larger datasets, use standard DB sorted pagination
-        if (totalCount < 2000) {
+        // Only perform in-memory natural sort if result set is manageable (e.g. < 500)
+        // For larger datasets, fallback to standard DB sorted pagination to prevent OOM
+        if (totalCount < 500) {
             const allItems = await prisma.product.findMany({
               where,
               select: { id: true, sku: true },
@@ -163,13 +162,9 @@ async function formatResponse(products: unknown[], total: number, page: number, 
 // 创建新商品
 export async function POST(request: Request) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "product:create")) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    const user = await getAuthorizedUser("product:create");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -191,7 +186,7 @@ export async function POST(request: Request) {
         isDiscontinued: isDiscontinued ?? false,
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         remark: remark || null,
-        userId: session.id,
+        userId: user.id,
       },
       include: {
         category: true,
@@ -209,7 +204,7 @@ export async function POST(request: Request) {
           status: "Received",
           totalAmount: 0,
           date: new Date(),
-          userId: session.id,
+          userId: user.id,
           items: {
             create: [{
               productId: product.id,
@@ -251,13 +246,9 @@ export async function POST(request: Request) {
 // 更新商品
 export async function PUT(request: Request) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "product:update")) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    const user = await getAuthorizedUser("product:update");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -268,7 +259,7 @@ export async function PUT(request: Request) {
     }
 
     const existing = await prisma.product.findFirst({
-      where: { id, userId: session.id }
+      where: { id, userId: user.id }
     });
 
     if (!existing) {
@@ -322,13 +313,9 @@ export async function PUT(request: Request) {
 // 删除商品
 export async function DELETE(request: Request) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "product:delete")) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    const user = await getAuthorizedUser("product:delete");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -340,7 +327,7 @@ export async function DELETE(request: Request) {
 
     // Security check: Global access
     const product = await prisma.product.findFirst({
-      where: { id, userId: session.id }
+      where: { id, userId: user.id }
     });
 
     if (!product) {

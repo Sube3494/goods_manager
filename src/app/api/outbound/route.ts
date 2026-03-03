@@ -1,34 +1,30 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { OutboundOrderItem, Prisma } from '../../../../prisma/generated-client';
-import { getFreshSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { Prisma } from '../../../../prisma/generated-client';
+import { getAuthorizedUser } from "@/lib/auth";
+import { InventoryService } from "@/services/inventoryService";
+ 
+interface OutboundItem {
+  productId: string;
+  quantity: number;
+  price?: number;
+}
 
 export async function GET() {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "outbound:manage")) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    const user = await getAuthorizedUser("outbound:manage");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
     const orders = await prisma.outboundOrder.findMany({
-      where: {
-        userId: session.id
-      },
+      where: { userId: user.id },
       include: {
         items: {
-          include: {
-            product: true
-          }
+          include: { product: true }
         }
       },
-      orderBy: {
-        date: 'desc'
-      }
+      orderBy: { date: 'desc' }
     });
     return NextResponse.json(orders);
   } catch (error) {
@@ -39,13 +35,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "outbound:manage")) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    const user = await getAuthorizedUser("outbound:manage");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -55,17 +47,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid items" }, { status: 400 });
     }
 
-    // Use a transaction to ensure data consistency
+    // 使用事务确保数据原子性，业务逻辑委托给 InventoryService
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 1. Create the OutboundOrder
+      // 1. 创建出库单记录
       const order = await tx.outboundOrder.create({
         data: {
           type: type || "Sale",
           date: date ? new Date(date) : new Date(),
           note: note || "",
-          userId: session.id,
+          userId: user.id,
           items: {
-            create: items.map((item: OutboundOrderItem) => ({
+            create: items.map((item: OutboundItem) => ({
               productId: item.productId,
               quantity: item.quantity,
               price: item.price || 0
@@ -74,63 +66,16 @@ export async function POST(request: Request) {
         }
       });
 
-      // 2. Process FIFO deduction for each item
-      for (const item of items) {
-        let remainingToDeduct = item.quantity;
-
-        // Find all available batches for this product, ordered by date (oldest first)
-        const batches = await tx.purchaseOrderItem.findMany({
-          where: {
-            productId: item.productId,
-            remainingQuantity: {
-                gt: 0
-            },
-            purchaseOrder: {
-                status: "Received"
-            }
-          },
-          orderBy: {
-            purchaseOrder: {
-                date: 'asc'
-            }
-          }
-        });
-
-        for (const batch of batches) {
-          if (remainingToDeduct <= 0) break;
-
-          const batchRemaining = batch.remainingQuantity || 0;
-          const deductFromThisBatch = Math.min(batchRemaining, remainingToDeduct);
-
-          await tx.purchaseOrderItem.update({
-            where: { id: batch.id },
-            data: {
-              remainingQuantity: {
-                decrement: deductFromThisBatch
-              }
-            }
-          });
-
-          remainingToDeduct -= deductFromThisBatch;
-        }
-
-        // 3. Update the global product stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              decrement: item.quantity
-            }
-          }
-        });
-      }
+      // 2. 委托 Service 处理 FIFO 扣减及库存更新
+      await InventoryService.processOutboundFIFO(tx, user.id, items);
 
       return order;
     });
 
     return NextResponse.json(result);
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to process outbound order";
     console.error("Outbound processing failed:", error);
-    return NextResponse.json({ error: "Failed to process outbound order" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
