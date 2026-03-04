@@ -490,8 +490,8 @@ export default function GoodsPage() {
           worksheet.addRow(headers.map(h => data[h]));
         });
 
-        worksheet.eachRow((row) => {
-          row.eachCell((cell) => {
+        worksheet.eachRow((row: import("exceljs").Row) => {
+          row.eachCell((cell: import("exceljs").Cell) => {
             cell.font = { ...cell.font, name: '微软雅黑' };
           });
         });
