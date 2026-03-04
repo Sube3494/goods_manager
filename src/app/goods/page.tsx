@@ -300,8 +300,30 @@ export default function GoodsPage() {
 
       if (res.ok) {
         showToast(`成功更新 ${count} 个商品`, "success");
+        
+        // 本地更新状态，避免全量刷新
+        setItems(prev => prev.map(item => {
+          if (selectedIds.includes(item.id)) {
+            const newItem = { ...item, ...updateData };
+            
+            // 如果更新了分类，同步分类对象
+            if (updateData.categoryId) {
+              const cat = categories.find(c => c.id === updateData.categoryId);
+              if (cat) newItem.category = cat;
+            }
+            
+            // 如果更新了供应商，同步供应商对象
+            if (updateData.supplierId) {
+              const sup = suppliers.find(s => s.id === updateData.supplierId);
+              if (sup) newItem.supplier = sup;
+            }
+            
+            return newItem;
+          }
+          return item;
+        }));
+        
         setSelectedIds([]);
-        fetchGoods();
       } else {
         showToast("批量更新失败", "error");
       }
@@ -325,8 +347,12 @@ export default function GoodsPage() {
           });
           if (res.ok) {
             showToast(`成功删除 ${count} 个商品`, "success");
+            
+            // 本地删除，避免全量刷新
+            setItems(prev => prev.filter(item => !selectedIds.includes(item.id)));
+            setTotalResults(prev => Math.max(0, prev - count));
+            
             setSelectedIds([]);
-            fetchGoods();
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           } else {
             showToast("删除失败", "error");
@@ -336,7 +362,7 @@ export default function GoodsPage() {
         }
       },
     });
-  }, [selectedIds, fetchGoods, showToast]);
+  }, [selectedIds, showToast]);
 
   const handleSaveItem = async (data: Partial<Product>, galleryItems?: GalleryItem[]) => {
     try {

@@ -89,21 +89,21 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
   }, [isOpen, updatePosition]);
 
   return (
-    <div className={cn("relative w-full", className)}>
+    <div className={cn("relative", className)}>
       <button
         ref={containerRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex w-full h-full items-center justify-between rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-left text-sm transition-all outline-none ring-offset-background",
-          isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/50 dark:hover:bg-white/10",
+          "flex w-full h-full items-center justify-between rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background",
+          isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/5 dark:hover:bg-white/10",
           triggerClassName
         )}
       >
-        <span className={cn("truncate", !value && "text-muted-foreground")}>{selectedLabel}</span>
+        <span className={cn("truncate font-bold", !value && "text-muted-foreground")}>{selectedLabel}</span>
         <ChevronDown
-          size={16}
-          className={cn("text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")}
+          size={12}
+          className={cn("text-muted-foreground transition-transform duration-200 ml-1 shrink-0", isOpen && "rotate-180")}
         />
       </button>
 
@@ -123,11 +123,9 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
                 zIndex: 99999,
                 transformOrigin: dropdownPosition.showAbove ? 'bottom' : 'top',
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
-                willChange: 'transform, opacity',
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden'
+                willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="rounded-2xl glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden"
+              className="rounded-lg glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden border border-border/50"
             >
               <div className="max-h-60 overflow-auto p-1 py-1.5">
                 {options.length > 0 ? (
@@ -140,14 +138,14 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
                         setIsOpen(false);
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-lg py-2.5 pl-3 pr-8 text-sm outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer",
-                        option.value === value && "bg-primary/10 text-primary font-medium"
+                        "relative flex w-full select-none items-center rounded-md py-2 pl-2.5 pr-7 text-xs outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer",
+                        option.value === value && "bg-primary/10 text-primary font-bold"
                       )}
                     >
-                      <span className="truncate">{option.label}</span>
+                      <span className="whitespace-nowrap font-medium">{option.label}</span>
                       {option.value === value && (
-                        <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center">
-                          <Check size={14} />
+                        <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                          <Check size={12} />
                         </span>
                       )}
                     </button>

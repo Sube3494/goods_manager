@@ -26,7 +26,12 @@ export async function GET() {
         storageType: "local",
         uploadConflictStrategy: "hash",
         shareExpireDuration: 1,
-        shareExpireUnit: "hours"
+        shareExpireUnit: "hours",
+        backupEnabled: false,
+        backupIntervalUnit: "days",
+        backupIntervalValue: 1,
+        backupRetention: 10,
+        webdavEnabled: false
       }
     });
     
@@ -60,7 +65,16 @@ export async function POST(request: Request) {
       minioPublicUrl,
       uploadConflictStrategy,
       shareExpireDuration,
-      shareExpireUnit
+      shareExpireUnit,
+      backupEnabled,
+      backupIntervalUnit,
+      backupIntervalValue,
+      backupRetention,
+      webdavEnabled,
+      webdavUrl,
+      webdavUser,
+      webdavPassword,
+      webdavPath
     } = body;
 
     const updateData: Prisma.SystemSettingUpdateInput = {};
@@ -81,6 +95,15 @@ export async function POST(request: Request) {
     if (uploadConflictStrategy !== undefined) updateData.uploadConflictStrategy = uploadConflictStrategy;
     if (shareExpireDuration !== undefined) updateData.shareExpireDuration = Number(shareExpireDuration);
     if (shareExpireUnit !== undefined) updateData.shareExpireUnit = shareExpireUnit;
+    if (backupEnabled !== undefined) updateData.backupEnabled = Boolean(backupEnabled);
+    if (backupIntervalUnit !== undefined) updateData.backupIntervalUnit = backupIntervalUnit;
+    if (backupIntervalValue !== undefined) updateData.backupIntervalValue = Number(backupIntervalValue);
+    if (backupRetention !== undefined) updateData.backupRetention = Number(backupRetention);
+    if (webdavEnabled !== undefined) updateData.webdavEnabled = Boolean(webdavEnabled);
+    if (webdavUrl !== undefined) updateData.webdavUrl = webdavUrl;
+    if (webdavUser !== undefined) updateData.webdavUser = webdavUser;
+    if (webdavPassword !== undefined) updateData.webdavPassword = webdavPassword;
+    if (webdavPath !== undefined) updateData.webdavPath = webdavPath;
 
     const settings = await prisma.systemSetting.upsert({
       where: { id: "system" },
@@ -102,6 +125,15 @@ export async function POST(request: Request) {
         minioPublicUrl: minioPublicUrl || null,
         shareExpireDuration: (typeof shareExpireDuration === 'number') ? shareExpireDuration : 1,
         shareExpireUnit: shareExpireUnit || "hours",
+        backupEnabled: (typeof backupEnabled === 'boolean') ? backupEnabled : false,
+        backupIntervalUnit: backupIntervalUnit || "days",
+        backupIntervalValue: (typeof backupIntervalValue === 'number') ? backupIntervalValue : 1,
+        backupRetention: (typeof backupRetention === 'number') ? backupRetention : 10,
+        webdavEnabled: (typeof webdavEnabled === 'boolean') ? webdavEnabled : false,
+        webdavUrl: webdavUrl || null,
+        webdavUser: webdavUser || null,
+        webdavPassword: webdavPassword || null,
+        webdavPath: webdavPath || null,
       }
     });
 

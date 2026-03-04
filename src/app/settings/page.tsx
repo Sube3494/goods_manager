@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Upload, Info, BarChart2, Users, Eye, TrendingUp } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Upload, Info, BarChart2, Users, Eye, TrendingUp, Trash2, Clock, Calendar, Cloud, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -11,6 +11,13 @@ import { BackupModal } from "@/components/Settings/BackupModal";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { cn } from "@/lib/utils";
+import { formatLocalDateTime } from "@/lib/dateUtils";
+
+interface BackupFile {
+  name: string;
+  size: number;
+  createdAt: string | Date;
+}
 
 interface SystemInfo {
   version: string;
@@ -43,7 +50,7 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const searchParams = useSearchParams();
-  const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
+  const [lowStockThreshold, setLowStockThreshold] = useState<number | "">(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
   const [gallerySortDesc, setGallerySortDesc] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
@@ -54,6 +61,24 @@ function SettingsContent() {
   const [analyticsRange, setAnalyticsRange] = useState<"7d" | "30d" | "12m">("7d");
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   
+  // Backup settings
+  const [backupEnabled, setBackupEnabled] = useState<boolean>(false);
+  const [backupIntervalUnit, setBackupIntervalUnit] = useState<string>("days");
+  const [backupIntervalValue, setBackupIntervalValue] = useState<number | "">(1);
+  const [backupRetention, setBackupRetention] = useState<number | "">(10);
+  const [backups, setBackups] = useState<BackupFile[]>([]);
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  
+  // WebDAV settings
+  const [webdavEnabled, setWebdavEnabled] = useState<boolean>(false);
+  const [webdavUrl, setWebdavUrl] = useState<string>("");
+  const [webdavUser, setWebdavUser] = useState<string>("");
+  const [webdavPassword, setWebdavPassword] = useState<string>("");
+  const [webdavPath, setWebdavPath] = useState<string>("");
+  const [webdavManualOpen, setWebdavManualOpen] = useState(false);
+  const [isTestingWebDAV, setIsTestingWebDAV] = useState(false);
+
   // Initialize tab based on search params
   const initialTab = (searchParams.get("tab") as "general" | "storage" | "data" | "system") || "general";
   const [activeTab, setActiveTab] = useState<"general" | "storage" | "data" | "system">(initialTab);
@@ -81,7 +106,7 @@ function SettingsContent() {
   const [minioUseSSL, setMinioUseSSL] = useState(true);
   const [minioPublicUrl, setMinioPublicUrl] = useState("");
   const [uploadConflictStrategy, setUploadConflictStrategy] = useState<"overwrite" | "rename" | "skip">("rename");
-  const [shareExpireDuration, setShareExpireDuration] = useState<number>(1);
+  const [shareExpireDuration, setShareExpireDuration] = useState<number | "">(1);
   const [shareExpireUnit, setShareExpireUnit] = useState<"minutes" | "hours" | "days">("hours");
   // Use refs to track last saved values to prevent initial auto-save and loops
   const lastSavedSettings = useRef<Record<string, unknown>>({});
@@ -130,6 +155,82 @@ function SettingsContent() {
     }
   };
 
+  const fetchBackups = async () => {
+    setIsLoadingBackups(true);
+    try {
+      const res = await fetch("/api/system/backup");
+      if (res.ok) setBackups(await res.json());
+    } catch { /* 静默失败 */ } finally {
+      setIsLoadingBackups(false);
+    }
+  };
+
+  const handleManualBackup = async () => {
+    setIsCreatingBackup(true);
+    showToast("正在创建备份...", "info");
+    try {
+      const res = await fetch("/api/system/backup", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.webdav?.success) {
+            showToast(`备份创建并已同步至 WebDAV: ${data.webdav.fullPath}`, "success");
+        } else if (data.webdav?.success === false) {
+            showToast(`备份创建成功，但 WebDAV 同步失败: ${data.webdav.error}`, "warning");
+        } else {
+            showToast("备份创建成功", "success");
+        }
+        fetchBackups();
+      } else {
+        showToast(data.error || "备份失败", "error");
+      }
+    } catch {
+      showToast("请求失败", "error");
+    } finally {
+      setIsCreatingBackup(false);
+    }
+  };
+
+  const handleDeleteBackup = async (fileName: string) => {
+    try {
+      const res = await fetch(`/api/system/backup?fileName=${fileName}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("备份已删除", "success");
+        setBackups(prev => prev.filter(b => b.name !== fileName));
+      }
+    } catch {
+      showToast("操作失败", "error");
+    }
+  };
+
+  const handleDownloadBackup = (fileName: string) => {
+    window.open(`/api/system/backup/download?fileName=${fileName}`, '_blank');
+  };
+
+  const handleTestWebDAV = async () => {
+    if (!webdavUrl) {
+      showToast("请输入 WebDAV 服务器地址", "warning");
+      return;
+    }
+    setIsTestingWebDAV(true);
+    try {
+      const res = await fetch("/api/system/backup/test-webdav", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webdavUrl, user: webdavUser, password: webdavPassword })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || "WebDAV 连接成功", "success");
+      } else {
+        showToast(data.error || "连接测试失败", "error");
+      }
+    } catch {
+      showToast("连接请求失败", "error");
+    } finally {
+      setIsTestingWebDAV(false);
+    }
+  };
+
   useEffect(() => {
     const initData = async () => {
         try {
@@ -158,6 +259,19 @@ function SettingsContent() {
                 );
                 setShareExpireDuration(data.shareExpireDuration ?? 1);
                 setShareExpireUnit(data.shareExpireUnit || "hours");
+                
+                // Backup settings
+                setBackupEnabled(data.backupEnabled ?? false);
+                setBackupIntervalUnit(data.backupIntervalUnit || "days");
+                setBackupIntervalValue(data.backupIntervalValue ?? 1);
+                setBackupRetention(data.backupRetention ?? 10);
+                
+                // WebDAV settings
+                setWebdavEnabled(data.webdavEnabled ?? false);
+                setWebdavUrl(data.webdavUrl || "");
+                setWebdavUser(data.webdavUser || "");
+                setWebdavPassword(data.webdavPassword || "");
+                setWebdavPath(data.webdavPath || "");
 
                 lastSavedSettings.current = data;
             }
@@ -179,7 +293,10 @@ function SettingsContent() {
 
   // 当切换到「数据管理」tab 或切换 range 时加载 analytics
   useEffect(() => {
-    if (activeTab === "data") fetchAnalytics(analyticsRange);
+    if (activeTab === "data") {
+      fetchAnalytics(analyticsRange);
+      fetchBackups();
+    }
   }, [activeTab, analyticsRange]);
 
   const saveSettings = useCallback(async (newSettings: Record<string, unknown>, options: { silent?: boolean } = {}) => {
@@ -201,6 +318,15 @@ function SettingsContent() {
         uploadConflictStrategy,
         shareExpireDuration,
         shareExpireUnit,
+        backupEnabled,
+        backupIntervalUnit,
+        backupIntervalValue,
+        backupRetention,
+        webdavEnabled,
+        webdavUrl,
+        webdavUser,
+        webdavPassword,
+        webdavPath,
         ...newSettings
     };
 
@@ -239,22 +365,44 @@ function SettingsContent() {
     uploadConflictStrategy, 
     shareExpireDuration,
     shareExpireUnit,
+    backupEnabled,
+    backupIntervalUnit,
+    backupIntervalValue,
+    backupRetention,
+    webdavEnabled,
+    webdavUrl,
+    webdavUser,
+    webdavPassword,
+    webdavPath,
     showToast
   ]);
 
   // Debounced save for text inputs
   useEffect(() => {
     if (!isInitialized.current) return;
-    
-    // Check if actually changed to avoid redundant saves
     if (lowStockThreshold === lastSavedSettings.current.lowStockThreshold) return;
 
     const timer = setTimeout(() => {
-        saveSettings({ lowStockThreshold }, { silent: true });
+      saveSettings({ lowStockThreshold }, { silent: true });
     }, 800);
 
     return () => clearTimeout(timer);
   }, [lowStockThreshold, saveSettings]);
+
+  // Debounced save for WebDAV settings
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    if (webdavUrl === lastSavedSettings.current.webdavUrl && 
+        webdavUser === lastSavedSettings.current.webdavUser && 
+        webdavPassword === lastSavedSettings.current.webdavPassword &&
+        webdavPath === lastSavedSettings.current.webdavPath) return;
+
+    const timer = setTimeout(() => {
+      saveSettings({ webdavUrl, webdavUser, webdavPassword, webdavPath }, { silent: true });
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [webdavUrl, webdavUser, webdavPassword, webdavPath, saveSettings]);
 
   // Sync tab from URL if it changes while on page
   useEffect(() => {
@@ -282,7 +430,7 @@ function SettingsContent() {
   }
 
   return (
-    <div className="w-full max-w-[1200px] mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Unified Header with Auto-save Status */}
       <div className="relative flex flex-col gap-2 mb-6">
         <div className="flex-1 min-w-0 pr-24 sm:pr-0">
@@ -341,7 +489,7 @@ function SettingsContent() {
         </div>
       </div>
 
-        <div className="grid gap-6">
+        <div className="grid grid-cols-1 w-full gap-6 pt-6 min-w-0 overflow-hidden">
           {/* Content sections will be rendered here based on activeTab */}
           {activeTab === "general" && (
             <div key="general" className="space-y-6">
@@ -433,10 +581,22 @@ function SettingsContent() {
                     <div className="relative w-full sm:w-32 shrink-0">
                       <input
                         type="number"
-                        value={lowStockThreshold || ""}
+                        value={lowStockThreshold ?? ""}
                         onChange={(e) => {
                           const val = e.target.value;
-                          setLowStockThreshold(val === "" ? 0 : parseInt(val) || 0);
+                          if (val === "") {
+                            setLowStockThreshold("");
+                          } else {
+                            const num = parseInt(val);
+                            setLowStockThreshold(isNaN(num) ? "" : num);
+                            if (!isNaN(num)) saveSettings({ lowStockThreshold: num }, { silent: true });
+                          }
+                        }}
+                        onBlur={() => {
+                          if (lowStockThreshold === "" || (typeof lowStockThreshold === 'number' && lowStockThreshold < 0)) {
+                            setLowStockThreshold(10);
+                            saveSettings({ lowStockThreshold: 10 });
+                          }
                         }}
                         className="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-3 pr-10 text-base font-mono font-bold focus:ring-2 focus:ring-primary/20 transition-all outline-none no-spinner text-center"
                       />
@@ -452,7 +612,7 @@ function SettingsContent() {
 
 
           {activeTab === "data" && (
-            <div key="data" className="space-y-6">
+            <div key="data" className="space-y-6 w-full min-w-0">
               {/* Analytics Panel */}
               {(() => {
                 const maxPV = analytics?.trend?.length
@@ -469,7 +629,7 @@ function SettingsContent() {
                 const uvPath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toUVY(p.uv).toFixed(1)}`).join(" ");
 
                 return (
-                  <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                  <div className="glass-panel w-full rounded-2xl border border-border overflow-hidden min-w-0">
                     {/* Header */}
                     <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex flex-col sm:flex-row sm:items-center gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -502,7 +662,7 @@ function SettingsContent() {
 
                     <div className="p-4 md:p-5 space-y-5">
                       {/* 三个数字卡片 */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {[
                           {
                             label: "今日访问",
@@ -535,9 +695,9 @@ function SettingsContent() {
                           <div
                             key={card.label}
                             className={cn(
-                              "relative rounded-xl border border-border p-3 space-y-2 overflow-hidden bg-white/5 dark:bg-white/3",
+                              "relative rounded-xl border border-border p-3 space-y-2 overflow-hidden bg-white/5 dark:bg-white/3 min-w-0",
                               isLoadingAnalytics && "animate-pulse",
-                              idx === 2 && "col-span-2 sm:col-span-1"
+                              idx === 2 && "sm:col-span-2 lg:col-span-1"
                             )}
                           >
                             <div className="flex items-center gap-1.5">
@@ -693,11 +853,22 @@ function SettingsContent() {
                       <input
                         type="number"
                         min="1"
-                        value={shareExpireDuration}
+                        value={shareExpireDuration ?? ""}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value) || 1;
-                          setShareExpireDuration(val);
-                          saveSettings({ shareExpireDuration: val }, { silent: true });
+                          const val = e.target.value;
+                          if (val === "") {
+                            setShareExpireDuration("");
+                          } else {
+                            const num = parseInt(val);
+                            setShareExpireDuration(isNaN(num) ? "" : num);
+                            if (!isNaN(num)) saveSettings({ shareExpireDuration: num }, { silent: true });
+                          }
+                        }}
+                        onBlur={() => {
+                          if (shareExpireDuration === "" || (typeof shareExpireDuration === 'number' && shareExpireDuration <= 0)) {
+                            setShareExpireDuration(1);
+                            saveSettings({ shareExpireDuration: 1 });
+                          }
                         }}
                         className="w-16 h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-2 text-center text-sm transition-all focus:ring-2 focus:ring-primary/20 outline-none"
                       />
@@ -718,12 +889,12 @@ function SettingsContent() {
                   </div>
 
 
-                  <div className="p-4 md:p-5 bg-muted/5 backdrop-blur-sm">
+                  <div className="p-4 md:p-5 bg-muted/5 backdrop-blur-sm space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex-1">
-                        <h4 className="text-sm font-bold text-foreground">系统级备份与恢复</h4>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                          通过 AES-256-GCM 加密，全量导出业务模型。
+                        <h4 className="text-sm font-bold text-foreground">数据迁移与离线管理 (导入/导出)</h4>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 text-balance">
+                          用于跨设备数据转移、手动下载冷备份或在紧急情况下从本地文件恢复系统。
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -741,15 +912,330 @@ function SettingsContent() {
                           className="h-9 px-4 rounded-xl bg-white dark:bg-white/5 border border-border hover:bg-muted text-xs font-bold transition-all flex items-center gap-2"
                         >
                           <Upload size={14} className="text-emerald-500" />
-                          恢复
+                          导入恢复
                         </button>
                         <button
                           onClick={() => setBackupConfig({ isOpen: true, type: "export" })}
-                          className="h-9 px-4 rounded-xl bg-primary text-primary-foreground shadow-sm hover:opacity-95 text-xs font-bold transition-all flex items-center gap-2"
+                          className="h-9 px-4 rounded-xl bg-white dark:bg-white/5 border border-border hover:bg-muted text-xs font-bold transition-all flex items-center gap-2"
                         >
                           <Download size={14} />
-                          备份
+                          手动导出
                         </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-border/40">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div className="flex-1">
+                          <h4 className="text-sm font-bold text-foreground font-number">自动备份配置</h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            配置系统定期全量自动备份，并将结果直接存储在服务器本地空间中。
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          <Switch 
+                            checked={backupEnabled} 
+                            onChange={(val) => {
+                              setBackupEnabled(val);
+                              saveSettings({ backupEnabled: val });
+                            }} 
+                          />
+                        </div>
+                      </div>
+
+                      {backupEnabled && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-in slide-in-from-top-2 duration-300">
+                          <div className="space-y-1.5 p-3 rounded-xl bg-white/5 border border-border/50">
+                            <label className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5 px-0.5">
+                              <Clock size={10} /> 备份频率
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                value={backupIntervalValue}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "") {
+                                    setBackupIntervalValue("");
+                                  } else {
+                                    const num = parseInt(val);
+                                    setBackupIntervalValue(isNaN(num) ? "" : num);
+                                    if (!isNaN(num)) saveSettings({ backupIntervalValue: num }, { silent: true });
+                                  }
+                                }}
+                                onBlur={() => {
+                                  if (backupIntervalValue === "" || (typeof backupIntervalValue === 'number' && backupIntervalValue <= 0)) {
+                                    setBackupIntervalValue(1);
+                                    saveSettings({ backupIntervalValue: 1 });
+                                  }
+                                }}
+                                className="w-14 h-8 rounded-lg bg-white dark:bg-white/5 border border-border px-1.5 text-center text-xs font-bold transition-all focus:ring-1 focus:ring-primary outline-none"
+                              />
+                              <CustomSelect 
+                                value={backupIntervalUnit}
+                                triggerClassName="h-8 w-18 rounded-lg text-xs font-bold px-2.5"
+                                onChange={(val) => {
+                                  setBackupIntervalUnit(val);
+                                  saveSettings({ backupIntervalUnit: val });
+                                }}
+                                options={[
+                                  { value: "hours", label: "小时" },
+                                  { value: "days", label: "天" },
+                                  { value: "weeks", label: "周" }
+                                ]}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1.5 p-3 rounded-xl bg-white/5 border border-border/50">
+                            <label className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5 px-0.5">
+                              <ShieldCheck size={10} /> 保留份数
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  value={backupRetention}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "") {
+                                      setBackupRetention("");
+                                    } else {
+                                      const num = parseInt(val);
+                                      setBackupRetention(isNaN(num) ? "" : num);
+                                      if (!isNaN(num)) saveSettings({ backupRetention: num }, { silent: true });
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    if (backupRetention === "" || (typeof backupRetention === 'number' && backupRetention <= 0)) {
+                                      setBackupRetention(10);
+                                      saveSettings({ backupRetention: 10 });
+                                    }
+                                  }}
+                                  className="w-full h-8 rounded-lg bg-white dark:bg-white/5 border border-border pl-3 pr-10 text-xs font-bold transition-all focus:ring-1 focus:ring-primary outline-none"
+                                />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground/60 pointer-events-none">份</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 p-3 rounded-xl bg-white/5 border border-border/50">
+                            <label className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5 px-0.5">
+                              <Zap size={10} /> 立即执行
+                            </label>
+                            <button
+                              onClick={handleManualBackup}
+                              disabled={isCreatingBackup}
+                              className="w-full h-8 rounded-lg bg-primary text-primary-foreground text-[11px] font-bold transition-all hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                              {isCreatingBackup ? (
+                                <div className="h-3 w-3 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Zap size={12} fill="currentColor" />
+                              )}
+                              立即触发备份
+                            </button>
+                          </div>
+
+                          {/* WebDAV 备份配置 */}
+                          <div className="md:col-span-3 space-y-0 rounded-2xl bg-white/5 border border-border/50 overflow-hidden">
+                            <div 
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setWebdavManualOpen(!webdavManualOpen)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setWebdavManualOpen(!webdavManualOpen);
+                                }
+                              }}
+                              className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer outline-none focus-visible:bg-white/5"
+                            >
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary shrink-0">
+                                  <Cloud size={14} />
+                                </div>
+                                <div className="text-left min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-[11px] font-bold text-foreground whitespace-nowrap">WebDAV 云端同步</h4>
+                                    {!webdavEnabled && (
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">已禁用</span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground/60 hidden sm:block">将加密备份自动同步至远程 WebDAV 服务器</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Switch 
+                                    checked={webdavEnabled} 
+                                    onChange={(checked) => {
+                                      setWebdavEnabled(checked);
+                                      saveSettings({ webdavEnabled: checked });
+                                      if (checked) setWebdavManualOpen(true);
+                                    }}
+                                  />
+                                </div>
+                                <div className="p-1 rounded-md bg-white/5 border border-border/10 text-muted-foreground/40">
+                                  {webdavManualOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                </div>
+                              </div>
+                            </div>
+
+                            {webdavManualOpen && (
+                              <motion.div 
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                transition={{ duration: 0.2 }}
+                                className="space-y-4 pt-4 pb-4 px-4 border-t border-border/20"
+                              >
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="space-y-1.5 md:col-span-2">
+                                    <label className="text-[10px] font-bold text-muted-foreground ml-0.5">服务器地址 (URL)</label>
+                                    <input
+                                      type="text"
+                                      value={webdavUrl}
+                                      onChange={(e) => setWebdavUrl(e.target.value)}
+                                      placeholder="https://nas.example.com/dav"
+                                      className="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-4 text-xs transition-all focus:ring-1 focus:ring-primary outline-none"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-muted-foreground ml-0.5">账号</label>
+                                    <input
+                                      type="text"
+                                      value={webdavUser}
+                                      onChange={(e) => setWebdavUser(e.target.value)}
+                                      className="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-4 text-xs transition-all focus:ring-1 focus:ring-primary outline-none"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-muted-foreground ml-0.5">密码</label>
+                                    <input
+                                      type="password"
+                                      value={webdavPassword}
+                                      onChange={(e) => setWebdavPassword(e.target.value)}
+                                      className="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-4 text-xs transition-all focus:ring-1 focus:ring-primary outline-none"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5 md:col-span-2">
+                                    <label className="text-[10px] font-bold text-muted-foreground ml-0.5">备份路径(可选)</label>
+                                    <input
+                                      type="text"
+                                      value={webdavPath}
+                                      onChange={(e) => setWebdavPath(e.target.value)}
+                                      placeholder="/PickNote/Backups"
+                                      className="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-4 text-xs transition-all focus:ring-1 focus:ring-primary outline-none"
+                                    />
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={handleTestWebDAV}
+                                  disabled={isTestingWebDAV}
+                                  className="w-full h-9 mt-2 rounded-lg bg-white/10 text-foreground text-[10px] font-bold transition-all hover:bg-white/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 border border-border/50"
+                                >
+                                  {isTestingWebDAV ? (
+                                    <div className="h-3 w-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <Cloud size={12} />
+                                  )}
+                                  测试 WebDAV 连接
+                                </button>
+                              </motion.div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 备份历史列表 */}
+                      <div className="mt-4 rounded-2xl overflow-hidden border border-border/50 bg-white/40 dark:bg-black/20 backdrop-blur-xl">
+                        <div className="px-4 py-3 bg-white/10 dark:bg-white/5 border-b border-border/50 flex items-center justify-between text-foreground">
+                          <div className="flex items-center">
+                             <h5 className="text-[10px] font-bold text-foreground/70 uppercase tracking-wider">备份历史记录</h5>
+                          </div>
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/20 dark:bg-white/5 text-muted-foreground/60 border border-border/10">
+                            配额: {backups.length} / {backupRetention}
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-[11px]">
+                            <thead>
+                              <tr className="bg-white/10 dark:bg-white/5 border-b border-border/20">
+                                <th className="px-4 py-3 font-bold text-muted-foreground/70 whitespace-nowrap">文件名</th>
+                                <th className="px-4 py-3 font-bold text-muted-foreground/70 text-center whitespace-nowrap">同步时间</th>
+                                <th className="px-4 py-3 font-bold text-muted-foreground/70 text-right whitespace-nowrap">文件体积</th>
+                                <th className="px-4 py-3 font-bold text-muted-foreground/70 text-center whitespace-nowrap">操作</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/10">
+                              {isLoadingBackups ? (
+                                <tr>
+                                  <td colSpan={4} className="px-4 py-16 text-center">
+                                    <div className="flex flex-col items-center gap-3">
+                                      <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                      <span className="text-xs text-muted-foreground animate-pulse">同步云端记录...</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : backups.length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="px-4 py-20 text-center">
+                                    <div className="flex flex-col items-center gap-3 opacity-30">
+                                      <Database size={32} className="text-muted-foreground" />
+                                      <div className="space-y-1">
+                                        <p className="text-sm font-bold text-muted-foreground">暂无自动备份记录</p>
+                                        <p className="text-[10px] text-muted-foreground/60">开启自动备份后，系统将按计划在此罗列归档文件</p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : (
+                                backups.map((b) => (
+                                  <tr key={b.name} className="hover:bg-white/5 transition-colors group">
+                                    <td className="px-4 py-3 font-mono text-muted-foreground group-hover:text-foreground transition-colors max-w-[120px] truncate">{b.name}</td>
+                                    <td className="px-4 py-3 text-muted-foreground tabular-nums whitespace-nowrap text-center">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <Calendar size={10} className="opacity-40" />
+                                        {formatLocalDateTime(new Date(b.createdAt))}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-muted-foreground text-right tabular-nums whitespace-nowrap">
+                                      {(b.size / 1024 / 1024).toFixed(2)} MB
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <button 
+                                          onClick={() => handleDownloadBackup(b.name)}
+                                          className="p-1.5 rounded-lg hover:bg-primary/20 text-primary transition-all"
+                                          title="下载"
+                                        >
+                                          <Download size={14} />
+                                        </button>
+                                        <button 
+                                          onClick={() => setBackupConfig({ isOpen: true, type: "import", file: { name: b.name } as File })}
+                                          className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-500 transition-all"
+                                          title="恢复此备份"
+                                        >
+                                          <RotateCcw size={14} />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteBackup(b.name)}
+                                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-500 transition-all"
+                                          title="删除"
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -787,19 +1273,37 @@ function SettingsContent() {
                             a.download = `PickNote_备份数据_${new Date().toISOString().split('T')[0]}.pnk`;
                             a.click();
                         } else {
-                            if (!backupConfig.file) return;
-                            const formData = new FormData();
-                            formData.append("file", backupConfig.file);
-                            formData.append("password", password);
+                            // 如果有 file.size 说明是本地上传的 File 对象
+                            // 否则是我们手动构造的 { name: string } 伪 File，表示服务器端恢复
+                            const isServerRestore = !backupConfig.file || !('size' in backupConfig.file);
                             
-                            const res = await fetch("/api/backup/import", {
-                                method: "POST",
-                                body: formData
-                            });
-                            onProgress(90);
-                            if (!res.ok) {
-                                const err = await res.json();
-                                throw new Error(err.error || "恢复失败");
+                            if (isServerRestore) {
+                                if (!backupConfig.file?.name) return;
+                                const res = await fetch("/api/system/backup/restore", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ fileName: backupConfig.file.name, password })
+                                });
+                                onProgress(90);
+                                if (!res.ok) {
+                                    const err = await res.json();
+                                    throw new Error(err.error || "恢复失败");
+                                }
+                            } else {
+                                if (!backupConfig.file) return;
+                                const formData = new FormData();
+                                formData.append("file", backupConfig.file);
+                                formData.append("password", password);
+                                
+                                const res = await fetch("/api/backup/import", {
+                                    method: "POST",
+                                    body: formData
+                                });
+                                onProgress(90);
+                                if (!res.ok) {
+                                    const err = await res.json();
+                                    throw new Error(err.error || "恢复失败");
+                                }
                             }
                             onProgress(100);
                             setTimeout(() => window.location.reload(), 2000);
@@ -809,21 +1313,6 @@ function SettingsContent() {
 
 
 
-              {/* Security Placeholder */}
-              <div className="glass-panel rounded-2xl border border-border-dashed p-6 opacity-60 grayscale hover:grayscale-0 hover:opacity-100 bg-white/5 border-dashed">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30">
-                      <ShieldCheck size={16} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-foreground">高级访问许可</h4>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground">多级管理员 RBAC 权限分配 (即将推出)</p>
-                    </div>
-                  </div>
-                  <Zap size={16} className="text-muted-foreground/20" />
-                </div>
-              </div>
             </div>
           )}
         

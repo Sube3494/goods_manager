@@ -47,9 +47,15 @@ export async function POST(request: Request) {
           include: { items: true } 
       }),
       galleryItems: await prisma.galleryItem.findMany({ where: { userId } }),
+      gallerySubmissions: await prisma.gallerySubmission.findMany({ where: { userId } }),
       systemSettings: await prisma.systemSetting.findMany({ where: { userId } }),
       users: await prisma.user.findMany({ where: { id: userId } }),
+      roleProfiles: await prisma.roleProfile.findMany(),
       whitelists: await prisma.emailWhitelist.findMany(),
+      invitations: await prisma.invitation.findMany(),
+      registrationRequests: await prisma.registrationRequest.findMany(),
+      pageViews: await prisma.pageView.findMany(),
+      verificationCodes: await prisma.verificationCode.findMany(),
     };
 
     // 2. 加密序列化后的 JSON

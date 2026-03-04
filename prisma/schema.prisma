@@ -277,6 +277,15 @@ model SystemSetting {
   uploadConflictStrategy String    @default("hash")
   shareExpireDuration    Int       @default(1)
   shareExpireUnit        String    @default("hours")
+  backupEnabled          Boolean   @default(false)
+  backupIntervalUnit     String    @default("days")
+  backupIntervalValue    Int       @default(1)
+  backupRetention        Int       @default(10)
+  webdavEnabled          Boolean   @default(false)
+  webdavUrl              String?
+  webdavUser             String?
+  webdavPassword         String?
+  webdavPath             String?
   lastBackup             DateTime?
   updatedAt              DateTime  @updatedAt
   userId                 String?
