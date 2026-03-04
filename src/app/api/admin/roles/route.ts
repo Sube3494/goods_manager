@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasPermission, ROLE_TEMPLATES, TEMPLATE_LABELS } from "@/lib/permissions";
 
 // 获取所有角色
 export async function GET() {
@@ -9,6 +9,21 @@ export async function GET() {
     const session = await getFreshSession();
     if (!session || !hasPermission(session, "system:manage")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 自动同步内置角色模板
+    for (const [key, permissions] of Object.entries(ROLE_TEMPLATES)) {
+      const name = TEMPLATE_LABELS[key] || key;
+      await prisma.roleProfile.upsert({
+        where: { name },
+        update: { permissions, isSystem: true },
+        create: {
+          name,
+          description: `内置系统角色: ${name}`,
+          permissions,
+          isSystem: true
+        }
+      });
     }
 
     const roles = await prisma.roleProfile.findMany({

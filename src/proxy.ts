@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { updateSession } from "@/lib/auth";
 import { jwtVerify } from "jose";
+import { SessionUser } from "@/lib/permissions";
 
 const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
 const key = new TextEncoder().encode(secretKey);
@@ -84,7 +85,34 @@ export async function proxy(request: NextRequest) {
 
   // Redirect authenticated users away from login page
   if (path === "/login" && session) {
-    return NextResponse.redirect(new URL("/", request.nextUrl));
+    try {
+      const { payload } = await jwtVerify(session, key);
+      const perms = (payload.permissions as Record<string, boolean>) || {};
+      const profilePerms = (payload.roleProfile as SessionUser["roleProfile"])?.permissions as Record<string, boolean> || {};
+      const hasProductRead = perms["product:read"] || perms["all"] || profilePerms["product:read"] || profilePerms["all"];
+      
+      // If user has product:read or is super admin, go to dashboard, else go to gallery
+      const target = (payload.role === "SUPER_ADMIN" || hasProductRead) ? "/" : "/gallery";
+      return NextResponse.redirect(new URL(target, request.nextUrl));
+    } catch {
+      return NextResponse.redirect(new URL("/", request.nextUrl));
+    }
+  }
+
+  // Handle root path for authenticated users without product:read permission
+  if (path === "/" && session) {
+    try {
+      const { payload } = await jwtVerify(session, key);
+      const perms = (payload.permissions as Record<string, boolean>) || {};
+      const profilePerms = (payload.roleProfile as SessionUser["roleProfile"])?.permissions as Record<string, boolean> || {};
+      const hasProductRead = perms["product:read"] || perms["all"] || profilePerms["product:read"] || profilePerms["all"];
+      
+      if (payload.role !== "SUPER_ADMIN" && !hasProductRead) {
+        return NextResponse.redirect(new URL("/gallery", request.nextUrl));
+      }
+    } catch {
+      // Ignore
+    }
   }
 
 

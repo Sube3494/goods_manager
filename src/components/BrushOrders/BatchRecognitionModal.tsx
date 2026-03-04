@@ -196,8 +196,6 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
       return segments;
     };
 
-    extractKeywords(normRecognized);
-
     let bestScore = 0;
     let bestProduct: Product | null = null;
 

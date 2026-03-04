@@ -93,6 +93,9 @@ export async function updateSession(request: NextRequest) {
     const parsed = await decrypt(session) as SessionPayload;
     parsed.expires = new Date(Date.now() + SESSION_DURATION * 1000);
     const res = NextResponse.next();
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
     res.cookies.set({
       name: "session",
       value: await encrypt(parsed),
