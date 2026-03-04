@@ -45,6 +45,7 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
+  const [gallerySortDesc, setGallerySortDesc] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
@@ -141,6 +142,7 @@ function SettingsContent() {
                 const data = await settingsRes.json();
                 setLowStockThreshold(data.lowStockThreshold);
                 setAllowGalleryUpload(data.allowGalleryUpload ?? true);
+                setGallerySortDesc(data.gallerySortDesc ?? true);
                 
                 // Storage settings
                 setStorageType(data.storageType || "local");
@@ -187,6 +189,7 @@ function SettingsContent() {
     const payload = {
         lowStockThreshold,
         allowGalleryUpload,
+        gallerySortDesc,
         storageType,
         minioEndpoint,
         minioPort,
@@ -224,6 +227,7 @@ function SettingsContent() {
   }, [
     lowStockThreshold, 
     allowGalleryUpload, 
+    gallerySortDesc,
     storageType, 
     minioEndpoint, 
     minioPort, 
@@ -265,6 +269,12 @@ function SettingsContent() {
     const newValue = !allowGalleryUpload;
     setAllowGalleryUpload(newValue);
     saveSettings({ allowGalleryUpload: newValue });
+  };
+
+  const toggleGallerySortDesc = () => {
+    const newValue = !gallerySortDesc;
+    setGallerySortDesc(newValue);
+    saveSettings({ gallerySortDesc: newValue });
   };
 
 
@@ -653,6 +663,28 @@ function SettingsContent() {
                       <Switch
                         checked={allowGalleryUpload}
                         onChange={toggleGalleryUpload}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 md:p-5 hover:bg-muted/5 transition-colors">
+                    <div className="max-w-md">
+                      <h4 className="text-sm font-bold text-foreground">实物相册排序方式控制</h4>
+                      <p className="text-xs text-muted-foreground mt-1 text-pretty">配置实物相册中商品组的排列顺序。降序：最新/最大编号在前；升序：最小编号在前。</p>
+                    </div>
+                    <div className="shrink-0 self-start sm:self-center">
+                      <CustomSelect
+                        value={gallerySortDesc ? "desc" : "asc"}
+                        triggerClassName="h-9 w-32 rounded-lg border-border bg-white dark:bg-white/5 text-xs font-bold"
+                        onChange={(val) => {
+                          const newValue = val === "desc";
+                          setGallerySortDesc(newValue);
+                          saveSettings({ gallerySortDesc: newValue });
+                        }}
+                        options={[
+                          { value: "desc", label: "编号降序" },
+                          { value: "asc", label: "编号升序" }
+                        ]}
                       />
                     </div>
                   </div>

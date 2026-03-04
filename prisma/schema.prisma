@@ -265,6 +265,7 @@ model SystemSetting {
   lowStockThreshold      Int       @default(10)
   allowDataImport        Boolean   @default(true)
   allowGalleryUpload     Boolean   @default(true)
+  gallerySortDesc        Boolean   @default(true)
   storageType            String    @default("local")
   minioEndpoint          String?
   minioPort              Int?

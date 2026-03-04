@@ -58,15 +58,24 @@ export async function GET(request: Request) {
       }
     });
 
-    // 4. Perform natural sort for products in memory
+    const total = allMatchingProducts.length;
+    const skip = (page - 1) * pageSize;
+
+    // 4. Fetch System Settings for sort direction
+    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+    const sortDesc = settings?.gallerySortDesc ?? true;
+
+    // 5. Perform natural sort for products in memory
     allMatchingProducts.sort((a, b) => {
       const skuA = a.sku || "";
       const skuB = b.sku || "";
-      return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
+      if (sortDesc) {
+        return skuB.localeCompare(skuA, undefined, { numeric: true, sensitivity: 'base' });
+      } else {
+        return skuA.localeCompare(skuB, undefined, { numeric: true, sensitivity: 'base' });
+      }
     });
 
-    const total = allMatchingProducts.length;
-    const skip = (page - 1) * pageSize;
     const pagedProducts = allMatchingProducts.slice(skip, skip + pageSize);
     const productIds = pagedProducts.map(p => p.id);
 

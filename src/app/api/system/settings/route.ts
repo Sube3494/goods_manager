@@ -22,6 +22,7 @@ export async function GET() {
         lowStockThreshold: 10,
         allowDataImport: true,
         allowGalleryUpload: true,
+        gallerySortDesc: true,
         storageType: "local",
         uploadConflictStrategy: "hash",
         shareExpireDuration: 1,
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     const { 
       lowStockThreshold, 
       allowGalleryUpload, 
+      gallerySortDesc,
       allowDataImport,
       storageType,
       minioEndpoint,
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
     const updateData: Prisma.SystemSettingUpdateInput = {};
     if (typeof lowStockThreshold === 'number') updateData.lowStockThreshold = lowStockThreshold;
     if (typeof allowGalleryUpload === 'boolean') updateData.allowGalleryUpload = allowGalleryUpload;
+    if (typeof gallerySortDesc === 'boolean') updateData.gallerySortDesc = gallerySortDesc;
     if (typeof allowDataImport === 'boolean') updateData.allowDataImport = allowDataImport;
     
     // Storage settings
@@ -87,6 +90,7 @@ export async function POST(request: Request) {
         lowStockThreshold: (typeof lowStockThreshold === 'number') ? lowStockThreshold : 10,
         allowDataImport: (typeof allowDataImport === 'boolean') ? allowDataImport : true,
         allowGalleryUpload: (typeof allowGalleryUpload === 'boolean') ? allowGalleryUpload : true,
+        gallerySortDesc: (typeof gallerySortDesc === 'boolean') ? gallerySortDesc : true,
         storageType: storageType || "local",
         uploadConflictStrategy: "hash",
         minioEndpoint: minioEndpoint || null,
