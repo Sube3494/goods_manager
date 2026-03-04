@@ -183,7 +183,7 @@ export default function BrushOrdersPage() {
             dayGroup.orders.sort((a, b) => {
                 const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
                 const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
-                return timeB - timeA; // 单日内按照下单顺序倒排
+                return timeA - timeB; // 单日内按照时间正序排列（早的在前）
             });
             // 重新按序分配每天的内部序号（保持从 1 开始，也可以考虑从当前总数倒数，但业务上通常正序编号即可）
             dayGroup.orders.forEach((order, index) => {
