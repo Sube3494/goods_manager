@@ -111,14 +111,14 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
   const toggleSelectAll = () => {
     const images = galleryImages || [];
-    if (selectedIds.size === images.length + (formData.image && !images.find(i => i.url === formData.image) ? 1 : 0)) {
+    // 过滤掉封面图 (Filter out cover images)
+    const selectableImages = images.filter(img => img.url !== formData.image && img.id !== 'cover-virtual');
+    
+    if (selectedIds.size === selectableImages.length && selectableImages.length > 0) {
         setSelectedIds(new Set());
     } else {
-        const allIds = images.map(img => img.id);
-        if (formData.image && !images.find(i => i.url === formData.image)) {
-            allIds.push('cover-virtual');
-        }
-        setSelectedIds(new Set(allIds));
+        const selectableIds = selectableImages.map(img => img.id);
+        setSelectedIds(new Set(selectableIds));
     }
   };
 
@@ -1300,13 +1300,13 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                               ? "cursor-pointer border-primary ring-2 ring-primary/20"
                                               : "cursor-grab active:cursor-grabbing border-border",
                                             isMain && !isCover && "border-primary ring-2 ring-primary/20",
-                                            isSelected && "ring-4 ring-primary ring-offset-2 dark:ring-offset-gray-900 border-primary scale-[0.98]",
+                                            isSelected && "ring-2 ring-primary ring-offset-1 dark:ring-offset-gray-900 border-primary scale-[0.98]",
                                             isBatchMode && isVirtual && "brightness-75",
                                             isDragTarget && "ring-2 ring-primary/60 scale-[0.97] opacity-70"
                                           )}
                                         >
-                                            {/* Batch selection overlay */}
-                                            {isBatchMode && (
+                                            {/* Batch selection overlay (Exclude cover) */}
+                                            {isBatchMode && !isMain && (
                                                 <div className={cn(
                                                     "absolute top-2 right-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shadow-lg",
                                                     isSelected 
