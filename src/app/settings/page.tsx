@@ -271,11 +271,6 @@ function SettingsContent() {
     saveSettings({ allowGalleryUpload: newValue });
   };
 
-  const toggleGallerySortDesc = () => {
-    const newValue = !gallerySortDesc;
-    setGallerySortDesc(newValue);
-    saveSettings({ gallerySortDesc: newValue });
-  };
 
 
   if (isLoading) {
