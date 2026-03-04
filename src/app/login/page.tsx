@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft } from "lucide-react";
@@ -17,13 +17,39 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(0);
 
+  const triggeredRef = useRef(false);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
         const tokenEmail = params.get("email");
+        const token = params.get("token");
         if (tokenEmail) setEmail(tokenEmail);
+        
+        // 如果有 email 和 token，且尚未进入验证码步骤，且从未触发过
+        if (tokenEmail && token && step === "email" && !isLoading && !triggeredRef.current) {
+            triggeredRef.current = true;
+            const autoTrigger = async () => {
+                setIsLoading(true);
+                try {
+                    const res = await fetch("/api/auth/send-code", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: tokenEmail }),
+                    });
+                    if (res.ok) {
+                        setStep("code");
+                        setTimer(60);
+                        showToast("欢迎加入！验证码已发送至您的邮箱", "success");
+                    }
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            autoTrigger();
+        }
     }
-  }, []);
+  }, [isLoading, showToast, step]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -386,7 +412,7 @@ export default function LoginPage() {
                         {isLoading ? (
                             <>
                                 <Loader2 className="animate-spin" size={20} />
-                                <span>验证登录中...</span>
+                                <span>正在同步空间...</span>
                             </>
                         ) : (
                             <>

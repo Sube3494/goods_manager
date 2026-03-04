@@ -165,9 +165,23 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     "h-full animate-fade-in",
                     !isFullScreenPage && "mx-auto max-w-7xl"
                 )}>
-                    <PageGuard>
-                        {children}
-                    </PageGuard>
+                    {isLoading && !isFullScreenPage ? (
+                        <div className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-4 bg-background">
+                            <div className="relative">
+                                <div className="h-20 w-20 rounded-3xl bg-primary/5 flex items-center justify-center mb-2 animate-pulse" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="h-10 w-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+                                </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground font-medium animate-pulse tracking-wide">
+                                正在准备 PickNote 空间...
+                            </p>
+                        </div>
+                    ) : (
+                        <PageGuard>
+                            {children}
+                        </PageGuard>
+                    )}
                 </div>
             </main>
         </div>

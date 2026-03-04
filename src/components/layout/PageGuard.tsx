@@ -5,7 +5,7 @@ import { useUser } from "@/hooks/useUser";
 import { navItems } from "@/lib/navigation";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { useMemo } from "react";
-import { ShieldAlert, Loader2 } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
 
 export function PageGuard({ children }: { children: React.ReactNode }) {
@@ -61,12 +61,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
   }, [pathname, user, isLoading]);
 
   if (isLoading || isAuthorized === null) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground italic">正在验证访问权限...</p>
-      </div>
-    );
+    return null; // Let the parent layout (MainLayout) handle the global loader for better UX
   }
 
   if (!isAuthorized) {
@@ -77,7 +72,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
         </div>
         <h1 className="text-2xl font-bold mb-2">访问受限</h1>
         <p className="text-muted-foreground max-w-md mb-8">
-          抱歉，您的账号没有权限访问该页面。如果您认为这是一个错误，请联系系统管理员。
+          抱歉，您的账号尚未获得进入该区域的许可。如果您认为这是一个错误，请联系管理员进行配置。
         </p>
         <div className="flex gap-4">
             <button 

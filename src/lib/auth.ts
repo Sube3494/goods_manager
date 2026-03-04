@@ -49,6 +49,14 @@ export async function getFreshSession() {
 
   if (!user || user.status === "DISABLED") return null;
 
+  // Extra safety: verify user is still in the whitelist (unless Super Admin)
+  if (user.role !== "SUPER_ADMIN") {
+    const whitelisted = await prisma.emailWhitelist.findUnique({
+      where: { email: user.email.toLowerCase() }
+    });
+    if (!whitelisted) return null;
+  }
+
   return {
     ...session,
     id: user.id,

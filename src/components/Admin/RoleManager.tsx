@@ -226,7 +226,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                             <Shield size={18} />
                         </div>
                         <h2 className="text-lg md:text-xl font-black text-foreground tracking-tighter">
-                            {editingRole?.id ? (editingRole.isSystem ? "查看系统内置角色" : "修改角色权限") : "创建新角色"}
+                            {editingRole?.id ? (editingRole.isSystem ? "查看系统内置角色" : "配置访问权限") : "创建新角色"}
                         </h2>
                     </div>
                     <button onClick={() => setEditingRole(null)} className="h-8 w-8 rounded-full hover:bg-muted dark:hover:bg-white/5 flex items-center justify-center transition-all opacity-40 hover:opacity-100">
@@ -341,10 +341,6 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                     return (
                                         <motion.div 
                                             key={group.key}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            transition={{ duration: 0.2 }}
                                             className="space-y-8"
                                         >
                                             <div className="flex items-start justify-between group/header gap-3">

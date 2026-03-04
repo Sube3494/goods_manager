@@ -135,7 +135,7 @@ export function SubmissionsReviewPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                 <RefreshCw className="animate-spin text-primary" size={40} />
-                <p className="text-muted-foreground animate-pulse text-sm">正在核验访问权限...</p>
+                <p className="text-muted-foreground animate-pulse text-sm">正在核验访问许可...</p>
             </div>
         );
     }

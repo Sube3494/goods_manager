@@ -44,3 +44,35 @@ export async function sendVerificationEmail(email: string, code: string) {
     return false;
   }
 }
+
+export async function sendInvitationEmail(email: string, inviteUrl: string) {
+  try {
+    const info = await transporter.sendMail({
+      from: SMTP_FROM,
+      to: email,
+      subject: "您已受邀加入 PickNote",
+      text: `您好，您已被邀请使用 PickNote。点击以下链接进入：${inviteUrl}`,
+      html: `
+        <div style="font-family: 'Microsoft YaHei', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+          <h2 style="color: #4F46E5;">诚邀您使用 PickNote</h2>
+          <p>您好！</p>
+          <p>您已被邀请加入 <strong>PickNote</strong> 协作空间。</p>
+          <p>请点击下方按钮进入系统：</p>
+          <div style="text-align: center; margin: 35px 0;">
+            <a href="${inviteUrl}" style="background-color: #4F46E5; color: white; padding: 12px 25px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">进入系统</a>
+          </div>
+          <p style="font-size: 12px; color: #999;">如果按钮无法点击，请复制以下链接粘贴至浏览器打开：</p>
+          <p style="font-size: 11px; color: #4F46E5; word-break: break-all; opacity: 0.8;">${inviteUrl}</p>
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #bbb; font-size: 12px;">
+            <p>&copy; ${new Date().getFullYear()} PickNote</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log("Invitation sent: %s", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("Error sending invitation email:", error);
+    return false;
+  }
+}

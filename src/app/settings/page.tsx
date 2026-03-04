@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { AlertTriangle, ShieldCheck, Database, Zap, Moon, Sun, Monitor, Download, Upload, Info, BarChart2, Users, Eye, TrendingUp } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "next-themes";
@@ -277,9 +277,9 @@ function SettingsContent() {
   }
 
   return (
-    <div className="w-full max-w-[1200px] mx-auto space-y-6 animate-in fade-in slide-in-from-top-4 duration-700">
+    <div className="w-full max-w-[1200px] mx-auto space-y-6">
       {/* Unified Header with Auto-save Status */}
-      <div className="relative flex flex-col gap-2 mb-6 transition-all">
+      <div className="relative flex flex-col gap-2 mb-6">
         <div className="flex-1 min-w-0 pr-24 sm:pr-0">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             系统管理
@@ -336,18 +336,10 @@ function SettingsContent() {
         </div>
       </div>
 
-      <div className="grid gap-6">
-        {/* Content sections will be rendered here based on activeTab */}
-
-        <AnimatePresence mode="wait">
+        <div className="grid gap-6">
+          {/* Content sections will be rendered here based on activeTab */}
           {activeTab === "general" && (
-            <motion.div
-              key="general"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
+            <div key="general" className="space-y-6">
               {/* Personalization Section */}
               <div className="glass-panel rounded-2xl border border-border overflow-hidden">
                 <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex items-center justify-between">
@@ -396,7 +388,7 @@ function SettingsContent() {
                             }
                           }}
                           className={cn(
-                            "flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg transition-all duration-300 text-xs font-bold",
+                            "flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold",
                             theme === t.id 
                               ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' 
                               : 'text-muted-foreground hover:text-foreground'
@@ -450,18 +442,12 @@ function SettingsContent() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
 
 
           {activeTab === "data" && (
-            <motion.div
-              key="data"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
+            <div key="data" className="space-y-6">
               {/* Analytics Panel */}
               {(() => {
                 const maxPV = analytics?.trend?.length
@@ -497,7 +483,7 @@ function SettingsContent() {
                             key={r}
                             onClick={() => setAnalyticsRange(r)}
                             className={cn(
-                              "px-2.5 py-1 rounded-md text-[10px] font-bold transition-all",
+                              "px-2.5 py-1 rounded-md text-[10px] font-bold",
                               analyticsRange === r
                                 ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm"
                                 : "text-muted-foreground hover:text-foreground"
@@ -544,7 +530,7 @@ function SettingsContent() {
                           <div
                             key={card.label}
                             className={cn(
-                              "relative rounded-xl border border-border p-3 space-y-2 overflow-hidden bg-white/5 dark:bg-white/3 transition-all",
+                              "relative rounded-xl border border-border p-3 space-y-2 overflow-hidden bg-white/5 dark:bg-white/3",
                               isLoadingAnalytics && "animate-pulse",
                               idx === 2 && "col-span-2 sm:col-span-1"
                             )}
@@ -797,7 +783,7 @@ function SettingsContent() {
 
 
               {/* Security Placeholder */}
-              <div className="glass-panel rounded-2xl border border-border-dashed p-6 opacity-60 grayscale hover:grayscale-0 transition-all hover:opacity-100 bg-white/5 border-dashed">
+              <div className="glass-panel rounded-2xl border border-border-dashed p-6 opacity-60 grayscale hover:grayscale-0 hover:opacity-100 bg-white/5 border-dashed">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30">
@@ -811,17 +797,11 @@ function SettingsContent() {
                   <Zap size={16} className="text-muted-foreground/20" />
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
         
           {activeTab === "storage" && (
-            <motion.div
-              key="storage"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
+            <div key="storage" className="space-y-6">
               {/* Storage Section */}
               <div className="glass-panel rounded-2xl border border-border overflow-hidden">
                 <div className="p-4 md:p-5 border-b border-border/50 bg-white/5 flex items-center justify-between">
@@ -863,7 +843,7 @@ function SettingsContent() {
                           key={mode.id}
                           onClick={() => { setStorageType(mode.id as "local" | "minio"); saveSettings({ storageType: mode.id }); }}
                           className={cn(
-                            "flex-1 flex items-center justify-center px-4 py-1.5 rounded-lg transition-all duration-300 text-xs font-bold",
+                            "flex-1 flex items-center justify-center px-4 py-1.5 rounded-lg text-xs font-bold",
                             storageType === mode.id 
                               ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' 
                               : 'text-muted-foreground hover:bg-white/5'
@@ -896,11 +876,7 @@ function SettingsContent() {
                   </div>
 
                   {storageType === "minio" && (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="p-4 md:p-5 bg-muted/5 space-y-4"
-                    >
+                    <div className="p-4 md:p-5 bg-muted/5 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold text-muted-foreground px-1">服务端点 (Endpoint)</label>
@@ -982,21 +958,15 @@ function SettingsContent() {
                           className="w-full h-9 rounded-lg bg-white dark:bg-white/5 border border-border px-3 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"
                         />
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {activeTab === "system" && (
-            <motion.div
-              key="system"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
+            <div key="system" className="space-y-6">
               <div className="glass-panel rounded-2xl border border-border overflow-hidden">
                 <div className="p-4 md:p-5 border-b border-border/50 bg-white/5">
                   <div className="flex items-center gap-2.5">
@@ -1035,11 +1005,10 @@ function SettingsContent() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
 
-    </div>
   );
 }

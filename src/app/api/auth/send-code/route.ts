@@ -1,10 +1,18 @@
+/*
+ * @Date: 2026-03-03 19:55:03
+ * @Author: Sube
+ * @FilePath: route.ts
+ * @LastEditTime: 2026-03-04 15:13:19
+ * @Description: 
+ */
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json();
+    const { email: rawEmail } = await request.json();
+    const email = rawEmail?.toLowerCase().trim();
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -53,6 +61,22 @@ export async function POST(request: Request) {
         }
     }
 
+    // Rate limit check: 1 minute
+    const lastCode = await prisma.verificationCode.findFirst({
+      where: { email },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (lastCode) {
+      const diff = Date.now() - lastCode.createdAt.getTime();
+      if (diff < 60 * 1000) {
+        const remaining = Math.ceil((60 * 1000 - diff) / 1000);
+        return NextResponse.json(
+          { error: `发送过于频繁，请在 ${remaining} 秒后重试` },
+          { status: 429 }
+        );
+      }
+    }
 
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();

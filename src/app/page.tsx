@@ -14,7 +14,6 @@ import { StatsGrid } from "@/components/Dashboard/StatsGrid";
 import { RecentInbound } from "@/components/Dashboard/RecentInbound";
 import { QuickActions } from "@/components/Dashboard/QuickActions";
 import { TopOutboundProducts } from "@/components/Dashboard/TopOutboundProducts";
-import { PageGuard } from "@/components/layout/PageGuard";
 import { format } from "date-fns";
 import { StatsData } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
@@ -76,7 +75,6 @@ export default function Home() {
   }
 
   return (
-    <PageGuard>
       <div className="relative px-3 sm:px-1">
         <div className="space-y-6 sm:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Header */}
@@ -97,9 +95,9 @@ export default function Home() {
             >
                <div className={`flex items-center justify-center h-5 w-5 rounded-full ${isLoading ? "bg-primary/20" : "bg-black/5 dark:bg-white/10 group-hover:bg-primary/20"} transition-colors`}>
                  <RefreshCw size={12} className={cn(
-                   "transition-all duration-700",
-                   isLoading ? "animate-spin text-primary" : "text-muted-foreground group-hover:text-primary group-hover:rotate-180"
-                 )} />
+                    "transition-all duration-700",
+                    isLoading ? "animate-spin text-primary" : "text-muted-foreground group-hover:text-primary group-hover:rotate-180"
+                  )} />
                </div>
                
                <div className="flex flex-col items-start leading-none">
@@ -142,6 +140,5 @@ export default function Home() {
           </div>
         </div>
       </div>
-    </PageGuard>
   );
 }

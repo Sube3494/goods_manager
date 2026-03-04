@@ -61,8 +61,8 @@ function RoleAssignmentModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
             <div className="glass-panel rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-border relative">
                 <div className="px-8 py-6 border-b border-border">
-                    <h3 className="text-xl font-bold">分配系统角色</h3>
-                    <p className="text-sm text-muted-foreground mt-1">选择一个角色以更新该用户的权限权限集</p>
+                    <h3 className="text-xl font-bold">设置成员角色</h3>
+                    <p className="text-sm text-muted-foreground mt-1">请选择一个角色以更新该成员的访问权限集</p>
                 </div>
 
                 <div className="p-8 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
@@ -97,7 +97,7 @@ function RoleAssignmentModal({
                         onClick={() => onSave(selectedId)}
                         className="px-8 py-2.5 rounded-xl bg-primary text-primary-foreground font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
                     >
-                        {isSaving ? <Loader2 className="animate-spin" size={18} /> : "确认分配"}
+                        {isSaving ? <Loader2 className="animate-spin" size={18} /> : "确认角色设置"}
                     </button>
                 </div>
             </div>
@@ -173,7 +173,7 @@ export function UserManager() {
       });
 
       if (res.ok) {
-        showToast("已发送邀请", "success");
+        showToast("邀请已发送", "success");
         setNewEmail("");
         const guestRole = roles.find(r => r.name === "基础访客");
         setTargetRoleId(guestRole ? guestRole.id : "");
@@ -278,7 +278,7 @@ export function UserManager() {
         </form>
         <p className="mt-4 text-xs text-muted-foreground flex items-center gap-1.5 px-1">
           <AlertCircle size={14} />
-          只有受邀并分配角色的邮箱可完成注册。您可以在“角色权限”页签中自定义更多的角色模板。
+          只有受邀并分配角色的邮箱可完成注册。您可以在“角色管理”页签中自定义更多的角色模板。
         </p>
       </div>
 
@@ -299,7 +299,7 @@ export function UserManager() {
                 <tr>
                   <td colSpan={4} className="py-20 text-center text-muted-foreground">
                     <Loader2 className="animate-spin mx-auto mb-4 text-primary" size={32} />
-                    正在同步成员数据...
+                    正在整理成员目录...
                   </td>
                 </tr>
               ) : entries.length === 0 ? (
@@ -340,66 +340,80 @@ export function UserManager() {
                              <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-1 rounded-lg">等待加入</span>
                          )}
                       </td>
-                      <td className="px-6 py-5 text-center">
-                        <div className="flex justify-center gap-2">
-                           {isRegistered ? (
-                             <button
-                               onClick={() => {
-                                 setEditingUserId(entry.user!.id);
-                                 setCurrentRoleId(entry.user!.roleProfileId);
-                               }}
-                               className="p-2.5 rounded-xl text-muted-foreground hover:bg-primary/5 hover:text-primary transition-all"
-                             >
-                               <Settings2 size={18} />
-                             </button>
-                           ) : (
-                             <button
-                                onClick={() => setDeleteEmail(entry.email)}
-                                className="p-2.5 rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-all"
-                             >
-                                <Trash2 size={18} />
-                             </button>
-                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Role Assignment Modal */}
-      {editingUserId && (
-        <RoleAssignmentModal 
-            roles={roles}
-            currentRoleId={currentRoleId}
-            onClose={() => setEditingUserId(null)}
-            onSave={handleRoleSave}
-            isSaving={isSaving}
-        />
-      )}
-
-      <ConfirmModal
-        isOpen={!!deleteEmail}
-        onClose={() => setDeleteEmail(null)}
-        onConfirm={async () => {
-            if (!deleteEmail) return;
-            const res = await fetch(`/api/admin/whitelist?email=${deleteEmail}`, { method: "DELETE" });
-            if (res.ok) {
-                showToast("已撤销邀请", "success");
-                fetchData();
-            } else {
-                showToast("撤销失败", "error");
-            }
-            setDeleteEmail(null);
-        }}
-        title="撤销邀请"
-        message={`确定要撤销对 ${deleteEmail} 的入驻邀请吗？`}
-        variant="danger"
-      />
+                       <td className="px-6 py-5 text-center">
+                         <div className="flex justify-center gap-2">
+                            <div className="flex items-center gap-1">
+                               {isRegistered ? (
+                                 <button
+                                   onClick={() => {
+                                     setEditingUserId(entry.user!.id);
+                                     setCurrentRoleId(entry.user!.roleProfileId);
+                                   }}
+                                   className="p-2.5 rounded-xl text-muted-foreground hover:bg-primary/5 hover:text-primary transition-all"
+                                   title="角色分配"
+                                 >
+                                   <Settings2 size={18} />
+                                 </button>
+                               ) : (
+                                 null
+                               )}
+                               <button
+                                  onClick={() => setDeleteEmail(entry.email)}
+                                  className="p-2.5 rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-all"
+                                  title={isRegistered ? "移除成员" : "撤销邀请"}
+                               >
+                                  <Trash2 size={18} />
+                               </button>
+                            </div>
+                         </div>
+                       </td>
+                     </tr>
+                   );
+                 })
+               )}
+             </tbody>
+           </table>
+         </div>
+       </div>
+ 
+       {/* Role Assignment Modal */}
+       {editingUserId && (
+         <RoleAssignmentModal 
+             roles={roles}
+             currentRoleId={currentRoleId}
+             onClose={() => setEditingUserId(null)}
+             onSave={handleRoleSave}
+             isSaving={isSaving}
+         />
+       )}
+ 
+       <ConfirmModal
+         isOpen={!!deleteEmail}
+         onClose={() => setDeleteEmail(null)}
+         onConfirm={async () => {
+             if (!deleteEmail) return;
+             // API 现在默认级联删除 User 记录
+             const res = await fetch(`/api/admin/whitelist?email=${deleteEmail}`, { method: "DELETE" });
+             if (res.ok) {
+                 showToast("已成功移除", "success");
+                 fetchData();
+             } else {
+                 showToast("操作失败", "error");
+             }
+             setDeleteEmail(null);
+         }}
+         title={(() => {
+             const entry = entries.find(e => e.email === deleteEmail);
+             return entry?.user ? "移除成员" : "撤销邀请";
+         })()}
+         message={(() => {
+             const entry = entries.find(e => e.email === deleteEmail);
+             return entry?.user 
+                ? `确定要移除成员 ${entry.user.name || deleteEmail} 吗？移除后该账号将无法登录且所有权限将被收回。`
+                : `确定要撤销对 ${deleteEmail} 的入驻邀请吗？`;
+         })()}
+         variant="danger"
+       />
     </div>
   );
 }

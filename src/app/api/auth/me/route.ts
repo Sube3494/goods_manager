@@ -20,6 +20,16 @@ export async function GET() {
     return NextResponse.json({ user: null });
   }
 
+  // Extra check: must be in whitelist if not SUPER_ADMIN
+  if (user.role !== "SUPER_ADMIN") {
+    const whitelisted = await prisma.emailWhitelist.findUnique({
+      where: { email: user.email.toLowerCase() }
+    });
+    if (!whitelisted) {
+        return NextResponse.json({ user: null });
+    }
+  }
+
   const response = NextResponse.json({ user });
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   return response;

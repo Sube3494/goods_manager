@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { SessionUser } from "@/lib/permissions";
+import { sendInvitationEmail } from "@/lib/email";
 
 /**
  * GET /api/admin/whitelist - List all whitelisted emails and invitations (SUPER_ADMIN only)
@@ -38,12 +39,13 @@ export async function GET() {
 
     // Join data in-memory
     const combined = whitelist.map(entry => {
-        const invitation = invitations.find(i => i.email === entry.email);
+        const entryEmail = entry.email.toLowerCase();
+        const invitation = invitations.find(i => i.email.toLowerCase() === entryEmail);
         return {
             ...entry,
             invitationToken: invitation?.token || null,
             invitationExpiresAt: invitation?.expiresAt || null,
-            user: users.find(u => u.email === entry.email) || null
+            user: users.find(u => u.email.toLowerCase() === entryEmail) || null
         };
     });
 
@@ -63,8 +65,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  try {
-    const { email, roleProfileId } = await request.json();
+    try {
+    const { email: rawEmail, roleProfileId } = await request.json();
+    const email = rawEmail?.toLowerCase().trim();
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -72,6 +75,12 @@ export async function POST(request: Request) {
 
     // Use transaction to create both whitelist entry and an invitation token
     const result = await prisma.$transaction(async (tx) => {
+        // Find existing user first
+        const existingUser = await tx.user.findUnique({
+            where: { email },
+            select: { status: true }
+        });
+
         const entry = await tx.emailWhitelist.upsert({
             where: { email },
             update: {
@@ -82,6 +91,11 @@ export async function POST(request: Request) {
                 roleProfileId: roleProfileId || null,
             },
         });
+
+        // If user is already registered and active, we don't need a new invitation token
+        if (existingUser && existingUser.status === 'ACTIVE') {
+            return { ...entry, alreadyActive: true };
+        }
 
         // Create or refresh an Invitation
         await tx.invitation.deleteMany({
@@ -99,6 +113,21 @@ export async function POST(request: Request) {
 
         return { ...entry, invitationToken: invitation.token };
     });
+
+    // 只有非活跃用户才发送邮件通知
+    const { alreadyActive, invitationToken } = result as { alreadyActive?: boolean; invitationToken?: string };
+
+    if (!alreadyActive && invitationToken) {
+        const urlObj = new URL(request.url);
+        const origin = urlObj.origin;
+        const safeEmail = email || "";
+        const encodedEmail = encodeURIComponent(safeEmail);
+        const inviteUrl = `${origin}/login?email=${encodedEmail}&token=${invitationToken}`;
+        
+        sendInvitationEmail(email, inviteUrl).catch(err => {
+            console.error("Failed to send invitation email background:", err);
+        });
+    }
 
     return NextResponse.json(result);
   } catch (error) {
@@ -119,8 +148,8 @@ export async function DELETE(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
-    const deleteUser = searchParams.get("deleteUser") === "true";
+    const rawEmail = searchParams.get("email");
+    const email = rawEmail?.toLowerCase().trim();
 
     if (!email) {
        return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -131,14 +160,21 @@ export async function DELETE(request: Request) {
         // 1. Delete whitelist entry
         await tx.emailWhitelist.delete({
             where: { email }
+        }).catch(() => {
+            console.log(`Whitelist entry for ${email} already gone or not found.`);
         });
 
-        // 2. Optional: Delete user account
-        if (deleteUser) {
-            await tx.user.delete({
-                where: { email }
-            });
-        }
+        // 2. Delete invitations
+        await tx.invitation.deleteMany({
+            where: { email }
+        });
+
+        // 3. Always try to delete matching user account to ensure complete removal
+        await tx.user.delete({
+            where: { email }
+        }).catch(() => {
+            console.log(`User record for ${email} not found during revocation.`);
+        });
     });
 
     return NextResponse.json({ success: true });
