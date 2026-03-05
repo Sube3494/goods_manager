@@ -115,7 +115,7 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
   return (
     <motion.div
       className={cn(
-        "relative flex items-center justify-center select-none touch-none",
+        "relative flex items-center justify-center select-none touch-none w-full h-full",
         isZoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in",
         className
       )}
@@ -123,8 +123,6 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
         x: smoothX,
         y: smoothY,
         scale: smoothScale,
-        width: '100%',
-        height: '100%',
         willChange: "transform"
       }}
       onTouchStart={handleTouchStart}
@@ -136,7 +134,8 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
       <img
         src={src}
         alt={alt}
-        className="max-w-[95%] max-h-[95%] object-contain rounded-lg shadow-2xl pointer-events-none mx-auto"
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl pointer-events-none block"
+        style={{ maxHeight: '75dvh' }}
         draggable={false}
       />
     </motion.div>

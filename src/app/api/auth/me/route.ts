@@ -17,7 +17,10 @@ export async function GET() {
   });
 
   if (!user || user.status === "DISABLED") {
-    return NextResponse.json({ user: null });
+    const response = NextResponse.json({ user: null });
+    // 清除失效的 session cookie，防止重定向死循环
+    response.cookies.set("session", "", { expires: new Date(0) });
+    return response;
   }
 
   // Extra check: must be in whitelist if not SUPER_ADMIN
@@ -26,7 +29,9 @@ export async function GET() {
       where: { email: user.email.toLowerCase() }
     });
     if (!whitelisted) {
-        return NextResponse.json({ user: null });
+        const response = NextResponse.json({ user: null });
+        response.cookies.set("session", "", { expires: new Date(0) });
+        return response;
     }
   }
 

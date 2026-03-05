@@ -74,7 +74,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMe
                                 <video 
                                     ref={videoRef}
                                     src={item.url} 
-                                    className="max-w-full max-h-[calc(100vh-320px)] w-auto h-auto object-contain cursor-pointer"
+                                    className="max-w-full max-h-[calc(100dvh-320px)] w-auto h-auto object-contain cursor-pointer"
                                     disablePictureInPicture
                                     disableRemotePlayback
                                     autoPlay
@@ -182,7 +182,6 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMe
                             <GestureImage 
                                 src={item.url} 
                                 onScaleChange={onScaleChange}
-                                className="max-w-full max-h-[calc(100vh-320px)] object-contain"
                             />
                         </div>
                     )}
@@ -292,24 +291,12 @@ function GalleryContent() {
   const [isUIVisible, setIsUIVisible] = useState(true);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleInteraction = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
-    // 处理点击切换
-    if (e?.type === 'click') {
-        const target = e.target as HTMLElement;
-        // 如果点击的是非按钮、非控制条的可选区域（即空白背景区域）
-        if (!target.closest('button, .pointer-events-auto')) {
-            setIsUIVisible(prev => !prev);
-        } else {
-            setIsUIVisible(true);
-        }
-    } else {
-        // 鼠标移动或触摸，显示 UI
-        setIsUIVisible(true);
-    }
-
-    // 移除自动隐藏逻辑，以满足用户“常显”以及不希望被突然隐藏干扰的需求
+  // 鼠标移动 / 触摸开始：始终显示 UI
+  const handleInteraction = useCallback(() => {
+    setIsUIVisible(true);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
   }, []);
+
 
   useEffect(() => {
     const currentTimer = idleTimerRef.current;
@@ -1404,7 +1391,6 @@ function GalleryContent() {
                             style={{ cursor: isUIVisible ? 'default' : 'none' }}
                             onMouseMove={handleInteraction}
                             onTouchStart={handleInteraction}
-                            onClick={handleInteraction}
                         >
                             {/* Layer 0: Ambient Background */}
                             <AnimatePresence mode="wait">
@@ -1443,7 +1429,7 @@ function GalleryContent() {
                                 style={{ 
                                     pointerEvents: isUIVisible ? "auto" : "none"
                                 }}
-                                className="absolute top-0 left-0 right-0 p-4 md:p-6 pt-[env(safe-area-inset-top,0px)] flex items-start justify-between z-50"
+                                className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55"
                             >
                                 <div className="flex items-center gap-2 pointer-events-auto">
                                     <button
@@ -1648,14 +1634,12 @@ function GalleryContent() {
                                     </motion.div>
                                 )}
 
-                                <div className="w-full h-full relative flex items-center justify-center">
-                                    <LightboxMediaItem 
-                                        key={selectedImage!.id}
-                                        item={selectedImage!}
-                                        onScaleChange={(v) => activeScale.set(v)}
-                                        isVisible={isUIVisible}
-                                    />
-                                </div>
+                                 <LightboxMediaItem 
+                                    key={selectedImage!.id}
+                                    item={selectedImage!}
+                                    onScaleChange={(v) => activeScale.set(v)}
+                                    isVisible={isUIVisible}
+                                />
                             </div>
 
                         {/* Bottom Bar Overlay (Minimalist Float) */}

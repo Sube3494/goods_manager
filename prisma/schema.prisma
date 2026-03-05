@@ -330,10 +330,12 @@ model PageView {
   date      DateTime @default(now())
   path      String   @default("/")
   visitorId String   // 匿名访客 ID（来自 cookie）
+  ip        String?  // 请求 IP 的 SHA256 hash（隐私保护）
   isUnique  Boolean  @default(false) // 当天该访客首次访问
 
   @@index([date])
   @@index([visitorId, date])
+  @@index([ip, date])
 }
 
 enum Role {

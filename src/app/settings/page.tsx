@@ -1270,7 +1270,7 @@ function SettingsContent() {
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement("a");
                             a.href = url;
-                            a.download = `PickNote_备份数据_${new Date().toISOString().split('T')[0]}.pnk`;
+                            a.download = `PickNote_备份数据_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(' ', '_').replace(/:/g, '')}.pnk`;
                             a.click();
                         } else {
                             // 如果有 file.size 说明是本地上传的 File 对象
