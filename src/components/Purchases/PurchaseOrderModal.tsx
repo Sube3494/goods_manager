@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin } from "lucide-react";
+import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin, BarChart3 } from "lucide-react";
 import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -656,56 +656,56 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed left-1/2 top-1/2 z-10000 w-[calc(100%-32px)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-              <div className="flex flex-col gap-1">
-                <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
+            <div className="flex items-center justify-between border-b border-white/10 p-5 sm:p-8 shrink-0">
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <h2 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2 sm:gap-3 truncate">
                   {formData.type === "Inbound" || formData.type === "Return" || formData.type === "InternalReturn" ? (
-                      <div className="flex items-center gap-2">
-                          <Package size={24} className="text-primary" />
-                          <span>{effectiveReadOnly ? "单据详情" : (initialData ? "编辑单据" : "新增入库")}</span>
+                      <div className="flex items-center gap-2 truncate">
+                          <Package size={20} className="text-primary shrink-0 sm:w-6 sm:h-6" />
+                          <span className="truncate">{effectiveReadOnly ? "单据详情" : (initialData ? "编辑单据" : "新增入库")}</span>
                       </div>
                   ) : (
-                      <div className="flex items-center gap-2">
-                          <ShoppingBag size={24} className="text-secondary" />
-                          <span>{effectiveReadOnly ? "采购详情" : (initialData ? "编辑采购单" : "新建采购单")}</span>
+                      <div className="flex items-center gap-2 truncate">
+                          <ShoppingBag size={20} className="text-secondary shrink-0 sm:w-6 sm:h-6" />
+                          <span className="truncate">{effectiveReadOnly ? "采购详情" : (initialData ? "编辑采购单" : "新建采购单")}</span>
                       </div>
                   )}
                 </h2>
                 {isSystemGenerated && (
-                  <p className="text-[10px] font-bold text-orange-500/80 tracking-wider flex items-center gap-1">
-                    <AlertCircle size={10} strokeWidth={3} /> 系统自动生成的退库记录，不支持手动修改
+                  <p className="text-[10px] font-bold text-orange-500/80 tracking-wider flex items-center gap-1 whitespace-nowrap overflow-hidden">
+                    <AlertCircle size={10} strokeWidth={3} className="shrink-0" /> <span className="truncate">系统自动生成的记录，不支持修改</span>
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {readOnly && initialData && (
-                  <div className="flex items-center gap-1 sm:gap-2 mr-2 border-r border-border/50 pr-2 sm:pr-4">
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                {initialData && (
+                  <div className="flex items-center gap-0.5 sm:gap-2 mr-1 sm:mr-2 border-r border-border/50 pr-1.5 sm:pr-4">
                     {onOverview && (
                       <button 
                         type="button"
-                        onClick={() => onOverview(initialData)}
-                        className="p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-2"
-                        title="总览商品汇总"
+                        onClick={() => onOverview(formData)}
+                        className="h-9 px-2 sm:px-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95"
+                        title="查看货品明细汇总"
                       >
-                        <ShoppingBag size={20} />
-                        <span className="hidden sm:inline text-xs font-bold">汇总</span>
+                        <BarChart3 size={18} className="text-blue-500 shrink-0" />
+                        <span className="hidden md:inline text-xs font-bold">汇总</span>
                       </button>
                     )}
                     {onExport && (
                       <button 
                         type="button"
-                        onClick={() => onExport(initialData)}
-                        className="p-2 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-2"
-                        title="导出采购明细"
+                        onClick={() => onExport(formData)}
+                        className="h-9 px-2 sm:px-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95"
+                        title="导出采购明细到 Excel"
                       >
-                        <Download size={20} />
-                        <span className="hidden sm:inline text-xs font-bold">导出</span>
+                        <Download size={18} className="text-emerald-500 shrink-0" />
+                        <span className="hidden md:inline text-xs font-bold">导出</span>
                       </button>
                     )}
                   </div>
                 )}
-                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                  <X size={24} />
+                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors active:scale-95 shrink-0">
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
               </div>
             </div>

@@ -2,7 +2,7 @@
  * @Date: 2026-02-15 09:51:02
  * @Author: Sube
  * @FilePath: route.ts
- * @LastEditTime: 2026-03-04 20:59:43
+ * @LastEditTime: 2026-03-05 13:38:13
  * @Description: 
  */
 import { NextResponse } from "next/server";

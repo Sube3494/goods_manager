@@ -59,6 +59,8 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, [timer]);
 
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -80,7 +82,11 @@ export default function LoginPage() {
         setTimer(60);
         showToast("验证码已发送，请查收邮件", "success");
       } else {
-        showToast(data.error || "发送失败", "error");
+        if (res.status === 401) {
+            setIsContactModalOpen(true);
+        } else {
+            showToast(data.error || "发送失败", "error");
+        }
       }
     } catch {
       showToast("网络错误，请稍后重试", "error");
@@ -297,48 +303,13 @@ export default function LoginPage() {
                   <div className="text-center text-xs text-muted-foreground/60 mt-4 flex flex-col items-center gap-3">
                       <div className="flex items-center gap-1">
                         <span>未注册邮箱将无法获取验证码，</span>
-                        <span className="relative inline-flex items-center justify-center group/wechat cursor-help">
-                            <span className="text-primary/70 hover:text-primary transition-colors border-b border-primary/30 hover:border-primary border-dashed pb-0.5">请联系管理员</span>
-                            
-                            {/* 悬停微信号/二维码气泡 */}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 opacity-0 pointer-events-none group-hover/wechat:opacity-100 group-hover/wechat:pointer-events-auto transition-all duration-300 translate-y-2 group-hover/wechat:translate-y-0 z-50 origin-bottom scale-95 group-hover/wechat:scale-100">
-                            <div className="bg-zinc-900/95 dark:bg-zinc-800/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-4 flex flex-col items-center gap-3">
-                                <div className="w-10 h-10 rounded-full border-2 border-primary/30 p-0.5 mb-1 overflow-hidden shrink-0 shadow-lg shadow-primary/20">
-                                    <div className="relative w-full h-full rounded-full overflow-hidden bg-primary/10">
-                                        <Image 
-                                            src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
-                                            alt="Admin Avatar"
-                                            fill
-                                            sizes="40px"
-                                            className="object-cover"
-                                        />
-                                    </div>
-                                </div>
-                                <p className="text-xs text-white/90 text-center font-medium leading-relaxed">
-                                管理员微信号<br/>
-                                <span className="font-bold text-white text-[13px] select-all tracking-wider mt-1 block">Sube3494</span>
-                                </p>
-                                <div className="w-full h-px bg-white/10 my-1" />
-                                {/* 留给用户放二维码的位置 */}
-                                <div className="w-full aspect-square bg-white rounded-xl p-2 relative flex flex-col items-center justify-center border border-white/20 overflow-hidden group/qr">
-                                <span className="text-xs text-zinc-400 font-bold text-center leading-relaxed z-0 absolute px-2">如果已放置 public/wechat.png <br/>请刷新页面</span>
-                                <div className="absolute inset-0 z-10 bg-white">
-                                    <Image 
-                                        src="/wechat.png" 
-                                        alt="WeChat QR" 
-                                        fill 
-                                        sizes="150px" 
-                                        className="object-cover rounded-lg" 
-                                        priority
-                                        unoptimized 
-                                    />
-                                </div>
-                                </div>
-                            </div>
-                            {/* 底部小箭头 */}
-                            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-zinc-900/95 dark:bg-zinc-800/95 backdrop-blur-xl border-b border-r border-white/10 rotate-45" />
-                            </div>
-                        </span>
+                        <button 
+                            type="button"
+                            onClick={() => setIsContactModalOpen(true)}
+                            className="text-primary/70 hover:text-primary transition-colors border-b border-primary/30 hover:border-primary border-dashed pb-0.5 active:scale-95"
+                        >
+                            请联系管理员
+                        </button>
                       </div>
 
 
@@ -439,6 +410,75 @@ export default function LoginPage() {
             </p>
         </motion.div>
       </motion.div>
+
+      {/* Contact Admin Modal */}
+      <AnimatePresence>
+        {isContactModalOpen && (
+            <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-100 flex items-center justify-center p-4 backdrop-blur-sm sm:backdrop-blur-xl bg-black/20 dark:bg-black/60"
+                onClick={() => setIsContactModalOpen(false)}
+            >
+                <motion.div 
+                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full max-w-sm bg-background/80 dark:bg-zinc-900/90 backdrop-blur-2xl border border-zinc-200 dark:border-white/10 shadow-3xl rounded-[2.5rem] p-8 flex flex-col items-center gap-6 relative overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-linear-to-b from-primary/10 to-transparent pointer-events-none" />
+                    
+                    <div className="relative">
+                        <div className="w-20 h-20 rounded-full border-4 border-primary/20 p-1 shadow-2xl shadow-primary/20">
+                            <div className="relative w-full h-full rounded-full overflow-hidden bg-primary/10">
+                                <Image 
+                                    src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
+                                    alt="Admin Avatar"
+                                    fill
+                                    sizes="80px"
+                                    className="object-cover"
+                                />
+                            </div>
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-green-500 w-5 h-5 rounded-full border-4 border-white dark:border-zinc-900" />
+                    </div>
+
+                    <div className="text-center space-y-2 relative z-10">
+                        <h2 className="text-2xl font-black tracking-tighter text-foreground">联系管理员</h2>
+                        <p className="text-sm text-muted-foreground px-4 leading-relaxed font-medium">您的邮箱尚未获得访问授权，<br/>请添加管理员微信进行申请。</p>
+                    </div>
+
+                    <div className="w-full space-y-4 relative z-10">
+                        <div className="bg-zinc-50 dark:bg-white/5 rounded-2xl p-4 border border-zinc-100 dark:border-white/5 flex flex-col items-center gap-2 group/wechat">
+                            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/60">管理员微信号</span>
+                            <span className="text-xl font-mono font-bold text-primary select-all tracking-wider">Sube3494</span>
+                        </div>
+
+                        <div className="relative aspect-square w-full max-w-[200px] mx-auto bg-white rounded-3xl p-3 shadow-2xl group/qr ring-1 ring-zinc-100 dark:ring-white/10">
+                             <Image 
+                                src="/wechat.png" 
+                                alt="WeChat QR" 
+                                fill 
+                                sizes="200px" 
+                                className="object-cover rounded-2xl" 
+                                priority
+                                unoptimized 
+                            />
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => setIsContactModalOpen(false)}
+                        className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:scale-[0.98]"
+                    >
+                        知道了
+                    </button>
+                </motion.div>
+            </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

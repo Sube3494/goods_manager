@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
-import { Plus, Search, ShoppingBag, Calendar, Trash2, Truck, Eye, Copy, ExternalLink, RotateCcw, X } from "lucide-react";
+import { Plus, Search, ShoppingBag, Calendar, Trash2, Truck, Eye, Copy, ExternalLink, RotateCcw, X, Download, BarChart3 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -53,7 +53,7 @@ function PurchasesContent() {
   const pathname = usePathname();
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [overviewPurchase, setOverviewPurchase] = useState<PurchaseOrder | null>(null);
+  const [overviewPurchases, setOverviewPurchases] = useState<PurchaseOrder[]>([]);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseOrder | null>(null);
 
 
@@ -342,7 +342,8 @@ function PurchasesContent() {
       
       const worksheet = workbook.addWorksheet("明细");
       
-      const dateStr = new Date().toLocaleDateString("zh-CN");
+      const now = new Date();
+      const dateStr = `${now.toLocaleDateString("zh-CN")} ${now.toLocaleTimeString("zh-CN", { hour12: false })}`;
       const title = specificPO ? `采购单明细` : `进货汇总`;
       
       // 添加标题行
@@ -576,7 +577,7 @@ function PurchasesContent() {
           <div className="flex items-center gap-2 shrink-0">
             <button 
               onClick={handleCreate}
-              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all"
+              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all active:scale-95"
             >
               <Plus size={16} className="md:w-[18px] md:h-[18px]" />
               新建采购单
@@ -934,7 +935,7 @@ function PurchasesContent() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleSave}
         onExport={handleExport}
-        onOverview={setOverviewPurchase}
+        onOverview={(po) => setOverviewPurchases([po])}
         initialData={editingPurchase || undefined}
         readOnly={detailReadOnly}
       />
@@ -960,9 +961,9 @@ function PurchasesContent() {
 
       {/* Purchase Overview Modal */}
       <PurchaseOverviewModal
-        isOpen={!!overviewPurchase}
-        onClose={() => setOverviewPurchase(null)}
-        purchases={overviewPurchase ? [overviewPurchase] : []}
+        isOpen={overviewPurchases.length > 0}
+        onClose={() => setOverviewPurchases([])}
+        purchases={overviewPurchases}
       />
 
     </div>

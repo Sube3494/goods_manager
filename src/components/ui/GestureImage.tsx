@@ -136,7 +136,7 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
       <img
         src={src}
         alt={alt}
-        className="max-w-[95%] max-h-[90%] object-contain rounded-lg shadow-2xl pointer-events-none"
+        className="max-w-[95%] max-h-[95%] object-contain rounded-lg shadow-2xl pointer-events-none mx-auto"
         draggable={false}
       />
     </motion.div>

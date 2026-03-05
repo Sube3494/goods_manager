@@ -1443,7 +1443,7 @@ function GalleryContent() {
                                 style={{ 
                                     pointerEvents: isUIVisible ? "auto" : "none"
                                 }}
-                                className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55"
+                                className="absolute top-0 left-0 right-0 p-4 md:p-6 pt-[env(safe-area-inset-top,0px)] flex items-start justify-between z-50"
                             >
                                 <div className="flex items-center gap-2 pointer-events-auto">
                                     <button
@@ -1483,7 +1483,7 @@ function GalleryContent() {
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                                 transition={{ duration: 0.2 }}
-                                                className="absolute top-16 md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/90 backdrop-blur-2xl px-5 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col gap-3 max-w-full md:max-w-md pointer-events-auto"
+                                                className="absolute top-[calc(env(safe-area-inset-top,0px)+3.5rem)] md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/90 backdrop-blur-2xl px-5 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col gap-3 max-w-full md:max-w-md pointer-events-auto"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <div className="flex flex-col gap-1 font-rounded">
@@ -1530,7 +1530,7 @@ function GalleryContent() {
                                 </AnimatePresence>
 
                                 <div className="flex items-center gap-2 pointer-events-auto">
-                                    {/* 上传按钮：仅系统开启上传功能且用户拥有 gallery:upload 权限时显示 */}
+                                     {/* 上传按钮：仅系统开启上传功能且用户拥有 gallery:upload 权限时显示 */}
                                     {isUploadAllowed && hasPermission(user as SessionUser | null, "gallery:upload") && (
                                     <button 
                                         onClick={() => {
@@ -1624,7 +1624,7 @@ function GalleryContent() {
                             </motion.div>
 
                             {/* Main Interaction Area */}
-                            <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
+                             <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
                                  {relatedImages.length > 1 && (
                                     <motion.div
                                         animate={{ opacity: isUIVisible ? 1 : 0 }}
@@ -1634,31 +1634,33 @@ function GalleryContent() {
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(-1); }}
                                             disabled={currentIndex === 0}
-                                            className="absolute left-8 z-55 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
+                                            className="absolute left-8 z-50 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
                                         >
                                             <ChevronRight size={32} className="rotate-180" />
                                         </button>
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); navigate(1); }}
                                             disabled={currentIndex === relatedImages.length - 1}
-                                            className="absolute right-8 z-55 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
+                                            className="absolute right-8 z-50 rounded-full p-4 bg-white/5 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-md disabled:opacity-0 shadow-xl active:scale-95"
                                         >
                                             <ChevronRight size={32} />
                                         </button>
                                     </motion.div>
                                 )}
 
-                                 <LightboxMediaItem 
-                                    key={selectedImage!.id}
-                                    item={selectedImage!}
-                                    onScaleChange={(v) => activeScale.set(v)}
-                                    isVisible={isUIVisible}
-                                />
+                                <div className="w-full h-full relative flex items-center justify-center">
+                                    <LightboxMediaItem 
+                                        key={selectedImage!.id}
+                                        item={selectedImage!}
+                                        onScaleChange={(v) => activeScale.set(v)}
+                                        isVisible={isUIVisible}
+                                    />
+                                </div>
                             </div>
 
                         {/* Bottom Bar Overlay (Minimalist Float) */}
                         {/* Bottom Bar Overlay (Immersive Float) */}
-                         <div className="absolute bottom-6 left-0 right-0 flex justify-center z-55 pointer-events-none px-4">
+                         <div className="absolute bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none px-4">
                             <motion.div 
                                 className="bg-zinc-900/40 backdrop-blur-3xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 max-w-full overflow-hidden transition-all duration-700 ring-1 ring-white/5 opacity-100 translate-y-0"
                                 style={{ 

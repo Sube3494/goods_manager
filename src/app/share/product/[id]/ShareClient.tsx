@@ -80,7 +80,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
                                 <video 
                                     ref={videoRef}
                                     src={item.url} 
-                                    className="max-w-full max-h-[calc(100vh-320px)] w-auto h-auto object-contain cursor-pointer"
+                                    className="max-w-full max-h-[calc(100dvh-200px)] w-auto h-auto object-contain cursor-pointer"
                                 disablePictureInPicture
                                 disableRemotePlayback
                                 autoPlay
@@ -188,7 +188,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
                         <GestureImage 
                             src={item.url} 
                             onScaleChange={onScaleChange}
-                            className="max-w-full max-h-[calc(100vh-320px)] object-contain"
+                            className="max-w-full max-h-[calc(100dvh-200px)] object-contain"
                         />
                     </div>
                 )}
@@ -261,7 +261,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   }, [currentIndex]);
 
   return (
-    <div className="min-h-screen h-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans select-none touch-none">
+    <div className="min-h-screen h-dvh w-full bg-black text-white flex flex-col relative overflow-hidden font-sans select-none touch-none">
       
       {/* Background Glow */}
       <AnimatePresence mode="wait">
@@ -292,7 +292,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
             y: uiYOffset,
             pointerEvents: pointerEvents
         }}
-        className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55 pointer-events-none"
+        className="absolute top-0 left-0 right-0 p-4 md:p-6 pt-[env(safe-area-inset-top,0px)] flex items-start justify-between z-50 pointer-events-none"
       >
         <div className="flex items-center gap-2 pointer-events-auto">
             <button
@@ -333,7 +333,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute top-16 md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/90 backdrop-blur-2xl px-5 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col gap-3 max-w-full md:max-w-md pointer-events-auto"
+                        className="absolute top-[calc(env(safe-area-inset-top,0px)+3.5rem)] md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/90 backdrop-blur-2xl px-5 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col gap-3 max-w-full md:max-w-md pointer-events-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex flex-col gap-1">
@@ -406,7 +406,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
                 </>
             )}
 
-            <motion.div className="w-full h-full">
+            <motion.div className="w-full h-full relative flex items-center justify-center">
                 <LightboxMediaItem 
                     key={selectedImage.id}
                     item={selectedImage}
