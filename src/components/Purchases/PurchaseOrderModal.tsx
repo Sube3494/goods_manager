@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin, BarChart3 } from "lucide-react";
+import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search } from "lucide-react";
 import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -27,46 +27,68 @@ interface PurchaseOrderModalProps {
 
 const PurchaseItemRow = memo(({ 
     item, 
-    index, 
     readOnly, 
     products, 
     suppliers, 
     onUpdate, 
-    onRemove 
+    onRemove,
+    isChecked,
+    onToggle
 }: { 
     item: PurchaseOrderItem; 
-    index: number; 
     readOnly: boolean; 
     products: Product[]; 
     suppliers: Supplier[];
-    onUpdate: (index: number, field: keyof PurchaseOrderItem, value: string | number) => void;
-    onRemove: (index: number) => void;
+    onUpdate: (productId: string, field: keyof PurchaseOrderItem, value: string | number) => void;
+    onRemove: (productId: string) => void;
+    isChecked?: boolean;
+    onToggle?: (productId: string) => void;
 }) => {
-    const imageUrl = item.image || item.product?.image || products.find(g => g.id === item.productId)?.image;
-    const productName = item.product?.name || products.find(g => g.id === item.productId)?.name || "加载中...";
-    const productSku = item.product?.sku || products.find(g => g.id === item.productId)?.sku;
-    const supplierId = item.product?.supplierId || item.supplierId;
-    const supplierName = suppliers.find(s => s.id === supplierId)?.name;
-    const remark = item.product?.remark || products.find(g => g.id === item.productId)?.remark;
+    const productData = useMemo(() => {
+        const p = item.product || products.find(g => g.id === item.productId);
+        const supplierId = p?.supplierId || item.supplierId;
+        return {
+            imageUrl: item.image || p?.image,
+            productName: p?.name || "加载中...",
+            productSku: p?.sku,
+            supplierName: suppliers.find(s => s.id === supplierId)?.name,
+            remark: p?.remark
+        };
+    }, [item, products, suppliers]);
+
+    const isBatchMode = onToggle !== undefined;
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+    const handleDeleteClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (confirmingDelete) {
+            onRemove(item.productId);
+        } else {
+            setConfirmingDelete(true);
+            setTimeout(() => setConfirmingDelete(false), 2500);
+        }
+    }, [confirmingDelete, item.productId, onRemove]);
 
     return (
-        <motion.div 
-            layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+        <div 
             className={cn(
-                "group relative flex flex-col sm:grid items-center gap-4 p-4 rounded-2xl bg-white dark:bg-white/10 border border-border dark:border-white/5 shadow-sm transition-all",
+                "group relative flex flex-col sm:grid items-center gap-4 p-4 rounded-2xl border shadow-sm transition-all",
+                isBatchMode
+                    ? isChecked
+                        ? 'bg-destructive/5 border-destructive/30 dark:bg-destructive/10 dark:border-destructive/20 cursor-pointer'
+                        : 'bg-white dark:bg-white/10 border-border dark:border-white/5 cursor-pointer'
+                    : 'bg-white dark:bg-white/10 border-border dark:border-white/5',
                 readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_80px_120px_120px_40px]'
             )}
+            onClick={isBatchMode ? () => onToggle(item.productId) : undefined}
         >
             {/* Product Info Column */}
             <div className="flex w-full items-center gap-3">
                 <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50">
-                    {imageUrl ? (
+                    {productData.imageUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
-                            src={imageUrl} 
+                            src={productData.imageUrl} 
                             alt="product" 
                             className="h-full w-full object-cover" 
                         />
@@ -80,34 +102,51 @@ const PurchaseItemRow = memo(({
                     <div className="flex flex-col gap-0.5 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                             <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
-                                {productName}
+                                {productData.productName}
                             </span>
                             {!readOnly && (
-                                <button 
-                                    type="button"
-                                    onClick={() => onRemove(index)}
-                                    className="sm:hidden shrink-0 flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
-                                    title="移除商品"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                isBatchMode ? (
+                                    <div className={cn(
+                                        "sm:hidden shrink-0 flex items-center justify-center h-5 w-5 rounded-md border-2 transition-all",
+                                        isChecked
+                                            ? 'bg-destructive border-destructive text-white'
+                                            : 'border-border dark:border-white/30'
+                                    )}>
+                                        {isChecked && <Check size={11} strokeWidth={3} />}
+                                    </div>
+                                ) : (
+                                     <button 
+                                        type="button"
+                                        onClick={handleDeleteClick}
+                                        className={cn(
+                                            "sm:hidden h-8 px-2 rounded-xl transition-all inline-flex items-center justify-center gap-1 active:scale-95 shrink-0 flex-nowrap",
+                                            confirmingDelete
+                                                ? 'bg-primary text-primary-foreground shadow-sm min-w-[52px]'
+                                                : 'text-primary/40 hover:text-primary hover:bg-primary/10 min-w-[32px]'
+                                        )}
+                                        title="移除商品"
+                                    >
+                                        <Trash2 size={14} className="shrink-0" />
+                                        {confirmingDelete && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
+                                    </button>
+                                )
                             )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                            {productSku && (
+                         <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            {productData.productSku && (
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                    #{productSku}
+                                    #{productData.productSku}
                                 </span>
                             )}
-                            {supplierName && (
+                            {productData.supplierName && (
                                 <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                                    • {supplierName}
+                                    • {productData.supplierName}
                                 </span>
                             )}
-                            {remark && (
+                            {productData.remark && (
                                 <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
                                     <span className="font-bold opacity-70 shrink-0">注:</span>
-                                    <span className="truncate leading-none">{remark}</span>
+                                    <span className="truncate leading-none">{productData.remark}</span>
                                 </span>
                             )}
                         </div>
@@ -121,7 +160,7 @@ const PurchaseItemRow = memo(({
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">数量</label>
                     {readOnly ? (
-                        <div className="w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm font-mono font-bold text-foreground">
+                        <div className="w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono font-bold text-foreground">
                             {item.quantity}
                         </div>
                     ) : (
@@ -129,7 +168,7 @@ const PurchaseItemRow = memo(({
                             type="number" 
                             min="1"
                             value={item.quantity || ""}
-                            onChange={(e) => onUpdate(index, "quantity", e.target.value)}
+                            onChange={(e) => onUpdate(item.productId, "quantity", e.target.value)}
                             className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                         />
                     )}
@@ -139,7 +178,7 @@ const PurchaseItemRow = memo(({
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">单价</label>
                     {readOnly ? (
-                        <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs sm:text-sm font-mono text-foreground">
+                        <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono text-foreground">
                             <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
                             {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 1 })}
                         </div>
@@ -150,35 +189,52 @@ const PurchaseItemRow = memo(({
                                 type="number" 
                                 step="0.01"
                                 value={item.costPrice || ""}
-                                onChange={(e) => onUpdate(index, "costPrice", e.target.value)}
-                                className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-[10px] sm:text-xs no-spinner"
+                                onChange={(e) => onUpdate(item.productId, "costPrice", e.target.value)}
+                                className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                             />
                         </div>
                     )}
                 </div>
 
                 {/* Total Column */}
-                <div className="flex flex-col sm:block items-end justify-center">
+                <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">小计</label>
-                    <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs sm:text-sm overflow-hidden whitespace-nowrap">
+                    <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs overflow-hidden whitespace-nowrap">
                         <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
                         {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1 })}
                     </div>
                 </div>
                 {!readOnly && (
                     <div className="hidden sm:flex w-full sm:w-auto pt-2 sm:pt-0 justify-end">
-                        <button 
-                            type="button"
-                            onClick={() => onRemove(index)}
-                            className="flex items-center justify-center h-8 w-8 rounded-lg bg-destructive/5 text-destructive hover:bg-destructive/10 transition-all active:scale-90"
-                            title="移除商品"
-                        >
-                            <Trash2 size={16} />
-                        </button>
+                        {isBatchMode ? (
+                            <div className={cn(
+                                "flex items-center justify-center h-5 w-5 rounded-md border-2 transition-all",
+                                isChecked
+                                    ? 'bg-destructive border-destructive text-white'
+                                    : 'border-border dark:border-white/20'
+                            )}>
+                                {isChecked && <Check size={11} strokeWidth={3} />}
+                            </div>
+                        ) : (
+                            <button 
+                                type="button"
+                                onClick={handleDeleteClick}
+                                className={cn(
+                                    "h-8 px-2 rounded-xl transition-all inline-flex items-center justify-center gap-1 active:scale-95 shrink-0 flex-nowrap",
+                                    confirmingDelete
+                                        ? 'bg-primary text-primary-foreground shadow-sm min-w-[52px]'
+                                        : 'text-primary/40 hover:text-primary hover:bg-primary/10 min-w-[32px] sm:opacity-0 group-hover:opacity-100'
+                                )}
+                                title="移除商品"
+                            >
+                                <Trash2 size={14} className="shrink-0" />
+                                {confirmingDelete && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
-        </motion.div>
+        </div>
     );
 });
 
@@ -275,6 +331,21 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
+  const [batchConfirming, setBatchConfirming] = useState(false);
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return formData.items;
+    const query = searchQuery.toLowerCase();
+    return formData.items.filter(item => {
+        const product = item.product || products.find(p => p.id === item.productId);
+        const nameMatch = product?.name.toLowerCase().includes(query);
+        const skuMatch = product?.sku?.toLowerCase().includes(query);
+        return nameMatch || skuMatch;
+    });
+  }, [formData.items, searchQuery, products]);
   const [isUploadingVoucher, setIsUploadingVoucher] = useState(false);
   const [galleryState, setGalleryState] = useState<{
     isOpen: boolean;
@@ -444,9 +515,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
       setFormData({ ...formData, trackingData: current });
   };
 
-  const addItem = () => {
+  const addItem = useCallback(() => {
     setIsSelectionModalOpen(true);
-  };
+  }, []);
 
   const handleBatchAdd = (selectedProducts: Product[]) => {
     setFormData(prev => {
@@ -476,39 +547,50 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     });
   };
 
-  const removeItem = (index: number) => {
-    setFormData({
-      ...formData,
-      items: formData.items.filter((_, i) => i !== index)
+  const removeItem = useCallback((productId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.productId !== productId)
+    }));
+  }, []);
+
+  const toggleBatchSelect = useCallback((productId: string) => {
+    setBatchSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId); else next.add(productId);
+      return next;
     });
-  };
+  }, []);
 
-   const updateItem = (index: number, field: keyof PurchaseOrderItem, value: string | number) => {
-    const newItems = [...formData.items];
-    
-    // Convert string inputs from numeric fields back to numbers for the state if they are valid numbers
-    let processedValue = value;
-    if (field === "quantity" || field === "costPrice") {
-        if (value === "") {
-            processedValue = 0;
-        } else {
-            processedValue = field === "quantity" ? parseInt(value as string) : parseFloat(value as string);
-            if (isNaN(processedValue as number)) processedValue = 0;
-        }
-    }
+  const batchDelete = useCallback(() => {
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => !batchSelected.has(item.productId))
+    }));
+    setBatchSelected(new Set());
+    setBatchMode(false);
+  }, [batchSelected]);
 
-    newItems[index] = { ...newItems[index], [field]: processedValue };
-    
-    // Auto-fill cost price if product changes
-    if (field === "productId") {
-        const product = products.find(g => g.id === value);
-        if (product) {
-            newItems[index].costPrice = product.costPrice; // Use exact cost price
-        }
-    }
-    
-    setFormData({ ...formData, items: newItems });
-  };
+  const updateItem = useCallback((productId: string, field: keyof PurchaseOrderItem, value: string | number) => {
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      const index = newItems.findIndex(item => item.productId === productId);
+      if (index === -1) return prev;
+      
+      let processedValue: string | number = value;
+      if (field === "quantity" || field === "costPrice") {
+          if (value === "") {
+              processedValue = 0;
+          } else {
+              processedValue = field === "quantity" ? parseInt(value as string) : parseFloat(value as string);
+              if (isNaN(processedValue as number)) processedValue = 0;
+          }
+      }
+
+      newItems[index] = { ...newItems[index], [field]: processedValue };
+      return { ...prev, items: newItems };
+    });
+  }, []);
 
   const inferStatus = (currentData: PurchaseOrder): PurchaseStatus => {
     // If it's already received, don't auto-downgrade status
@@ -781,26 +863,110 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
 
 
                     {/* Items Section */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between px-2">
-                            <label className="text-sm font-bold text-foreground flex items-center gap-2">
-                                <ListOrdered size={16} className="text-primary" /> {formData.type === "Inbound" ? "入库项目" : "采购项目"} {formData.items.length > 0 && `(${formData.items.length})`}
-                            </label>
-                            {formData.items.length > 0 && !readOnly && (
-                                <button 
-                                    type="button"
-                                    onClick={addItem}
-                                    className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
-                                >
-                                    <Plus size={14} /> 继续添加
-                                </button>
+                        <div className="flex flex-col gap-3 px-2">
+                            {/* Title & Buttons Row */}
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-bold text-foreground flex items-center gap-2 shrink-0">
+                                    <ListOrdered size={16} className="text-primary" /> {formData.type === "Inbound" ? "入库项目" : "采购项目"} {formData.items.length > 0 && `(${formData.items.length})`}
+                                </label>
+                                {formData.items.length > 0 && !readOnly && (
+                                    <div className="flex items-center gap-1">
+                                        {batchMode ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const allIds = filteredItems.map(i => i.productId);
+                                                        const allSelected = allIds.every(id => batchSelected.has(id));
+                                                        setBatchSelected(allSelected ? new Set() : new Set(allIds));
+                                                    }}
+                                                    className="text-[11px] font-bold text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted/80 transition-all active:scale-95 whitespace-nowrap"
+                                                >
+                                                    {filteredItems.every(i => batchSelected.has(i.productId)) ? "取消全选" : "全选"}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (batchConfirming) {
+                                                            batchDelete();
+                                                            setBatchConfirming(false);
+                                                        } else {
+                                                            setBatchConfirming(true);
+                                                            setTimeout(() => setBatchConfirming(false), 3000);
+                                                        }
+                                                    }}
+                                                    disabled={batchSelected.size === 0}
+                                                    className={cn(
+                                                        "flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none whitespace-nowrap",
+                                                        batchConfirming
+                                                            ? "text-white bg-destructive hover:bg-destructive/90"
+                                                            : "text-destructive bg-destructive/10 hover:bg-destructive/20"
+                                                    )}
+                                                >
+                                                    <Trash2 size={12} /> {batchConfirming ? `确认？` : (batchSelected.size > 0 ? `删除 ${batchSelected.size}` : "删除")}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setBatchMode(false); setBatchSelected(new Set()); setBatchConfirming(false); }}
+                                                    className="text-[11px] font-bold text-muted-foreground px-3 py-1.5 rounded-xl hover:bg-muted/80 transition-all active:scale-95"
+                                                >
+                                                    取消
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setBatchMode(true)}
+                                                    className="text-[11px] font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
+                                                >
+                                                    批量删除
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={addItem}
+                                                    className="flex items-center gap-1.5 text-[11px] font-bold text-primary hover:bg-primary/10 bg-primary/5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
+                                                >
+                                                    <Plus size={14} /> 继续添加
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Search Bar Row */}
+                            {formData.items.length > 0 && (
+                                <div className="flex items-center gap-3 w-full">
+                                    <div className="relative flex-1">
+                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
+                                        <input 
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="搜索商品名或货号..."
+                                            className="w-full h-9 pl-9 pr-8 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold placeholder:font-normal"
+                                        />
+                                        {searchQuery && (
+                                            <button 
+                                                type="button"
+                                                onClick={() => setSearchQuery("")}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground active:scale-90"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    {/* Desktop only "Add" button placeholder/alignment if needed, but handled above for mobile */}
+                                </div>
                             )}
                         </div>
 
                         <div className="space-y-3 bg-muted/20 dark:bg-white/5 p-2 sm:p-4 rounded-3xl border border-border/50">
                             {/* Desktop Header */}
                             {formData.items.length > 0 && (
-                                <div className={`hidden sm:grid ${readOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_80px_120px_120px_40px]'} gap-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/10 mb-2`}>
+                                <div className={`hidden sm:grid ${batchMode ? (readOnly ? 'grid-cols-[24px_1fr_100px_120px_120px]' : 'grid-cols-[24px_1fr_80px_120px_120px_40px]') : (readOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_80px_120px_120px_40px]')} gap-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/10 mb-2`}>
+                                    {batchMode && <div />}
                                     <div className="text-left pl-2">商品信息 <span className="text-red-500">*</span></div>
                                     <div className="text-center">数量 <span className="text-red-500">*</span></div>
                                     <div className="text-center">单价 <span className="text-red-500">*</span></div>
@@ -809,18 +975,37 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                 </div>
                             )}
 
-                            {formData.items.map((item, index) => (
+                            {filteredItems.map((item) => (
                                 <PurchaseItemRow 
-                                    key={`${item.productId}-${index}`}
+                                    key={item.productId}
                                     item={item}
-                                    index={index}
                                     readOnly={effectiveReadOnly}
                                     products={products}
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
+                                    isChecked={batchMode ? batchSelected.has(item.productId) : undefined}
+                                    onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
                                 />
                             ))}
+                            
+                            {formData.items.length > 0 && filteredItems.length === 0 && (
+                                <div className="py-12 flex flex-col items-center justify-center gap-4 text-muted-foreground bg-white dark:bg-white/5 rounded-2xl border-2 border-dashed border-border/50">
+                                    <div className="p-4 rounded-full bg-muted/50">
+                                        <Search size={32} className="opacity-20" />
+                                    </div>
+                                    <div className="flex flex-col items-center gap-1">
+                                        <span className="text-sm font-bold">未找到匹配项</span>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setSearchQuery("")}
+                                            className="text-xs text-primary hover:underline font-bold"
+                                        >
+                                            清除搜索内容
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             
                             {formData.items.length === 0 && (
                                 <button
@@ -840,7 +1025,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                 </button>
                             )}
                         </div>
-                    </div>
+
 
 
 
@@ -857,9 +1042,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                             </label>
                         </div>
                         {((formData.paymentVouchers && formData.paymentVouchers.length > 0) || !readOnly) ? (
-                            <div className="bg-muted/10 dark:bg-white/5 p-3 rounded-2xl border border-border/40 flex flex-wrap gap-3">
+                            <div className="bg-white dark:bg-zinc-800/40 p-3 rounded-2xl border border-border dark:border-white/10 shadow-sm backdrop-blur-sm grid grid-cols-3 sm:grid-cols-3 md:grid-cols-3 gap-3">
                                 {formData.paymentVouchers?.map((url, idx) => (
-                                    <div key={url || idx} className="relative group w-28 sm:w-48 aspect-square sm:aspect-3/2 rounded-xl overflow-hidden border border-border/60 shadow-sm transition-all hover:ring-2 hover:ring-primary/20">
+                                    <div key={url || idx} className="relative group w-full aspect-square sm:aspect-3/2 rounded-xl overflow-hidden border border-border/60 shadow-sm transition-all hover:ring-2 hover:ring-primary/20">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img 
                                             src={url} 
@@ -878,16 +1063,21 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                     const newVouchers = (formData.paymentVouchers || []).filter((_, i) => i !== idx);
                                                     setFormData({ ...formData, paymentVouchers: newVouchers });
                                                 }}
-                                                className="absolute top-2 right-2 p-1.5 rounded-lg bg-destructive text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                className="absolute top-2 right-2 p-1.5 rounded-lg bg-primary/60 text-primary-foreground border border-primary/20 transition-all shadow-lg opacity-100 sm:opacity-0 group-hover:opacity-100 hover:bg-primary"
                                             >
-                                                <Trash2 size={14} />
+                                                <Trash2 size={16} strokeWidth={2.5} />
                                             </button>
                                         )}
                                     </div>
                                 ))}
                                 {!readOnly && (
                                     <label 
-                                        className="w-28 sm:w-48 aspect-square sm:aspect-3/2 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-95"
+                                        className={cn(
+                                            "rounded-xl border-2 border-dashed border-border dark:border-white/30 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-95 bg-zinc-500/5 dark:bg-white/5",
+                                            formData.paymentVouchers && formData.paymentVouchers.length > 0 
+                                                ? "w-full aspect-square sm:aspect-3/2" 
+                                                : "col-span-full py-10 sm:py-14"
+                                        )}
                                         onDragOver={(e) => {
                                             e.preventDefault();
                                             e.currentTarget.classList.add('border-primary', 'bg-primary/10');
@@ -915,10 +1105,16 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                         />
                                         <Camera size={24} className={`${isUploadingVoucher ? 'animate-spin' : 'text-muted-foreground group-hover/up:text-primary'} transition-colors`} />
                                         <div className="flex flex-col items-center">
-                                            <span className="text-[10px] font-bold text-muted-foreground group-hover/up:text-primary">
+                                            <span className={cn(
+                                                "font-bold text-muted-foreground/60 group-hover/up:text-primary transition-colors",
+                                                formData.paymentVouchers && formData.paymentVouchers.length > 0 ? "text-[10px]" : "text-xs sm:text-sm"
+                                            )}>
                                                 {isUploadingVoucher ? "上传中..." : "上传凭证"}
                                             </span>
-                                            <span className="text-[10px] scale-90 text-muted-foreground/40">支持拖拽</span>
+                                            <span className={cn(
+                                                "hidden sm:inline-block text-muted-foreground/40 font-medium group-hover/up:text-primary/60 transition-colors mt-0.5",
+                                                formData.paymentVouchers && formData.paymentVouchers.length > 0 ? "text-[10px] scale-90" : "text-xs"
+                                            )}>支持拖拽 / Ctrl+V</span>
                                         </div>
                                     </label>
                                 )}
@@ -953,10 +1149,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                     }
                                                 }}
                                                 className={cn(
-                                                    "text-[10px] font-bold transition-all flex items-center gap-1 rounded-md px-2 py-1",
+                                                    "text-[10px] font-bold transition-all flex items-center gap-1 rounded-full px-3 py-1.5 shrink-0",
                                                     isConfirmingClear 
-                                                        ? "bg-destructive text-white hover:bg-destructive/90" 
-                                                        : "text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                                                        ? "bg-destructive text-white shadow-sm ring-2 ring-destructive/20" 
+                                                        : "text-destructive/70 hover:text-destructive hover:bg-destructive/10 bg-destructive/5"
                                                 )}
                                             >
                                                 <Trash2 size={12} />
@@ -966,10 +1162,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                         <button
                                             type="button"
                                             onClick={addTrackingRow}
-                                            className="text-[10px] font-bold text-orange-500 hover:text-orange-600 transition-colors flex items-center gap-1"
+                                            className="text-[10px] font-bold bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white transition-all flex items-center gap-1 px-4 py-1.5 rounded-full shadow-sm active:scale-95 shrink-0"
                                         >
                                             <Plus size={12} />
-                                            添加包裹
+                                            <span>添加包裹</span>
                                         </button>
                                     </div>
                                 )}
@@ -982,68 +1178,96 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                       const isEditable = !readOnly && formData.status !== "Received";
                                       return (
                                           /* Responsive Tracking Bar */
-                                          <div key={index} className="group/tbar relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 sm:p-2.5 rounded-2xl bg-muted/30 dark:bg-white/5 border border-border/40 hover:bg-muted/40 dark:hover:bg-white/10 transition-all duration-300 shadow-sm backdrop-blur-sm">
+                                          <div key={index} className="group/tbar relative flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 sm:p-2 sm:px-3 rounded-2xl bg-white dark:bg-zinc-800/40 border border-border dark:border-white/10 hover:border-primary/40 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-all duration-300 shadow-sm backdrop-blur-sm">
                                               
                                               {/* Mobile Top Row / Desktop Flex Items */}
                                               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0">
-                                                  {/* 1. Package Label */}
-                                                  <div className="flex items-center gap-1.5 shrink-0 pl-1 w-auto sm:w-[80px]">
-                                                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary shrink-0">
-                                                          <Package size={12} />
+                                                  {/* 1. Package Label & Delete Button (Mobile) */}
+                                                  <div className="flex items-center justify-between w-full sm:shrink-0 pl-1 sm:w-[80px]">
+                                                      <div className="flex items-center gap-1.5">
+                                                          <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary shrink-0">
+                                                              <Package size={12} />
+                                                          </div>
+                                                          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60 truncate">#{index + 1}</span>
                                                       </div>
-                                                      <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60 truncate">#{index + 1}</span>
+                                                      
+                                                      {/* Mobile-only delete button */}
+                                                      {isEditable && (
+                                                          <button
+                                                              type="button"
+                                                              onClick={() => {
+                                                                  if (confirmingDeleteIndex === index) {
+                                                                      removeTrackingRow(index);
+                                                                      setConfirmingDeleteIndex(null);
+                                                                  } else {
+                                                                      setConfirmingDeleteIndex(index);
+                                                                  }
+                                                              }}
+                                                              className={cn(
+                                                                  "sm:hidden h-8 px-2 rounded-xl transition-all inline-flex items-center justify-center gap-1 shrink-0 flex-nowrap",
+                                                                  confirmingDeleteIndex === index
+                                                                      ? "bg-primary text-primary-foreground shadow-sm min-w-[52px]"
+                                                                      : "text-primary/40 hover:text-primary hover:bg-primary/10 min-w-[32px]"
+                                                              )}
+                                                              title={confirmingDeleteIndex === index ? "点击确定删除" : "移除包裹"}
+                                                          >
+                                                              <Trash2 size={14} className="shrink-0" />
+                                                              {confirmingDeleteIndex === index && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
+                                                          </button>
+                                                      )}
                                                   </div>
 
-                                                  {/* Courier Select */}
-                                                  <div className="flex-1 sm:flex-none sm:w-[120px] min-w-[100px] shrink-0">
-                                                      <div className="relative">
-                                                          {isEditable ? (
-                                                              <CustomSelect
-                                                                  className="h-9 w-full"
-                                                                  value={tracking.courier}
-                                                                  onChange={(val) => updateTrackingData(index, "courier", val)}
-                                                                  options={["顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", "极兔速递", "EMS", "京东快递", "德邦快递", "安能物流", "顺心捷达"].map(opt => ({
-                                                                      value: opt,
-                                                                      label: opt
-                                                                  }))}
-                                                                  triggerClassName="bg-white dark:bg-white/5 border-border dark:border-white/10 rounded-xl text-xs font-bold text-foreground hover:bg-muted dark:hover:bg-white/10 transition-all px-3"
-                                                              />
-                                                          ) : (
-                                                              <div className="h-9 flex items-center px-3 bg-white/50 dark:bg-white/2 border border-border/50 dark:border-white/3 rounded-xl text-xs font-bold text-foreground/60">
-                                                                  {tracking.courier}
-                                                              </div>
-                                                          )}
+                                                  {/* 2. Courier Select & Tracking Number (Merged on mobile) */}
+                                                  <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:flex-1 min-w-0 px-1 sm:px-0">
+                                                      <div className="w-[100px] sm:w-[120px] shrink-0">
+                                                          <div className="relative">
+                                                              {isEditable ? (
+                                                                  <CustomSelect
+                                                                      className="h-9 w-full"
+                                                                      value={tracking.courier}
+                                                                      onChange={(val) => updateTrackingData(index, "courier", val)}
+                                                                      options={["顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", "极兔速递", "EMS", "京东快递", "德邦快递", "安能物流", "顺心捷达"].map(opt => ({
+                                                                          value: opt,
+                                                                          label: opt
+                                                                      }))}
+                                                                      triggerClassName="bg-white dark:bg-white/5 border-border dark:border-white/10 rounded-xl text-[11px] font-bold text-foreground hover:bg-muted dark:hover:bg-white/10 transition-all px-2.5"
+                                                                  />
+                                                              ) : (
+                                                                  <div className="h-9 flex items-center px-2.5 bg-white/50 dark:bg-white/2 border border-border/50 dark:border-white/3 rounded-xl text-[11px] font-bold text-foreground/60">
+                                                                      {tracking.courier}
+                                                                  </div>
+                                                              )}
+                                                          </div>
                                                       </div>
-                                                  </div>
-
-                                                  {/* Tracking Number Input */}
-                                                  <div className="w-full sm:w-[160px] md:w-[220px] shrink-0">
-                                                      <div className="relative group/input">
-                                                          {isEditable ? (
-                                                              <input
-                                                                  type="text"
-                                                                  value={tracking.number}
-                                                                  onChange={(e) => updateTrackingData(index, "number", e.target.value)}
-                                                                  className="w-full h-9 bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-3 text-xs font-mono font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/30"
-                                                                  placeholder="输入物流单号"
-                                                              />
-                                                          ) : (
-                                                              <div className="h-9 flex items-center px-3 bg-white/50 dark:bg-white/2 border border-border/50 dark:border-white/3 rounded-xl text-xs font-mono font-bold text-foreground/60 min-w-0">
-                                                                  <span className="flex-1 truncate tracking-wider">{tracking.number || "无单号"}</span>
-                                                                  {tracking.number && (
-                                                                      <button
-                                                                          type="button"
-                                                                          onClick={() => {
-                                                                              navigator.clipboard.writeText(tracking.number);
-                                                                              showToast("单号已复制", "success");
-                                                                          }}
-                                                                          className="p-1.5 rounded-md bg-background/50 dark:bg-white/5 text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all ml-2 shrink-0"
-                                                                      >
-                                                                          <Copy size={12} />
-                                                                      </button>
-                                                                  )}
-                                                              </div>
-                                                          )}
+    
+                                                      <div className="flex-1 sm:w-[160px] md:w-[220px]">
+                                                          <div className="relative group/input">
+                                                              {isEditable ? (
+                                                                  <input
+                                                                      type="text"
+                                                                      value={tracking.number}
+                                                                      onChange={(e) => updateTrackingData(index, "number", e.target.value)}
+                                                                      className="w-full h-9 bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-3 text-xs font-mono font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/30"
+                                                                      placeholder="输入物流单号"
+                                                                  />
+                                                              ) : (
+                                                                  <div className="h-9 flex items-center px-3 bg-white/50 dark:bg-white/2 border border-border/50 dark:border-white/3 rounded-xl text-xs font-mono font-bold text-foreground/60 min-w-0">
+                                                                      <span className="flex-1 truncate tracking-wider">{tracking.number || "无单号"}</span>
+                                                                      {tracking.number && (
+                                                                          <button
+                                                                              type="button"
+                                                                              onClick={() => {
+                                                                                  navigator.clipboard.writeText(tracking.number);
+                                                                                  showToast("单号已复制", "success");
+                                                                              }}
+                                                                              className="p-1.5 rounded-md bg-background/50 dark:bg-white/5 text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-all ml-2 shrink-0"
+                                                                          >
+                                                                              <Copy size={12} />
+                                                                          </button>
+                                                                      )}
+                                                                  </div>
+                                                              )}
+                                                          </div>
                                                       </div>
                                                   </div>
                                               </div>
@@ -1051,7 +1275,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                               {/* 3. Horizontal Waybills List & Delete */}
                                               <div className="flex flex-row items-center gap-2 w-full sm:flex-1 sm:min-w-[80px] shrink-0 sm:justify-end mt-2 sm:mt-0 pt-2 sm:pt-0 border-t border-border/20 sm:border-0 border-dashed">
                                                   <div 
-                                                      className="flex items-center sm:justify-end gap-2 flex-1 overflow-x-auto no-scrollbar scroll-smooth h-10"
+                                                      className="flex items-center sm:justify-end gap-2 flex-1 overflow-x-auto no-scrollbar scroll-smooth"
                                                       onDragOver={(e) => {
                                                           if (!isEditable) return;
                                                           e.preventDefault();
@@ -1070,7 +1294,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                               <>
                                                                   {/* Render existing images horizontally */}
                                                                   {images.map((img, imgIndex) => (
-                                                                      <div key={imgIndex} className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden shrink-0 group/thumbnail border border-border/20 shadow-sm">
+                                                                      <div key={imgIndex} className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 group/thumbnail border border-border/20 shadow-sm">
                                                                           {/* eslint-disable-next-line @next/next/no-img-element */}
                                                                           <img 
                                                                               src={img} 
@@ -1085,7 +1309,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                                               }}
                                                                           />
                                                                           {isEditable && (
-                                                                              <button
+                                                                                <button
                                                                                   type="button"
                                                                                   onClick={(e) => {
                                                                                       e.stopPropagation();
@@ -1097,10 +1321,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                                                       if (newImages.length === 0) current[index].waybillImage = undefined;
                                                                                       setFormData({ ...formData, trackingData: current });
                                                                                   }}
-                                                                                  className="absolute top-0.5 right-0.5 bg-red-500/90 text-white flex items-center justify-center p-0.5 rounded-md opacity-0 group-hover/thumbnail:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                                                                                  className="absolute top-0.5 right-0.5 bg-primary/60 text-primary-foreground border border-primary/20 flex items-center justify-center p-0.5 rounded-md transition-all shadow-sm hover:bg-primary opacity-100 sm:opacity-0 group-hover/thumbnail:opacity-100"
                                                                                   title="删除此面单"
                                                                               >
-                                                                                  <X size={12} />
+                                                                                  <X size={16} strokeWidth={2.5} />
                                                                               </button>
                                                                           )}
                                                                       </div>
@@ -1110,18 +1334,26 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                                   {isEditable && (
                                                                       <label 
                                                                           className={cn(
-                                                                              "flex items-center justify-center shrink-0 h-9 sm:h-10 rounded-xl transition-all duration-300 cursor-pointer group/up bg-muted/30",
+                                                                              "flex items-center justify-center shrink-0 rounded-xl transition-all duration-300 cursor-pointer group/up bg-zinc-500/5 dark:bg-white/5",
                                                                               images.length > 0 
-                                                                                  ? "w-9 sm:w-10 border border-dashed border-border/60 hover:border-primary/50 hover:bg-primary/5" 
-                                                                                  : "flex-1 max-w-[120px] border border-dashed border-border/80 hover:border-primary/50 hover:bg-primary/5"
+                                                                                  ? "w-14 h-14 sm:w-16 sm:h-16 border border-dashed border-border dark:border-white/20 hover:border-primary/50 hover:bg-primary/5" 
+                                                                                  : "flex-1 h-14 sm:h-16 border-2 border-dashed border-border dark:border-white/30 hover:border-primary/50 hover:bg-primary/10 sm:max-w-[200px]"
                                                                           )}
                                                                           title="点击或拖拽上传面单"
                                                                       >
                                                                           <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files!, 'waybill', index)} />
-                                                                          <div className="flex items-center justify-center gap-1.5 px-2">
-                                                                              <Camera size={14} className="text-muted-foreground/40 group-hover/up:text-primary transition-colors shrink-0" />
-                                                                              {images.length === 0 && (
-                                                                                  <span className="text-[10px] font-bold text-muted-foreground/40 group-hover/up:text-primary/70 truncate hidden sm:inline-block">面单凭证</span>
+                                                                          <div className={cn(
+                                                                              "flex items-center justify-center gap-0.5",
+                                                                              images.length === 0 ? "flex-col" : "flex-row px-2"
+                                                                          )}>
+                                                                              <Camera size={images.length === 0 ? 16 : 14} className="text-muted-foreground/60 group-hover/up:text-primary transition-colors shrink-0" />
+                                                                              {images.length === 0 ? (
+                                                                                  <div className="flex flex-col items-center">
+                                                                                      <span className="text-xs sm:text-sm font-bold text-muted-foreground/60 group-hover/up:text-primary transition-colors">上传面单</span>
+                                                                                      <span className="hidden sm:inline-block text-[10px] text-muted-foreground/40 font-medium group-hover/up:text-primary/60 transition-colors mt-0.5">支持拖拽 / 点击</span>
+                                                                                  </div>
+                                                                              ) : (
+                                                                                  <span className="text-[10px] font-bold text-muted-foreground/60 group-hover/up:text-primary/70 truncate hidden sm:inline-block">补发面单</span>
                                                                               )}
                                                                           </div>
                                                                       </label>
@@ -1139,7 +1371,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                   </div>
 
                                                   {isEditable && (
-                                                      <div className="shrink-0 flex items-center justify-center absolute sm:relative top-2 sm:top-0 right-2 sm:right-0">
+                                                      <div className="hidden sm:flex shrink-0 items-center justify-center relative">
                                                           <button
                                                               type="button"
                                                               onClick={() => {
@@ -1151,15 +1383,15 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                                   }
                                                               }}
                                                               className={cn(
-                                                                  "w-auto min-w-[32px] h-8 px-2 rounded-xl transition-all flex items-center justify-center gap-1",
+                                                                  "h-8 px-2 rounded-xl transition-all inline-flex items-center justify-center gap-1 shrink-0 flex-nowrap",
                                                                   confirmingDeleteIndex === index
-                                                                      ? "bg-red-500 text-white shadow-sm opacity-100"
-                                                                      : "text-red-500/40 hover:text-red-500 hover:bg-red-500/10 sm:opacity-0 group-hover/tbar:opacity-100"
+                                                                      ? "bg-primary text-primary-foreground shadow-sm opacity-100 min-w-[52px]"
+                                                                      : "text-primary/40 hover:text-primary hover:bg-primary/10 sm:opacity-0 group-hover/tbar:opacity-100 min-w-[32px]"
                                                               )}
                                                               title={confirmingDeleteIndex === index ? "点击确定删除" : "移除包裹"}
                                                           >
-                                                              <Trash2 size={14} />
-                                                              {confirmingDeleteIndex === index && <span className="text-[10px] font-bold">确认删除</span>}
+                                                              <Trash2 size={14} className="shrink-0" />
+                                                              {confirmingDeleteIndex === index && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
                                                           </button>
                                                       </div>
                                                   )}

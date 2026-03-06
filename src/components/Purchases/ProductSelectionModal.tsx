@@ -57,12 +57,8 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { showToast } = useToast();
   const resultsVersion = useRef(0);
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(typeof window !== "undefined");
 
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(handle);
-  }, []);
 
   // 初始化重置逻辑
   useEffect(() => {
@@ -74,12 +70,13 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       // 不再清空 products，除非是首次初始化或需要强制刷新
       // setProducts([]); 
       setIsLoading(products.length === 0);
-      setIsDataStale(products.length > 0);
+      setIsDataStale(false); // 不暗化已有缓存数据，后台静默刷新即可
       pageRef.current = 1;
       setIsInitialized(true);
     } else {
       setIsInitialized(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); // 移除对 selectedIds 的依赖，因为它可能由于父组件重渲染而导致意外重置
 
   // Lock body scroll when modal is open
@@ -98,7 +95,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     
     if (mode === 'initial' || mode === 'search') {
       pageRef.current = 1;
-      setIsDataStale(true);
       if (mode === 'search') setIsSearching(true);
     } else {
       setIsNextPageLoading(true);
@@ -245,25 +241,17 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
     onClose();
   };
 
-  if (!mounted || typeof document === "undefined") return null;
+  if (!mounted || !isOpen) return null;
 
   return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60000 bg-black/60 backdrop-blur-sm"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-60001 w-[calc(100%-24px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-          >
+    <>
+      <div
+        className="fixed inset-0 z-60000 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div
+        className="fixed left-1/2 top-1/2 z-60001 w-[calc(100%-24px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
              <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold text-foreground">选择商品</h2>
@@ -312,7 +300,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar min-h-0 relative">
+              <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar min-h-0 relative">
                  {(isLoading && products.length === 0) ? (
                     <div className="space-y-2">
                         {[...Array(6)].map((_, i) => (
@@ -320,7 +308,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                         ))}
                     </div>
                  ) : (
-                    <div className={cn("space-y-2 transition-all duration-300", (isSearching || isDataStale) && "opacity-60 grayscale-[0.2] pointer-events-none")}>
+                    <div className="space-y-2">
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
                       return (
@@ -437,16 +425,14 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
           
           <ProductFormModal 
             isOpen={isCreateModalOpen}
             onClose={() => setIsCreateModalOpen(false)}
             onSubmit={handleQuickCreate}
           />
-        </>
-      )}
-    </AnimatePresence>,
+        </>,
     document.body
   );
 }
