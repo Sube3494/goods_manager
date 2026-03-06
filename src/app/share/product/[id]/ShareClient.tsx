@@ -345,20 +345,12 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
                             </h3>
                         </div>
                         
-                        {(sku || description) && (
+                        {description && (
                             <div className="space-y-4 mt-2">
-                                {sku && (
-                                    <div>
-                                        <h3 className="text-[10px] text-white/50 uppercase tracking-widest mb-1 font-bold">货号 (SKU)</h3>
-                                        <p className="text-lg font-mono text-blue-400">{sku}</p>
-                                    </div>
-                                )}
-                                {description && (
-                                    <div>
-                                        <h3 className="text-[10px] text-white/50 uppercase tracking-widest mb-1 font-bold">备注内容</h3>
-                                        <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{description}</p>
-                                    </div>
-                                )}
+                                <div>
+                                    <h3 className="text-[10px] text-white/50 uppercase tracking-widest mb-1 font-bold">备注内容</h3>
+                                    <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap">{description}</p>
+                                </div>
                             </div>
                         )}
                     </motion.div>
@@ -367,6 +359,13 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
         </AnimatePresence>
 
         <div className="flex items-center gap-2 pointer-events-auto">
+            <a 
+                href="/gallery" 
+                className="h-10 px-4 flex items-center gap-1.5 rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl shadow-xl text-[11px] font-bold group"
+            >
+                <ChevronRight size={16} className="rotate-180 group-hover:-translate-x-0.5 transition-transform" />
+                返回实物相册
+            </a>
             <button 
                 onClick={() => {
                     checkAction(() => {

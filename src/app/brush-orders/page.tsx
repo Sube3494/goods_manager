@@ -849,7 +849,7 @@ export default function BrushOrdersPage() {
                             <button 
                                 onClick={(e) => toggleGroupSelect(monthGroup.days.flatMap(d => d.orders).map(o => o.id), e)}
                                 className={cn(
-                                    "relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer",
+                                    "relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer",
                                     monthGroup.days.flatMap(d => d.orders).length > 0 && monthGroup.days.flatMap(d => d.orders).every(o => selectedIds.includes(o.id))
                                     ? "bg-foreground border-foreground text-background dark:text-black scale-110" 
                                     : "bg-white/50 border-primary/20 dark:bg-white/10"
@@ -860,20 +860,25 @@ export default function BrushOrdersPage() {
                                 )}
                             </button>
                             <div className={cn(
-                                "flex items-center justify-center w-8 h-8 rounded-xl bg-white dark:bg-white/5 border border-primary/10 text-primary shadow-sm transition-transform duration-300",
+                                "flex items-center justify-center w-7 h-7 rounded-xl bg-white dark:bg-white/5 border border-primary/10 text-primary shadow-sm transition-transform duration-300",
                                 expandedMonths.includes(monthGroup.month) ? "rotate-0" : "-rotate-90"
                             )}>
-                                <ChevronDown size={18} />
+                                <ChevronDown size={16} />
                             </div>
-                            <h3 className="text-base font-black text-foreground tracking-tight">{monthGroup.month}</h3>
+                            <h3 className="text-sm font-black text-foreground tracking-tight whitespace-nowrap">{monthGroup.month}</h3>
                         </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-[10px] font-bold text-blue-500 uppercase bg-blue-500/10 px-1.5 py-0.5 rounded-md mb-1">
+                        <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-[10px] font-bold text-blue-500 uppercase bg-blue-500/10 px-1.5 py-0.5 rounded-md">
                                 {monthGroup.periodStats.count}单
                             </span>
-                            <span className="text-xs font-mono font-bold text-emerald-500">
-                                ¥{monthGroup.periodStats.received.toFixed(2)}
-                            </span>
+                            <div className="flex flex-col items-end">
+                                <span className="text-[9px] font-mono font-medium text-muted-foreground whitespace-nowrap">
+                                    实付 ¥{monthGroup.periodStats.payment.toFixed(2)}
+                                </span>
+                                <span className="text-[11px] font-mono font-bold text-emerald-500 whitespace-nowrap">
+                                    到手 ¥{monthGroup.periodStats.received.toFixed(2)}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -908,8 +913,9 @@ export default function BrushOrdersPage() {
                                         {dayGroup.dailyStats.count}单
                                     </span>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-xs font-mono font-bold text-emerald-500">¥{dayGroup.dailyStats.received.toFixed(2)}</p>
+                                <div className="text-right flex flex-col items-end shrink-0">
+                                    <p className="text-[10px] font-mono text-muted-foreground scale-90 origin-right">实付 ¥{dayGroup.dailyStats.payment.toFixed(2)}</p>
+                                    <p className="text-xs font-mono font-bold text-emerald-500">到手 ¥{dayGroup.dailyStats.received.toFixed(2)}</p>
                                 </div>
                             </div>
 
@@ -967,13 +973,22 @@ export default function BrushOrdersPage() {
                                                         {order.items[0]?.product?.name || "未绑定商品"}
                                                         {order.items.length > 1 && <span className="text-muted-foreground font-normal ml-1">等{order.items.length}件</span>}
                                                     </p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="px-1 py-0 rounded bg-blue-500/10 text-blue-500 text-[9px] font-bold border border-blue-500/20 uppercase">
+                                                     <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                                                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[9px] font-bold border border-blue-500/20 uppercase">
                                                             {order.type}
                                                         </span>
-                                                        <span className="text-[10px] font-mono font-bold text-emerald-500">
-                                                            ¥{order.receivedAmount.toFixed(2)}
-                                                        </span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[9px] text-muted-foreground uppercase font-bold">实付</span>
+                                                            <span className="text-[10px] font-mono font-bold text-foreground">
+                                                                ¥{order.paymentAmount.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[9px] text-emerald-500 uppercase font-bold">到手</span>
+                                                            <span className="text-[10px] font-mono font-bold text-emerald-500">
+                                                                ¥{order.receivedAmount.toFixed(2)}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
