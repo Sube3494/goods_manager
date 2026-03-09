@@ -1,19 +1,14 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getAuthorizedUser } from "@/lib/auth";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession() as SessionUser | null;
+    const session = await getAuthorizedUser("supplier:manage");
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "supplier:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
@@ -35,12 +30,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession() as SessionUser | null;
+    const session = await getAuthorizedUser("supplier:manage");
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "supplier:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
@@ -61,12 +52,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession() as SessionUser | null;
+    const session = await getAuthorizedUser("supplier:manage");
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!hasPermission(session, "supplier:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 

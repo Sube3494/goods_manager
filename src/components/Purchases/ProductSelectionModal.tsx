@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Check, Package, Truck, Plus } from "lucide-react";
 import { Product, Supplier, GalleryItem } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -53,11 +52,10 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isDataStale, setIsDataStale] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { showToast } = useToast();
   const resultsVersion = useRef(0);
-  const [mounted, setMounted] = useState(typeof window !== "undefined");
+  const [mounted] = useState(typeof window !== "undefined");
 
 
   // 初始化重置逻辑
@@ -70,7 +68,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       // 不再清空 products，除非是首次初始化或需要强制刷新
       // setProducts([]); 
       setIsLoading(products.length === 0);
-      setIsDataStale(false); // 不暗化已有缓存数据，后台静默刷新即可
       pageRef.current = 1;
       setIsInitialized(true);
     } else {
@@ -121,7 +118,6 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
         
         if (mode === 'initial' || mode === 'search') {
           setProducts(newItems);
-          setIsDataStale(false);
         } else {
           setProducts(prev => {
             const existingIds = new Set(prev.map(i => i.id));

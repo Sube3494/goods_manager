@@ -1,27 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { hasPermission } from "@/lib/permissions";
-
+import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from '@/lib/storage';
 
 export async function GET(req: NextRequest) {
-  const { getLightSession } = await import("@/lib/auth");
-  const session = await getLightSession();
+  const session = await getAuthorizedUser("brush:manage");
+  if (!session) {
+    return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+  }
   const searchParams = req.nextUrl.searchParams;
   const page = parseInt(searchParams.get('page') || '1');
   const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 1000);
   const skip = (page - 1) * limit;
-
-  if (!session || !session.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Cast to SessionUser because getLightSession provides the required role/id
-  const user = session as import("@/lib/permissions").SessionUser;
-
-  if (!hasPermission(user, "brush:manage")) {
-    return NextResponse.json({ error: "Permission denied" }, { status: 403 });
-  }
 
   try {
     const [orders, total] = await Promise.all([
@@ -75,15 +65,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { getLightSession } = await import("@/lib/auth");
-    const session = await getLightSession();
-    if (!session || !session.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = session as import("@/lib/permissions").SessionUser;
-
-    if (!hasPermission(user, "brush:manage")) {
+    const session = await getAuthorizedUser("brush:manage");
+    if (!session) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
