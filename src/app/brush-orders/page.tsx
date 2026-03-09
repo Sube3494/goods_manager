@@ -7,7 +7,7 @@ import { BrushOrderModal } from "@/components/BrushOrders/BrushOrderModal";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { BatchRecognitionModal } from "@/components/BrushOrders/BatchRecognitionModal";
 import { BatchEditOrderModal } from "@/components/BrushOrders/BatchEditOrderModal";
-import { BrushOrder } from "@/lib/types";
+import { BrushOrder, User as UserType } from "@/lib/types";
 import { formatLocalDateTime, formatLocalDate, formatLocalMonth } from "@/lib/dateUtils";
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -24,6 +24,7 @@ import { SessionUser } from "@/lib/permissions";
 export default function BrushOrdersPage() {
   const { showToast } = useToast();
   const { user } = useUser();
+  const typedUser = user as unknown as UserType;
   const canBrush = hasPermission(user as SessionUser | null, "brush:manage");
   const [orders, setOrders] = useState<BrushOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,6 +53,7 @@ export default function BrushOrdersPage() {
     onConfirm: () => {},
   });
   const [selectedType, setSelectedType] = useState("全部");
+  const [selectedShop, setSelectedShop] = useState("全部");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
   
@@ -79,11 +81,12 @@ export default function BrushOrdersPage() {
     }
   };
 
-  const hasActiveFilters = searchQuery !== "" || selectedType !== "全部" || startDate !== "" || endDate !== "";
+  const hasActiveFilters = searchQuery !== "" || selectedType !== "全部" || selectedShop !== "全部" || startDate !== "" || endDate !== "";
 
   const resetFilters = () => {
     setSearchQuery("");
     setSelectedType("全部");
+    setSelectedShop("全部");
     setStartDate("");
     setEndDate("");
   };
@@ -98,11 +101,15 @@ export default function BrushOrdersPage() {
           pinyinMatch(o.type, query) ||
           pinyinMatch(o.note || "", query) ||
           pinyinMatch(o.platformOrderId || "", query) ||
+          pinyinMatch(o.shopName || "", query) ||
           o.items.some(i => i.product?.name && pinyinMatch(i.product.name, query)) 
       );
 
       // 2. 平台筛选
       const matchesType = selectedType === "全部" || o.type === selectedType;
+
+      // 3. 店铺筛选
+      const matchesShop = selectedShop === "全部" || o.shopName === selectedShop;
 
       // 3. 日期筛选
       let matchesDate = true;
@@ -113,13 +120,19 @@ export default function BrushOrdersPage() {
           matchesDate = isWithinInterval(orderDate, { start, end });
       }
 
-      return matchesSearch && matchesType && matchesDate;
+      return matchesSearch && matchesType && matchesShop && matchesDate;
     }).sort((a, b) => {
         const timeA = typeof a.date === 'string' ? new Date(a.date).getTime() : a.date.getTime();
         const timeB = typeof b.date === 'string' ? new Date(b.date).getTime() : b.date.getTime();
         return timeB - timeA;
     });
-  }, [orders, searchQuery, startDate, endDate, selectedType]);
+  }, [orders, searchQuery, startDate, endDate, selectedType, selectedShop]);
+
+  const allShopNames = useMemo(() => {
+    const addressLabels = typedUser?.shippingAddresses?.map(a => a.label) || [];
+    const existingOrderShops = orders.map(o => o.shopName).filter(Boolean) as string[];
+    return Array.from(new Set([...addressLabels, ...existingOrderShops])).sort();
+  }, [typedUser?.shippingAddresses, orders]);
 
   const groupedOrders = useMemo(() => {
     // 结构: 月份 -> 天 -> 订单
@@ -313,7 +326,7 @@ export default function BrushOrdersPage() {
     });
   };
 
-  const handleBatchEdit = async (data: { commission?: number; note?: string }) => {
+  const handleBatchEdit = async (data: { commission?: number; note?: string; type?: string; shopName?: string }) => {
     setIsLoading(true);
     try {
       const res = await fetch("/api/brush-orders/batch", {
@@ -564,6 +577,25 @@ export default function BrushOrdersPage() {
                   )}
               />
           </div>
+          {/* 店铺筛选 */}
+          {allShopNames.length > 0 && (
+            <div className="w-28 sm:w-36 shrink-0 h-12">
+                <CustomSelect
+                    value={selectedShop}
+                    onChange={setSelectedShop}
+                    options={[
+                      { value: "全部", label: "全部店铺" },
+                      ...allShopNames.map(name => ({ value: name, label: name }))
+                    ]}
+                    placeholder="全部店铺"
+                    className="h-full"
+                    triggerClassName={cn(
+                        "h-full rounded-full border shadow-sm transition-all text-sm",
+                        selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                    )}
+                />
+            </div>
+          )}
         </div>
 
         {/* Date Range & Reset */}
@@ -802,11 +834,18 @@ export default function BrushOrdersPage() {
                                       <td className="px-6 py-4 text-sm font-mono text-muted-foreground whitespace-nowrap text-center">
                                          {formatLocalDateTime(order.date).substring(5, 16)}
                                       </td>
-                                      <td className="px-6 py-4 text-center whitespace-nowrap">
-                                              <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20 uppercase whitespace-nowrap">
+                                       <td className="px-6 py-4 text-center whitespace-nowrap">
+                                          <div className="flex flex-col items-center justify-center gap-1">
+                                              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20 uppercase whitespace-nowrap">
                                                   {order.type}
                                               </span>
-                                      </td>
+                                              {order.shopName && (
+                                                  <div className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 text-[9px] font-bold border border-indigo-500/20 whitespace-nowrap truncate max-w-[85px] text-center" title={order.shopName}>
+                                                      {order.shopName}
+                                                  </div>
+                                              )}
+                                          </div>
+                                       </td>
                                       <td className="px-6 py-4 font-number font-medium text-center text-sm whitespace-nowrap">¥{order.paymentAmount.toFixed(2)}</td>
                                       <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm whitespace-nowrap">¥{order.receivedAmount.toFixed(2)}</td>
                                       <td className="px-6 py-4 font-number font-bold text-orange-500 text-center text-sm whitespace-nowrap">¥{order.commission.toFixed(2)}</td>
@@ -961,22 +1000,29 @@ export default function BrushOrdersPage() {
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[10px] font-mono font-bold text-muted-foreground/30">
-                                                            #{String(order.globalIndex).padStart(2, '0')}
-                                                        </span>
-                                                        <span className="text-[10px] font-mono text-muted-foreground">
-                                                            {formatLocalDateTime(order.date).substring(5, 16)}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-xs font-bold text-foreground line-clamp-1 mt-0.5">
-                                                        {order.items[0]?.product?.name || "未绑定商品"}
-                                                        {order.items.length > 1 && <span className="text-muted-foreground font-normal ml-1">等{order.items.length}件</span>}
-                                                    </p>
-                                                     <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1.5">
-                                                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[9px] font-bold border border-blue-500/20 uppercase">
-                                                            {order.type}
-                                                        </span>
+                                                     <div className="flex items-center justify-between">
+                                                         <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-mono font-bold text-muted-foreground/30">
+                                                                #{String(order.globalIndex).padStart(2, '0')}
+                                                            </span>
+                                                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[8px] font-bold border border-blue-500/20 uppercase leading-none">
+                                                                {order.type}
+                                                            </span>
+                                                         </div>
+                                                         <span className="text-[10px] font-mono text-muted-foreground">
+                                                             {formatLocalDateTime(order.date).substring(5, 16)}
+                                                         </span>
+                                                     </div>
+                                                     <p className="text-xs font-bold text-foreground line-clamp-1 mt-0.5">
+                                                         {order.items[0]?.product?.name || "未绑定商品"}
+                                                         {order.items.length > 1 && <span className="text-muted-foreground font-normal ml-1">等{order.items.length}件</span>}
+                                                     </p>
+                                                      <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-1.5">
+                                                         {order.shopName && (
+                                                             <div className="px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 text-[9px] font-bold border border-indigo-500/20 whitespace-nowrap truncate max-w-[80px]" title={order.shopName}>
+                                                                 {order.shopName}
+                                                             </div>
+                                                         )}
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="text-[9px] text-muted-foreground uppercase font-bold">实付</span>
                                                             <span className="text-[10px] font-mono font-bold text-foreground">
@@ -1045,6 +1091,7 @@ export default function BrushOrdersPage() {
         onClose={() => setIsBatchEditModalOpen(false)}
         onConfirm={handleBatchEdit}
         selectedCount={selectedIds.length}
+        shopOptions={allShopNames}
       />
 
       <ActionBar 

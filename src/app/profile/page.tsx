@@ -249,7 +249,6 @@ export default function ProfilePage() {
                   )}
                 </div>
               </div>
-
               <div className="pt-6">
                 <button 
                   onClick={handleSave}

@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, AlertTriangle, Wand2 } from "lucide-react";
+import { X, Package, Plus, Trash2, AlertTriangle, Wand2, Store } from "lucide-react";
 import Image from "next/image";
-import { BrushOrder, Product } from "@/lib/types";
+import { BrushOrder, Product, User as UserType } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductSelectionModal } from "../Purchases/ProductSelectionModal";
 import { useToast } from "@/components/ui/Toast";
+import { useUser } from "@/hooks/useUser";
 
 interface BrushOrderModalProps {
   isOpen: boolean;
@@ -23,88 +24,94 @@ interface BrushOrderModalProps {
 const BRUSH_TYPES = ["美团", "淘宝", "京东"];
 
 export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false, onOpenBatch }: BrushOrderModalProps) {
-  const { showToast } = useToast();
-  const [formData, setFormData] = useState<BrushOrder>(() => ({
-    id: initialData?.id || "",
-    status: initialData?.status || "Completed",
-    date: initialData?.date || new Date().toISOString(),
-    items: initialData?.items || [],
-    type: initialData?.type || "美团",
-    paymentAmount: initialData?.paymentAmount || 0,
-    receivedAmount: initialData?.receivedAmount || 0,
-    commission: initialData?.commission || 0,
-    note: initialData?.note || "",
-  }));
+    const { showToast } = useToast();
+    const { user } = useUser();
+    const typedUser = user as unknown as UserType;
+    // 直接将地址库的 Label 作为店铺列表
+    const shopList = typedUser?.shippingAddresses?.map(addr => ({ id: addr.id, name: addr.label, isDefault: addr.isDefault })) || [];
 
-  const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  // 移除单张识别状态，改为调用批量窗口
-  // const [isRecognizing, setIsRecognizing] = useState(false);
-  // const recognitionInputRef = useRef<HTMLInputElement>(null);
-  
-  // 1. Data Fetching & Lifecycle
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => setMounted(true));
-    fetch("/api/products?pageSize=1000")
-      .then(res => res.json())
-      .then(data => {
-        if (data && Array.isArray(data.items)) {
-          setProducts(data.items);
-        } else if (Array.isArray(data)) {
-          setProducts(data);
-        }
-      })
-      .catch(console.error);
-    return () => cancelAnimationFrame(handle);
-  }, []);
+    const [formData, setFormData] = useState<BrushOrder>(() => ({
+        id: initialData?.id || "",
+        status: initialData?.status || "Completed",
+        date: initialData?.date || new Date().toISOString(),
+        items: initialData?.items || [],
+        type: initialData?.type || "美团",
+        shopName: initialData?.shopName || "",
+        paymentAmount: initialData?.paymentAmount || 0,
+        receivedAmount: initialData?.receivedAmount || 0,
+        commission: initialData?.commission || 0,
+        note: initialData?.note || "",
+    }));
 
-  // 2. Body Scroll logic - Lock scroll when modal is open to prevent scroll-through
-  useEffect(() => {
-    if (isOpen) {
-      const originalBodyOverflow = document.body.style.overflow;
-      const originalHtmlOverflow = document.documentElement.style.overflow;
-      
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-
-      return () => {
-        document.body.style.overflow = originalBodyOverflow;
-        document.documentElement.style.overflow = originalHtmlOverflow;
-      };
-    }
-  }, [isOpen]);
-
-  // 3. Form Data Synchronization
-  const [prevId, setPrevId] = useState<string | undefined>(undefined);
-  const [isNewOrder, setIsNewOrder] = useState(true);
-
-  // Sync data when opening
-  if (isOpen && (initialData?.id !== prevId || (initialData === null && !isNewOrder))) {
-    setPrevId(initialData?.id);
-    setIsNewOrder(!initialData);
+    const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
+    const [products, setProducts] = useState<Product[]>([]);
     
-    setFormData(initialData ? {
-      ...initialData,
-      note: initialData.note || ""
-    } : {
-      id: "",
-      status: "Completed",
-      date: new Date().toISOString(),
-      items: [],
-      type: "美团",
-      paymentAmount: 0,
-      receivedAmount: 0,
-      commission: 0,
-      note: "",
-    });
-  }
+    // 1. Data Fetching & Lifecycle
+    useEffect(() => {
+        const handle = requestAnimationFrame(() => setMounted(true));
+        fetch("/api/products?pageSize=1000")
+            .then(res => res.json())
+            .then(data => {
+                if (data && Array.isArray(data.items)) {
+                    setProducts(data.items);
+                } else if (Array.isArray(data)) {
+                    setProducts(data);
+                }
+            })
+            .catch(console.error);
+        return () => cancelAnimationFrame(handle);
+    }, []);
 
-  // Reset sync tracking during render when closed (avoids useEffect cascading render)
-  if (!isOpen && (prevId !== undefined || isNewOrder !== false)) {
-    setPrevId(undefined);
-    setIsNewOrder(false);
-  }
+    // 2. Body Scroll logic - Lock scroll when modal is open to prevent scroll-through
+    useEffect(() => {
+        if (isOpen) {
+            const originalBodyOverflow = document.body.style.overflow;
+            const originalHtmlOverflow = document.documentElement.style.overflow;
+            
+            document.body.style.overflow = "hidden";
+            document.documentElement.style.overflow = "hidden";
+
+            return () => {
+                document.body.style.overflow = originalBodyOverflow;
+                document.documentElement.style.overflow = originalHtmlOverflow;
+            };
+        }
+    }, [isOpen]);
+
+    // 3. Form Data Synchronization
+    const [prevId, setPrevId] = useState<string | undefined>(undefined);
+    const [isNewOrder, setIsNewOrder] = useState(true);
+
+    // Sync data when opening
+    if (isOpen && (initialData?.id !== prevId || (initialData === null && !isNewOrder))) {
+        setPrevId(initialData?.id);
+        setIsNewOrder(!initialData);
+        
+        setFormData(initialData ? {
+            ...initialData,
+            note: initialData.note || "",
+            shopName: initialData.shopName || "",
+        } : {
+            id: "",
+            status: "Completed",
+            date: new Date().toISOString(),
+            items: [],
+            type: "美团",
+            shopName: shopList.find(s => s.isDefault)?.name || "",
+            paymentAmount: 0,
+            receivedAmount: 0,
+            commission: 0,
+            note: "",
+        });
+    }
+
+    // Reset sync tracking during render when closed (avoids useEffect cascading render)
+    if (!isOpen && (prevId !== undefined || isNewOrder !== false)) {
+        setPrevId(undefined);
+        setIsNewOrder(false);
+    }
+
 
   const addItem = () => setIsSelectionModalOpen(true);
 
@@ -268,6 +275,70 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
                                 );
                             })()}
                         </div>
+                    </div>
+
+                    {/* 店铺选择行 */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-500 flex items-center gap-1.5">
+                            <Store size={13} className="text-muted-foreground" />
+                            店铺
+                        </label>
+                        {shopList.length > 0 ? (
+                            (() => {
+                                const isCustomShop = formData.shopName !== "" && !shopList.some(s => s.name === formData.shopName);
+                                if (isCustomShop) {
+                                    return (
+                                        <div className="relative animate-in zoom-in-95 duration-200">
+                                            <input
+                                                type="text"
+                                                placeholder="店铺名称"
+                                                value={formData.shopName || ""}
+                                                disabled={readOnly}
+                                                onChange={(e) => setFormData({...formData, shopName: e.target.value})}
+                                                className="w-full h-11 px-3 pr-8 rounded-2xl border bg-transparent border-gray-200 dark:bg-white/5 dark:border-white/10 outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                                            />
+                                            {!readOnly && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({...formData, shopName: ""})}
+                                                    className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <CustomSelect
+                                        options={[
+                                            { value: "", label: "不指定店铺" },
+                                            ...shopList.map(s => ({ value: s.name, label: s.name })),
+                                            { value: "__custom__", label: "＋ 手动输入..." },
+                                        ]}
+                                        value={formData.shopName || ""}
+                                        onChange={(val) => {
+                                            if (val === "__custom__") {
+                                                setFormData({...formData, shopName: " "});  // 触发 isCustomShop
+                                                setTimeout(() => setFormData(f => ({...f, shopName: ""})), 0);
+                                            } else {
+                                                setFormData({...formData, shopName: val});
+                                            }
+                                        }}
+                                        className="w-full h-11"
+                                    />
+                                );
+                            })()
+                        ) : (
+                            <input
+                                type="text"
+                                placeholder="店铺名称（可选，在个人资料中预设常用店铺）"
+                                value={formData.shopName || ""}
+                                disabled={readOnly}
+                                onChange={(e) => setFormData({...formData, shopName: e.target.value})}
+                                className="w-full h-11 px-3 rounded-2xl border bg-transparent border-gray-200 dark:bg-white/5 dark:border-white/10 outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                            />
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 sm:gap-6">

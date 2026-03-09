@@ -11,13 +11,14 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { name, shippingAddresses } = body;
+    const { name, shippingAddresses, brushShops } = body;
 
     const updatedUser = await prisma.user.update({
       where: { id: session.id },
       data: { 
         name: name || undefined,
-        shippingAddresses: shippingAddresses !== undefined ? shippingAddresses : undefined
+        shippingAddresses: shippingAddresses !== undefined ? shippingAddresses : undefined,
+        brushShops: brushShops !== undefined ? brushShops : undefined
       }
     });
 

@@ -21,12 +21,20 @@ export interface AddressItem {
   isDefault: boolean;
 }
 
+export interface BrushShopItem {
+  id: string;
+  name: string;
+  platform?: string;
+  isDefault?: boolean;
+}
+
 export interface User {
   id: string;
   name?: string | null;
   email: string;
   shippingAddresses?: AddressItem[];
   shippingAddress?: string | null;
+  brushShops?: BrushShopItem[];
   role: string;
   status: string;
 }
@@ -173,6 +181,7 @@ export interface BrushOrder {
   date: Date | string;
   type: string;
   status: BrushStatus | string;
+  shopName?: string;       // 店铺名称
   paymentAmount: number;   // 实付
   receivedAmount: number;  // 到手金额
   commission: number;      // 佣金

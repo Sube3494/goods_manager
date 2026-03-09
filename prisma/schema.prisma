@@ -182,6 +182,7 @@ model User {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   shippingAddresses  Json?               @default("[]")
+  brushShops         Json?               @default("[]")
   roleProfileId      String?
   brushOrders        BrushOrder[]
   categories         Category[]
@@ -192,6 +193,7 @@ model User {
   purchaseOrders     PurchaseOrder[]
   suppliers          Supplier[]
   systemSettings     SystemSetting[]
+  settlements        Settlement[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
 }
 
@@ -305,6 +307,7 @@ model BrushOrder {
   note            String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  shopName        String?
   platformOrderId String?
   userId          String?
   user            User?            @relation(fields: [userId], references: [id])
@@ -336,6 +339,38 @@ model PageView {
   @@index([date])
   @@index([visitorId, date])
   @@index([ip, date])
+}
+
+model Settlement {
+  id                   String           @id @default(cuid())
+  date                 DateTime         @default(now())
+  totalNet             Float            @default(0)
+  serviceFeeRate       Float            @default(0.06)
+  serviceFee           Float            @default(0)
+  totalAlreadyReceived Float            @default(0)
+  finalBalance         Float            @default(0)
+  note                 String?
+  userId               String?
+  user                 User?            @relation(fields: [userId], references: [id])
+  items                SettlementItem[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([userId, date(sort: Desc)])
+}
+
+model SettlementItem {
+  id             String     @id @default(cuid())
+  settlementId   String
+  platformName   String
+  received       Float      @default(0)
+  brushing       Float      @default(0)
+  receivedToCard Float      @default(0)
+  net            Float      @default(0)
+  settlement     Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@index([settlementId])
 }
 
 enum Role {

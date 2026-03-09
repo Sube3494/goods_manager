@@ -9,6 +9,7 @@ export type Permission =
   | "outbound:manage"
   | "brush:manage"
   | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy" | "gallery:audit"
+  | "settlement:manage"
   | "system:manage"
   | "all";
 
@@ -95,6 +96,13 @@ export const PERMISSION_TREE = [
     label: "系统设置",
     children: [
       { key: "system:manage", label: "系统管理" },
+    ]
+  },
+  {
+    key: "settlement",
+    label: "财务结算",
+    children: [
+      { key: "settlement:manage", label: "结算管理" },
     ]
   }
 ];

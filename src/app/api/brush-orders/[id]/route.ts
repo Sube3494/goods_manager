@@ -66,6 +66,7 @@ export async function PUT(
       commission,
       note,
       status,
+      shopName,
     } = body;
 
     // Delete existing items and create new ones (simple approach)
@@ -80,6 +81,7 @@ export async function PUT(
         data: {
           date: new Date(date),
           type,
+          shopName: shopName || null,
           paymentAmount: parseFloat(paymentAmount || 0),
           receivedAmount: parseFloat(receivedAmount || 0),
           commission: parseFloat(commission || 0),

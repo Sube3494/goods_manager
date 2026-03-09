@@ -1,26 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Check, FileText, ShoppingBag } from "lucide-react";
+import { X, Check, FileText, ShoppingBag, Store } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 
 interface BatchEditOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (data: { commission?: number; note?: string; type?: string }) => void;
+  onConfirm: (data: { commission?: number; note?: string; type?: string; shopName?: string }) => void;
   selectedCount: number;
+  shopOptions: string[];
 }
 
 const BatchEditOrderForm = ({
   onClose,
   onConfirm,
-  selectedCount
+  selectedCount,
+  shopOptions
 }: Omit<BatchEditOrderModalProps, "isOpen">) => {
   const [commission, setCommission] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [type, setType] = useState<string>("");
+  const [shopName, setShopName] = useState<string>("");
   const [clearNote, setClearNote] = useState(false);
 
   useEffect(() => {
@@ -33,13 +37,17 @@ const BatchEditOrderForm = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data: { commission?: number; note?: string; type?: string } = {};
+    const data: { commission?: number; note?: string; type?: string; shopName?: string } = {};
     if (commission.trim() !== "") {
       data.commission = Number(commission);
     }
     
     if (type !== "") {
       data.type = type;
+    }
+
+    if (shopName !== "") {
+        data.shopName = shopName;
     }
     
     if (clearNote) {
@@ -116,6 +124,25 @@ const BatchEditOrderForm = ({
           </div>
         </div>
 
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Store size={15} /> 批量修改店铺
+          </label>
+          <div className="h-12">
+              <CustomSelect
+                  value={shopName}
+                  onChange={setShopName}
+                  options={[
+                    { value: "", label: "保持原样" },
+                    ...shopOptions.map(name => ({ value: name, label: name }))
+                  ]}
+                  placeholder="选择店铺或保持原样"
+                  className="h-full"
+                  triggerClassName="h-full rounded-2xl bg-muted/30 border-border/50 text-sm"
+              />
+          </div>
+        </div>
+
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <label className="text-sm font-bold text-muted-foreground flex items-center gap-2">
@@ -171,7 +198,7 @@ const BatchEditOrderForm = ({
           </button>
           <button
             type="submit"
-            disabled={commission.trim() === "" && note.trim() === "" && !clearNote && type === ""}
+            disabled={commission.trim() === "" && note.trim() === "" && !clearNote && type === "" && shopName === ""}
             className="flex-[1.5] rounded-2xl bg-foreground hover:bg-foreground/90 py-3 text-sm font-black text-background dark:text-black shadow-xl shadow-black/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale disabled:scale-100"
           >
             <Check size={18} strokeWidth={3} />
@@ -187,7 +214,8 @@ export function BatchEditOrderModal({
   isOpen, 
   onClose, 
   onConfirm, 
-  selectedCount 
+  selectedCount,
+  shopOptions
 }: BatchEditOrderModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -216,6 +244,7 @@ export function BatchEditOrderModal({
             onClose={onClose}
             onConfirm={onConfirm}
             selectedCount={selectedCount}
+            shopOptions={shopOptions}
           />
         </div>
       )}

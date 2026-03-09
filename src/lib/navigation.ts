@@ -20,6 +20,7 @@ export const navItems: NavItem[] = [
   { name: "刷单管理", href: "/brush-orders", icon: CreditCard, adminOnly: true, permission: "brush:manage" },
   { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true, permission: "inbound:manage" },
   { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true, permission: "outbound:manage" },
+  { name: "结算对账", href: "/settlement", icon: CreditCard, adminOnly: true, permission: "brush:manage" },
   { name: "实物相册", href: "/gallery", icon: Camera, public: true },
   { name: "实拍审核", href: "/gallery/submissions", icon: CheckCircle, adminOnly: true, permission: "gallery:audit" },
   { name: "成员管理", href: "/admin/members", icon: Users, superAdminOnly: true },

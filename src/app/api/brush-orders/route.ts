@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
       note,
       status,
       platformOrderId,
+      shopName,
     } = body;
 
     // 去重检查
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
       data: {
         date: new Date(date),
         type,
+        shopName: shopName || null,
         userId: session.id,
         paymentAmount: parseFloat(paymentAmount || 0),
         receivedAmount: parseFloat(receivedAmount || 0),
