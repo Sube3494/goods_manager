@@ -100,7 +100,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
           triggerClassName
         )}
       >
-        <span className={cn("truncate font-bold", !value && "text-muted-foreground")}>{selectedLabel}</span>
+        <span className={cn("truncate font-normal", !value && "text-muted-foreground")}>{selectedLabel}</span>
         <ChevronDown
           size={12}
           className={cn("text-muted-foreground transition-transform duration-200 ml-1 shrink-0", isOpen && "rotate-180")}

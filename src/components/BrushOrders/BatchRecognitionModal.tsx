@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { Product } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { GestureImage } from "@/components/ui/GestureImage";
+import { useUser } from "@/hooks/useUser";
+import { User as UserType } from "@/lib/types";
 
 interface BatchItem {
   id: string;
@@ -43,6 +45,21 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<string>("美团");
+  const { user } = useUser();
+  const typedUser = user as unknown as UserType;
+  const shopList = useMemo(() => {
+    return typedUser?.shippingAddresses?.map(addr => ({ id: addr.id, name: addr.label, isDefault: addr.isDefault })) || [];
+  }, [typedUser?.shippingAddresses]);
+  const [selectedShop, setSelectedShop] = useState<string>("");
+
+  // Sync default shop when shopList loads
+  useEffect(() => {
+    if (shopList.length > 0 && !selectedShop) {
+      const defaultShop = shopList.find(s => s.isDefault)?.name || shopList[0].name;
+      setSelectedShop(defaultShop);
+    }
+  }, [shopList, selectedShop]);
+
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState("");
@@ -322,6 +339,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             body: JSON.stringify({
               date: item.result?.date as string,
               type: item.result?.platform || selectedPlatform,
+              shopName: selectedShop,
               items: item.result?.matchedItems?.map(mi => ({
                 productId: mi.productId,
                 quantity: mi.quantity
@@ -448,6 +466,28 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
                 ))}
               </div>
             </div>
+
+            {shopList.length > 0 && (
+              <div className="flex items-center gap-2 sm:pl-6 sm:border-l border-gray-200 dark:border-white/10 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbars-hide">
+                <span className="text-xs font-bold text-zinc-400 shrink-0">店铺:</span>
+                <div className="flex bg-zinc-100/50 dark:bg-black/40 backdrop-blur-md rounded-xl p-0.5 shrink-0 border border-zinc-200/50 dark:border-transparent gap-0.5">
+                  {shopList.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedShop(s.name)}
+                      className={cn(
+                        "px-3 py-1 text-xs font-black rounded-lg transition-all duration-200 whitespace-nowrap",
+                        selectedShop === s.name 
+                          ? "bg-emerald-500 text-white shadow-md scale-105" 
+                          : "text-zinc-500/70 hover:text-foreground hover:bg-white/50 dark:hover:bg-white/5"
+                      )}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
           <button onClick={onClose} className="absolute right-4 top-4 sm:static sm:p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200 transition-colors rounded-xl z-10">

@@ -559,7 +559,7 @@ export default function BrushOrdersPage() {
             )}
           </div>
           
-          <div className="w-28 sm:w-36 shrink-0 h-12">
+          <div className="w-24 sm:w-28 shrink-0 h-12">
               <CustomSelect
                   value={selectedType}
                   onChange={setSelectedType}
@@ -573,13 +573,13 @@ export default function BrushOrdersPage() {
                   className="h-full"
                   triggerClassName={cn(
                       "h-full rounded-full border shadow-sm transition-all text-sm",
-                      selectedType !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                      selectedType !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-normal" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
                   )}
               />
           </div>
           {/* 店铺筛选 */}
           {allShopNames.length > 0 && (
-            <div className="w-28 sm:w-36 shrink-0 h-12">
+            <div className="w-24 sm:w-28 shrink-0 h-12">
                 <CustomSelect
                     value={selectedShop}
                     onChange={setSelectedShop}
@@ -591,7 +591,7 @@ export default function BrushOrdersPage() {
                     className="h-full"
                     triggerClassName={cn(
                         "h-full rounded-full border shadow-sm transition-all text-sm",
-                        selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                        selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-normal" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
                     )}
                 />
             </div>
@@ -676,7 +676,7 @@ export default function BrushOrdersPage() {
                                      </button>
                                  </div>
                              </td>
-                             <td colSpan={4} className="py-2.5 px-3">
+                             <td colSpan={5} className="py-2.5 px-3">
                                  <div className="flex items-center gap-2">
                                      <div 
                                         className={cn(
@@ -738,7 +738,7 @@ export default function BrushOrdersPage() {
                                              </button>
                                          </div>
                                      </td>
-                                     <td colSpan={4} className="py-2 px-3 pl-8">
+                                     <td colSpan={5} className="py-2 px-3 pl-8">
                                          <div className="flex items-center gap-2">
                                              <div 
                                                 className={cn(
@@ -775,6 +775,7 @@ export default function BrushOrdersPage() {
                                              <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-left">商品</th>
                                              <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center">时间</th>
                                              <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center whitespace-nowrap">平台</th>
+                                             <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center whitespace-nowrap">店铺</th>
                                              <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center whitespace-nowrap">实付</th>
                                              <th className="px-6 py-3 text-xs font-bold text-emerald-500 uppercase text-center whitespace-nowrap">到手</th>
                                              <th className="px-6 py-3 text-xs font-bold text-orange-500 uppercase text-center whitespace-nowrap">佣金</th>
@@ -825,7 +826,7 @@ export default function BrushOrdersPage() {
                                                      </div>
                                                  )}
                                              </div>
-                                             <p className="text-sm font-medium line-clamp-1 max-w-[200px]" title={order.items.map(i => i.product?.name).join("\n")}>
+                                             <p className="text-sm font-medium line-clamp-1 max-w-[120px]" title={order.items.map(i => i.product?.name).join("\n")}>
                                                  {order.items[0]?.product?.name || "未绑定商品"}
                                                  {order.items.length > 1 && <span className="text-muted-foreground ml-1 text-xs">等{order.items.length}件</span>}
                                              </p>
@@ -835,16 +836,18 @@ export default function BrushOrdersPage() {
                                          {formatLocalDateTime(order.date).substring(5, 16)}
                                       </td>
                                        <td className="px-6 py-4 text-center whitespace-nowrap">
-                                          <div className="flex flex-col items-center justify-center gap-1">
                                               <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20 uppercase whitespace-nowrap">
                                                   {order.type}
                                               </span>
-                                              {order.shopName && (
-                                                  <div className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 text-[9px] font-bold border border-indigo-500/20 whitespace-nowrap truncate max-w-[85px] text-center" title={order.shopName}>
+                                       </td>
+                                       <td className="px-6 py-4 text-center whitespace-nowrap">
+                                              {order.shopName ? (
+                                                  <div className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 text-[10px] font-bold border border-indigo-500/20 whitespace-nowrap truncate max-w-[120px] mx-auto text-center" title={order.shopName}>
                                                       {order.shopName}
                                                   </div>
+                                              ) : (
+                                                  <span className="text-muted-foreground/50">-</span>
                                               )}
-                                          </div>
                                        </td>
                                       <td className="px-6 py-4 font-number font-medium text-center text-sm whitespace-nowrap">¥{order.paymentAmount.toFixed(2)}</td>
                                       <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm whitespace-nowrap">¥{order.receivedAmount.toFixed(2)}</td>
