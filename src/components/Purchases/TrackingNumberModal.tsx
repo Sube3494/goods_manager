@@ -183,6 +183,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
   const [paymentVouchers, setPaymentVouchers] = useState<string[]>([]);
   const [isUploadingVoucher, setIsUploadingVoucher] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [hoveredZone, setHoveredZone] = useState<{ type: 'payment' | 'waybill', index?: number } | null>(null);
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
@@ -298,15 +299,24 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
   // Global paste listener for Payment Mode
 
   useEffect(() => {
-      if (!isOpen || mode !== 'payment') return;
+      if (!isOpen) return;
 
       const handleGlobalPaste = (e: ClipboardEvent) => {
-          handlePasteUpload(e, 'payment');
+          // If focus is in an input or textarea, let default behavior happen
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+          if (hoveredZone) {
+              handlePasteUpload(e, hoveredZone.type, hoveredZone.index);
+          } else if (mode === 'payment') {
+              // Backward compatibility/Fallback for pure payment mode
+              handlePasteUpload(e, 'payment');
+          }
       };
 
       document.addEventListener('paste', handleGlobalPaste);
       return () => document.removeEventListener('paste', handleGlobalPaste);
-  }, [isOpen, mode, handlePasteUpload]); // Dependencies
+  }, [isOpen, mode, hoveredZone, handlePasteUpload]); // Dependencies
 
 
   if (!mounted) return null;
@@ -503,7 +513,9 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                           {/* Upload Button */}
                           {!readOnly && (
                             <label 
-                              className="h-20 w-28 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 group/up active:scale-95"
+                              className={`h-20 w-28 rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 group/up active:scale-95 ${hoveredZone?.type === 'waybill' && hoveredZone.index === index ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : ''}`}
+                              onMouseEnter={() => setHoveredZone({ type: 'waybill', index })}
+                              onMouseLeave={() => setHoveredZone(null)}
                               onDragOver={(e) => {
                                 e.preventDefault();
                                 e.currentTarget.classList.add('border-primary', 'bg-primary/10');
@@ -595,7 +607,9 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                         
                         {!readOnly && (
                             <label 
-                                className={`rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-[0.98] ${mode === 'payment' ? 'h-32 sm:h-40 w-full sm:w-56' : 'h-20 sm:h-32 w-28 sm:w-48'}`}
+                                className={`rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-[0.98] ${mode === 'payment' ? 'h-32 sm:h-40 w-full sm:w-56' : 'h-20 sm:h-32 w-28 sm:w-48'} ${hoveredZone?.type === 'payment' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : ''}`}
+                                onMouseEnter={() => setHoveredZone({ type: 'payment' })}
+                                onMouseLeave={() => setHoveredZone(null)}
                                 onDragOver={(e) => {
                                     e.preventDefault();
                                     e.currentTarget.classList.add('border-primary', 'bg-primary/10');

@@ -360,6 +360,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   // State for two-step inline delete confirmations
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
   const [confirmingDeleteIndex, setConfirmingDeleteIndex] = useState<number | null>(null);
+  const [hoveredZone, setHoveredZone] = useState<{ type: 'payment' | 'waybill', index?: number } | null>(null);
 
   useEffect(() => {
       let clearTba: NodeJS.Timeout;
@@ -705,6 +706,35 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
       if (type === 'payment') setIsUploadingVoucher(false);
     }
   }, [showToast]);
+
+  const handlePasteUpload = useCallback(async (e: React.ClipboardEvent | ClipboardEvent, type: 'payment' | 'waybill', rowIndex?: number) => {
+      const items = (e as ClipboardEvent).clipboardData?.items || (e as React.ClipboardEvent).clipboardData?.items;
+      if (!items) return;
+
+      const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'));
+      if (imageItems.length === 0) return;
+
+      e.preventDefault();
+      
+      const files = imageItems.map(item => item.getAsFile()).filter(file => file !== null) as File[];
+      handleFileUpload(files, type, rowIndex);
+  }, [handleFileUpload]);
+
+  useEffect(() => {
+      if (!isOpen) return;
+
+      const handleGlobalPaste = (e: ClipboardEvent) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+          if (hoveredZone) {
+              handlePasteUpload(e, hoveredZone.type, hoveredZone.index);
+          }
+      };
+
+      document.addEventListener('paste', handleGlobalPaste);
+      return () => document.removeEventListener('paste', handleGlobalPaste);
+  }, [isOpen, hoveredZone, handlePasteUpload]);
 
   const isShippedAndReady = useMemo(() => {
     return formData.status === "Shipped" && 
@@ -1071,30 +1101,33 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                     </div>
                                 ))}
                                 {!readOnly && (
-                                    <label 
-                                        className={cn(
-                                            "rounded-xl border-2 border-dashed border-border dark:border-white/30 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-95 bg-zinc-500/5 dark:bg-white/5",
-                                            formData.paymentVouchers && formData.paymentVouchers.length > 0 
-                                                ? "w-full aspect-square sm:aspect-3/2" 
-                                                : "col-span-full py-10 sm:py-14"
-                                        )}
-                                        onDragOver={(e) => {
-                                            e.preventDefault();
-                                            e.currentTarget.classList.add('border-primary', 'bg-primary/10');
-                                        }}
-                                        onDragLeave={(e) => {
-                                            e.preventDefault();
-                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
-                                            const files = e.dataTransfer.files;
-                                            if (files && files.length > 0) {
-                                                handleFileUpload(files, 'payment');
-                                            }
-                                        }}
-                                    >
+                                        <label 
+                                            className={cn(
+                                                "rounded-xl border-2 border-dashed border-border dark:border-white/30 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group/up active:scale-95 bg-zinc-500/5 dark:bg-white/5",
+                                                formData.paymentVouchers && formData.paymentVouchers.length > 0 
+                                                    ? "w-full aspect-square sm:aspect-3/2" 
+                                                    : "col-span-full py-10 sm:py-14",
+                                                hoveredZone?.type === 'payment' && "border-primary bg-primary/10 ring-2 ring-primary/20"
+                                            )}
+                                            onMouseEnter={() => setHoveredZone({ type: 'payment' })}
+                                            onMouseLeave={() => setHoveredZone(null)}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.classList.add('border-primary', 'bg-primary/10');
+                                            }}
+                                            onDragLeave={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                            }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.classList.remove('border-primary', 'bg-primary/10');
+                                                const files = e.dataTransfer.files;
+                                                if (files && files.length > 0) {
+                                                    handleFileUpload(files, 'payment');
+                                                }
+                                            }}
+                                        >
                                         <input
                                             type="file"
                                             accept="image/*"
@@ -1337,8 +1370,11 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                                               "flex items-center justify-center shrink-0 rounded-xl transition-all duration-300 cursor-pointer group/up bg-zinc-500/5 dark:bg-white/5",
                                                                               images.length > 0 
                                                                                   ? "w-14 h-14 sm:w-16 sm:h-16 border border-dashed border-border dark:border-white/20 hover:border-primary/50 hover:bg-primary/5" 
-                                                                                  : "flex-1 h-14 sm:h-16 border-2 border-dashed border-border dark:border-white/30 hover:border-primary/50 hover:bg-primary/10 sm:max-w-[200px]"
+                                                                                  : "flex-1 h-14 sm:h-16 border-2 border-dashed border-border dark:border-white/30 hover:border-primary/50 hover:bg-primary/10 sm:max-w-[200px]",
+                                                                              hoveredZone?.type === 'waybill' && hoveredZone.index === index && "border-primary bg-primary/10 ring-2 ring-primary/20"
                                                                           )}
+                                                                          onMouseEnter={() => setHoveredZone({ type: 'waybill', index })}
+                                                                          onMouseLeave={() => setHoveredZone(null)}
                                                                           title="点击或拖拽上传面单"
                                                                       >
                                                                           <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files!, 'waybill', index)} />
