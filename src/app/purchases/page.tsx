@@ -24,6 +24,7 @@ const COURIER_CODES: Record<string, string> = {
   "顺丰速运": "shunfeng",
   "圆通速递": "yuantong",
   "中通快递": "zhongtong",
+  "中通快运": "zhongtongkuaiyun",
   "申通快递": "shentong",
   "韵达快递": "yunda",
   "极兔速递": "jtexpress",

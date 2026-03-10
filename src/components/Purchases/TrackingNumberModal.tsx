@@ -21,7 +21,7 @@ export interface TrackingNumberModalProps {
 }
 
 const COURIER_OPTIONS = [
-  "顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", 
+  "顺丰速运", "圆通速递", "中通快递", "中通快运", "申通快递", "韵达快递", 
   "极兔速递", "EMS", "邮政快递", "京东快递", "德邦快递", "安能物流", "顺心捷达", "跨越速运", "优速快递", "其他"
 ];
 
@@ -29,6 +29,7 @@ const COURIER_CODES: Record<string, string> = {
   "顺丰速运": "shunfeng",
   "圆通速递": "yuantong",
   "中通快递": "zhongtong",
+  "中通快运": "zhongtongkuaiyun",
   "申通快递": "shentong",
   "韵达快递": "yunda",
   "极兔速递": "jtexpress",
