@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, CheckCircle, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, CheckCircle, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store } from "lucide-react";
 import { Permission } from "./permissions";
 
 export interface NavItem {
@@ -17,6 +17,7 @@ export const navItems: NavItem[] = [
   { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true, permission: "category:manage" },
   { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true, permission: "supplier:manage" },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true, permission: "purchase:manage" },
+  { name: "开店进货", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "purchase:manage" },
   { name: "刷单管理", href: "/brush-orders", icon: CreditCard, adminOnly: true, permission: "brush:manage" },
   { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true, permission: "inbound:manage" },
   { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true, permission: "outbound:manage" },

@@ -88,7 +88,7 @@ export function ConfirmModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-4 sm:p-6", className)}>
+        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-4 sm:p-6 lg:pl-(--sidebar-width) transition-[padding] duration-200", className)}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

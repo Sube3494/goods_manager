@@ -20,7 +20,8 @@ import {
   X, 
   Loader2,
   Eye,
-  Check
+  Check,
+  Store
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PERMISSION_TREE } from "@/lib/permissions";
@@ -301,6 +302,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                                             case 'categories': return <LayoutGrid size={16} />;
                                                             case 'suppliers': return <Truck size={16} />;
                                                             case 'purchases': return <ShoppingBag size={16} />;
+                                                            case 'setup_purchases': return <Store size={16} />;
                                                             case 'store_management': return <Warehouse size={16} />;
                                                             case 'brush_orders': return <Layers size={16} />;
                                                             case 'gallery': return <ImageIcon size={16} />;

@@ -56,11 +56,8 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
       const spaceBelow = windowHeight - rect.bottom;
       const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
+      // 始终优先左对齐，但在右侧空间不足时左移以防止溢出
       let left = rect.left;
-      // 判定是否在屏幕右半部分，如果是，则尝试右对齐
-      if (rect.left + rect.width / 2 > windowWidth / 2) {
-          left = rect.right - dropdownMinWidth;
-      }
 
       // 边界溢出保护 (保持 16px 间距)
       if (left + dropdownMinWidth > windowWidth - 16) {
@@ -179,12 +176,11 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
               width: `${dropdownPosition.width}px`,
               minWidth: '280px',
               maxWidth: 'calc(100vw - 2rem)',
-              transform: dropdownPosition.showAbove ? 'translateY(-100%)' : 'none',
               pointerEvents: 'auto'
             }}
-            className="z-9999 rounded-2xl glass p-4 shadow-2xl border border-white/10"
+            className="z-1000001 rounded-[24px] glass p-3 shadow-2xl border border-white/10"
           >
-            <div className="max-w-[320px] mx-auto">
+            <div className="max-w-[280px] mx-auto">
               <div className="flex items-center justify-between mb-4 px-1">
                 <div className="flex items-center gap-1.5 overflow-hidden">
                     <button

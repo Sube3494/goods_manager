@@ -47,6 +47,7 @@ model Product {
   supplier        Supplier?           @relation(fields: [supplierId], references: [id])
   user            User?               @relation(fields: [userId], references: [id])
   orderItems      PurchaseOrderItem[]
+  storeOpeningItems StoreOpeningItem[]
 
   @@index([categoryId])
   @@index([supplierId])
@@ -195,6 +196,7 @@ model User {
   suppliers          Supplier[]
   systemSettings     SystemSetting[]
   settlements        Settlement[]
+  storeOpeningBatches StoreOpeningBatch[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
 }
 
@@ -377,4 +379,41 @@ model SettlementItem {
 enum Role {
   USER
   SUPER_ADMIN
+}
+
+model StoreOpeningBatch {
+  id          String              @id @default(cuid())
+  name        String              
+  date        DateTime            @default(now())
+  userId      String?
+  user        User?               @relation(fields: [userId], references: [id])
+  items       StoreOpeningItem[]  
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([userId])
+}
+
+model StoreOpeningItem {
+  id            String            @id @default(cuid())
+  batchId       String
+  batch         StoreOpeningBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  
+  productCode   String?           
+  productName   String?           
+  productId     String?
+  product       Product?          @relation(fields: [productId], references: [id])
+  quantity      Int               @default(0)
+  unitPrice     Float             @default(0)
+  totalAmount   Float             @default(0)
+  
+  channel       String?            
+  remark        String?           
+  checked       Boolean           @default(false)
+  
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([batchId])
+  @@index([productId])
 }

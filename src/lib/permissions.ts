@@ -5,6 +5,7 @@ export type Permission =
   | "category:manage"
   | "supplier:manage"
   | "purchase:manage"
+  | "setup_purchase:manage"
   | "inbound:manage"
   | "outbound:manage"
   | "brush:manage"
@@ -48,9 +49,16 @@ export const PERMISSION_TREE = [
   },
   {
     key: "purchases",
-    label: "采购管理",
+    label: "日常采购",
     children: [
-      { key: "purchase:manage", label: "采购管理" },
+      { key: "purchase:manage", label: "日常采购管理" },
+    ]
+  },
+  {
+    key: "setup_purchases",
+    label: "开店进货",
+    children: [
+      { key: "setup_purchase:manage", label: "开店进货管理" },
     ]
   },
   {
