@@ -270,27 +270,28 @@ function SetupPurchaseDetailContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-4 border-b border-border/50 pb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-4 border-b border-border/50 pb-4">
+        <div className="flex items-center gap-3 shrink-0">
            <Link href="/setup-purchases" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
               <ArrowLeft size={18} className="text-muted-foreground" />
            </Link>
            <div>
-             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+             <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2 line-clamp-1">
                  {batchName || "账单明细"}
              </h1>
            </div>
         </div>
 
         {canManage && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button 
                 onClick={() => setIsProductSelectOpen(true)}
                 disabled={isUploading}
-                className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-black text-primary-foreground shadow-md shadow-black/10 dark:shadow-none hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+                className="h-9 w-9 sm:w-auto md:h-10 flex items-center justify-center sm:gap-2 rounded-full bg-primary p-0 sm:px-4 md:px-6 text-xs md:text-sm font-black text-primary-foreground shadow-md shadow-black/10 dark:shadow-none hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
+                title="添加库商品"
               >
-                <Plus size={16} strokeWidth={3} />
-                添加库商品
+                <Plus size={16} strokeWidth={3} className="shrink-0" />
+                <span className="hidden sm:inline">添加库商品</span>
               </button>
               <button 
                 onClick={() => {
@@ -301,10 +302,11 @@ function SetupPurchaseDetailContent() {
                    input.click();
                 }}
                 disabled={isUploading}
-                className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-muted/60 border border-border px-3 md:px-4 text-xs md:text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-all active:scale-95 disabled:opacity-50"
+                className="h-9 w-9 sm:w-auto md:h-10 flex items-center justify-center sm:gap-2 rounded-full bg-muted/60 border border-border p-0 sm:px-3 md:px-4 text-xs md:text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-all active:scale-95 disabled:opacity-50"
+                title={isUploading ? "解析中..." : "导入Excel"}
               >
-                {isUploading ? <RefreshCcw size={14} className="animate-spin" /> : <Upload size={14} />}
-                {isUploading ? "解析中..." : "导入Excel"}
+                {isUploading ? <RefreshCcw size={14} className="animate-spin shrink-0" /> : <Upload size={14} className="shrink-0" />}
+                <span className="hidden sm:inline">{isUploading ? "解析中..." : "导入Excel"}</span>
               </button>
             </div>
         )}
@@ -335,27 +337,29 @@ function SetupPurchaseDetailContent() {
               </div>
           )}
 
-          <div className={cn("flex items-center gap-2 overflow-x-auto no-scrollbar pt-3 pb-1", suppliers.length > 0 && "border-t border-border/30")}>
-              <div className="flex items-center gap-1.5 mr-2 shrink-0">
-                  <Check size={11} className="text-muted-foreground opacity-50" />
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-50">核对状态</span>
+          <div className={cn("flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 pb-1", suppliers.length > 0 && "border-t border-border/30")}>
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto pb-1 sm:pb-0 pr-2">
+                  <div className="flex items-center gap-1.5 mr-2 shrink-0">
+                      <Check size={11} className="text-muted-foreground opacity-50" />
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-50">核对状态</span>
+                  </div>
+                  {[
+                    { label: "全部", val: "All" },
+                    { label: "已核对", val: "Checked" },
+                    { label: "未核对", val: "Unchecked" }
+                  ].map(opt => (
+                      <button
+                        key={opt.val}
+                        onClick={() => setCheckStatusFilter(opt.val)}
+                        className={cn("px-3.5 h-8 rounded-full text-xs font-bold transition-all whitespace-nowrap border shrink-0", checkStatusFilter === opt.val ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80")}
+                      >
+                        {opt.label}
+                      </button>
+                  ))}
               </div>
-              {[
-                { label: "全部", val: "All" },
-                { label: "已核对", val: "Checked" },
-                { label: "未核对", val: "Unchecked" }
-              ].map(opt => (
-                  <button
-                    key={opt.val}
-                    onClick={() => setCheckStatusFilter(opt.val)}
-                    className={cn("px-3.5 h-8 rounded-full text-xs font-bold transition-all whitespace-nowrap border shrink-0", checkStatusFilter === opt.val ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80")}
-                  >
-                    {opt.label}
-                  </button>
-              ))}
 
-              <div className="ml-auto flex items-center gap-2 mt-2 sm:mt-0 pr-1 shrink-0">
-                   <div className="h-8 w-48 px-3 rounded-full bg-white dark:bg-white/5 border border-border/50 flex items-center gap-2 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+              <div className="flex items-center w-full sm:w-auto shrink-0">
+                   <div className="h-8 w-full sm:w-48 px-3 rounded-full bg-white dark:bg-white/5 border border-border/50 flex items-center gap-2 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                         <Search size={12} className="text-muted-foreground shrink-0" />
                         <input type="text" placeholder="搜索条目..." value={query} onChange={e => setQuery(e.target.value)} className="bg-transparent border-none outline-none w-full text-[11px] text-foreground placeholder:text-muted-foreground h-full" />
                    </div>
@@ -456,7 +460,7 @@ function SetupPurchaseDetailContent() {
                                  <td className="px-6 py-3 whitespace-nowrap text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">￥{(item.totalAmount || 0).toLocaleString()}</td>
                                  
                                  {canManage && (
-                                     <td className="px-6 py-3 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                     <td className="px-6 py-3 text-center">
                                           <div className="flex items-center justify-center gap-1">
                                              <button onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }} className="p-1.5 text-red-500/70 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16} /></button>
                                           </div>
