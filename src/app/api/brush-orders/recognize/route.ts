@@ -44,12 +44,18 @@ export async function POST(req: NextRequest) {
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
     const imageDataUrl = `data:${file.type};base64,${base64Image}`;
 
-    // 获取中国标准时间的时间和年份
+    // 获取明确的中国标准时间
     const now = new Date();
-    const chinaTime = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
-    const todayYear = chinaTime.getFullYear();
+    const formatter = new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    // result is like "2026/03/10"
+    const todayStr = formatter.format(now).replace(/\//g, '-');
+    const todayYear = parseInt(todayStr.split('-')[0]);
     const lastYear = todayYear - 1;
-    const todayStr = chinaTime.toISOString().split('T')[0]; // e.g: 2026-03-06
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -69,7 +75,7 @@ export async function POST(req: NextRequest) {
             content: [
               {
                 type: "text",
-                text: `请分析这张截图，严格按照前面定义的 JSON 结构返回数据。要求：\n- 当前日期是 ${todayStr}。请根据此日期智能推断年份。\n- date 必须是截图中显示的真实交易时间。如果截图中的时间缺少跨度（例如只有 "12-24 18:24"）：\n    - 如果该月-日（12-24）晚于当前日期（${todayStr.slice(5)}），请推断年份为去年 "${lastYear}"，并补充为 "${lastYear}-12-24 18:24:00"。\n    - 如果该月-日早于或等于当前日期，请默认使用当前年份 "${todayYear}" 补充为完整的 "YYYY-MM-DD HH:mm:ss"。\n- 如果截图只有日期没有时间，请返回 "YYYY-MM-DD 00:00:00"。\n- 如果截图中**没有明确指出任何交易日期或时间**，请返回 "${todayStr} 00:00:00"。\n- 金额字段（paymentAmount, receivedAmount）必须是数字，不要带货币符号。注意定义：\n    - \`paymentAmount\`（实付）：指买家/顾客端实际支付的金额。\n    - \`receivedAmount\`（到手/本金）：指商家端实际或预计能收到的结算金额。\n- 返回的字符串必须是纯粹的 JSON 文本，严禁使用 \`\`\`json 等代码块包裹。`
+                text: `请分析这张截图，严格按照前面定义的 JSON 结构返回数据。要求：\n- 当前日期是 ${todayStr}。请根据此日期智能推断年份、月份和日期。\n- date 必须是截图中显示的真实交易时间。\n  - 如果截图中的时间缺少跨度（例如只有 "12-24 18:24"）：\n      - 如果该月-日晚于当前日期（${todayStr.substring(5)}），推断为去年 "${lastYear}"，返回 "${lastYear}-12-24 18:24:00"。\n      - 否则使用当前年份 "${todayYear}"，返回 "YYYY-MM-DD HH:mm:ss"。\n  - 如果截图只有时间没有日期（例如只有 "18:24"），请直接使用当前日期 "${todayStr}"，拼接为 "${todayStr} 18:24:00"。\n  - 如果截图只有日期没有时间，请返回 "YYYY-MM-DD 00:00:00"。\n  - 如果截图中没有明确指出任何交易日期或时间，请返回 "${todayStr} 00:00:00"。\n- 金额字段（paymentAmount, receivedAmount）必须是数字，不要带货币符号。注意定义：\n    - \`paymentAmount\`（实付）：指买家/顾客端实际支付的金额。\n    - \`receivedAmount\`（到手/本金）：指商家端实际或预计能收到的结算金额。\n- 返回的字符串必须是纯粹的 JSON 文本，严禁使用 \`\`\`json 等代码块包裹。`
               },
               {
                 type: "image_url",
@@ -118,13 +124,24 @@ export async function POST(req: NextRequest) {
         platformOrderId: String(parsed.orderId || ""),
         date: (() => {
           if (!isValidDate) return new Date().toISOString();
-          const rawDate = String(parsed.date);
-          // 补全 ISO 格式
-          const dateStr = (rawDate.includes('+') || rawDate.includes('Z')) 
-            ? rawDate 
-            : `${rawDate.replace(' ', 'T')}+08:00`;
+          let rawDate = String(parsed.date).trim();
+          
+          // 如果没有带时区，强制附加东八区
+          if (!rawDate.includes('+') && !rawDate.includes('Z')) {
+            // YYYY-MM-DD -> YYYY-MM-DDT00:00:00+08:00
+            if (rawDate.length === 10) {
+              rawDate = `${rawDate}T00:00:00+08:00`;
+            } else {
+              rawDate = `${rawDate.replace(' ', 'T')}+08:00`;
+            }
+          }
+          
           try {
-            return new Date(dateStr).toISOString();
+            const d = new Date(rawDate);
+            if (isNaN(d.getTime())) {
+                return new Date().toISOString();
+            }
+            return d.toISOString();
           } catch {
             return new Date().toISOString();
           }
