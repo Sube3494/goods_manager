@@ -7,6 +7,9 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+import { useUser } from "@/hooks/useUser";
+import { hasPermission, SessionUser } from "@/lib/permissions";
+
 interface PlatformData {
   id: string;
   name: string;
@@ -22,8 +25,11 @@ export default function SettlementPage() {
     { id: "tb", name: "淘宝闪购", received: 0, brushing: 0, receivedToCard: 0 },
   ]);
 
+  const { user, isLoading: userLoading } = useUser();
   const { showToast } = useToast();
   const router = useRouter();
+
+  const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
 
   const [serviceFeeRate, setServiceFeeRate] = useState(0.06);
   const [note, setNote] = useState("");
@@ -108,6 +114,12 @@ export default function SettlementPage() {
       setIsSaving(false);
     }
   };
+
+  if (userLoading) return null;
+  if (!canManage) return null; // PageGuard will handle the UI
+
+  if (userLoading) return null;
+  if (!canManage) return null;
 
   return (
     <div className="space-y-8 pb-10">

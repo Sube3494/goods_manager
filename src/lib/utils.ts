@@ -22,3 +22,21 @@ export function getCategoryName(category: string | Category | undefined): string
   if (typeof category === "string") return category;
   return category.name;
 }
+
+/**
+ * 从请求中提取真实的 Origin。
+ * 优先检查 x-forwarded-host 和 x-forwarded-proto 头，以适配 Nginx 等反向代理。
+ */
+export function getRequestOrigin(request: Request): string {
+  const headers = request.headers;
+  const host = headers.get("x-forwarded-host") || headers.get("host");
+  const proto = headers.get("x-forwarded-proto") || "http";
+  
+  if (host) {
+    return `${proto}://${host}`;
+  }
+  
+  // 兜底方案
+  const url = new URL(request.url);
+  return url.origin;
+}

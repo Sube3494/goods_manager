@@ -18,6 +18,8 @@ import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import * as XLSX from 'xlsx';
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { useUser } from "@/hooks/useUser";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 interface SettlementItem {
   id: string;
@@ -49,7 +51,10 @@ export default function SettlementHistoryPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
+  const { user, isLoading: userLoading } = useUser();
   const { showToast } = useToast();
+
+  const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
 
   useEffect(() => {
     fetchSettlements();
@@ -158,6 +163,9 @@ export default function SettlementHistoryPage() {
       </div>
     );
   }
+
+  if (userLoading) return null;
+  if (!canManage) return null;
 
   return (
     <div className="space-y-8 pb-10">

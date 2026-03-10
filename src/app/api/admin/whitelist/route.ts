@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { SessionUser } from "@/lib/permissions";
 import { sendInvitationEmail } from "@/lib/email";
+import { getRequestOrigin } from "@/lib/utils";
 
 /**
  * GET /api/admin/whitelist - List all whitelisted emails and invitations (SUPER_ADMIN only)
@@ -118,8 +119,7 @@ export async function POST(request: Request) {
     const { alreadyActive, invitationToken } = result as { alreadyActive?: boolean; invitationToken?: string };
 
     if (!alreadyActive && invitationToken) {
-        const urlObj = new URL(request.url);
-        const origin = urlObj.origin;
+        const origin = getRequestOrigin(request);
         const safeEmail = email || "";
         const encodedEmail = encodeURIComponent(safeEmail);
         const inviteUrl = `${origin}/login?email=${encodedEmail}&token=${invitationToken}`;
