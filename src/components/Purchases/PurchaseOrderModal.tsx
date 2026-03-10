@@ -300,7 +300,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
       extraFees: 0,
       totalAmount: 0,
       discountAmount: 0,
-      shippingAddress: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.address || (user as unknown as UserType)?.shippingAddresses?.[0]?.address || ""
+      shippingAddress: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.address || (user as unknown as UserType)?.shippingAddresses?.[0]?.address || "",
+      shopName: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.label || (user as unknown as UserType)?.shippingAddresses?.[0]?.label || ""
     };
   });
   
@@ -462,7 +463,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                 totalAmount: 0,
                 trackingData: undefined,
                 paymentVouchers: [],
-                shippingAddress: defaultAddr
+                shippingAddress: defaultAddr,
+                shopName: (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.label || ""
             }));
             setShippingFeeInput("0");
             setExtraFeeInput("0");
@@ -485,6 +487,16 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
       }
     }
   }, [formData.type, formData.shippingAddress, addressList]);
+
+  // Auto-sync shopName if address changes and matches a known label
+  useEffect(() => {
+    if (formData.shippingAddress && addressList.length > 0 && !formData.shopName) {
+        const matched = addressList.find(a => a.address === formData.shippingAddress);
+        if (matched) {
+            setFormData(prev => ({ ...prev, shopName: matched.label }));
+        }
+    }
+  }, [formData.shippingAddress, addressList, formData.shopName]);
 
 
   const calculateTotal = () => {
@@ -855,6 +867,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                             </div>
                         </div>
 
+
+
                         {formData.type === "Purchase" && (
                             <div className="flex flex-col gap-2 md:col-span-2">
                                 <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
@@ -868,7 +882,14 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                     <div className="flex flex-col sm:flex-row gap-2">
                                         <CustomSelect 
                                             value={formData.shippingAddress || ""}
-                                            onChange={(val) => setFormData({...formData, shippingAddress: val})}
+                                            onChange={(val) => {
+                                                const matched = addressList.find(a => a.address === val);
+                                                setFormData({
+                                                    ...formData,
+                                                    shippingAddress: val,
+                                                    shopName: matched?.label || formData.shopName
+                                                });
+                                            }}
                                             options={addressList.map(addr => ({
                                                 value: addr.address,
                                                 label: addr.label ? `[${addr.label}] ${addr.address}` : addr.address

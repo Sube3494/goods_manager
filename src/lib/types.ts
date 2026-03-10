@@ -85,6 +85,7 @@ export interface PurchaseOrder {
   paymentVouchers?: string[];
   trackingData?: TrackingInfo[];
   shippingAddress?: string;
+  shopName?: string;
   note?: string;
   createdAt?: string;
   updatedAt?: string;

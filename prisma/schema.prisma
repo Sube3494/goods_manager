@@ -88,6 +88,7 @@ model PurchaseOrder {
   updatedAt       DateTime            @updatedAt
   note            String?
   shippingAddress String?
+  shopName        String?             @default("")
   userId          String?
   user            User?               @relation(fields: [userId], references: [id])
   items           PurchaseOrderItem[]

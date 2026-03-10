@@ -19,7 +19,8 @@ export async function PUT(
       trackingData,
       paymentVouchers,
       date,
-      shippingAddress
+      shippingAddress,
+      shopName
     } = body;
 
 
@@ -38,6 +39,7 @@ export async function PUT(
           paymentVouchers: paymentVouchers !== undefined ? paymentVouchers : undefined,
           trackingData: trackingData !== undefined ? trackingData : undefined,
           shippingAddress: shippingAddress !== undefined ? shippingAddress : undefined,
+          shopName: shopName !== undefined ? shopName : undefined,
           date: date ? new Date(date) : undefined,
           ...(items && {
             items: {

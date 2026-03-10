@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
-import { Plus, Search, ShoppingBag, Calendar, Trash2, Truck, Eye, Copy, ExternalLink, RotateCcw, X } from "lucide-react";
+import { Plus, Search, ShoppingBag, Calendar, Trash2, Truck, Eye, Copy, ExternalLink, RotateCcw, X, Store } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -60,6 +60,7 @@ function PurchasesContent() {
   const [detailReadOnly, setDetailReadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [shopFilter, setShopFilter] = useState<string>("All");
   const [isLoading, setIsLoading] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -90,6 +91,7 @@ function PurchasesContent() {
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     setStatusFilter("All");
+    setShopFilter("All");
     
     // Also clean URL params if necessary
     const params = new URLSearchParams(searchParams);
@@ -294,7 +296,12 @@ function PurchasesContent() {
             matchesStatus = p.status === statusFilter;
           }
         }
-        return matchesStatus;
+        
+        let matchesShop = shopFilter === 'All';
+        if (!matchesShop) {
+            matchesShop = p.shopName === shopFilter;
+        }
+        return matchesStatus && matchesShop;
       }
 
       const matchesId = pinyinMatch(p.id, query);
@@ -304,7 +311,6 @@ function PurchasesContent() {
       const matchesProduct = p.items.some(item =>
         item.product?.name && pinyinMatch(item.product.name, query)
       );
-      
       let matchesStatus = statusFilter === 'All';
       if (!matchesStatus) {
         if (statusFilter === 'Confirmed') {
@@ -314,9 +320,15 @@ function PurchasesContent() {
         }
       }
       
-      return (matchesId || matchesSupplier || matchesProduct) && matchesStatus;
+      let matchesShop = shopFilter === 'All';
+      if (!matchesShop) {
+          matchesShop = p.shopName === shopFilter;
+      }
+      
+      const queryMatch = matchesId || matchesSupplier || matchesProduct || (p.shopName && pinyinMatch(p.shopName, query));
+      return queryMatch && matchesStatus && matchesShop;
     });
-  }, [purchases, searchQuery, statusFilter]);
+  }, [purchases, searchQuery, statusFilter, shopFilter]);
 
   const handleExport = useCallback(async (specificPO?: PurchaseOrder) => {
     const targets = specificPO ? [specificPO] : filteredPurchases;
@@ -622,26 +634,65 @@ function PurchasesContent() {
         )}
       </div>
 
-      {/* Status Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar mb-6 md:mb-8">
-          {['All', 'Confirmed', 'Shipped', 'Received', 'Draft'].map(status => (
-              <button
-                key={status}
-                onClick={() => handleStatusFilterChange(status)}
-                className={cn(
-                    "px-4 h-9 rounded-full text-sm font-bold transition-all whitespace-nowrap border",
-                    statusFilter === status 
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm" 
-                        : "bg-white dark:bg-white/5 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80",
-                    statusFilter !== "All" && status === statusFilter && status !== "All" && "ring-2 ring-primary/20"
-                )}
-              >
-                {status === 'All' ? '全部' : 
-                 status === 'Confirmed' ? '已下单' :
-                 status === 'Shipped' ? '运输中' :
-                 status === 'Received' ? '已入库' : '草稿'}
-              </button>
-          ))}
+      {/* Optimized Filter Zone */}
+      <div className="flex flex-col gap-4 mb-6 md:mb-8 bg-white/40 dark:bg-white/5 p-4 rounded-2xl border border-border/50 shadow-sm backdrop-blur-sm">
+          {/* Row 1: Shop Filter */}
+          {(() => {
+              const uniqueShops = Array.from(new Set(purchases.map(p => p.shopName).filter(Boolean))) as string[];
+              if (uniqueShops.length === 0) return null;
+              return (
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2 shrink-0 opacity-50">归属店铺</span>
+                      <button
+                        onClick={() => setShopFilter("All")}
+                        className={cn(
+                            "px-3 h-7 rounded-full text-[11px] font-bold transition-all whitespace-nowrap border",
+                            shopFilter === "All"
+                                ? "bg-secondary text-secondary-foreground border-secondary shadow-sm"
+                                : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80"
+                        )}
+                      >
+                        全部
+                      </button>
+                      {uniqueShops.map(shop => (
+                          <button
+                            key={shop}
+                            onClick={() => setShopFilter(shop)}
+                            className={cn(
+                                "px-3 h-7 rounded-full text-[11px] font-bold transition-all whitespace-nowrap border",
+                                shopFilter === shop
+                                    ? "bg-secondary text-secondary-foreground border-secondary shadow-sm"
+                                    : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80"
+                            )}
+                          >
+                            {shop}
+                          </button>
+                      ))}
+                  </div>
+              );
+          })()}
+
+          {/* Row 2: Status Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-3 border-t border-border/30">
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2 shrink-0 opacity-50">单据状态</span>
+              {['All', 'Confirmed', 'Shipped', 'Received', 'Draft'].map(status => (
+                  <button
+                    key={status}
+                    onClick={() => handleStatusFilterChange(status)}
+                    className={cn(
+                        "px-3.5 h-8 rounded-full text-xs font-bold transition-all whitespace-nowrap border",
+                        statusFilter === status 
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm" 
+                            : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    {status === 'All' ? '全部' : 
+                     status === 'Confirmed' ? '已下单' :
+                     status === 'Shipped' ? '运输中' :
+                     status === 'Received' ? '已入库' : '草稿'}
+                  </button>
+              ))}
+          </div>
       </div>
 
       {/* Table/List View */}
@@ -658,6 +709,7 @@ function PurchasesContent() {
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">单据编号</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">归属店铺</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">交易金额</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">状态</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单/入库时间</th>
@@ -681,6 +733,14 @@ function PurchasesContent() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="font-bold text-foreground font-mono text-xs">{po.id}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {po.shopName ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/5 text-primary text-[10px] font-bold border border-primary/10">
+                              <Store size={10} />
+                              {po.shopName}
+                          </span>
+                      ) : <span className="text-[10px] text-muted-foreground/30 italic">未归属</span>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center text-foreground font-bold">

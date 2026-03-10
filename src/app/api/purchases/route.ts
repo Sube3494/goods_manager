@@ -130,7 +130,8 @@ export async function POST(request: Request) {
       discountAmount,
       trackingData,
       paymentVouchers,
-      shippingAddress
+      shippingAddress,
+      shopName
     } = body;
 
 
@@ -157,6 +158,7 @@ export async function POST(request: Request) {
           paymentVouchers: paymentVouchers || [],
           trackingData: trackingData || [],
           shippingAddress: shippingAddress || "",
+          shopName: shopName || "",
           userId: session.id,
           items: {
             create: items.map((item: PurchaseOrderItem) => ({
