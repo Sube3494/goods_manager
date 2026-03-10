@@ -13,18 +13,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     
     const data = await req.json();
+    
+    interface ItemInput {
+      productCode?: string;
+      productName?: string;
+      productId?: string;
+      quantity?: string | number;
+      unitPrice?: string | number;
+      totalAmount?: string | number;
+      remark?: string;
+    }
+
 
     if (Array.isArray(data)) {
         const items = await prisma.storeOpeningItem.createMany({
-            data: data.map((item: any) => ({
+            data: data.map((item: ItemInput) => ({
                 batchId: id,
                 productCode: item.productCode || null,
                 productName: item.productName || null,
                 productId: item.productId || null,
                 channel: null,
-                quantity: parseInt(item.quantity) || 1,
-                unitPrice: parseFloat(item.unitPrice) || 0,
-                totalAmount: parseFloat(item.totalAmount) || ((item.quantity || 1) * (item.unitPrice || 0)),
+                quantity: parseInt(item.quantity?.toString() || "1") || 1,
+                unitPrice: parseFloat(item.unitPrice?.toString() || "0") || 0,
+                totalAmount: parseFloat(item.totalAmount?.toString() || "0") || ((parseFloat(item.quantity?.toString() || "1") || 1) * (parseFloat(item.unitPrice?.toString() || "0") || 0)),
                 remark: item.remark || null,
             }))
         });

@@ -1280,7 +1280,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                                       className="h-9 w-full"
                                                                       value={tracking.courier}
                                                                       onChange={(val) => updateTrackingData(index, "courier", val)}
-                                                                      options={["顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", "极兔速递", "EMS", "京东快递", "德邦快递", "安能物流", "顺心捷达"].map(opt => ({
+                                                                      options={["顺丰速运", "圆通速递", "中通快递", "申通快递", "韵达快递", "极兔速递", "EMS", "京东快递", "德邦快递", "安能物流", "顺心捷达", "跨越速运", "优速快递"].map(opt => ({
                                                                           value: opt,
                                                                           label: opt
                                                                       }))}

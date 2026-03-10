@@ -24,7 +24,8 @@ export function ItemModal({ isOpen, onClose, onSave, editingItem, setEditingItem
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
 
   if (!mounted || !isOpen) return null;

@@ -32,7 +32,8 @@ const COURIER_CODES: Record<string, string> = {
   "京东快递": "jd",
   "德邦快递": "debangwuliu",
   "安能物流": "annengwuliu",
-  "跨越速运": "kuayue"
+  "跨越速运": "kuayue",
+  "优速快递": "yousu"
 };
 
 const getTrackingUrl = (num: string, courierName?: string) => {

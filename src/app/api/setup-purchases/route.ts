@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
