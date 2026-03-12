@@ -420,10 +420,60 @@ function PurchasesContent() {
           const price = (item as any).price || item.costPrice || item.product?.costPrice || 0;
           const subtotal = qty * price;
           const subtotalFormula = { formula: `E${currentRowIndex}*F${currentRowIndex}`, result: subtotal };
-          
+
           totalQty += qty;
           totalAmount += subtotal;
-          
+
+          // ── 第一步：预取图片并计算尺寸，用于动态行高 ──
+          const imageUrl = item.image || item.product?.image;
+          let imageBuffer: ArrayBuffer | null = null;
+          let imgW = 0;
+          let imgH = 0;
+
+          if (imageUrl) {
+            try {
+              const response = await fetch(imageUrl);
+              if (response.ok) {
+                imageBuffer = await response.arrayBuffer();
+                const blob = new Blob([imageBuffer]);
+                const blobUrl = URL.createObjectURL(blob);
+                const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+                  const img = new Image();
+                  img.onload = () => { URL.revokeObjectURL(blobUrl); resolve({ width: img.width, height: img.height }); };
+                  img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve({ width: 100, height: 100 }); };
+                  img.src = blobUrl;
+                });
+                imgW = dims.width || 100;
+                imgH = dims.height || 100;
+              }
+            } catch (err) {
+              console.error("Failed to pre-fetch image for export", err);
+            }
+          }
+
+          // ── 第二步：根据图片宽高比计算行高 ──
+          // 图片列宽 18 ≈ 135px；图片宽度上限留 10px 边距 = 125px
+          const COL_WIDTH_PX = 135;
+          const IMG_MAX_W = 125;
+          const MIN_ROW_H = 80;   // 最小行高（Excel points）
+          const MAX_ROW_H = 200;  // 最大行高，防止过高
+          const PADDING_PX = 12;  // 上下各留 6px
+
+          let rowHeightPts = MIN_ROW_H;
+          let finalW = IMG_MAX_W;
+          let finalH = IMG_MAX_W;
+
+          if (imgW > 0 && imgH > 0) {
+            // 按宽度缩放，算出对应的图片高度（px）
+            const scale = IMG_MAX_W / imgW;
+            finalW = imgW * scale;         // ≈ IMG_MAX_W
+            finalH = imgH * scale;
+            // Excel row height (pts) ≈ px * 0.75；加上上下边距后换算
+            rowHeightPts = Math.round((finalH + PADDING_PX) * 0.75);
+            rowHeightPts = Math.max(MIN_ROW_H, Math.min(MAX_ROW_H, rowHeightPts));
+          }
+
+          // ── 第三步：用正确行高创建行 ──
           const row = worksheet.addRow([
             globalIndex++,
             "", // Placeholder for image
@@ -433,90 +483,53 @@ function PurchasesContent() {
             qty,
             subtotalFormula,
           ]);
-          
-          row.height = 80;
+
+          row.height = rowHeightPts;
           row.alignment = { vertical: 'middle', wrapText: true };
-          
+
           // 对齐设置 (A-G)
-          worksheet.getCell(`A${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 序号
-          worksheet.getCell(`B${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 图片
-          worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };   // 名称 (确保换行)
-          worksheet.getCell(`D${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 编码
-          worksheet.getCell(`E${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 单价
-          // 让数量和金额都是数值型（确保公式可计算），数量可编辑
-          worksheet.getCell(`F${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 数量
-          worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 小计
-          
+          worksheet.getCell(`A${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+          worksheet.getCell(`B${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+          worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+          worksheet.getCell(`D${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+          worksheet.getCell(`E${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+          worksheet.getCell(`F${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+          worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+
           // 格式化金额
           worksheet.getCell(`E${currentRowIndex}`).numFmt = '¥#,##0.00';
           worksheet.getCell(`G${currentRowIndex}`).numFmt = '¥#,##0.00';
-          
-          // Image handling
-          const imageUrl = item.image || item.product?.image;
-          if (imageUrl) {
+
+          // ── 第四步：将图片插入对应行，居中对齐 ──
+          if (imageBuffer) {
             try {
-              // Fetch image as array buffer
-              const response = await fetch(imageUrl);
-              if (response.ok) {
-                const buffer = await response.arrayBuffer();
-                const ext = imageUrl.split('.').pop()?.toLowerCase();
-                const extType = ext === 'png' ? 'png' : 'jpeg';
-                
-                const imageId = workbook.addImage({
-                  buffer: buffer,
-                  extension: extType as 'png' | 'jpeg',
-                });
-                
-                // Get image dimensions to preserve aspect ratio
-                const blob = new Blob([buffer]);
-                const blobUrl = URL.createObjectURL(blob);
-                const dims = await new Promise<{width: number, height: number}>((resolve) => {
-                  const img = new Image();
-                  img.onload = () => {
-                    URL.revokeObjectURL(blobUrl);
-                    resolve({ width: img.width, height: img.height });
-                  };
-                  img.onerror = () => {
-                    URL.revokeObjectURL(blobUrl);
-                    resolve({ width: 100, height: 100 });
-                  };
-                  img.src = blobUrl;
-                });
+              const ext = imageUrl!.split('.').pop()?.toLowerCase();
+              const extType = ext === 'png' ? 'png' : 'jpeg';
 
-                // Excel width 18 (getColumn.width) is approx 135px in many viewers
-                // Row height 80 (row.height) is approx 106px (80 * 1.33)
-                const cellWidthPx = 135;
-                const cellHeightPx = 106;
-                
-                const maxW = 125;
-                const maxH = 95;
-                const scale = Math.min(maxW / dims.width, maxH / dims.height);
-                
-                const finalW = dims.width * scale;
-                const finalH = dims.height * scale;
+              const imageId = workbook.addImage({
+                buffer: imageBuffer,
+                extension: extType as 'png' | 'jpeg',
+              });
 
-                // Calculate center offset in pixels, then convert to proportional offset for ExcelJS
-                // colOffset and rowOffset are fractions of the cell's dimension
-                const colOffsetPx = (cellWidthPx - finalW) / 2;
-                const rowOffsetPx = (cellHeightPx - finalH) / 2;
-                
-                const colOffset = colOffsetPx / cellWidthPx;
-                const rowOffset = rowOffsetPx / cellHeightPx;
+              // 单元格实际像素高度 = rowHeightPts / 0.75
+              const cellHeightPx = rowHeightPts / 0.75;
 
-                // Add image to cell with preserved aspect ratio and centering
-                worksheet.addImage(imageId, {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  tl: { col: 1 + colOffset, row: currentRowIndex - 1 + rowOffset } as any,
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  ext: { width: finalW, height: finalH } as any,
-                  editAs: 'oneCell'
-                });
-              }
+              // 图片居中偏移（比例值）
+              const colOffset = ((COL_WIDTH_PX - finalW) / 2) / COL_WIDTH_PX;
+              const rowOffset = ((cellHeightPx - finalH) / 2) / cellHeightPx;
+
+              worksheet.addImage(imageId, {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                tl: { col: 1 + colOffset, row: currentRowIndex - 1 + rowOffset } as any,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ext: { width: finalW, height: finalH } as any,
+                editAs: 'oneCell',
+              });
             } catch (err) {
-              console.error("Failed to load image for export", err);
+              console.error("Failed to insert image into worksheet", err);
             }
           }
-          
+
           currentRowIndex++;
         }
       }

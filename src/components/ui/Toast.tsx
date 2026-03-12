@@ -10,20 +10,25 @@ interface ToastProps {
   id: string;
   message: string;
   type: ToastType;
+  duration?: number;
   onClose: (id: string) => void;
 }
 
 const ToastContext = createContext<{
-  showToast: (message: string, type?: ToastType) => void;
+  showToast: (message: string, type?: ToastType, duration?: number) => string;
+  updateToast: (id: string, message: string, type?: ToastType) => void;
+  removeToast: (id: string) => void;
 } | null>(null);
 
-function Toast({ id, message, type, onClose }: ToastProps) {
+function Toast({ id, message, type, duration = 3000, onClose }: ToastProps) {
   useEffect(() => {
-    const timer = setTimeout(() => {
-      onClose(id);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [id, onClose]);
+    if (duration > 0) {
+      const timer = setTimeout(() => {
+        onClose(id);
+      }, duration);
+      return () => clearTimeout(timer);
+    }
+  }, [id, onClose, duration]);
 
   const icons = {
     success: <CheckCircle className="text-green-500" size={18} />,
@@ -50,11 +55,18 @@ function Toast({ id, message, type, onClose }: ToastProps) {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<{ id: string; message: string; type: ToastType }[]>([]);
+  const [toasts, setToasts] = useState<{ id: string; message: string; type: ToastType; duration?: number }[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = "info") => {
+  const showToast = useCallback((message: string, type: ToastType = "info", duration: number = 3000) => {
     const id = Math.random().toString(36).substring(7);
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type, duration }]);
+    return id;
+  }, []);
+
+  const updateToast = useCallback((id: string, message: string, type?: ToastType) => {
+    setToasts((prev) => prev.map((t) => 
+      t.id === id ? { ...t, message, type: type || t.type } : t
+    ));
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -62,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={{ showToast, updateToast, removeToast }}>
       {children}
       <div className="fixed bottom-6 right-6 z-1000000 flex flex-col gap-2 pointer-events-none">
         <AnimatePresence>

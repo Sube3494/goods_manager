@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
-import { Plus, Upload, AlertCircle, ArrowLeft, RefreshCcw, Trash2, Search, Package, Check, Filter } from "lucide-react";
+import { Plus, Upload, AlertCircle, ArrowLeft, RefreshCcw, Trash2, Search, Package, Check, Filter, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+import NextImage from "next/image";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { Product } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
@@ -13,6 +13,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { ItemModal } from "./ItemModal";
+import type { Row, Cell } from "exceljs";
 
 interface StoreOpeningItem {
   id: string;
@@ -31,7 +32,7 @@ function SetupPurchaseDetailContent() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { showToast } = useToast();
+  const { showToast, updateToast, removeToast } = useToast();
   const { user } = useUser();
   const canManage = hasPermission(user as SessionUser | null, "setup_purchase:manage");
   
@@ -259,6 +260,215 @@ function SetupPurchaseDetailContent() {
     });
   }, [items, supplierFilter, checkStatusFilter, query]);
 
+  const handleExport = useCallback(async () => {
+    if (filteredItems.length === 0) {
+      showToast("没有可导出的记录", "error");
+      return;
+    }
+
+    console.log("Starting export for", batchName, "items count:", filteredItems.length);
+    const toastId = showToast(`正在准备表格 (0 / ${filteredItems.length})...`, "info", 0); // 0 表示不自动关闭
+
+    try {
+      // 简化导入，参考 purchases 页面
+      const ExcelJS = (await import("exceljs")).default;
+      const fileSaver = await import("file-saver") as unknown as { saveAs?: (data: Blob | string, filename?: string) => void, default?: { saveAs?: (data: Blob | string, filename?: string) => void } };
+      const saveAs = fileSaver.saveAs || fileSaver.default?.saveAs;
+      
+      if (!saveAs) {
+        throw new Error("保存函数(saveAs)加载失败");
+      }
+
+      console.log("Libraries loaded, creating workbook...");
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Goods Manager";
+      workbook.lastModifiedBy = "Goods Manager";
+      workbook.created = new Date();
+      workbook.modified = new Date();
+      
+      const worksheet = workbook.addWorksheet("明细");
+      
+      const now = new Date();
+      const dateStr = `${now.toLocaleDateString("zh-CN")} ${now.toLocaleTimeString("zh-CN", { hour12: false })}`;
+      
+      // 添加标题行
+      worksheet.addRow([`${batchName || "账单明细"} — ${dateStr}`]);
+      worksheet.mergeCells('A1:H1'); 
+      worksheet.getCell('A1').font = { size: 14, bold: true };
+      worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      worksheet.addRow([]); // 空行
+      
+      // 添加表头
+      const headerRow = worksheet.addRow(["序号", "商品图片", "识别编号/名称", "商品全称", "供应商", "单价", "数量", "小计"]);
+      headerRow.font = { bold: true };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      
+      // 设置列宽
+      worksheet.getColumn(1).width = 8;   // 序号
+      worksheet.getColumn(2).width = 18;  // 图片
+      worksheet.getColumn(3).width = 20;  // 识别编号/名称
+      worksheet.getColumn(4).width = 35;  // 商品全称
+      worksheet.getColumn(5).width = 20;  // 供应商
+      worksheet.getColumn(6).width = 12;  // 单价
+      worksheet.getColumn(7).width = 12;  // 数量
+      worksheet.getColumn(8).width = 15;  // 小计
+      
+      let globalIndex = 1;
+      let currentRowIndex = worksheet.rowCount + 1; // 动态索引
+      let totalQty = 0;
+      let totalAmount = 0;
+      
+      for (const item of filteredItems) {
+        const qty = item.quantity || 0;
+        const price = item.unitPrice || 0;
+        const subtotal = item.totalAmount || (qty * price);
+        
+        totalQty += qty;
+        totalAmount += subtotal;
+        
+        const row = worksheet.addRow([
+          globalIndex++,
+          "", // 图片占位
+          item.productCode || item.productName || "",
+          item.product?.name || item.productName || "",
+          item.product?.supplier?.name || "未知",
+          price,
+          qty,
+          { formula: `F${currentRowIndex}*G${currentRowIndex}`, result: subtotal },
+        ]);
+        
+        row.height = 80;
+        row.alignment = { vertical: 'middle', wrapText: true };
+        
+        // 居中设置 (A:序号, B:图片, C:识别编号, D:商品名称, E:供应商, F:单价, G:数量, H:小计)
+        ['A', 'B', 'C', 'E', 'F', 'G', 'H'].forEach(col => {
+            worksheet.getCell(`${col}${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+        worksheet.getCell(`D${currentRowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+        
+        // 格式化金额
+        worksheet.getCell(`F${currentRowIndex}`).numFmt = '¥#,##0.00';
+        worksheet.getCell(`H${currentRowIndex}`).numFmt = '¥#,##0.00';
+        
+        // 图片处理
+        const imageUrl = item.product?.image;
+        if (imageUrl) {
+          try {
+            console.log(`Fetching image ${globalIndex-1}/${filteredItems.length}: ${imageUrl}`);
+            
+            // 添加超时处理
+            const fetchPromise = fetch(imageUrl);
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
+            
+            const response = (await Promise.race([fetchPromise, timeoutPromise])) as Response;
+            
+            if (response.ok) {
+              const buffer = await response.arrayBuffer();
+              const ext = imageUrl.split('.').pop()?.split('?')[0].toLowerCase();
+              const extType = (ext === 'png' || ext === 'gif') ? ext : 'jpeg';
+              
+              const imageId = workbook.addImage({
+                buffer: buffer,
+                extension: extType as 'png' | 'jpeg' | 'gif',
+              });
+              
+              // 获取尺寸以居中
+              const blob = new Blob([buffer]);
+              const blobUrl = URL.createObjectURL(blob);
+              const dims = await new Promise<{width: number, height: number}>((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                  URL.revokeObjectURL(blobUrl);
+                  resolve({ width: img.width, height: img.height });
+                };
+                img.onerror = () => {
+                  URL.revokeObjectURL(blobUrl);
+                  resolve({ width: 100, height: 100 });
+                };
+                img.src = blobUrl;
+              });
+              
+              // 兜底尺寸，防止加载异常导致 Infinity/NaN
+              const imgW = dims.width || 100;
+              const imgH = dims.height || 100;
+
+              // Excel width 18 (getColumn.width) is approx 135px in many viewers
+              // Row height 80 (row.height) is approx 106px (80 * 1.33)
+              const cellWidthPx = 135;
+              const cellHeightPx = 106;
+              const maxW = 120; // 稍微收紧宽度
+              const maxH = 90;  // 稍微收紧高度防止溢出
+              const scale = Math.min(maxW / imgW, maxH / imgH);
+              
+              const finalW = imgW * scale;
+              const finalH = imgH * scale;
+
+              // 计算中心偏移量（相对单元格比例）
+              const colOffset = ((cellWidthPx - finalW) / 2) / cellWidthPx;
+              const rowOffset = ((cellHeightPx - finalH) / 2) / cellHeightPx;
+
+              // 使用 tl + ext 来保持图片的原始宽高比例，br 会导致单元格被拉伸变形
+              worksheet.addImage(imageId, {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                tl: { col: 1 + colOffset, row: currentRowIndex - 1 + rowOffset } as any,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ext: { width: finalW, height: finalH } as any,
+                editAs: 'oneCell'
+              });
+            }
+          } catch (err) {
+            console.error("Failed to load image for export", err);
+          }
+        }
+        
+        currentRowIndex++;
+        updateToast(toastId, `正在下载商品图片 (${globalIndex - 1} / ${filteredItems.length})...`);
+      }
+      
+      // 总计行
+      const totalRow = worksheet.addRow(["", "", "总计", "", "", "", totalQty, { formula: `SUM(H4:H${currentRowIndex - 1})`, result: totalAmount }]);
+      totalRow.font = { bold: true };
+      totalRow.height = 35;
+      worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getCell(`H${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getCell(`H${currentRowIndex}`).numFmt = '¥#,##0.00';
+      
+      // 样式
+      worksheet.eachRow((row: Row, rowNumber: number) => {
+        row.eachCell((cell: Cell) => {
+          cell.font = { ...cell.font, name: '微软雅黑' };
+          if (rowNumber >= 3) {
+            cell.border = {
+              top: {style:'thin'},
+              left: {style:'thin'},
+              bottom: {style:'thin'},
+              right: {style:'thin'}
+            };
+          }
+        });
+      });
+      
+      console.log("Workbook built, generating buffer...");
+      const buffer = await workbook.xlsx.writeBuffer();
+      const timestamp = Date.now();
+      const rawFilename = `${batchName || "账单明细"}_${timestamp}.xlsx`;
+      const filename = rawFilename.replace(/[\\/:\*\?"<>\|]/g, '_');
+      
+      console.log("Buffer generated, triggering download:", filename);
+      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+      
+      removeToast(toastId);
+      showToast("导出成功", "success");
+      console.log("Export completed successfully");
+    } catch (error) {
+      console.error("Export failed:", error);
+      removeToast(toastId);
+      showToast("导出失败", "error");
+    }
+  }, [filteredItems, batchName, showToast, updateToast, removeToast]);
+
   if (isLoading && items.length === 0) {
       return (
          <div className="py-20 flex flex-col items-center justify-center text-center">
@@ -284,6 +494,14 @@ function SetupPurchaseDetailContent() {
 
         {canManage && (
             <div className="flex items-center gap-2 shrink-0">
+              <button 
+                onClick={handleExport}
+                className="h-9 w-9 sm:w-auto md:h-10 flex items-center justify-center sm:gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 p-0 sm:px-3 md:px-4 text-xs md:text-sm font-bold text-emerald-600 hover:bg-emerald-500/20 transition-all active:scale-95"
+                title="导出Excel"
+              >
+                <Download size={14} className="shrink-0" />
+                <span className="hidden sm:inline">导出Excel</span>
+              </button>
               <button 
                 onClick={() => setIsProductSelectOpen(true)}
                 disabled={isUploading}
@@ -399,7 +617,7 @@ function SetupPurchaseDetailContent() {
                                      <div className="flex items-center gap-3">
                                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted border border-border/50 flex items-center justify-center shrink-0">
                                              {item.product?.image ? (
-                                                 <Image src={item.product.image} alt={item.productName || ""} width={40} height={40} className="w-full h-full object-cover" unoptimized />
+                                                 <NextImage src={item.product.image} alt={item.productName || ""} width={40} height={40} className="w-full h-full object-cover" unoptimized />
                                              ) : (
                                                  <Package size={18} className="text-muted-foreground/40" />
                                              )}
