@@ -23,6 +23,7 @@ interface StoreOpeningItem {
   product?: (Product & { supplier?: { name: string } | null }) | null;
   quantity: number;
   unitPrice: number;
+  shippingFee: number;
   totalAmount: number;
   remark: string | null;
   checked: boolean;
@@ -46,7 +47,7 @@ function SetupPurchaseDetailContent() {
   const [editingItem, setEditingItem] = useState<Partial<StoreOpeningItem>>({});
   
   // Inline editing state
-  const [editingCell, setEditingCell] = useState<{ id: string, field: "quantity" | "unitPrice" } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ id: string, field: "quantity" | "unitPrice" | "shippingFee" } | null>(null);
 
   const [supplierFilter, setSupplierFilter] = useState("All");
   const [checkStatusFilter, setCheckStatusFilter] = useState("All");
@@ -190,17 +191,20 @@ function SetupPurchaseDetailContent() {
     }
   };
 
-  const handleInlineUpdate = async (itemId: string, field: "quantity" | "unitPrice", value: number) => {
+  const handleInlineUpdate = async (itemId: string, field: "quantity" | "unitPrice" | "shippingFee", value: number) => {
     const item = items.find(it => it.id === itemId);
     if (!item) return;
 
-    if (field === "quantity" && isNaN(value)) value = 0;
-    if (field === "unitPrice" && isNaN(value)) value = 0;
+    if (isNaN(value)) value = 0;
+
+    const newQty = field === "quantity" ? value : item.quantity;
+    const newPrice = field === "unitPrice" ? value : item.unitPrice;
+    const newFee = field === "shippingFee" ? value : (item.shippingFee || 0);
 
     const updatedData = {
       ...item,
       [field]: value,
-      totalAmount: field === "quantity" ? value * item.unitPrice : item.quantity * value
+      totalAmount: newQty * newPrice + newFee
     };
 
     // Optimistically update UI
@@ -595,25 +599,26 @@ function SetupPurchaseDetailContent() {
              <table className="w-full text-left border-collapse min-w-[600px] table-auto">
                  <thead>
                  <tr className="border-b border-border bg-muted/30">
-                     <th className="px-6 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap w-12 text-center">核对</th>
-                     <th className="px-6 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap">识别编号/名称</th>
-                     <th className="px-6 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">供应商</th>
-                     <th className="px-6 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">数量</th>
-                     <th className="px-6 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">单价</th>
-                     <th className="px-6 py-4 text-xs font-bold text-foreground whitespace-nowrap text-right bg-primary/5">小计金额</th>
-                     {canManage && <th className="px-6 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center w-24">操作</th>}
+                     <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap w-12 text-center">核对</th>
+                     <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap">识别编号/名称</th>
+                     <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">供应商</th>
+                     <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">数量</th>
+                     <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">单价</th>
+                     <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">运费</th>
+                     <th className="px-3 py-4 text-xs font-bold text-foreground whitespace-nowrap text-right bg-primary/5">小计金额</th>
+                     {canManage && <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center w-20">操作</th>}
                  </tr>
                  </thead>
                  <tbody className="divide-y divide-border">
                      <AnimatePresence>
                         {filteredItems.map(item => (
                             <motion.tr key={item.id} className={cn("hover:bg-muted/30 group transition-all", item.checked && "opacity-60 bg-emerald-500/5")}>
-                                 <td className="px-6 py-3 whitespace-nowrap text-center">
+                                 <td className="px-3 py-3 whitespace-nowrap text-center">
                                       <button onClick={() => handleToggleCheck(item.id, item.checked)} className={cn("relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center m-auto", item.checked ? "bg-foreground border-foreground text-background scale-110 shadow-lg shadow-black/10" : "bg-white dark:bg-white/5 border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-foreground/50 shadow-sm")}>
                                          {item.checked && <Check size={14} strokeWidth={4} />}
                                       </button>
                                  </td>
-                                 <td className="px-6 py-3 whitespace-nowrap">
+                                 <td className="px-3 py-3 whitespace-nowrap">
                                      <div className="flex items-center gap-3">
                                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted border border-border/50 flex items-center justify-center shrink-0">
                                              {item.product?.image ? (
@@ -632,7 +637,7 @@ function SetupPurchaseDetailContent() {
                                          </div>
                                      </div>
                                  </td>
-                                 <td className="px-6 py-3 whitespace-nowrap text-center">
+                                 <td className="px-3 py-3 whitespace-nowrap text-center">
                                      <div className="flex items-center justify-center gap-1.5">
                                          {item.product?.supplier ? (
                                              <span className="text-[10px] font-bold bg-zinc-500/5 border border-zinc-500/10 px-2 py-0.5 rounded-full text-muted-foreground/80">{item.product.supplier.name}</span>
@@ -642,7 +647,7 @@ function SetupPurchaseDetailContent() {
                                      </div>
                                  </td>
                                  
-                                 <td className="px-6 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "quantity" })}>
+                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "quantity" })}>
                                      {editingCell?.id === item.id && editingCell.field === "quantity" ? (
                                          <input 
                                            autoFocus
@@ -658,7 +663,7 @@ function SetupPurchaseDetailContent() {
                                      )}
                                  </td>
 
-                                 <td className="px-6 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "unitPrice" })}>
+                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "unitPrice" })}>
                                      {editingCell?.id === item.id && editingCell.field === "unitPrice" ? (
                                          <input 
                                            autoFocus
@@ -675,10 +680,29 @@ function SetupPurchaseDetailContent() {
                                      )}
                                  </td>
 
-                                 <td className="px-6 py-3 whitespace-nowrap text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">￥{(item.totalAmount || 0).toLocaleString()}</td>
+                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "shippingFee" })}>
+                                     {editingCell?.id === item.id && editingCell.field === "shippingFee" ? (
+                                         <input
+                                           autoFocus
+                                           type="number"
+                                           step="0.01"
+                                           className="w-24 h-8 text-center px-2 rounded-md border-2 border-primary/30 dark:border-primary/50 ring-2 ring-primary/10 focus:ring-primary/30 outline-none text-sm font-bold bg-white dark:bg-background shadow-[0_0_0_1px_rgba(var(--primary),0.2)] dark:shadow-none transition-all"
+                                           defaultValue={item.shippingFee || 0}
+                                           onBlur={(e) => handleInlineUpdate(item.id, "shippingFee", parseFloat(e.target.value) || 0)}
+                                           onKeyDown={(e) => e.key === 'Enter' && handleInlineUpdate(item.id, "shippingFee", parseFloat(e.currentTarget.value) || 0)}
+                                           onClick={(e) => e.stopPropagation()}
+                                         />
+                                     ) : (
+                                         <span className={cn("text-sm cursor-text inline-block min-w-[50px] px-2 py-1 rounded hover:bg-primary/10 hover:text-primary transition-all border border-transparent border-dashed hover:border-primary/30", (item.shippingFee || 0) > 0 ? "font-bold text-orange-500 dark:text-orange-400" : "text-muted-foreground/40")}>
+                                             {(item.shippingFee || 0) > 0 ? `￥${item.shippingFee}` : "—"}
+                                         </span>
+                                     )}
+                                 </td>
+
+                                 <td className="px-3 py-3 whitespace-nowrap text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">￥{(item.totalAmount || 0).toLocaleString()}</td>
                                  
                                  {canManage && (
-                                     <td className="px-6 py-3 text-center">
+                                     <td className="px-3 py-3 text-center">
                                           <div className="flex items-center justify-center gap-1">
                                              <button onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }} className="p-1.5 text-red-500/70 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16} /></button>
                                           </div>
@@ -695,7 +719,12 @@ function SetupPurchaseDetailContent() {
       {filteredItems.length > 0 && (
          <div className="bg-muted/30 p-4 border-t border-border flex items-center justify-between">
              <div className="text-xs text-muted-foreground">列出 <span className="font-bold text-foreground">{filteredItems.length}</span> 项</div>
-             <div className="flex items-center gap-4">
+             <div className="flex items-center gap-4 flex-wrap justify-end">
+                 {filteredItems.some(i => (i.shippingFee || 0) > 0) && (
+                   <span className="text-xs text-muted-foreground">
+                     含运费 <span className="font-bold text-orange-500">￥{filteredItems.reduce((acc, cur) => acc + (cur.shippingFee || 0), 0).toLocaleString()}</span>
+                   </span>
+                 )}
                  <span className="text-sm font-bold">当前列表总计核对:</span>
                  <span className="text-2xl font-black text-primary tracking-tight">￥{filteredItems.reduce((acc, cur) => acc + (cur.totalAmount || 0), 0).toLocaleString()}</span>
              </div>

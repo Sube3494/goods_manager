@@ -406,6 +406,7 @@ model StoreOpeningItem {
   quantity      Int               @default(0)
   unitPrice     Float             @default(0)
   totalAmount   Float             @default(0)
+  shippingFee   Float             @default(0)
   
   channel       String?            
   remark        String?           

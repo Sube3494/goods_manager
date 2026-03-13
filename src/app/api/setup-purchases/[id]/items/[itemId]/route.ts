@@ -80,14 +80,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         return isNaN(res) ? undefined : res;
     };
 
+    const qty = parseIntNum(data.quantity);
+    const price = parseNum(data.unitPrice);
+    const fee = parseNum(data.shippingFee);
+
+    // 如果前端直接传了 totalAmount 就用，否则重算
+    let total = parseNum(data.totalAmount);
+    if (total === undefined && qty !== undefined && price !== undefined) {
+      const currentFee = fee ?? 0;
+      total = qty * price + currentFee;
+    }
+
     const updated = await prisma.storeOpeningItem.update({
       where: { id: itemId },
       data: {
         productName: data.productName !== undefined ? data.productName : undefined,
         productCode: data.productCode !== undefined ? data.productCode : undefined,
-        quantity: parseIntNum(data.quantity),
-        unitPrice: parseNum(data.unitPrice),
-        totalAmount: parseNum(data.totalAmount),
+        quantity: qty,
+        unitPrice: price,
+        shippingFee: fee,
+        totalAmount: total,
         remark: data.remark !== undefined ? data.remark : undefined,
       }
     });
