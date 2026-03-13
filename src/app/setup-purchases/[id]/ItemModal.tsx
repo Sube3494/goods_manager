@@ -85,7 +85,7 @@ export function ItemModal({ isOpen, onClose, onSave, editingItem, setEditingItem
               </div>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-muted-foreground/80">小计总额</label>
+              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5 text-muted-foreground/80">小计总额 (可直接填写)</label>
               <input
                 type="number"
                 step="0.01"
@@ -96,7 +96,8 @@ export function ItemModal({ isOpen, onClose, onSave, editingItem, setEditingItem
                     : (editingItem.quantity || 1) * (editingItem.unitPrice || 0)
                 }
                 onChange={(e) => setEditingItem({ ...editingItem, totalAmount: parseFloat(e.target.value) || 0 })}
-                className="w-full h-12 px-4 rounded-xl border-2 border-emerald-500/20 bg-emerald-500/5 text-emerald-500 font-black text-lg focus:border-emerald-500 outline-none transition-all"
+                className="w-full h-12 px-4 rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 text-emerald-600 font-black text-lg focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                placeholder="直接填写总金额"
               />
             </div>
           </div>

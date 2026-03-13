@@ -47,7 +47,7 @@ function SetupPurchaseDetailContent() {
   const [editingItem, setEditingItem] = useState<Partial<StoreOpeningItem>>({});
   
   // Inline editing state
-  const [editingCell, setEditingCell] = useState<{ id: string, field: "quantity" | "unitPrice" | "shippingFee" } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ id: string, field: "quantity" | "unitPrice" | "shippingFee" | "totalAmount" } | null>(null);
 
   const [supplierFilter, setSupplierFilter] = useState("All");
   const [checkStatusFilter, setCheckStatusFilter] = useState("All");
@@ -120,7 +120,7 @@ function SetupPurchaseDetailContent() {
         showToast("记录已移除", "success");
         fetchData();
       } else {
-         showToast("移除失败", "error");
+        showToast("移除失败", "error");
       }
     } catch {
         showToast("网络错误", "error");
@@ -201,7 +201,7 @@ function SetupPurchaseDetailContent() {
     }
   };
 
-  const handleInlineUpdate = async (itemId: string, field: "quantity" | "unitPrice" | "shippingFee", value: number) => {
+  const handleInlineUpdate = async (itemId: string, field: "quantity" | "unitPrice" | "shippingFee" | "totalAmount", value: number) => {
     const item = items.find(it => it.id === itemId);
     if (!item) return;
 
@@ -210,11 +210,12 @@ function SetupPurchaseDetailContent() {
     const newQty = field === "quantity" ? value : item.quantity;
     const newPrice = field === "unitPrice" ? value : item.unitPrice;
     const newFee = field === "shippingFee" ? value : (item.shippingFee || 0);
+    const newTotal = field === "totalAmount" ? value : (newQty * newPrice + newFee);
 
     const updatedData = {
       ...item,
       [field]: value,
-      totalAmount: newQty * newPrice + newFee
+      totalAmount: newTotal
     };
 
     // Optimistically update UI
@@ -713,7 +714,24 @@ function SetupPurchaseDetailContent() {
                                      )}
                                  </td>
 
-                                 <td className="px-3 py-3 whitespace-nowrap text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">￥{(item.totalAmount || 0).toLocaleString()}</td>
+                                 <td className="px-3 py-3 whitespace-nowrap text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5" onClick={() => canManage && setEditingCell({ id: item.id, field: "totalAmount" })}>
+                                     {editingCell?.id === item.id && editingCell.field === "totalAmount" ? (
+                                         <input 
+                                           autoFocus
+                                           type="number"
+                                           step="0.01"
+                                           className="w-24 h-8 text-right px-2 rounded-md border-2 border-emerald-500/30 dark:border-emerald-500/50 ring-2 ring-emerald-500/10 focus:ring-emerald-500/30 outline-none text-sm font-bold bg-white dark:bg-background shadow-[0_0_0_1px_rgba(var(--primary),0.2)] dark:shadow-none transition-all ml-auto"
+                                           defaultValue={item.totalAmount}
+                                           onBlur={(e) => handleInlineUpdate(item.id, "totalAmount", parseFloat(e.target.value) || 0)}
+                                           onKeyDown={(e) => e.key === 'Enter' && handleInlineUpdate(item.id, "totalAmount", parseFloat(e.currentTarget.value) || 0)}
+                                           onClick={(e) => e.stopPropagation()}
+                                         />
+                                     ) : (
+                                         <span className="cursor-text inline-block min-w-[60px] px-2 py-1 rounded hover:bg-emerald-500/10 transition-all border border-transparent border-dashed hover:border-emerald-500/30">
+                                             ￥{(item.totalAmount || 0).toLocaleString()}
+                                         </span>
+                                     )}
+                                 </td>
                                  
                                  {canManage && (
                                      <td className="px-3 py-3 text-center">
