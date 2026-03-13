@@ -128,11 +128,21 @@ function SetupPurchaseDetailContent() {
   };
 
   const handleBatchProductSelect = async (selectedProducts: Product[]) => {
-      if (selectedProducts.length === 0) return;
+      // Filter out products that are already in the items list to prevent duplicates
+      const existingProductIds = new Set(items.map(it => it.productId).filter(Boolean));
+      const newProducts = selectedProducts.filter(p => !existingProductIds.has(p.id));
+
+      if (newProducts.length === 0) {
+          setIsProductSelectOpen(false);
+          if (selectedProducts.length > 0) {
+              showToast("所选商品已在列表中", "info");
+          }
+          return;
+      }
       
       setIsUploading(true);
       try {
-          const itemsData = selectedProducts.map(p => ({
+          const itemsData = newProducts.map(p => ({
               productId: p.id,
               productCode: p.sku || "",
               productName: p.name,
@@ -148,7 +158,7 @@ function SetupPurchaseDetailContent() {
           });
 
           if (res.ok) {
-              showToast(`成功添加 ${selectedProducts.length} 件商品`, "success");
+              showToast(`成功添加 ${newProducts.length} 件商品`, "success");
               fetchData();
           } else {
               showToast("批量添加失败", "error");
@@ -263,6 +273,10 @@ function SetupPurchaseDetailContent() {
       return matchesSupplier && matchesCheck && matchesQuery;
     });
   }, [items, supplierFilter, checkStatusFilter, query]);
+
+  const selectedProductIds = useMemo(() => {
+    return items.map(item => item.productId).filter((id): id is string => id !== null);
+  }, [items]);
 
   const handleExport = useCallback(async () => {
     if (filteredItems.length === 0) {
@@ -742,7 +756,7 @@ function SetupPurchaseDetailContent() {
         isOpen={isProductSelectOpen}
         onClose={() => setIsProductSelectOpen(false)}
         onSelect={handleBatchProductSelect}
-        selectedIds={[]}
+        selectedIds={selectedProductIds}
       />
     </div>
   );
