@@ -31,7 +31,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [canAnimate, setCanAnimate] = useState(false);
 
   const isLoginPage = pathname === "/login";
-  const isSharePage = pathname?.startsWith("/share");
+  const isSharePage = pathname?.startsWith("/share") || pathname?.startsWith("/brush-plans/share");
   const isFullScreenPage = isLoginPage || isSharePage;
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop

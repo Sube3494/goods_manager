@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
 
   // Define public paths that don't require authentication
   // STRICT MODE: Only Login, Gallery, Settings, and Share are public.
-  const publicPaths = ["/login", "/gallery", "/settings", "/share"];
+  const publicPaths = ["/login", "/gallery", "/settings", "/share", "/brush-plans/share"];
 
   // 1. Always allow public static files (images, favicon, etc) - handled by matcher
 
@@ -38,19 +38,23 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public GET APIs
-  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/share/sign"];
+  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/share/sign", "/api/brush-plans/public"];
   const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public POST APIs (Guest uploads/submissions)
   const publicPostApis = ["/api/upload", "/api/gallery/submissions"];
   const isPublicPostApi = request.method === "POST" && publicPostApis.some(p => path === p || path.startsWith(p + "/"));
 
+  // Check for public PATCH APIs (Guest toggle status)
+  const publicPatchApis = ["/api/brush-plans/public"];
+  const isPublicPatchApi = request.method === "PATCH" && publicPatchApis.some(p => path === p || path.startsWith(p + "/"));
+
   // Get session from cookies
   const session = request.cookies.get("session")?.value;
 
   // Protect private routes
-  // If pass is NOT public AND NOT a public GET API AND NOT a public POST API AND no session
-  if (!isPublicPath && !isPublicGetApi && !isPublicPostApi && !session) {
+  // If pass is NOT public AND NOT a public GET API AND NOT a public POST API AND NOT a public PATCH API AND no session
+  if (!isPublicPath && !isPublicGetApi && !isPublicPostApi && !isPublicPatchApi && !session) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

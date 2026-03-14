@@ -60,7 +60,13 @@ export async function GET(request: Request) {
     }
 
     if (categoryName !== "all") andConditions.push({ category: { name: categoryName } });
-    if (supplierId !== "all") andConditions.push({ supplierId: supplierId });
+    if (supplierId !== "all") {
+      if (supplierId === "unknown") {
+        andConditions.push({ supplierId: null });
+      } else {
+        andConditions.push({ supplierId: supplierId });
+      }
+    }
 
     if (status === "low_stock") {
       andConditions.push({ stock: { lt: lowStockThreshold } });
@@ -168,7 +174,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, brushKeyword } = body;
 
     const stockNum = Number(stock) || 0;
 
@@ -186,6 +192,7 @@ export async function POST(request: Request) {
         isDiscontinued: isDiscontinued ?? false,
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         remark: remark || null,
+        brushKeyword: brushKeyword || null,
         userId: user.id,
       },
       include: {
@@ -252,7 +259,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, brushKeyword } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -283,7 +290,8 @@ export async function PUT(request: Request) {
         // If undefined entirely, don't update it to avoid wiping out accidently.
         // It accepts `null` to clear it, or the object to save.
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
-        remark: remark !== undefined ? remark : undefined
+        remark: remark !== undefined ? remark : undefined,
+        brushKeyword: brushKeyword !== undefined ? brushKeyword : undefined
       },
       include: {
         category: true,

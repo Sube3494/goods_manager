@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2 } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2, Search } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
@@ -46,7 +46,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {},
-    remark: initialData?.remark || ""
+    remark: initialData?.remark || "",
+    brushKeyword: initialData?.brushKeyword || ""
   });
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -214,10 +215,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: initialData.categoryId || "",
           supplierId: initialData.supplierId || "",
           image: initialData.image || "",
-          isPublic: initialData.isPublic ?? true,
           isDiscontinued: initialData.isDiscontinued ?? false,
           specs: initialData.specs as Record<string, string> || {},
-          remark: initialData.remark || ""
+          remark: initialData.remark || "",
+          brushKeyword: initialData.brushKeyword || ""
         });
         fetchGallery(initialData.id, initialData.image || "");
       } else {
@@ -229,10 +230,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           categoryId: "",
           supplierId: "",
           image: "",
-          isPublic: true,
           isDiscontinued: false,
           specs: {},
-          remark: ""
+          remark: "",
+          brushKeyword: ""
         });
       }
     }
@@ -624,7 +625,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         costPrice: Number(formData.costPrice),
         stock: Number(formData.stock),
         specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
-        id: initialData?.id
+        id: initialData?.id,
+        brushKeyword: formData.brushKeyword
     }, galleryImages);
     onClose();
   };
@@ -1021,6 +1023,22 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                         placeholder="0"
                                     />
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Brush Keyword */}
+                        <div className="space-y-2 col-span-2">
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Search size={16} /> 刷单搜索关键词
+                            </label>
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    value={formData.brushKeyword}
+                                    onChange={(e) => setFormData({...formData, brushKeyword: e.target.value})}
+                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10"
+                                    placeholder="预设刷单时使用的关键词"
+                                />
                             </div>
                         </div>
                     </div>

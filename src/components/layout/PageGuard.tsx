@@ -15,7 +15,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
 
   const isAuthorized = useMemo(() => {
     // 1. Instant allow for public entry points to prevent flickering while loading user session
-    const publicPaths = ["/login", "/gallery", "/share"];
+    const publicPaths = ["/login", "/gallery", "/share", "/brush-plans/share"];
     const isPublicPath = publicPaths.some(p => pathname === p || pathname.startsWith(p + "/"));
     const isStaticFile = pathname.endsWith('.txt');
 

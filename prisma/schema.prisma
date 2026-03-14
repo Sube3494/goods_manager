@@ -40,7 +40,9 @@ model Product {
   isDiscontinued  Boolean             @default(false)
   remark          String?
   userId          String?
-  brushOrderItems BrushOrderItem[]
+  brushKeyword    String?             // 默认刷单搜索关键词
+  brushOrderItems     BrushOrderItem[]
+  brushOrderPlanItems BrushOrderPlanItem[]
   gallery         GalleryItem[]
   outboundItems   OutboundOrderItem[]
   category        Category            @relation(fields: [categoryId], references: [id])
@@ -187,6 +189,7 @@ model User {
   brushShops         Json?               @default("[]")
   roleProfileId      String?
   brushOrders        BrushOrder[]
+  brushOrderPlans    BrushOrderPlan[]
   categories         Category[]
   galleryItems       GalleryItem[]
   gallerySubmissions GallerySubmission[]
@@ -329,6 +332,41 @@ model BrushOrderItem {
   updatedAt    DateTime   @updatedAt
   brushOrder   BrushOrder @relation(fields: [brushOrderId], references: [id], onDelete: Cascade)
   product      Product    @relation(fields: [productId], references: [id])
+}
+
+model BrushOrderPlan {
+  id          String               @id @default(cuid())
+  date        DateTime             @default(now())
+  title       String?
+  note        String?
+  status      String               @default("Draft")
+  userId      String?
+  user        User?                @relation(fields: [userId], references: [id])
+  items       BrushOrderPlanItem[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([userId, date(sort: Desc)])
+}
+
+model BrushOrderPlanItem {
+  id            String          @id @default(cuid())
+  planId        String
+  plan          BrushOrderPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?        @relation(fields: [productId], references: [id])
+  productName   String?
+  quantity      Int             @default(1)
+  searchKeyword String?
+  note          String?
+  done          Boolean         @default(false)
+  sortOrder     Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([planId])
+  @@index([productId])
 }
 
 model PageView {

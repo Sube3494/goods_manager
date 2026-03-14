@@ -50,6 +50,7 @@ export interface Product {
   image?: string;
   isPublic?: boolean;
   isDiscontinued?: boolean;
+  brushKeyword?: string;
   specs?: Record<string, string>;
   remark?: string;
   supplierId?: string;
@@ -211,6 +212,32 @@ export interface OutboundOrder {
   totalAmount?: number;
   items: OutboundOrderItem[];
   workspaceId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BrushOrderPlanItem {
+  id?: string;
+  planId?: string;
+  productId?: string;
+  product?: Product;
+  productName?: string;
+  quantity: number;
+  searchKeyword?: string;
+  note?: string;
+  done?: boolean;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BrushOrderPlan {
+  id: string;
+  date: string | Date;
+  title?: string;
+  note?: string;
+  status: string;
+  items: BrushOrderPlanItem[];
   createdAt?: string;
   updatedAt?: string;
 }
