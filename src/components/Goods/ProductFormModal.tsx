@@ -216,6 +216,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           supplierId: initialData.supplierId || "",
           image: initialData.image || "",
           isDiscontinued: initialData.isDiscontinued ?? false,
+          isPublic: initialData.isPublic ?? true,
           specs: initialData.specs as Record<string, string> || {},
           remark: initialData.remark || "",
           brushKeyword: initialData.brushKeyword || ""
@@ -231,6 +232,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           supplierId: "",
           image: "",
           isDiscontinued: false,
+          isPublic: true,
           specs: {},
           remark: "",
           brushKeyword: ""
