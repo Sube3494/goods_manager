@@ -286,7 +286,14 @@ export default function GoodsPage() {
   }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
 
 
-  const handleBatchUpdate = async (updateData: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean; costPrice?: number }) => {
+  const handleBatchUpdate = async (updateData: { 
+    categoryId?: string; 
+    supplierId?: string; 
+    isPublic?: boolean; 
+    isDiscontinued?: boolean; 
+    costPrice?: number;
+    brushKeyword?: string;
+  }) => {
     const count = selectedIds.length;
     try {
       const res = await fetch("/api/products/batch", {

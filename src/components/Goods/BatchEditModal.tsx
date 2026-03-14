@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Tag, Truck, CheckCircle, Eye, Activity } from "lucide-react";
+import { X, Tag, Truck, CheckCircle, Eye, Activity, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Category, Supplier } from "@/lib/types";
@@ -15,7 +15,8 @@ interface BatchEditModalProps {
     supplierId?: string; 
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
-    costPrice?: number 
+    costPrice?: number;
+    brushKeyword?: string;
   }) => void;
   categories: Category[];
   suppliers: Supplier[];
@@ -35,16 +36,25 @@ const BatchEditForm = ({
   const [visibility, setVisibility] = useState<string>("keep");
   const [productionStatus, setProductionStatus] = useState<string>("keep");
   const [costPrice, setCostPrice] = useState<string>("");
+  const [brushKeyword, setBrushKeyword] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data: { categoryId?: string; supplierId?: string; isPublic?: boolean; isDiscontinued?: boolean; costPrice?: number } = {};
+    const data: { 
+      categoryId?: string; 
+      supplierId?: string; 
+      isPublic?: boolean; 
+      isDiscontinued?: boolean; 
+      costPrice?: number;
+      brushKeyword?: string;
+    } = {};
     
     if (categoryId !== "keep") data.categoryId = categoryId;
     if (supplierId !== "keep") data.supplierId = supplierId;
     if (visibility !== "keep") data.isPublic = visibility === "public";
     if (productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
     if (costPrice.trim() !== "") data.costPrice = parseFloat(costPrice);
+    if (brushKeyword.trim() !== "") data.brushKeyword = brushKeyword.trim();
 
     onConfirm(data);
     onClose();
@@ -55,11 +65,11 @@ const BatchEditForm = ({
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 20 }}
-      className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/10 shadow-2xl bg-white dark:bg-gray-900/70 backdrop-blur-xl"
+      className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 shadow-2xl bg-white dark:bg-gray-900/70 backdrop-blur-xl"
     >
-      <div className="flex items-center justify-between border-b border-white/5 p-6">
+      <div className="flex items-center justify-between border-b border-white/5 p-6 sm:p-8">
         <div>
-          <h3 className="text-xl font-bold text-foreground">批量修改商品</h3>
+          <h3 className="text-xl sm:text-2xl font-bold text-foreground">批量修改商品</h3>
           <p className="text-xs text-muted-foreground mt-1">已选中 {selectedCount} 个商品</p>
         </div>
         <button
@@ -70,92 +80,113 @@ const BatchEditForm = ({
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-6">
-        {/* Category Select */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Tag size={16} /> 目标分类
-          </label>
-          <CustomSelect
-            value={categoryId}
-            onChange={setCategoryId}
-            options={[
-              { value: "keep", label: "保持原分类" },
-              ...categories.map(c => ({ value: c.id, label: c.name }))
-            ]}
-            triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
-          />
-        </div>
-
-        {/* Supplier Select */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Truck size={16} /> 目标供应商
-          </label>
-          <CustomSelect
-            value={supplierId}
-            onChange={setSupplierId}
-            options={[
-              { value: "keep", label: "保持原供应商" },
-              ...suppliers.map(s => ({ value: s.id, label: s.name }))
-            ]}
-            triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
-          />
-        </div>
-
-        {/* Visibility Select */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Eye size={16} /> 可见性
-          </label>
-          <CustomSelect
-            value={visibility}
-            onChange={setVisibility}
-            options={[
-              { value: "keep", label: "保持当前状态" },
-              { value: "public", label: "设为公开可见" },
-              { value: "private", label: "设为隐藏不公开" }
-            ]}
-            triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
-          />
-        </div>
-
-        {/* Production Status Select */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Activity size={16} /> 生产状态
-          </label>
-          <CustomSelect
-            value={productionStatus}
-            onChange={setProductionStatus}
-            options={[
-              { value: "keep", label: "保持当前状态" },
-              { value: "active", label: "正常生产中" },
-              { value: "discontinued", label: "标记为已停产" }
-            ]}
-            triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
-          />
-        </div>
-
-        {/* Cost Price Input */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Tag size={16} className="rotate-90" /> 进货单价
-          </label>
-          <div className="relative group/price">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold font-number">¥</span>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="保持原单价"
-              value={costPrice}
-              onChange={(e) => setCostPrice(e.target.value)}
-              className="w-full h-12 pl-8 pr-4 rounded-2xl bg-muted/30 border border-transparent focus:border-primary/30 outline-none transition-all font-bold font-number"
+      <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          {/* Category Select */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+              <Tag size={16} /> 目标分类
+            </label>
+            <CustomSelect
+              value={categoryId}
+              onChange={setCategoryId}
+              options={[
+                { value: "keep", label: "保持原分类" },
+                ...categories.map(c => ({ value: c.id, label: c.name }))
+              ]}
+              triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
             />
+          </div>
+
+          {/* Supplier Select */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+              <Truck size={16} /> 目标供应商
+            </label>
+            <CustomSelect
+              value={supplierId}
+              onChange={setSupplierId}
+              options={[
+                { value: "keep", label: "保持原供应商" },
+                ...suppliers.map(s => ({ value: s.id, label: s.name }))
+              ]}
+              triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
+            />
+          </div>
+
+          {/* Visibility Select */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+              <Eye size={16} /> 可见性
+            </label>
+            <CustomSelect
+              value={visibility}
+              onChange={setVisibility}
+              options={[
+                { value: "keep", label: "保持当前状态" },
+                { value: "public", label: "设为公开可见" },
+                { value: "private", label: "设为隐藏不公开" }
+              ]}
+              triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
+            />
+          </div>
+
+          {/* Production Status Select */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+              <Activity size={16} /> 生产状态
+            </label>
+            <CustomSelect
+              value={productionStatus}
+              onChange={setProductionStatus}
+              options={[
+                { value: "keep", label: "保持当前状态" },
+                { value: "active", label: "正常生产中" },
+                { value: "discontinued", label: "标记为已停产" }
+              ]}
+              triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
+            />
+          </div>
+
+          {/* Cost Price Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+              <Tag size={16} className="rotate-90" /> 进货单价
+            </label>
+            <div className="relative group/price">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold font-number">¥</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="保持原单价"
+                value={costPrice}
+                onChange={(e) => setCostPrice(e.target.value)}
+                className="w-full h-12 pl-10 pr-4 rounded-2xl bg-muted/30 border border-white/5 focus:border-primary/30 outline-none transition-all font-bold font-number"
+              />
+            </div>
+          </div>
+
+          {/* Brush Keyword Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+              <Search size={16} /> 刷单关键词
+            </label>
+            <div className="relative group/keyword">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <Search size={16} />
+              </span>
+              <input
+                type="text"
+                placeholder="保持原关键词"
+                value={brushKeyword}
+                onChange={(e) => setBrushKeyword(e.target.value)}
+                className="w-full h-12 pl-10 pr-4 rounded-2xl bg-muted/30 border border-white/5 focus:border-primary/30 outline-none transition-all font-bold"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="pt-4 flex gap-3">
+        <div className="pt-4 flex flex-col-reverse sm:flex-row gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -165,11 +196,11 @@ const BatchEditForm = ({
           </button>
           <button
             type="submit"
-            disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep" && costPrice.trim() === ""}
-            className="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+            disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep" && costPrice.trim() === "" && brushKeyword.trim() === ""}
+            className="flex-2 rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
           >
             <CheckCircle size={18} />
-            确认修改
+            确认修改所选商品
           </button>
         </div>
       </form>
