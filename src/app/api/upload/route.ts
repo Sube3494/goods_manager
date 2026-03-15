@@ -48,7 +48,8 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({
         ...result,
-        url: storage.resolveUrl(result.url)
+        url: storage.resolveUrl(result.url),
+        path: result.url // 增加原始路径字段，供数据库保存使用
       });
     } 
     
@@ -77,7 +78,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ...result,
-      url: storage.resolveUrl(result.url)
+      url: storage.resolveUrl(result.url),
+      path: result.url // 增加原始路径字段，供数据库保存使用
     });
 
   } catch (error) {

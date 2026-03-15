@@ -13,6 +13,7 @@ function generatePinyinSearchText(name: string): string {
   return `${fullPinyin} ${firstLetters}`.toLowerCase();
 }
 
+
 // 获取所有商品 (支持分页、筛选、排序)
 export async function GET(request: Request) {
   try {
@@ -146,7 +147,6 @@ export async function GET(request: Request) {
 }
 
 async function formatResponse(products: unknown[], total: number, page: number, pageSize: number) {
-  const { getStorageStrategy } = await import("@/lib/storage");
   const storage = await getStorageStrategy();
   
   const resolved = (products as Record<string, unknown>[]).map(p => ({
@@ -176,6 +176,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, brushKeyword } = body;
 
+    const storage = await getStorageStrategy();
+
+    // 格式化价格和库存
     const stockNum = Number(stock) || 0;
 
     const product = await prisma.product.create({
@@ -186,7 +189,7 @@ export async function POST(request: Request) {
         stock: stockNum,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
-        image,
+        image: storage.stripUrl(image),
         pinyin: generatePinyinSearchText(name),
         isPublic: isPublic ?? true,
         isDiscontinued: isDiscontinued ?? false,
@@ -224,7 +227,6 @@ export async function POST(request: Request) {
       });
     }
 
-    const storage = await getStorageStrategy();
     return NextResponse.json({
       ...product,
       image: product.image ? storage.resolveUrl(product.image) : null
@@ -261,6 +263,8 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, brushKeyword } = body;
 
+    const storage = await getStorageStrategy();
+
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
     }
@@ -282,7 +286,7 @@ export async function PUT(request: Request) {
         stock: Number(stock) || 0,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
-        image,
+        image: image !== undefined ? storage.stripUrl(image) : undefined,
         pinyin: name ? generatePinyinSearchText(name) : undefined,
         isPublic: isPublic ?? undefined,
         isDiscontinued: isDiscontinued ?? undefined,
@@ -299,7 +303,6 @@ export async function PUT(request: Request) {
       }
     });
 
-    const storage = await getStorageStrategy();
     return NextResponse.json({
       ...updatedProduct,
       image: updatedProduct.image ? storage.resolveUrl(updatedProduct.image) : null

@@ -166,7 +166,9 @@ export default function SharedPlanPage() {
                                 </div>
                                 {item.product?.image ? (
                                     <Image 
-                                        src={item.product.image} 
+                                        src={item.product.image.startsWith('http') || item.product.image.startsWith('/') 
+                                            ? item.product.image 
+                                            : `/api/uploads/${item.product.image.replace(/^\/?uploads\//, '')}`} 
                                         fill 
                                         className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
                                         alt="" 

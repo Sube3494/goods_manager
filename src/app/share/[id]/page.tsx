@@ -72,7 +72,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
   const isVideo = isVideoUrl(item.url) || item.type === "video";
   const displayUrl = item.url.startsWith("http") || item.url.startsWith("/") 
     ? item.url 
-    : `/uploads/${item.url}`;
+    : `/api/uploads/${item.url.replace(/^\/?uploads\//, '')}`;
 
   return (
     <div className="min-h-screen h-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans">

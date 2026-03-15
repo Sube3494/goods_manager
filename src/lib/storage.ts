@@ -27,6 +27,7 @@ export interface StorageStrategy {
   delete(url: string): Promise<void>;
   resolveUrl(path: string): string;
   exists(relativeUrl: string): Promise<boolean>;
+  stripUrl(url: string | null | undefined): string | null;
   getPresignedUrl?(options: UploadOptions): Promise<{ url: string; fileName: string; publicUrl: string } | null>;
 }
 
@@ -164,7 +165,32 @@ export class LocalStorageStrategy implements StorageStrategy {
   }
 
   resolveUrl(path: string): string {
-    return path; // Local already returns /uploads/... which is relative to root
+    if (!path) return path;
+    if (path.startsWith('http')) return path;
+    
+    // 统一将 /uploads/... 或 uploads/... 映射到我们的分发 API
+    let cleanPath = path;
+    if (cleanPath.startsWith('/uploads/')) cleanPath = cleanPath.substring(9);
+    else if (cleanPath.startsWith('uploads/')) cleanPath = cleanPath.substring(8);
+    else if (cleanPath.startsWith('/')) cleanPath = cleanPath.substring(1);
+
+    return `/api/uploads/${cleanPath}`;
+  }
+
+  stripUrl(url: string | null | undefined): string | null {
+    if (!url) return null;
+    if (!url.startsWith('http')) return url;
+    
+    try {
+      const parsed = new URL(url);
+      const path = parsed.pathname;
+      if (path.includes('/uploads/')) {
+        return path.substring(path.indexOf('uploads/'));
+      }
+      return path.startsWith('/') ? path.substring(1) : path;
+    } catch {
+      return url;
+    }
   }
 
 
@@ -478,6 +504,12 @@ export class MinioStorageStrategy implements StorageStrategy {
     return `${baseUrl}/${path.replace(/^\//, '')}`;
   }
 
+  stripUrl(url: string | null | undefined): string | null {
+    if (!url) return null;
+    if (typeof url !== 'string') return url;
+    return this.resolveObjectName(url);
+  }
+
   async getPresignedUrl(options: UploadOptions): Promise<{ url: string; fileName: string; publicUrl: string } | null> {
     try {
       const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
@@ -578,6 +610,12 @@ export class MinioStorageStrategy implements StorageStrategy {
     } else {
       objectName = url;
     }
+    
+    // 同时也剥离已经固化在路径里的 bucketName 
+    if (objectName.startsWith(bucketName + '/')) {
+        objectName = objectName.substring(bucketName.length + 1);
+    }
+    
     if (objectName.startsWith('/uploads/')) objectName = objectName.substring(9);
     if (objectName.startsWith('uploads/')) objectName = objectName.substring(8);
     return objectName.replace(/^\//, '');

@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public GET APIs
-  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/share/sign", "/api/brush-plans/public"];
+  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/share/sign", "/api/brush-plans/public", "/api/uploads"];
   const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public POST APIs (Guest uploads/submissions)
