@@ -17,7 +17,7 @@ export const navItems: NavItem[] = [
   { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true, permission: "category:manage" },
   { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true, permission: "supplier:manage" },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true, permission: "purchase:manage" },
-  { name: "开店进货", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "purchase:manage" },
+  { name: "开店进货", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "setup_purchase:manage" },
   { name: "刷单管理", href: "/brush-orders", icon: CreditCard, adminOnly: true, permission: "brush:manage" },
   { name: "刷单安排", href: "/brush-plans", icon: ListTodo, adminOnly: true, permission: "brush_plan:manage" },
   { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true, permission: "inbound:manage" },

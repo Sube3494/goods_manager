@@ -305,6 +305,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                                             case 'setup_purchases': return <Store size={16} />;
                                                             case 'store_management': return <Warehouse size={16} />;
                                                             case 'brush_orders': return <Layers size={16} />;
+                                                            case 'brush_plans': return <ListChecks size={16} />;
                                                             case 'gallery': return <ImageIcon size={16} />;
                                                             case 'gallery_audit': return <ClipboardCheck size={16} />;
                                                             case 'system': return <Settings size={16} />;

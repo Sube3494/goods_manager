@@ -78,9 +78,15 @@ export const PERMISSION_TREE = [
   },
   {
     key: "brush_orders",
-    label: "刷单管理",
+    label: "刷单订单",
     children: [
       { key: "brush:manage", label: "刷单订单" },
+    ]
+  },
+  {
+    key: "brush_plans",
+    label: "刷单安排",
+    children: [
       { key: "brush_plan:manage", label: "刷单安排" },
     ]
   },
