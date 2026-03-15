@@ -57,6 +57,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Role name is required" }, { status: 400 });
     }
 
+    // 检查名称是否冲突
+    const existing = await prisma.roleProfile.findUnique({ where: { name } });
+    if (existing) {
+      return NextResponse.json({ error: `角色名称 "${name}" 已存在` }, { status: 400 });
+    }
+
     const role = await prisma.roleProfile.create({
       data: {
         name,
@@ -68,6 +74,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(role);
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+       return NextResponse.json({ error: "角色名称已存在" }, { status: 400 });
+    }
     console.error("Failed to create role:", error);
     return NextResponse.json({ error: "Failed to create role" }, { status: 500 });
   }
@@ -88,16 +97,23 @@ export async function PUT(request: Request) {
        return NextResponse.json({ error: "Role ID is required" }, { status: 400 });
     }
 
-    const existing = await prisma.roleProfile.findUnique({ where: { id } });
-    if (!existing) {
+    const current = await prisma.roleProfile.findUnique({ where: { id } });
+    if (!current) {
        return NextResponse.json({ error: "Role not found" }, { status: 404 });
     }
 
-    // 系统内置角色禁止更名，但可以修改权限（可选策略，这里允许修改描述和权限）
+    // 如果修改了名称，检查新名称是否冲突
+    if (name && name !== current.name) {
+      const existing = await prisma.roleProfile.findUnique({ where: { name } });
+      if (existing) {
+        return NextResponse.json({ error: `角色名称 "${name}" 已被占用` }, { status: 400 });
+      }
+    }
+
     const role = await prisma.roleProfile.update({
       where: { id },
       data: {
-        name,
+        name: name || undefined,
         description,
         permissions: permissions || undefined,
       }
@@ -105,6 +121,9 @@ export async function PUT(request: Request) {
 
     return NextResponse.json(role);
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+       return NextResponse.json({ error: "角色名称已存在" }, { status: 400 });
+    }
     console.error("Failed to update role:", error);
     return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
   }
