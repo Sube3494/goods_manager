@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getStorageStrategy } from "@/lib/storage";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -31,12 +32,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     if (!batch) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const storage = await getStorageStrategy();
 
-    // 汇总总金额
+    // 汇总总金额并解析图片 URL
     let totalAmount = 0;
     
     batch.items.forEach(item => {
       totalAmount += item.totalAmount;
+      if (item.product?.image) {
+        item.product.image = storage.resolveUrl(item.product.image);
+      }
     });
 
     return NextResponse.json({
