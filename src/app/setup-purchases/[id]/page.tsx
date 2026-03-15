@@ -318,8 +318,8 @@ function SetupPurchaseDetailContent() {
       
       worksheet.addRow([]); // 空行
       
-      // 添加表头
-      const headerRow = worksheet.addRow(["序号", "商品图片", "识别编号/名称", "商品全称", "供应商", "单价", "数量", "小计"]);
+      // 增加运费列，总计放在最后
+      const headerRow = worksheet.addRow(["序号", "商品图片", "识别编号/名称", "商品全称", "供应商", "单价", "数量", "运费", "小计"]);
       headerRow.font = { bold: true };
       headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
       
@@ -331,7 +331,8 @@ function SetupPurchaseDetailContent() {
       worksheet.getColumn(5).width = 20;  // 供应商
       worksheet.getColumn(6).width = 12;  // 单价
       worksheet.getColumn(7).width = 12;  // 数量
-      worksheet.getColumn(8).width = 15;  // 小计
+      worksheet.getColumn(8).width = 12;  // 运费
+      worksheet.getColumn(9).width = 15;  // 小计
       
       let globalIndex = 1;
       let currentRowIndex = worksheet.rowCount + 1; // 动态索引
@@ -354,14 +355,15 @@ function SetupPurchaseDetailContent() {
           item.product?.supplier?.name || "未知",
           price,
           qty,
-          { formula: `F${currentRowIndex}*G${currentRowIndex}`, result: subtotal },
+          item.shippingFee || 0,
+          subtotal,
         ]);
         
         row.height = 80;
         row.alignment = { vertical: 'middle', wrapText: true };
         
-        // 居中设置 (A:序号, B:图片, C:识别编号, D:商品名称, E:供应商, F:单价, G:数量, H:小计)
-        ['A', 'B', 'C', 'E', 'F', 'G', 'H'].forEach(col => {
+        // 居中设置 (A:序号, B:图片, C:识别编号, D:商品名称, E:供应商, F:单价, G:数量, H:运费, I:小计)
+        ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'I'].forEach(col => {
             worksheet.getCell(`${col}${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
         });
         worksheet.getCell(`D${currentRowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
@@ -369,6 +371,7 @@ function SetupPurchaseDetailContent() {
         // 格式化金额
         worksheet.getCell(`F${currentRowIndex}`).numFmt = '¥#,##0.00';
         worksheet.getCell(`H${currentRowIndex}`).numFmt = '¥#,##0.00';
+        worksheet.getCell(`I${currentRowIndex}`).numFmt = '¥#,##0.00';
         
         // 图片处理
         const imageUrl = item.product?.image;
@@ -445,14 +448,16 @@ function SetupPurchaseDetailContent() {
         updateToast(toastId, `正在下载商品图片 (${globalIndex - 1} / ${filteredItems.length})...`);
       }
       
-      // 总计行
-      const totalRow = worksheet.addRow(["", "", "总计", "", "", "", totalQty, { formula: `SUM(H4:H${currentRowIndex - 1})`, result: totalAmount }]);
+      // 总计行 - 改为静态数值
+      const totalRow = worksheet.addRow(["", "", "总计", "", "", "", totalQty, filteredItems.reduce((acc, cur) => acc + (cur.shippingFee || 0), 0), totalAmount]);
       totalRow.font = { bold: true };
       totalRow.height = 35;
       worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
       worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
       worksheet.getCell(`H${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getCell(`I${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
       worksheet.getCell(`H${currentRowIndex}`).numFmt = '¥#,##0.00';
+      worksheet.getCell(`I${currentRowIndex}`).numFmt = '¥#,##0.00';
       
       // 样式
       worksheet.eachRow((row: Row, rowNumber: number) => {
