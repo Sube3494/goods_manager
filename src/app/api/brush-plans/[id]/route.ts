@@ -8,6 +8,7 @@ interface BrushPlanItemInput {
   productName?: string | null;
   quantity?: number | string;
   searchKeyword?: string | null;
+  platform?: string | null;
   note?: string | null;
   done?: boolean;
   sortOrder?: number;
@@ -95,6 +96,7 @@ export async function PUT(
     const {
       date,
       title,
+      shopName,
       items,
       note,
       status,
@@ -112,6 +114,7 @@ export async function PUT(
           data: {
             date: date ? new Date(date) : undefined,
             title: title !== undefined ? title : undefined,
+            shopName: shopName !== undefined ? shopName : undefined,
             note: note !== undefined ? note : undefined,
             status: status || undefined,
             items: {
@@ -120,6 +123,7 @@ export async function PUT(
                 productName: item.productName || null,
                 quantity: parseInt(String(item.quantity || 1)),
                 searchKeyword: item.searchKeyword || null,
+                platform: item.platform || null,
                 note: item.note || null,
                 done: item.done || false,
                 sortOrder: item.sortOrder !== undefined ? item.sortOrder : index,
@@ -142,6 +146,7 @@ export async function PUT(
           data: {
             date: date ? new Date(date) : undefined,
             title: title !== undefined ? title : undefined,
+            shopName: shopName !== undefined ? shopName : undefined,
             note: note !== undefined ? note : undefined,
             status: status || undefined,
           },

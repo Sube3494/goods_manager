@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, Calendar, Share2, Edit2, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Search, Calendar, Share2, Edit2, Trash2, Store, X, Package, ShieldAlert } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
-import { BrushOrderPlan } from "@/lib/types";
+import { BrushOrderPlan, BrushOrderPlanItem } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { ShieldAlert } from "lucide-react";
 
 
 export default function BrushPlansPage() {
@@ -24,6 +25,8 @@ export default function BrushPlansPage() {
     const [mounted, setMounted] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterDate, setFilterDate] = useState("");
+    const [filterShop, setFilterShop] = useState("");
+    const [filterPlatform, setFilterPlatform] = useState("");
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -41,23 +44,35 @@ export default function BrushPlansPage() {
     const fetchPlans = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("/api/brush-plans?limit=1000");
+            const params = new URLSearchParams();
+            // Original code had limit=1000, adding it back
+            params.append('limit', '1000');
+            if (filterShop) params.append('shopName', filterShop);
+            if (filterPlatform) params.append('platform', filterPlatform);
+            const res = await fetch(`/api/brush-plans?${params.toString()}`);
             if (res.ok) {
                 const data = await res.json();
-                setPlans(data.data || []);
+                setPlans(data.items || []);
             }
-        } catch {
-            console.error("Failed to fetch plans");
+        } catch (error) {
+            console.error("Failed to fetch plans:", error);
             showToast("加载计划失败", "error");
         } finally {
             setIsLoading(false);
         }
-    }, [showToast]);
+    }, [showToast, filterShop, filterPlatform]); // Added filterShop, filterPlatform to dependencies
 
     useEffect(() => {
         setMounted(true);
         fetchPlans();
     }, [fetchPlans]);
+
+    const resetFilters = () => {
+        setSearchQuery("");
+        setFilterDate("");
+        setFilterShop("");
+        setFilterPlatform("");
+    };
 
     const handleCreate = () => {
         setEditingPlan(null);
@@ -118,12 +133,14 @@ export default function BrushPlansPage() {
         return plans.filter(p => {
             const matchesSearch = !searchQuery || (
                 (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                p.items.some(i => i.productName?.toLowerCase().includes(searchQuery.toLowerCase()) || i.product?.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                p.items.some((i: BrushOrderPlanItem) => i.productName?.toLowerCase().includes(searchQuery.toLowerCase()) || i.product?.name.toLowerCase().includes(searchQuery.toLowerCase()))
             );
             const matchesDate = !filterDate || formatLocalDate(p.date) === filterDate;
-            return matchesSearch && matchesDate;
+            const matchesShop = !filterShop || p.shopName === filterShop;
+            const matchesPlatform = !filterPlatform || p.items.some((item: BrushOrderPlanItem) => item.platform === filterPlatform);
+            return matchesSearch && matchesDate && matchesShop && matchesPlatform;
         });
-    }, [plans, searchQuery, filterDate]);
+    }, [plans, searchQuery, filterDate, filterShop, filterPlatform]);
 
     if (!mounted) return null;
 
@@ -178,12 +195,40 @@ export default function BrushPlansPage() {
                         triggerClassName="rounded-full h-full text-sm"
                     />
                 </div>
-                {(searchQuery || filterDate) && (
-                    <button 
-                        onClick={() => { setSearchQuery(""); setFilterDate(""); }}
-                        className="h-12 w-12 flex items-center justify-center rounded-full bg-muted/50 text-muted-foreground hover:text-foreground transition-all active:-rotate-45"
+                {user?.shippingAddresses && user.shippingAddresses.length > 0 && (
+                    <div className="w-full sm:w-44 h-12">
+                        <CustomSelect
+                            options={[
+                                { value: "", label: "所有店铺" },
+                                ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
+                            ]}
+                            value={filterShop}
+                            onChange={(val) => setFilterShop(val)}
+                            className="h-full w-full"
+                            triggerClassName="rounded-full h-full text-sm font-medium"
+                        />
+                    </div>
+                )}
+                <div className="w-full sm:w-44 h-12">
+                    <CustomSelect
+                        options={[
+                            { value: "", label: "所有平台" },
+                            { value: "美团", label: "美团" },
+                            { value: "淘宝", label: "淘宝" },
+                            { value: "京东", label: "京东" },
+                        ]}
+                        value={filterPlatform}
+                        onChange={(val) => setFilterPlatform(val)}
+                        className="h-full w-full"
+                        triggerClassName="rounded-full h-full text-sm font-medium"
+                    />
+                </div>
+                {(searchQuery || filterDate || filterShop || filterPlatform) && (
+                    <button
+                        onClick={resetFilters}
+                        className="h-12 px-6 rounded-full bg-primary/10 text-primary text-sm font-bold hover:bg-primary/20 transition-all flex items-center gap-2"
                     >
-                        <RotateCcw size={18} />
+                        <X size={16} /> 重置
                     </button>
                 )}
             </div>
@@ -191,69 +236,113 @@ export default function BrushPlansPage() {
             <div className="grid grid-cols-[repeat(auto_fill,minmax(280px,1fr))] gap-5">
                 {filteredPlans.map(plan => {
                     const totalItems = plan.items.length;
-                    const doneItems = plan.items.filter(i => i.done).length;
+                    const doneItems = plan.items.filter((i: BrushOrderPlanItem) => i.done).length;
                     const isAllDone = totalItems > 0 && doneItems === totalItems;
 
                     return (
-                        <div key={plan.id} className="group relative flex flex-col rounded-[24px] border border-border bg-white dark:bg-gray-900/40 p-4 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all">
-                            {/* Header Info */}
-                                <div className="flex flex-wrap items-center justify-between gap-y-3 mb-3">
-                                    <div className="flex items-center gap-3 text-left min-w-0">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${isAllDone ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`}>
-                                            <Calendar size={18} />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h3 className="text-base sm:text-lg font-black tracking-tight truncate">{formatLocalDate(plan.date)}</h3>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                <div className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                                                    isAllDone ? 'bg-emerald-500/10 text-emerald-500' :
-                                                    'bg-amber-500/10 text-amber-500'
-                                                }`}>
+                        <div key={plan.id} className="group relative flex flex-col rounded-[24px] sm:rounded-[32px] border border-border bg-white dark:bg-gray-900/60 p-4 sm:p-6 shadow-sm hover:shadow-2xl hover:border-primary/30 transition-all duration-300">
+                            {/* Row 1: Date & Actions */}
+                            <div className="flex items-start justify-between mb-4 sm:mb-5">
+                                <div className="flex items-center gap-3 sm:gap-4">
+                                    <div className={cn(
+                                        "w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500 group-hover:rotate-12 shadow-sm border border-transparent",
+                                        isAllDone ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-primary/10 text-primary border-primary/20'
+                                    )}>
+                                        <Calendar className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                            <h3 className="text-lg sm:text-2xl font-black tracking-tight sm:tracking-tighter text-foreground leading-tight truncate">
+                                                {formatLocalDate(plan.date)}
+                                            </h3>
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10">
+                                                <div className={cn(
+                                                    "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full animate-pulse shadow-[0_0_8px]",
+                                                    isAllDone ? "bg-emerald-500 shadow-emerald-500/50" : "bg-amber-500 shadow-amber-500/50"
+                                                )} />
+                                                <span className={cn(
+                                                    "text-[9px] sm:text-[10px] font-black uppercase tracking-widest",
+                                                    isAllDone ? "text-emerald-500" : "text-amber-500"
+                                                )}>
                                                     {isAllDone ? '已完成' : '进行中'}
-                                                </div>
-                                                <span className="text-[9px] font-bold text-muted-foreground opacity-50 uppercase shrink-0">{doneItems} / {totalItems}</span>
+                                                </span>
                                             </div>
                                         </div>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity ml-auto sm:ml-0">
-                                        <button 
-                                            onClick={() => { 
-                                                const shareUrl = `${window.location.origin}/brush-plans/share/${plan.id}`;
-                                                navigator.clipboard.writeText(shareUrl).then(() => {
-                                                    showToast("链接已复制，去发给刷单员吧", "success");
-                                                });
-                                            }}
-                                            className="p-2 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition-all font-bold text-[10px] flex items-center gap-1.5"
-                                            title="复制分享链接"
-                                        >
-                                            <Share2 size={13} />
-                                            <span>分享</span>
-                                        </button>
-                                        {canManage && (
-                                            <>
-                                                <button onClick={() => handleEdit(plan)} className="p-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
-                                                    <Edit2 size={15} />
-                                                </button>
-                                                <button onClick={() => handleDelete(plan.id)} className="p-2 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </>
-                                        )}
+                                        <p className="text-[10px] sm:text-xs font-bold text-muted-foreground/60 uppercase tracking-widest mt-0.5 sm:mt-1">
+                                            {plan.items.length} 个订单项
+                                        </p>
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 sm:translate-x-2 sm:group-hover:translate-x-0 ml-2">
+                                    <button 
+                                        onClick={() => { 
+                                            const shareUrl = `${window.location.origin}/brush-plans/share/${plan.id}`;
+                                            navigator.clipboard.writeText(shareUrl).then(() => {
+                                                showToast("链接已复制，去发给刷单员吧", "success");
+                                            });
+                                        }}
+                                        className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-muted/60 sm:bg-muted/80 text-foreground hover:bg-primary hover:text-white transition-all shadow-sm"
+                                        title="分享链接"
+                                    >
+                                        <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </button>
+                                    {canManage && (
+                                        <>
+                                            <button onClick={() => handleEdit(plan)} className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-muted/60 sm:bg-muted/80 text-foreground hover:bg-zinc-800 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all shadow-sm">
+                                                <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                            </button>
+                                            <button onClick={() => handleDelete(plan.id)} className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-muted/60 sm:bg-muted/80 text-foreground hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                                                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
 
-                            {/* Progress Footer */}
-                            <div className="pt-3 border-t border-zinc-100 dark:border-white/5">
-                                <div className="flex justify-between items-end mb-2">
-                                    <span className="text-[10px] font-black text-muted-foreground uppercase opacity-50">完成度 {Math.round((doneItems / totalItems) * 100) || 0}%</span>
-                                    <span className="text-sm font-black text-foreground">
-                                            {doneItems} <span className="text-[10px] opacity-30 text-muted-foreground">/ {totalItems}</span>
-                                    </span>
+                            {/* Row 2: Metadata Badges (Merged Store, Platforms) */}
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-6 sm:mb-8">
+                                <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-[9px] sm:text-[10px] font-black text-muted-foreground uppercase tracking-wider">
+                                    <Store className="w-2.5 h-2.5 opacity-50" />
+                                    <span className="truncate max-w-[80px] sm:max-w-none">{plan.shopName || "通用"}</span>
                                 </div>
-                                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                {Array.from(new Set(plan.items.map((i: BrushOrderPlanItem) => i.platform).filter((p): p is string => !!p))).map((platform: string) => {
+                                    let platformStyle = "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:border-white/10";
+                                    if (platform === "美团") platformStyle = "bg-[#FFD000]/10 text-[#222222] border-[#FFD000]/20 dark:text-[#FFD000]";
+                                    if (platform === "淘宝") platformStyle = "bg-[#FF5000]/10 text-[#FF5000] border-[#FF5000]/20";
+                                    if (platform === "京东") platformStyle = "bg-[#E1251B]/10 text-[#E1251B] border-[#E1251B]/20";
+                                    
+                                    return (
+                                        <div key={platform} className={cn("px-2 py-1 rounded-lg text-[9px] sm:text-[10px] font-black border", platformStyle)}>
+                                            {platform}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Progress Area */}
+                            <div className="mt-auto pt-4 sm:pt-6 border-t border-zinc-100 dark:border-white/5 space-y-2 sm:space-y-3">
+                                <div className="flex justify-between items-end">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] sm:text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest mb-0.5 sm:mb-1">完成进度</span>
+                                        <div className="flex items-baseline gap-0.5 sm:gap-1">
+                                            <span className="text-xl sm:text-2xl font-black text-foreground">{Math.round((doneItems / totalItems) * 100) || 0}</span>
+                                            <span className="text-[10px] sm:text-xs font-black text-muted-foreground">%</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right flex flex-col items-end">
+                                        <span className="text-[9px] sm:text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest mb-0.5 sm:mb-1">商品数</span>
+                                        <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-black text-foreground">
+                                            <Package className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-20" />
+                                            {doneItems} <span className="text-[9px] sm:text-[10px] opacity-20 px-0.5">/</span> <span className="opacity-40">{totalItems}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="w-full h-1.5 sm:h-2 bg-zinc-100 dark:bg-white/5 rounded-full overflow-hidden">
                                     <div 
-                                        className={`h-full transition-all duration-700 ease-out rounded-full ${isAllDone ? 'bg-emerald-500' : 'bg-primary'}`}
+                                        className={cn(
+                                            "h-full transition-all duration-1000 ease-out rounded-full shadow-lg",
+                                            isAllDone ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-primary shadow-primary/20'
+                                        )}
                                         style={{ width: `${totalItems > 0 ? (doneItems / totalItems) * 100 : 0}%` }}
                                     />
                                 </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Search, Package, Calendar, CheckCircle2, Circle } from "lucide-react";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { BrushOrderPlan, BrushOrderPlanItem } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
@@ -155,52 +156,176 @@ export default function SharedPlanPage() {
                 </div>
             </header>
 
-            {/* Gallery Grid */}
+            {/* Grouped View */}
             <main className="flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 pb-20">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                    {plan.items.map((item: BrushOrderPlanItem, index: number) => (
-                        <div key={index} className="group relative flex flex-col glass-panel rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1.5 cursor-default">
-                            <div className="relative aspect-4/3 w-full bg-secondary/30 overflow-hidden">
-                                <div className="absolute top-2 left-2 z-10 px-2.5 py-0.5 rounded-lg bg-black/40 backdrop-blur-md text-white text-[12px] font-black shadow-sm flex items-center justify-center pointer-events-none">
-                                    #{index + 1}
-                                </div>
-                                {item.product?.image ? (
-                                    <Image 
-                                        src={item.product.image.startsWith('http') || item.product.image.startsWith('/') 
-                                            ? item.product.image 
-                                            : `/api/uploads/${item.product.image.replace(/^\/?uploads\//, '')}`} 
-                                        fill 
-                                        className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
-                                        alt="" 
-                                        unoptimized 
+                {(() => {
+                    const platforms = ["美团", "淘宝", "京东", "其他"];
+                    
+                    // Standardize platform mapping for grouping
+                    const getStandardPlatform = (p?: string | null) => {
+                        const trimmed = (p || "").trim();
+                        if (trimmed === "美团") return "美团";
+                        if (trimmed === "淘宝") return "淘宝";
+                        if (trimmed === "京东") return "京东";
+                        return "其他";
+                    };
+
+                    const existingPlatforms = platforms.filter(p => 
+                        plan.items.some(item => getStandardPlatform(item.platform) === p)
+                    );
+
+                    if (existingPlatforms.length > 0) {
+                        return (
+                            <div className="space-y-12">
+                                {existingPlatforms.map((platformName: string) => {
+                                    const platformItems = plan.items.filter(item => getStandardPlatform(item.platform) === platformName);
+                                    const platformDone = platformItems.filter(i => i.done).length;
+                                    
+                                    let bgColor = "bg-zinc-100 dark:bg-white/5";
+                                    let textColor = "text-zinc-500";
+                                    let dotColor = "bg-zinc-400";
+                                    
+                                    if (platformName === "美团") {
+                                        bgColor = "bg-[#FFD000]/10";
+                                        textColor = "text-[#222222] dark:text-[#FFD000]";
+                                        dotColor = "bg-[#FFD000]";
+                                    } else if (platformName === "淘宝") {
+                                        bgColor = "bg-[#FF5000]/10";
+                                        textColor = "text-[#FF5000]";
+                                        dotColor = "bg-[#FF5000]";
+                                    } else if (platformName === "京东") {
+                                        bgColor = "bg-[#E1251B]/10";
+                                        textColor = "text-[#E1251B]";
+                                        dotColor = "bg-[#E1251B]";
+                                    }
+
+                                    return (
+                                        <section key={platformName} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="flex items-center justify-between mb-6 sticky top-[92px] sm:top-[108px] z-5 py-2 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn("px-4 py-1.5 rounded-2xl text-sm font-black border border-transparent shadow-sm", bgColor, textColor)}>
+                                                        <span className={cn("inline-block w-2 h-2 rounded-full mr-2", dotColor)} />
+                                                        {platformName}
+                                                    </div>
+                                                    <span className="text-xs font-black text-muted-foreground opacity-40">
+                                                        {platformDone} / {platformItems.length}
+                                                    </span>
+                                                </div>
+                                                <div className="h-px flex-1 bg-zinc-200 dark:bg-white/5 mx-6 hidden sm:block" />
+                                                <div className="hidden sm:block text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">
+                                                    {platformName === "美团" ? "Meituan Orders" : platformName === "淘宝" ? "Taobao Orders" : platformName === "京东" ? "JD Orders" : "Misc Tasks"}
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                                {platformItems.map((item, pIdx) => (
+                                                    <ItemCard 
+                                                        key={item.id} 
+                                                        item={item} 
+                                                        index={pIdx} 
+                                                        onToggle={handleToggle} 
+                                                    />
+                                                ))}
+                                            </div>
+                                        </section>
+                                    );
+                                })}
+                            </div>
+                        );
+                    } else {
+                        return (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                {plan.items.map((item, index) => (
+                                    <ItemCard 
+                                        key={item.id} 
+                                        item={item} 
+                                        index={index} 
+                                        onToggle={handleToggle} 
                                     />
-                                ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
-                                        <Package size={28} />
-                                    </div>
-                                )}
+                                ))}
                             </div>
-                            <div className="flex flex-col gap-2 p-3 sm:p-4">
-                                <div className="flex items-start gap-1 p-2 rounded-lg bg-emerald-500/5 text-emerald-600 font-black text-[12px] leading-snug w-full">
-                                    <Search size={12} className="shrink-0 mt-[2px]" />
-                                    <span className="line-clamp-2 break-all">{item.searchKeyword || "暂无关键字"}</span>
-                                </div>
-                                <div className="flex items-center justify-between mt-1 pl-1">
-                                    <span className="text-zinc-500 text-[12px] font-black">x{item.quantity}</span>
-                                    <button 
-                                        onClick={() => handleToggle(item.id!, !!item.done)}
-                                        className={`transition-all active:scale-90 p-1 -m-1 rounded-full ${
-                                            item.done ? 'text-emerald-500' : 'text-zinc-300 hover:text-zinc-400'
-                                        }`}
-                                    >
-                                        {item.done ? <CheckCircle2 size={20} fill="currentColor" className="text-emerald-500 fill-white dark:fill-zinc-900" /> : <Circle size={20} />}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                        );
+                    }
+                })()}
             </main>
+        </div>
+    );
+}
+
+function ItemCard({ item, index, onToggle }: { item: BrushOrderPlanItem; index: number; onToggle: (id: string, done: boolean) => void }) {
+    return (
+        <div className="group relative flex flex-col glass-panel rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1.5 cursor-default bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/5 shadow-sm hover:shadow-xl">
+            <div className="relative aspect-square w-full bg-zinc-100 dark:bg-zinc-800/50 overflow-hidden">
+                {/* ID Badge */}
+                <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-white text-[10px] font-black shadow-sm flex items-center justify-center pointer-events-none tracking-tighter">
+                    #{index + 1}
+                </div>
+                
+                {/* Quantity Badge - Condensed */}
+                <div className="absolute bottom-2 right-2 z-10 px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[10px] font-black shadow-lg flex items-center justify-center pointer-events-none tracking-tighter">
+                    {item.quantity}份
+                </div>
+
+                {item.product?.image ? (
+                    <Image 
+                        src={item.product.image.startsWith('http') || item.product.image.startsWith('/') 
+                            ? item.product.image 
+                            : `/api/uploads/${item.product.image.replace(/^\/?uploads\//, '')}`} 
+                        fill 
+                        className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+                        alt="" 
+                        unoptimized 
+                    />
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
+                        <Package size={24} />
+                    </div>
+                )}
+                
+                {/* Completion Overlay */}
+                {item.done && (
+                    <div className="absolute inset-0 bg-emerald-500/40 backdrop-blur-[1px] flex items-center justify-center animate-in zoom-in duration-300">
+                        <div className="bg-white dark:bg-zinc-950 text-emerald-500 p-1.5 rounded-full shadow-2xl scale-125 border-2 border-emerald-500/50">
+                            <CheckCircle2 size={20} strokeWidth={4} />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="flex flex-col gap-1.5 p-2 sm:p-3">
+                {/* Keyword area - Condensed */}
+                <div className="flex items-start gap-1 p-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-300 font-bold text-[11px] leading-tight w-full border border-zinc-100 dark:border-white/5">
+                    <Search size={10} className="shrink-0 mt-px opacity-30" />
+                    <span className="line-clamp-1 break-all">{item.searchKeyword || "暂无关键字"}</span>
+                </div>
+                
+                <div className="flex items-center justify-between px-0.5">
+                    <div className="flex flex-col min-w-0">
+                        <span className="text-[11px] font-black text-foreground truncate max-w-[100px] leading-none">
+                            {item.productName || item.product?.name || "未知商品"}
+                        </span>
+                        {item.product?.sku && (
+                            <span className="text-[8px] font-bold text-muted-foreground/40 uppercase tracking-tighter mt-0.5">
+                                {item.product.sku}
+                            </span>
+                        )}
+                    </div>
+                    
+                    <button 
+                        onClick={() => onToggle(item.id!, !!item.done)}
+                        className={cn(
+                            "transition-all active:scale-75 p-1 rounded-full",
+                            item.done ? 'text-emerald-500' : 'text-zinc-200 dark:text-zinc-800 hover:text-primary transition-colors'
+                        )}
+                    >
+                        {item.done ? (
+                            <CheckCircle2 size={24} fill="currentColor" className="text-emerald-500 fill-white dark:fill-zinc-950 shadow-md" />
+                        ) : (
+                            <Circle size={24} strokeWidth={2} />
+                        )}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

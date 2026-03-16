@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from '@/lib/storage';
 
@@ -8,6 +9,7 @@ interface BrushPlanItemInput {
   productName?: string | null;
   quantity?: number | string;
   searchKeyword?: string | null;
+  platform?: string | null;
   note?: string | null;
   done?: boolean;
   sortOrder?: number;
@@ -22,48 +24,48 @@ export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const page = parseInt(searchParams.get('page') || '1');
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 1000);
+  const shopName = searchParams.get('shopName');
+  const platform = searchParams.get('platform');
   const skip = (page - 1) * limit;
 
   try {
-    const [plans, total] = await Promise.all([
+    const where: Prisma.BrushOrderPlanWhereInput = { userId: session.id };
+    if (shopName) {
+      where.shopName = shopName;
+    }
+    if (platform) {
+      where.items = {
+        some: {
+          platform: platform
+        }
+      };
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.brushOrderPlan.count({ where }),
       prisma.brushOrderPlan.findMany({
-        where: { userId: session.id },
+        where,
+        orderBy: { date: 'desc' },
         skip,
         take: limit,
-        orderBy: { date: 'desc' },
         include: {
           items: {
             include: {
-              product: true,
-            },
-            orderBy: { sortOrder: 'asc' }
-          },
-        },
-      }),
-      prisma.brushOrderPlan.count({
-        where: { userId: session.id }
-      }),
+              product: true
+            }
+          }
+        }
+      })
     ]);
 
-    const storage = await getStorageStrategy();
-    const resolvedPlans = plans.map(plan => ({
-      ...plan,
-      items: plan.items.map(item => ({
-        ...item,
-        product: item.product ? {
-          ...item.product,
-          image: item.product.image ? storage.resolveUrl(item.product.image) : null
-        } : null
-      }))
-    }));
-
+    const totalPages = Math.ceil(total / limit);
     return NextResponse.json({
-      data: resolvedPlans,
+      items,
       meta: {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages,
       },
     });
   } catch (error) {
@@ -86,15 +88,17 @@ export async function POST(req: NextRequest) {
     const {
       date,
       title,
+      shopName,
       items,
       note,
       status,
     } = body;
-
+    
     const plan = await prisma.brushOrderPlan.create({
       data: {
         date: new Date(date),
         title: title || null,
+        shopName: shopName || null,
         note: note || null,
         status: status || 'Draft',
         userId: session.id,
@@ -104,6 +108,7 @@ export async function POST(req: NextRequest) {
             productName: item.productName || null,
             quantity: parseInt(String(item.quantity || 1)),
             searchKeyword: item.searchKeyword || null,
+            platform: item.platform || null,
             note: item.note || null,
             done: item.done || false,
             sortOrder: item.sortOrder || index,

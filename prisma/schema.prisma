@@ -338,6 +338,7 @@ model BrushOrderPlan {
   id          String               @id @default(cuid())
   date        DateTime             @default(now())
   title       String?
+  shopName    String?
   note        String?
   status      String               @default("Draft")
   userId      String?
@@ -359,6 +360,7 @@ model BrushOrderPlanItem {
   productName   String?
   quantity      Int             @default(1)
   searchKeyword String?
+  platform      String?
   note          String?
   done          Boolean         @default(false)
   sortOrder     Int             @default(0)
@@ -421,11 +423,11 @@ enum Role {
 
 model StoreOpeningBatch {
   id          String              @id @default(cuid())
-  name        String              
+  name        String
   date        DateTime            @default(now())
   userId      String?
   user        User?               @relation(fields: [userId], references: [id])
-  items       StoreOpeningItem[]  
+  items       StoreOpeningItem[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 

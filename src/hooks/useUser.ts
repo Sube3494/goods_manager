@@ -1,10 +1,26 @@
 import { useState, useEffect } from "react";
 
+interface BrushShopItem {
+  id: string;
+  name: string;
+  platform?: string;
+  isDefault?: boolean;
+}
+
+interface AddressItem {
+  id: string;
+  label: string;
+  address: string;
+  isDefault: boolean;
+}
+
 interface User {
   id: string;
   email: string;
   name?: string;
   role: string;
+  brushShops?: BrushShopItem[];
+  shippingAddresses?: AddressItem[];
   roleProfile?: {
     id: string;
     name: string;

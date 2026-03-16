@@ -61,8 +61,7 @@ export interface Product {
   updatedAt?: string;
 }
 
-export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered"; // 暂时保留 Ordered 以防万一，但主推前四个
-
+export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered";
 
 export interface TrackingInfo {
   courier: string;
@@ -92,7 +91,6 @@ export interface PurchaseOrder {
   updatedAt?: string;
 }
 
-
 export interface PurchaseOrderItem {
   id?: string;
   purchaseOrderId?: string;
@@ -109,15 +107,14 @@ export interface PurchaseOrderItem {
 export interface PurchaseOrderItemWithOrder extends PurchaseOrderItem {
   purchaseOrder: PurchaseOrder;
 }
+
 export interface Category {
   id: string;
   name: string;
   count: number;
   description?: string;
   workspaceId?: string;
-
   products?: Product[];
-  items?: Product[]; // For compatibility if used elsewhere
 }
 
 export interface GalleryItem {
@@ -183,12 +180,12 @@ export interface BrushOrder {
   date: Date | string;
   type: string;
   status: BrushStatus | string;
-  shopName?: string;       // 店铺名称
-  paymentAmount: number;   // 实付
-  receivedAmount: number;  // 到手金额
-  commission: number;      // 佣金
-  note?: string;           // 备注
-  platformOrderId?: string; // 平台订单号
+  shopName?: string;
+  paymentAmount: number;
+  receivedAmount: number;
+  commission: number;
+  note?: string;
+  platformOrderId?: string;
   items: BrushOrderItem[];
   workspaceId?: string;
   createdAt?: string;
@@ -216,28 +213,29 @@ export interface OutboundOrder {
   updatedAt?: string;
 }
 
-export interface BrushOrderPlanItem {
-  id?: string;
-  planId?: string;
-  productId?: string;
-  product?: Product;
-  productName?: string;
-  quantity: number;
-  searchKeyword?: string;
+export interface BrushOrderPlan {
+  id: string;
+  userId: string;
+  title: string;
+  shopName?: string;
+  date: string;
+  status: string;
   note?: string;
-  done?: boolean;
-  sortOrder?: number;
+  items: BrushOrderPlanItem[];
   createdAt?: string;
   updatedAt?: string;
 }
 
-export interface BrushOrderPlan {
-  id: string;
-  date: string | Date;
-  title?: string;
+export interface BrushOrderPlanItem {
+  id?: string;
+  planId?: string;
+  productId?: string;
+  productName?: string;
+  product?: Product;
+  quantity: number;
+  searchKeyword: string;
+  platform?: string;
   note?: string;
-  status: string;
-  items: BrushOrderPlanItem[];
-  createdAt?: string;
-  updatedAt?: string;
+  done: boolean;
+  sortOrder?: number;
 }

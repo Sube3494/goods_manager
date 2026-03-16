@@ -52,6 +52,7 @@ export async function GET(
         id: item.id,
         quantity: item.quantity,
         searchKeyword: item.searchKeyword,
+        platform: item.platform,
         note: item.note,
         done: item.done,
         product: item.product ? {

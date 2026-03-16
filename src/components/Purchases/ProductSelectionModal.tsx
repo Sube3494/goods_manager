@@ -19,7 +19,7 @@ function cn(...inputs: ClassValue[]) {
 interface ProductSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (products: Product[]) => void;
+  onSelect: (products: Product[], platform: string) => void;
   selectedIds: string[];
   singleSelect?: boolean;
   showPrice?: boolean;
@@ -40,7 +40,7 @@ function ProductSkeleton() {
 export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, singleSelect = false, showPrice = true }: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
-  const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
+  const [tempSelectedIds, setTempSelectedIds] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,12 +56,14 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   const { showToast } = useToast();
   const resultsVersion = useRef(0);
   const [mounted] = useState(typeof window !== "undefined");
+  const [targetPlatform, setTargetPlatform] = useState("美团");
+  const PLATFORMS = ["美团", "淘宝", "京东"];
 
 
   // 初始化重置逻辑
   useEffect(() => {
     if (isOpen) {
-      setTempSelectedIds(selectedIds);
+      setTempSelectedIds([]);
       setSelectedProducts([]);
       setSearchQuery("");
       setSelectedSupplierId("");
@@ -233,7 +235,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
   };
 
   const handleConfirm = () => {
-    onSelect(selectedProducts);
+    onSelect(selectedProducts, targetPlatform);
     onClose();
   };
 
@@ -321,10 +323,10 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                           <div className={cn(
                             "absolute top-3 right-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110",
                             isSelected 
-                              ? "bg-foreground border-foreground text-background dark:text-black shadow-sm shadow-foreground/10" 
+                              ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20" 
                               : "bg-black/20 dark:bg-black/40 border-white/50 backdrop-blur-sm"
                           )}>
-                            {isSelected && <Check size={14} strokeWidth={3.5} />}
+                            {isSelected && <Check size={12} strokeWidth={4} />}
                           </div>
 
                           <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative">
@@ -347,6 +349,11 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                            <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pr-10">
                             <div className="flex items-center gap-2">
                              <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
+                             {selectedIds.includes(product.id) && (
+                                 <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-green-500/10 text-green-500 border border-green-500/20">
+                                     已在计划中
+                                 </span>
+                             )}
                             </div>
                              {(product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark) && (
                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
@@ -402,24 +409,48 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </div>
             </div>
 
-             <div className="flex items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5">
-              <div className="text-xs sm:text-sm font-medium text-muted-foreground">
-                已选 <span className="text-primary font-medium">{tempSelectedIds.length}</span> 项
-              </div>
-              <div className="flex gap-2 sm:gap-4">
-                <button 
-                  onClick={onClose} 
-                  className="rounded-xl px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
-                >
-                  取消
-                </button>
-                 <button 
-                  onClick={handleConfirm}
-                  className="bg-foreground text-background dark:text-black px-5 sm:px-8 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-foreground/10 active:scale-[0.98] transition-all"
-                >
-                  确认添加
-                </button>
-              </div>
+              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5 gap-4">
+               <div className="flex flex-col gap-2 w-full sm:w-auto">
+                 <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>
+                 <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
+                    {PLATFORMS.map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setTargetPlatform(p)}
+                        className={cn(
+                          "px-4 py-1.5 rounded-lg text-xs font-black transition-all",
+                          targetPlatform === p 
+                            ? "bg-white dark:bg-white/10 text-primary shadow-sm border border-border" 
+                            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        )}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                 </div>
+               </div>
+
+               <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
+                <div className="text-xs sm:text-sm font-medium text-muted-foreground mr-2">
+                  已选 <span className="text-primary font-medium">{tempSelectedIds.length}</span> 项
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={onClose} 
+                    className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
+                  >
+                    取消
+                  </button>
+                   <button 
+                    onClick={handleConfirm}
+                    disabled={tempSelectedIds.length === 0}
+                    className="bg-foreground text-background dark:text-black px-6 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-foreground/10 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    确认添加
+                  </button>
+                </div>
+               </div>
             </div>
           </div>
           
