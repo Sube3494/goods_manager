@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, Calendar, Share2, Edit2, Trash2, Store, Package, ShieldAlert, RotateCcw } from "lucide-react";
+import { Plus, Search, Calendar, Share2, Edit2, Trash2, Store, Package, ShieldAlert, RotateCcw, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
@@ -239,6 +239,8 @@ export default function BrushPlansPage() {
                     const doneItems = plan.items.filter((i: BrushOrderPlanItem) => i.done).length;
                     const isAllDone = totalItems > 0 && doneItems === totalItems;
 
+                    const totalPrincipal = plan.items.reduce((sum, item) => sum + ((item.principal || 0) * (item.quantity || 1)), 0);
+
                     return (
                         <div key={plan.id} className="group relative flex flex-col rounded-[24px] sm:rounded-[32px] border border-border bg-white dark:bg-gray-900/60 p-4 sm:p-6 shadow-sm hover:shadow-2xl hover:border-primary/30 transition-all duration-300">
                             {/* Row 1: Date & Actions */}
@@ -299,12 +301,18 @@ export default function BrushPlansPage() {
                                 </div>
                             </div>
 
-                            {/* Row 2: Metadata Badges (Merged Store, Platforms) */}
+                            {/* Row 2: Metadata Badges (Merged Store, Platforms, Principal) */}
                             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-6 sm:mb-8">
                                 <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-[9px] sm:text-[10px] font-black text-muted-foreground uppercase tracking-wider">
                                     <Store className="w-2.5 h-2.5 opacity-50" />
                                     <span className="truncate max-w-[80px] sm:max-w-none">{plan.shopName || "通用"}</span>
                                 </div>
+                                {totalPrincipal > 0 && (
+                                    <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20 text-[9px] sm:text-[10px] font-black uppercase tracking-wider">
+                                        <Wallet className="w-2.5 h-2.5 opacity-70" />
+                                        <span>¥{totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                    </div>
+                                )}
                                 {Array.from(new Set(plan.items.map((i: BrushOrderPlanItem) => i.platform).filter((p): p is string => !!p))).map((platform: string) => {
                                     let platformStyle = "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:border-white/10";
                                     if (platform === "美团") platformStyle = "bg-[#FFD000]/10 text-[#222222] border-[#FFD000]/20 dark:text-[#FFD000]";
