@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, Calendar, Share2, Edit2, Trash2, Store, X, Package, ShieldAlert } from "lucide-react";
+import { Plus, Search, Calendar, Share2, Edit2, Trash2, Store, Package, ShieldAlert, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
@@ -175,8 +175,8 @@ export default function BrushPlansPage() {
                 )}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
-                <div className="h-12 px-5 flex-1 w-full rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+            <div className="flex flex-row flex-wrap items-center gap-2">
+                <div className="h-12 px-5 flex-1 min-w-[200px] rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
                     <Search size={18} className="text-muted-foreground" />
                     <input
                         type="text"
@@ -186,7 +186,7 @@ export default function BrushPlansPage() {
                         className="bg-transparent border-none outline-none w-full text-sm font-medium"
                     />
                 </div>
-                <div className="w-full sm:w-44 h-12">
+                <div className="w-auto flex-1 sm:flex-none sm:w-44 h-12 min-w-[120px]">
                     <DatePicker
                         value={filterDate}
                         onChange={setFilterDate}
@@ -196,7 +196,7 @@ export default function BrushPlansPage() {
                     />
                 </div>
                 {user?.shippingAddresses && user.shippingAddresses.length > 0 && (
-                    <div className="w-full sm:w-44 h-12">
+                    <div className="w-auto flex-1 sm:flex-none sm:w-44 h-12 min-w-[120px]">
                         <CustomSelect
                             options={[
                                 { value: "", label: "所有店铺" },
@@ -209,7 +209,7 @@ export default function BrushPlansPage() {
                         />
                     </div>
                 )}
-                <div className="w-full sm:w-44 h-12">
+                <div className="w-auto flex-1 sm:flex-none sm:w-44 h-12 min-w-[120px]">
                     <CustomSelect
                         options={[
                             { value: "", label: "所有平台" },
@@ -226,9 +226,9 @@ export default function BrushPlansPage() {
                 {(searchQuery || filterDate || filterShop || filterPlatform) && (
                     <button
                         onClick={resetFilters}
-                        className="h-12 px-6 rounded-full bg-primary/10 text-primary text-sm font-bold hover:bg-primary/20 transition-all flex items-center gap-2"
+                        className="h-12 px-5 flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
                     >
-                        <X size={16} /> 重置
+                        <RotateCcw size={14} /> 重置
                     </button>
                 )}
             </div>
