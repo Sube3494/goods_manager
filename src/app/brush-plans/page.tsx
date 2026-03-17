@@ -283,7 +283,7 @@ export default function BrushPlansPage() {
                                                 showToast("链接已复制，去发给刷单员吧", "success");
                                             });
                                         }}
-                                        className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-muted/60 sm:bg-muted/80 text-foreground hover:bg-primary hover:text-white transition-all shadow-sm"
+                                        className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-muted/60 sm:bg-muted/80 text-foreground hover:bg-primary hover:text-white dark:hover:bg-white dark:hover:text-zinc-950 transition-all shadow-sm"
                                         title="分享链接"
                                     >
                                         <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
