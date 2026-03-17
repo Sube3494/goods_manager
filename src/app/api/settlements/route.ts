@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       totalAlreadyReceived,
       finalBalance,
       note,
+      shopName,
       items
     } = body;
 
@@ -73,13 +74,24 @@ export async function POST(req: NextRequest) {
         totalAlreadyReceived: parseFloat(totalAlreadyReceived || 0),
         finalBalance: parseFloat(finalBalance || 0),
         note: note || null,
+        shopName: shopName || null,
         items: {
-          create: items.map((item: any) => ({
-            platformName: item.name,
-            received: parseFloat(item.received || 0),
-            brushing: parseFloat(item.brushing || 0),
-            receivedToCard: parseFloat(item.receivedToCard || 0),
-            net: parseFloat(item.net || 0)
+          create: items.map((item: {
+            platformName: string;
+            shopName: string;
+            serviceFeeRate: number;
+            received: number;
+            brushing: number;
+            receivedToCard: number;
+            net: number;
+          }) => ({
+            platformName: item.platformName,
+            shopName: item.shopName,
+            serviceFeeRate: item.serviceFeeRate,
+            received: item.received,
+            brushing: item.brushing,
+            receivedToCard: item.receivedToCard,
+            net: item.net
           }))
         }
       },

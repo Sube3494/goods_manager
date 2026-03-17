@@ -19,6 +19,7 @@ export interface AddressItem {
   label: string;
   address: string;
   isDefault: boolean;
+  serviceFeeRate?: number;
 }
 
 export interface BrushShopItem {
@@ -26,6 +27,7 @@ export interface BrushShopItem {
   name: string;
   platform?: string;
   isDefault?: boolean;
+  serviceFeeRate?: number;
 }
 
 export interface User {

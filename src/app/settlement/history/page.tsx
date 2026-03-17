@@ -20,10 +20,13 @@ import * as XLSX from 'xlsx';
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+import { AddressItem } from "@/lib/types";
 
 interface SettlementItem {
   id: string;
   platformName: string;
+  shopName: string | null;
   received: number;
   brushing: number;
   receivedToCard: number;
@@ -39,12 +42,14 @@ interface Settlement {
   totalAlreadyReceived: number;
   finalBalance: number;
   note: string | null;
+  shopName: string | null;
   items: SettlementItem[];
   createdAt: string;
 }
 
 export default function SettlementHistoryPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [filterShop, setFilterShop] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
@@ -109,6 +114,7 @@ export default function SettlementHistoryPage() {
       
       // 平台明细表
       const itemData = settlement.items.map(item => ({
+        "店铺": item.shopName || "未指定",
         "平台名称": item.platformName,
         "账单到手": item.received,
         "扣除刷单": item.brushing,
@@ -117,7 +123,8 @@ export default function SettlementHistoryPage() {
       }));
       // 添加总计行
       itemData.push({
-        "平台名称": "总计",
+        "店铺": "合计汇总",
+        "平台名称": "---",
         "账单到手": settlement.items.reduce((s, i) => s + i.received, 0),
         "扣除刷单": settlement.items.reduce((s, i) => s + i.brushing, 0),
         "已打款到卡": settlement.items.reduce((s, i) => s + i.receivedToCard, 0),
@@ -180,6 +187,20 @@ export default function SettlementHistoryPage() {
           <h1 className="text-2xl font-bold tracking-tight">结算历史</h1>
           <p className="text-sm text-muted-foreground mt-1">查看并管理往期保存的结算单据</p>
         </div>
+        {user?.shippingAddresses && (user.shippingAddresses as AddressItem[]).length > 0 && (
+          <div className="ml-auto min-w-[160px]">
+            <CustomSelect 
+              options={[
+                { value: "", label: "全部店铺" },
+                ...(user.shippingAddresses as AddressItem[]).map(s => ({ value: s.label, label: s.label }))
+              ]}
+              value={filterShop}
+              onChange={setFilterShop}
+              placeholder="筛选店铺"
+              triggerClassName="rounded-full h-10 text-xs font-bold"
+            />
+          </div>
+        )}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-12 items-start">
@@ -196,7 +217,9 @@ export default function SettlementHistoryPage() {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
-              {settlements.map((s) => (
+              {settlements
+                .filter(s => !filterShop || s.shopName === filterShop)
+                .map((s) => (
                 <div 
                   key={s.id}
                   onClick={() => setSelectedSettlement(s)}
@@ -207,14 +230,21 @@ export default function SettlementHistoryPage() {
                   }`}
                 >
                   <div className="space-y-3">
-                    {/* Top Section: Date & Note */}
+                    {/* Top Section: Date & Note & Shop */}
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex flex-col gap-2 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={14} className="text-muted-foreground shrink-0" />
-                          <span className="text-sm font-bold text-foreground">
-                            {format(new Date(s.date), 'yyyy年MM月dd日', { locale: zhCN })}
-                          </span>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={14} className="text-muted-foreground shrink-0" />
+                            <span className="text-sm font-bold text-foreground whitespace-nowrap">
+                              {format(new Date(s.date), 'yyyy年MM月dd日', { locale: zhCN })}
+                            </span>
+                          </div>
+                          {s.shopName && (
+                            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold whitespace-nowrap">
+                              {s.shopName}
+                            </span>
+                          )}
                         </div>
                         {s.note && (
                           <div className="pl-5">
@@ -304,7 +334,7 @@ export default function SettlementHistoryPage() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-muted/30">
-                          <th className="px-5 py-3 text-[10px] font-black uppercase text-muted-foreground whitespace-nowrap">平台</th>
+                          <th className="px-5 py-3 text-[10px] font-black uppercase text-muted-foreground whitespace-nowrap">所属店铺/平台</th>
                           <th className="px-5 py-3 text-[10px] font-black uppercase text-muted-foreground text-right border-x border-border/50 whitespace-nowrap">账单到手</th>
                           <th className="px-5 py-3 text-[10px] font-black uppercase text-muted-foreground text-right border-x border-border/50 whitespace-nowrap">扣除刷单</th>
                           <th className="px-5 py-3 text-[10px] font-black uppercase text-muted-foreground text-right border-x border-border/50 whitespace-nowrap">已打本人卡</th>
@@ -314,7 +344,10 @@ export default function SettlementHistoryPage() {
                       <tbody className="divide-y divide-border">
                         {selectedSettlement.items.map((item) => (
                           <tr key={item.id} className="hover:bg-muted/5 font-mono text-sm leading-8 transition-colors">
-                            <td className="px-5 py-2 font-black text-foreground whitespace-nowrap">{item.platformName}</td>
+                            <td className="px-5 py-2 font-black text-foreground whitespace-nowrap">
+                              <span className="text-[9px] text-primary/70 uppercase block h-3 leading-3">{item.shopName}</span>
+                              {item.platformName}
+                            </td>
                             <td className="px-5 py-2 text-right border-x border-border/30">¥{item.received.toLocaleString()}</td>
                             <td className="px-5 py-2 text-right border-x border-border/30 text-orange-500">¥{item.brushing.toLocaleString()}</td>
                             <td className="px-5 py-2 text-right border-x border-border/30 text-rose-500">¥{item.receivedToCard.toLocaleString()}</td>

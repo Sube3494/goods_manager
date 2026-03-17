@@ -393,6 +393,7 @@ model Settlement {
   totalAlreadyReceived Float            @default(0)
   finalBalance         Float            @default(0)
   note                 String?
+  shopName             String?
   userId               String?
   user                 User?            @relation(fields: [userId], references: [id])
   items                SettlementItem[]
@@ -411,6 +412,8 @@ model SettlementItem {
   brushing       Float      @default(0)
   receivedToCard Float      @default(0)
   net            Float      @default(0)
+  shopName       String?
+  serviceFeeRate Float?     @default(0.06)
   settlement     Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
   @@index([settlementId])

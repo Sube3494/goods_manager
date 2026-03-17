@@ -202,7 +202,7 @@ export default function ProfilePage() {
                           value={item.label}
                           onChange={(e) => {
                             const newList = [...addressList];
-                            newList[index].label = e.target.value;
+                            newList[index] = { ...newList[index], label: e.target.value };
                             setAddressList(newList);
                           }}
                           className="flex-1 bg-transparent border-b border-border/50 text-sm font-bold outline-none focus:border-primary px-1"
@@ -227,17 +227,43 @@ export default function ProfilePage() {
                           </button>
                         </div>
                       </div>
-                      <textarea 
-                        placeholder="详细地址..."
-                        value={item.address}
-                        onChange={(e) => {
-                          const newList = [...addressList];
-                          newList[index].address = e.target.value;
-                          setAddressList(newList);
-                        }}
-                        rows={2}
-                        className="w-full py-2 px-3 rounded-xl bg-muted/20 border border-transparent focus:bg-white dark:focus:bg-white/5 focus:border-primary/30 transition-all outline-none text-sm resize-none"
-                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div className="sm:col-span-3">
+                          <textarea 
+                            placeholder="详细地址..."
+                            value={item.address}
+                            onChange={(e) => {
+                              const newList = [...addressList];
+                              newList[index] = { ...newList[index], address: e.target.value };
+                              setAddressList(newList);
+                            }}
+                            rows={2}
+                            className="w-full py-2 px-3 rounded-xl bg-muted/20 border border-transparent focus:bg-white dark:focus:bg-white/5 focus:border-primary/30 transition-all outline-none text-sm resize-none"
+                          />
+                        </div>
+                        <div className="sm:col-span-1 space-y-1">
+                          <label className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest px-1">抽出率 (%)</label>
+                          <div className="relative">
+                             <input 
+                              type="number"
+                              placeholder="6"
+                              step="0.1"
+                              value={item.serviceFeeRate !== undefined ? (item.serviceFeeRate * 100).toString() : ""}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const newList = [...addressList];
+                                newList[index] = { 
+                                  ...newList[index], 
+                                  serviceFeeRate: isNaN(val) ? undefined : val / 100 
+                                };
+                                setAddressList(newList);
+                              }}
+                              className="w-full h-10 px-3 pr-8 rounded-xl bg-muted/20 border border-transparent focus:bg-white dark:focus:bg-white/5 focus:border-primary/30 transition-all outline-none text-sm font-mono"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
 

@@ -1,77 +1,117 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Wallet, Info, RefreshCw, Receipt, History, Save, Loader2 } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Wallet, RefreshCw, Receipt, History, Save, Loader2, Store } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { User } from "@/lib/types";
 
 interface PlatformData {
   id: string;
-  name: string;
+  shopName: string;
+  platformName: string;
+  serviceFeeRate: number;
   received: number; // 账面到手 (A)
   brushing: number; // 刷单到手
   receivedToCard: number; // 已结账
 }
 
-export default function SettlementPage() {
-  const [platforms, setPlatforms] = useState<PlatformData[]>([
-    { id: "mt", name: "美团闪购", received: 0, brushing: 0, receivedToCard: 0 },
-    { id: "jd", name: "京东秒送", received: 0, brushing: 0, receivedToCard: 0 },
-    { id: "tb", name: "淘宝闪购", received: 0, brushing: 0, receivedToCard: 0 },
-  ]);
+const DEFAULT_PLATFORMS = ["美团闪购", "京东秒送", "淘宝闪购"];
 
+export default function SettlementPage() {
   const { user, isLoading: userLoading } = useUser();
+  const shops = useMemo(() => (user as unknown as User)?.shippingAddresses || [], [user]);
   const { showToast } = useToast();
   const router = useRouter();
-
   const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
 
-  const [serviceFeeRate, setServiceFeeRate] = useState(0.06);
+  // 多选店铺状态 (存储选中的店铺标签)
+  const [selectedShops, setSelectedShops] = useState<string[]>([]);
+  
+  // 核心数据状态：基于 (店铺 + 平台) 动态生成的行
+  const [entries, setEntries] = useState<PlatformData[]>([]);
   const [note, setNote] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  // 当选中的店铺变化时，同步 entries
+  useEffect(() => {
+    if (selectedShops.length === 0) {
+      setEntries([]);
+      return;
+    }
+
+    setEntries(prev => {
+      const newEntries: PlatformData[] = [];
+      
+      selectedShops.forEach(shopLabel => {
+        const shopInfo = shops.find(s => s.label === shopLabel);
+        const rate = shopInfo?.serviceFeeRate ?? 0.06;
+        
+        DEFAULT_PLATFORMS.forEach(pName => {
+          const entryId = `${shopLabel}-${pName}`;
+          // 尝试保留已有数据
+          const existing = prev.find(e => e.id === entryId);
+          if (existing) {
+            newEntries.push({ ...existing, serviceFeeRate: rate });
+          } else {
+            newEntries.push({
+              id: entryId,
+              shopName: shopLabel,
+              platformName: pName,
+              serviceFeeRate: rate,
+              received: 0,
+              brushing: 0,
+              receivedToCard: 0
+            });
+          }
+        });
+      });
+      
+      return newEntries;
+    });
+  }, [selectedShops, shops]);
+
   // 计算逻辑
   const stats = useMemo(() => {
-    const platformResults = platforms.map(p => ({
-      ...p,
-      net: p.received - p.brushing
+    const list = entries.map(e => ({
+      ...e,
+      net: e.received - e.brushing,
+      fee: (e.received - e.brushing) * e.serviceFeeRate
     }));
 
-    const totalNet = platformResults.reduce((sum, p) => sum + p.net, 0);
-    const serviceFee = totalNet * serviceFeeRate;
+    const totalNet = list.reduce((sum, e) => sum + e.net, 0);
+    const totalServiceFee = list.reduce((sum, e) => sum + e.fee, 0);
     
-    // 计算已到账款项对应的“业绩”部分，避免重复扣除刷单成本
-    const totalAlreadyReceivedNet = platforms.reduce((sum, p) => {
-      if (p.received <= 0) return sum;
-      // 按比例计算到账金额中包含的“真实业绩”
-      const netPortion = (p.receivedToCard / p.received) * (p.received - p.brushing);
-      return sum + netPortion;
+    // 计算已到账业绩部分
+    const totalAlreadyReceivedNet = list.reduce((sum, e) => {
+      if (e.received <= 0) return sum;
+      return sum + (e.receivedToCard / e.received) * e.net;
     }, 0);
 
-    // 最终结算：(总真业绩 - 内部扣点) - 已到账业绩部分
-    const finalBalance = totalNet - serviceFee - totalAlreadyReceivedNet;
+    const finalBalance = totalNet - totalServiceFee - totalAlreadyReceivedNet;
 
     return {
-      platformResults,
+      list,
       totalNet,
-      serviceFee,
+      totalServiceFee,
       totalAlreadyReceived: totalAlreadyReceivedNet,
       finalBalance
     };
-  }, [platforms, serviceFeeRate]);
+  }, [entries]);
 
   const handleInputChange = (id: string, field: 'received' | 'brushing' | 'receivedToCard', value: string) => {
     const numValue = parseFloat(value) || 0;
-    setPlatforms(prev => prev.map(p => p.id === id ? { ...p, [field]: numValue } : p));
+    setEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: numValue } : e));
   };
 
   const resetData = () => {
-    setPlatforms(prev => prev.map(p => ({ ...p, received: 0, brushing: 0, receivedToCard: 0 })));
-    showToast("结算数据已重置清空", "success");
+    setEntries(prev => prev.map(e => ({ ...e, received: 0, brushing: 0, receivedToCard: 0 })));
+    setNote("");
+    showToast("结算数据已重置", "success");
   };
 
   const saveSettlement = async () => {
@@ -88,17 +128,20 @@ export default function SettlementPage() {
         body: JSON.stringify({
           date: new Date(),
           totalNet: stats.totalNet,
-          serviceFeeRate,
-          serviceFee: stats.serviceFee,
+          serviceFeeRate: 0, // 混合费率时，主表记录 0，明细记录实际费率
+          serviceFee: stats.totalServiceFee,
           totalAlreadyReceived: stats.totalAlreadyReceived,
           finalBalance: stats.finalBalance,
           note: note,
-          items: stats.platformResults.map(p => ({
-            name: p.name,
-            received: p.received,
-            brushing: p.brushing,
-            receivedToCard: p.receivedToCard,
-            net: p.net
+          shopName: selectedShops.join(", "),
+          items: stats.list.map(e => ({
+            platformName: e.platformName,
+            shopName: e.shopName,
+            serviceFeeRate: e.serviceFeeRate,
+            received: e.received,
+            brushing: e.brushing,
+            receivedToCard: e.receivedToCard,
+            net: e.net
           }))
         })
       });
@@ -107,6 +150,7 @@ export default function SettlementPage() {
       
       showToast("结算单已存入历史记录", "success");
       router.refresh();
+      setSelectedShops([]);
     } catch (error) {
       console.error(error);
       showToast("保存失败，请重试", "error");
@@ -116,373 +160,236 @@ export default function SettlementPage() {
   };
 
   if (userLoading) return null;
-  if (!canManage) return null; // PageGuard will handle the UI
-
-  if (userLoading) return null;
   if (!canManage) return null;
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-10 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 relative">
-        <div className="flex-1 min-w-0 pr-24 md:pr-0">
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">
-            结算计算器
+            结算对账
           </h1>
           <p className="text-muted-foreground mt-2 text-sm sm:text-lg">
-            分平台剔除刷单，严谨核算每月真实净业绩。
+            支持同时核算多个店铺，自动按各店费率汇总。
           </p>
         </div>
         
-        <div className="flex items-center gap-3 absolute top-0 right-0 md:relative">
+        <div className="flex items-center gap-3">
           <Link 
             href="/settlement/history"
-            className="flex items-center justify-center gap-2 h-10 w-10 md:w-auto md:px-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted transition-all active:scale-95 text-sm font-medium"
-            title="历史记录"
+            className="flex items-center justify-center gap-2 h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted transition-all active:scale-95 text-sm font-medium"
           >
-            <History size={16} className="md:w-3.5 md:h-3.5" />
-            <span className="hidden md:inline">历史记录</span>
+            <History size={16} />
+            <span>历史记录</span>
           </Link>
           <button 
             onClick={resetData}
-            className="flex items-center justify-center gap-2 h-10 w-10 md:w-auto md:px-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted transition-all active:scale-95 text-sm font-medium"
-            title="重置数据"
+            className="flex items-center justify-center gap-2 h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted transition-all active:scale-95 text-sm font-medium"
           >
-            <RefreshCw size={16} className="md:w-3.5 md:h-3.5" />
-            <span className="hidden md:inline">重置数据</span>
+            <RefreshCw size={16} />
+            <span>重置</span>
           </button>
         </div>
       </div>
 
-      <div className="flex flex-col gap-8 max-w-4xl mx-auto">
-        {/* Data Entry Section */}
-        <div className="space-y-6">
+      {/* Shop Selection - Multi Select Simulation */}
+      <div className="bg-muted/10 p-6 rounded-3xl border border-border/50">
+        <div className="flex items-center gap-2 mb-4">
+          <Store size={18} className="text-primary" />
+          <h3 className="font-bold text-sm uppercase tracking-wider">选择参与结算的店铺</h3>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {shops.map(shop => (
+            <button
+              key={shop.id}
+              onClick={() => {
+                setSelectedShops(prev => 
+                  prev.includes(shop.label) 
+                    ? prev.filter(s => s !== shop.label) 
+                    : [...prev, shop.label]
+                );
+              }}
+              className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all border ${
+                selectedShops.includes(shop.label)
+                  ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20'
+                  : 'bg-white dark:bg-white/5 border-border hover:border-primary/50 text-muted-foreground'
+              }`}
+            >
+              {shop.label} ({(shop.serviceFeeRate ?? 0.06) * 100}%)
+            </button>
+          ))}
+          {shops.length === 0 && (
+            <p className="text-sm text-muted-foreground">暂无店铺配置，请前往个人资料页添加。</p>
+          )}
+        </div>
+      </div>
+
+      {selectedShops.length > 0 ? (
+        <div className="flex flex-col gap-8">
+          {/* Data Entry Table */}
           <div className="rounded-3xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
             <div className="p-6 border-b border-border/50 bg-muted/5">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Receipt className="text-primary" size={20} />
-                账目明细录入
+                账目明细
               </h2>
             </div>
             
-            {/* Desktop View: Professional Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[800px]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-muted/10">
-                    <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">平台名称</th>
-                    <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap text-right min-w-[180px]">账单到手 (A)</th>
-                    <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap text-right min-w-[180px]">刷单到手</th>
-                    <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap text-right min-w-[180px]">已结账</th>
-                    <th className="px-6 py-4 text-xs font-bold text-primary uppercase tracking-wider whitespace-nowrap text-right">真实业绩 (A-B)</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest">店铺/平台</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest text-center">账单到手 (A)</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest text-center">刷单到手</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest text-center">已结账 (到卡)</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-primary uppercase tracking-widest text-center">费率</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-primary uppercase tracking-widest text-center">真实业绩</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {platforms.map((p) => (
-                    <tr key={p.id} className="hover:bg-muted/5 transition-colors">
-                      <td className="px-6 py-4 font-bold text-foreground whitespace-nowrap">{p.name}</td>
-                      <td className="px-6 py-4 text-right min-w-[180px]">
-                        <div className="relative inline-block w-full">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">¥</span>
-                          <input 
-                            type="number"
-                            value={p.received || ""}
-                            onChange={(e) => handleInputChange(p.id, 'received', e.target.value)}
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm text-right font-bold"
-                            placeholder="0.00"
-                          />
+                  {entries.map((e) => (
+                    <tr key={e.id} className="hover:bg-muted/5 transition-colors group">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-primary font-black uppercase mb-0.5">{e.shopName}</span>
+                          <span className="font-bold text-foreground">{e.platformName}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right min-w-[180px]">
-                        <div className="relative inline-block w-full">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">¥</span>
-                          <input 
-                            type="number"
-                            value={p.brushing || ""}
-                            onChange={(e) => handleInputChange(p.id, 'brushing', e.target.value)}
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm text-right font-bold"
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right min-w-[180px]">
-                        <div className="relative inline-block w-full">
+                      <td className="px-6 py-4 text-center">
+                        <div className="relative inline-block w-40 text-left">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">¥</span>
                           <input 
                             type="number"
-                            value={p.receivedToCard || ""}
-                            onChange={(e) => handleInputChange(p.id, 'receivedToCard', e.target.value)}
+                            value={e.received || ""}
+                            onChange={(eVal) => handleInputChange(e.id, 'received', eVal.target.value)}
+                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm text-right font-bold"
                             placeholder="0.00"
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-orange-500/5 border border-orange-500/20 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all font-mono text-sm outline-none placeholder:text-muted-foreground/30 text-rose-500 font-bold text-right"
                           />
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="font-mono font-bold text-primary text-lg">
-                          ¥{(p.received - p.brushing).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <td className="px-6 py-4 text-center">
+                        <div className="relative inline-block w-40 text-left">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">¥</span>
+                          <input 
+                            type="number"
+                            value={e.brushing || ""}
+                            onChange={(eVal) => handleInputChange(e.id, 'brushing', eVal.target.value)}
+                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm text-right font-bold"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="relative inline-block w-40 text-left">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]">¥</span>
+                          <input 
+                            type="number"
+                            value={e.receivedToCard || ""}
+                            onChange={(eVal) => handleInputChange(e.id, 'receivedToCard', eVal.target.value)}
+                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-orange-500/5 border border-orange-500/20 focus:border-orange-500 transition-all font-mono text-sm text-right text-rose-500 font-bold"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-xs font-black text-muted-foreground bg-muted/30 px-2 py-1 rounded-lg">
+                          {(e.serviceFeeRate * 100).toFixed(0)}%
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-center font-mono font-bold text-primary">
+                        ¥{(e.received - e.brushing).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-muted/10 dark:bg-white/5 border-t border-border">
-                    <td className="px-6 py-6 font-bold text-muted-foreground whitespace-nowrap">合计汇总</td>
-                    <td className="px-6 py-6 text-right">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider mb-1">总账单 (A)</span>
-                        <span className="font-mono font-bold text-foreground text-lg">
-                          ¥{platforms.reduce((sum, p) => sum + p.received, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
+                  <tr className="bg-primary/5 border-t-2 border-primary/20">
+                    <td className="px-6 py-6 font-black text-primary uppercase text-xs tracking-widest">总计汇总</td>
+                    <td className="px-6 py-6 text-center font-mono font-bold text-foreground">
+                      ¥{entries.reduce((sum, e) => sum + e.received, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-6 text-right">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider mb-1">总刷单 (B)</span>
-                        <span className="font-mono font-bold text-orange-500 text-lg">
-                          ¥{platforms.reduce((sum, p) => sum + p.brushing, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
+                    <td className="px-6 py-6 text-center font-mono font-bold text-orange-500">
+                      ¥{entries.reduce((sum, e) => sum + e.brushing, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-6 py-6 text-right">
-                      {stats.totalAlreadyReceived > 0 && (
-                        <div className="flex flex-col items-end">
-                          <span className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider mb-1">已到账业绩部分</span>
-                          <span className="font-mono font-bold text-rose-500/80 text-sm">
-                            ¥{stats.totalAlreadyReceived.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-6 text-right bg-primary/3">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold text-primary tracking-widest mb-1.5">总真业绩合计</span>
-                        <span className="font-mono font-black text-primary text-2xl tracking-tight">
-                          ¥{stats.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
+                    <td colSpan={2} />
+                    <td className="px-6 py-6 text-center font-mono font-black text-primary text-xl">
+                      ¥{stats.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
+          </div>
 
-            {/* Mobile View: Card-based Entry */}
-            <div className="md:hidden divide-y divide-border/50">
-              {platforms.map((p) => (
-                <div key={p.id} className="p-4 space-y-4 hover:bg-muted/5 transition-colors">
-                  <div className="flex justify-between items-center px-1">
-                    <span className="font-bold text-lg text-foreground">{p.name}</span>
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] text-muted-foreground font-bold uppercase">真实业绩</span>
-                      <span className="font-mono font-bold text-primary">
-                        ¥{(p.received - p.brushing).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
+          {/* Final Summary Card */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="rounded-3xl p-8 bg-white dark:bg-white/5 border border-border shadow-xl flex flex-col relative overflow-hidden h-full">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-8">
+                    <Wallet size={20} className="text-primary" />
+                    <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">多店合并净得预测</span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-muted-foreground px-1">账单实到 (A)</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">¥</span>
-                        <input 
-                          type="number"
-                          value={p.received || ""}
-                          onChange={(e) => handleInputChange(p.id, 'received', e.target.value)}
-                          className="w-full h-11 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm font-bold"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-muted-foreground px-1">刷单到手</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">¥</span>
-                        <input 
-                          type="number"
-                          value={p.brushing || ""}
-                          onChange={(e) => handleInputChange(p.id, 'brushing', e.target.value)}
-                          className="w-full h-11 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm font-bold"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
+                  <div className="mb-12">
+                    <h3 className="text-6xl font-black tracking-tighter text-primary">
+                      ¥{stats.finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </h3>
                   </div>
 
-                  <div className="space-y-1.5 pt-1">
-                    <label className="text-[10px] font-bold text-orange-600 dark:text-orange-500 px-1">已结账</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">¥</span>
-                      <input 
-                        type="number"
-                        value={p.receivedToCard || ""}
-                        onChange={(e) => handleInputChange(p.id, 'receivedToCard', e.target.value)}
-                        placeholder="输入已到账额度"
-                        className="w-full h-11 pl-7 pr-3 rounded-xl bg-orange-500/5 border border-orange-500/20 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all font-mono text-sm outline-none placeholder:text-muted-foreground/30 text-rose-500 font-bold"
-                      />
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center py-3 border-b border-border/50">
+                      <span className="text-sm font-bold text-muted-foreground">合计真实业绩 (A-B)</span>
+                      <span className="font-mono font-bold text-lg">¥{stats.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
+                    <div className="flex justify-between items-center py-3 border-b border-border/50">
+                      <span className="text-sm font-bold text-muted-foreground">累计各店服务费扣点</span>
+                      <span className="font-mono font-bold text-orange-500">-¥{stats.totalServiceFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {stats.totalAlreadyReceived > 0 && (
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-sm font-bold text-muted-foreground">累计已到账金额</span>
+                        <span className="font-mono font-bold text-rose-500">-¥{stats.totalAlreadyReceived.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-              
-              {/* Mobile Summary Row */}
-               <div className="p-6 bg-muted/20 dark:bg-white/5 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">总账单 (A)</span>
-                    <p className="font-mono font-bold text-foreground">¥{platforms.reduce((sum, p) => sum + p.received, 0).toLocaleString()}</p>
-                  </div>
-                  <div className="space-y-1 text-right">
-                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">总刷单 (B)</span>
-                    <p className="font-mono font-bold text-orange-500">¥{platforms.reduce((sum, p) => sum + p.brushing, 0).toLocaleString()}</p>
-                  </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-1 space-y-6">
+              <div className="rounded-3xl p-8 bg-white dark:bg-white/5 border border-border h-full flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-sm mb-4">结算备注</h4>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="输入本次多店结算的备注..."
+                    className="w-full h-32 p-4 text-sm rounded-2xl bg-muted/30 border-transparent focus:border-primary/50 transition-all outline-none resize-none"
+                  />
                 </div>
                 
-                <div className="pt-4 border-t border-border flex justify-between items-end">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-bold text-primary tracking-widest mb-1">合计净业绩汇总</span>
-                    <span className="font-mono font-black text-primary text-3xl leading-none tracking-tight">
-                      ¥{stats.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  {stats.totalAlreadyReceived > 0 && (
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-bold text-rose-500 mb-1">已到账部分: -¥{stats.totalAlreadyReceived.toLocaleString()}</span>
-                    </div>
-                  )}
+                <div className="pt-8">
+                  <button 
+                    onClick={saveSettlement}
+                    disabled={isSaving || stats.totalNet === 0}
+                    className="w-full h-16 rounded-2xl bg-primary text-primary-foreground font-black text-lg flex items-center justify-center gap-3 shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30"
+                  >
+                    {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+                    保存结算单
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
-        {/* Result Summary Section */}
-        <div className="space-y-6">
-          <div className="relative mb-20">
-            <div className="rounded-3xl p-8 bg-white dark:bg-white/5 text-foreground border border-border shadow-xl relative overflow-hidden flex flex-col min-h-[500px]">
-              {/* 背景装饰 */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
-
-              <div className="relative z-10 flex flex-col flex-1">
-                <div className="flex items-center gap-2 mb-6">
-                   <Wallet size={20} className="text-primary" />
-                   <span className="text-sm font-black uppercase tracking-widest text-muted-foreground dark:text-white/60">最终本期补款/应得</span>
-                </div>
-                
-                {/* 核心大数字前置 */}
-                <div className="mb-10">
-                  <h3 className="text-5xl sm:text-6xl font-black tracking-tighter dark:text-white font-number text-primary drop-shadow-sm">
-                     ¥{stats.finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </h3>
-                </div>
-
-                {/* 扣费明细流水 */}
-                <div className="space-y-4 bg-muted/20 dark:bg-black/20 p-5 rounded-2xl border border-border/50 backdrop-blur-sm">
-                   <div className="flex justify-between items-center">
-                     <span className="text-sm font-bold text-muted-foreground">合计真实总业绩</span>
-                     <span className="font-mono font-black text-lg text-foreground">¥{stats.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                   </div>
-                   
-                   {/* Render individual platform nets here */}
-                   {stats.platformResults.some(p => p.net > 0) && (
-                     <div className="space-y-2 mt-4 pt-4 border-t border-border/50">
-                       {stats.platformResults.filter(p => p.net > 0).map(p => (
-                         <div key={p.id} className="flex justify-between items-center text-xs">
-                           <span className="text-muted-foreground">{p.name} 真实业绩</span>
-                           <span className="font-mono text-foreground font-medium">¥{p.net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                         </div>
-                       ))}
-                     </div>
-                   )}
-                   
-                   <div className="h-px bg-border/50 w-full mt-4" />
-
-                   <div className="space-y-3">
-                       <div className="flex justify-between items-center group">
-                         <div className="flex items-center gap-1.5 shrink-0">
-                           <span className="text-xs sm:text-sm font-bold text-muted-foreground whitespace-nowrap">扣除平台服务费</span>
-                           <CustomSelect 
-                              value={serviceFeeRate.toString()}
-                              onChange={(val) => setServiceFeeRate(parseFloat(val))}
-                              options={[
-                                { value: "0.05", label: "5.0%" },
-                                { value: "0.06", label: "6.0%" },
-                                { value: "0.07", label: "7.0%" },
-                                { value: "0.08", label: "8.0%" },
-                              ]}
-                              className="w-20 h-7 opacity-70 hover:opacity-100 transition-opacity"
-                              triggerClassName="h-full text-xs font-bold py-0"
-                            />
-                         </div>
-                         <span className="font-mono font-bold text-orange-500 text-sm whitespace-nowrap pl-2">
-                           -¥{stats.serviceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                         </span>
-                       </div>
-
-                     {stats.totalAlreadyReceived > 0 && (
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm font-bold text-muted-foreground">扣除已打款部分</span>
-                         <span className="font-mono font-bold text-rose-500 text-sm">
-                           -¥{stats.totalAlreadyReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                         </span>
-                       </div>
-                     )}
-                   </div>
-                </div>
-
-                <div className="mt-auto pt-8">
-                    <div className="mb-4">
-                      <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="添加备注（选填）"
-                        className="w-full h-20 p-4 text-sm rounded-2xl bg-muted/30 border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none resize-none placeholder:text-muted-foreground/50"
-                      />
-                    </div>
-                    
-                    <button                      onClick={saveSettlement}
-                      disabled={isSaving || stats.totalNet === 0}
-                      className="w-full mt-6 h-14 rounded-2xl bg-primary text-primary-foreground font-black text-lg flex items-center justify-center gap-3 shadow-lg shadow-primary/20 hover:translate-y-[-2px] active:translate-y-0 transition-all disabled:opacity-50 disabled:pointer-events-none"
-                    >
-                      {isSaving ? (
-                        <Loader2 size={24} className="animate-spin" />
-                      ) : (
-                        <Save size={24} />
-                      )}
-                      保存此结算单
-                    </button>
-
-                    <p className="text-[10px] text-muted-foreground dark:text-white/30 mt-4 font-medium leading-relaxed">
-                      * 基于分平台剔除刷单逻辑自动核算，并可保存至历史记录中随时查阅。
-                    </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Tips */}
-            <div className="mt-6 p-6 rounded-3xl border border-primary/20 bg-primary/5 dark:bg-primary/10">
-              <h4 className="text-sm font-bold text-primary flex items-center gap-2 mb-2">
-                <Info size={16} />
-                对账小贴士
-              </h4>
-              <ul className="text-xs text-muted-foreground space-y-2 font-medium">
-                <li className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>严谨模式：分平台计算能看清每个平台的真实收益贡献。</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>实时预览：输入框变动即刻触发全局重新计算。</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span>扣点变更：支持手动调整扣点费率（默认为 6%）。</span>
-                </li>
-              </ul>
-            </div>
-          </div>
+      ) : (
+        <div className="h-[40vh] rounded-3xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-4 text-muted-foreground bg-muted/5">
+          <Store size={48} className="opacity-20 text-primary" />
+          <p className="font-bold">请在上方选择一个或多个店铺开始核算</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }

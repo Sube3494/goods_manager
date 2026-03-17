@@ -177,7 +177,7 @@ function SetupPurchasesContent() {
                 </div>
                 <button
                   onClick={() => router.push(`/setup-purchases/${batch.id}`)}
-                  className="px-5 py-2.5 text-sm font-black text-primary-foreground bg-primary rounded-xl hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95 flex items-center gap-2"
+                  className="px-5 py-2.5 text-sm font-black text-primary-foreground bg-primary rounded-xl hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap shrink-0"
                 >
                   <Eye size={18} strokeWidth={2.5} />
                   查看明细
