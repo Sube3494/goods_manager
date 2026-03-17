@@ -362,6 +362,7 @@ model BrushOrderPlanItem {
   searchKeyword String?
   platform      String?
   note          String?
+  principal     Float?
   done          Boolean         @default(false)
   sortOrder     Int             @default(0)
   createdAt     DateTime        @default(now())

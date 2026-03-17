@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, Search, CheckCircle2, Circle, Store, ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
+import { X, Package, Plus, Trash2, Search, CheckCircle2, Circle, Store, ChevronDown, ChevronRight, LayoutGrid, Wallet } from "lucide-react";
 import Image from "next/image";
 import { BrushOrderPlan, BrushOrderPlanItem, Product, AddressItem } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -240,7 +240,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                     >
                                                                                         {item.done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
                                                                                     </button>
- 
+
                                                                                     <div className="w-10 h-10 rounded-lg bg-muted border border-border/50 overflow-hidden shrink-0">
                                                                                         {item.product?.image ? (
                                                                                             <Image src={item.product.image} width={40} height={40} className="w-full h-full object-cover" alt={item.product.name} unoptimized />
@@ -263,22 +263,32 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                     </button>
                                                                                 </div>
  
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <div className="flex items-center gap-2 bg-muted/30 dark:bg-white/5 rounded-lg px-2 h-9 border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all w-[70px] shrink-0">
+                                                                                <div className="flex flex-row items-center gap-2">
+                                                                                    <div className="flex items-center gap-1.5 bg-muted/30 dark:bg-white/5 rounded-lg px-2 h-9 border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all w-[65px] shrink-0">
                                                                                         <span className="text-[9px] font-black text-muted-foreground uppercase opacity-40 shrink-0">份</span>
                                                                                         <input
                                                                                             type="number"
-                                                                                            className="w-full bg-transparent text-xs text-center outline-none font-black text-foreground"
+                                                                                            className="w-full bg-transparent text-xs text-center outline-none font-black text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                                             value={item.quantity}
                                                                                             min="1"
                                                                                             onChange={e => updateItem(originalIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                                                                        />
+                                                                                    </div>
+
+                                                                                    <div className="flex items-center gap-1.5 bg-amber-500/5 dark:bg-amber-500/10 rounded-lg px-2 h-9 border border-transparent focus-within:border-amber-500/20 focus-within:bg-background transition-all w-[85px] shrink-0">
+                                                                                        <span className="text-[9px] font-black text-amber-600 dark:text-amber-500/70 uppercase opacity-40 shrink-0">本金</span>
+                                                                                        <input
+                                                                                            type="number"
+                                                                                            className="w-full bg-transparent text-xs text-center outline-none font-black text-amber-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            value={item.principal || ""}
+                                                                                            placeholder="0"
+                                                                                            onChange={e => updateItem(originalIndex, 'principal', parseFloat(e.target.value) || 0)}
                                                                                         />
                                                                                     </div>
  
                                                                                     <div className="relative flex-1 flex items-center h-9">
                                                                                         <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-muted-foreground pointer-events-none opacity-40">
                                                                                             <Search size={12} />
-                                                                                            <span className="text-red-500 font-bold text-[10px]">*</span>
                                                                                         </div>
                                                                                         <input
                                                                                             type="text"
@@ -303,7 +313,30 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                 );
                                             })}
 
-                                            {(!formData.items || formData.items.length === 0) && (
+                                            {formData.items && formData.items.length > 0 ? (
+                                                <div className="mt-4 p-4 rounded-3xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/10 flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600">
+                                                            <Wallet size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-[10px] font-black text-amber-600/50 uppercase tracking-widest">任务总估算本金</div>
+                                                            <div className="flex items-baseline gap-1">
+                                                                <span className="text-xs font-black text-amber-600/70">¥</span>
+                                                                <span className="text-xl font-black text-amber-600 tracking-tight">
+                                                                    {(formData.items.reduce((sum, item) => sum + ((item.principal || 0) * (item.quantity || 1)), 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right border-l border-amber-500/10 pl-6">
+                                                        <div className="text-[10px] font-black text-amber-600/50 uppercase tracking-widest">总件数</div>
+                                                        <div className="text-lg font-black text-amber-600 leading-none mt-1">
+                                                            {formData.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} <span className="text-xs">份</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
                                                 <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed rounded-3xl border-gray-100 dark:border-white/5 text-muted-foreground">
                                                     <Package size={48} className="opacity-10 mb-4" />
                                                     <p className="text-sm font-bold opacity-40">点击右上角“选择商品”开始规划</p>

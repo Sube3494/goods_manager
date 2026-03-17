@@ -238,6 +238,7 @@ export interface BrushOrderPlanItem {
   searchKeyword: string;
   platform?: string;
   note?: string;
+  principal?: number;
   done: boolean;
   sortOrder?: number;
 }

@@ -54,6 +54,7 @@ export async function GET(
         searchKeyword: item.searchKeyword,
         platform: item.platform,
         note: item.note,
+        principal: item.principal,
         done: item.done,
         product: item.product ? {
           name: item.product.name,
@@ -78,7 +79,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { itemId, done } = body;
+    const { itemId, done, principal } = body;
 
     if (!itemId) {
       return NextResponse.json({ error: 'Item ID is required' }, { status: 400 });
@@ -105,15 +106,16 @@ export async function PATCH(
     }
 
     // 3. Update the specific item
-    // Note: We also check the itemId belongs to the plan for security
+    const updateData: { done?: boolean; principal?: number } = {};
+    if (done !== undefined) updateData.done = !!done;
+    if (principal !== undefined) updateData.principal = parseFloat(String(principal)) || 0;
+
     const updatedItem = await prisma.brushOrderPlanItem.updateMany({
       where: {
         id: itemId,
         planId: id
       },
-      data: {
-        done: !!done
-      }
+      data: updateData
     });
 
     if (updatedItem.count === 0) {
