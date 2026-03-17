@@ -34,6 +34,11 @@ export async function POST(req: NextRequest) {
     // but a transaction ensures consistency. 
     // Given it's an import, let's try to do as much as possible.
 
+    const allProducts = await prisma.product.findMany({
+      where: { userId },
+      select: { id: true, name: true, sku: true }
+    });
+
     for (const row of data) {
       try {
         // Map keys (supporting both Chinese and Optional * for required fields)
@@ -73,34 +78,74 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Try to find product in CURRENT workspace
+        // --- Smart Product Matching Logic ---
         let product = null;
-        if (sku) {
-          product = await prisma.product.findFirst({ 
-              where: { 
-                  sku: String(sku), 
-                  userId 
-              } 
-          });
+        const targetSku = sku ? String(sku).trim() : null;
+        const targetName = productName ? String(productName).trim() : null;
+
+        // 1. Try SKU exact match
+        if (targetSku) {
+            product = allProducts.find(p => p.sku === targetSku);
         }
-        if (!product && productName) {
-          // Try pinyin or exact name
-          product = await prisma.product.findFirst({ 
-              where: { 
-                  name: String(productName), 
-                  userId 
-              } 
-          });
-          
-          if (!product) {
-              // Try a more loose match for long Meituan product names (contains)
-              product = await prisma.product.findFirst({
-                  where: {
-                      name: { contains: String(productName).substring(0, 20) }, // Use prefix for fuzzy match
-                      userId
-                  }
-              });
-          }
+
+        // 2. Try Name exact match
+        if (!product && targetName) {
+            product = allProducts.find(p => p.name === targetName);
+        }
+
+        // 3. Smart Token & Bi-gram Scoring Match
+        if (!product && targetName) {
+            // Clean marketing characters
+            const cleanTarget = targetName.replace(/[【】\[\]()（）\s]/g, ' ');
+            
+            // Tokenize English/Numbers
+            const targetKeywords = cleanTarget.split(/([a-zA-Z0-9.\-_]{2,})/).filter(k => k && k.trim().length >= 2);
+            
+            // Create Bi-grams for Chinese parts
+            const biGrams: string[] = [];
+            for (let i = 0; i < targetName.length - 1; i++) {
+                const chunk = targetName.substring(i, i + 2);
+                if (/[\u4e00-\u9fa5]{2}/.test(chunk)) {
+                    biGrams.push(chunk);
+                }
+            }
+            
+            let bestScore = 0;
+            let bestMatch = null;
+
+            for (const p of allProducts) {
+                let score = 0;
+                const pName = p.name;
+
+                // Full include score (highest weight)
+                if (targetName.includes(pName) || pName.includes(targetName)) {
+                    score += 20;
+                }
+
+                // Keyword hits (English/Code)
+                targetKeywords.forEach(kw => {
+                    if (pName.toLowerCase().includes(kw.toLowerCase())) {
+                        score += kw.length * 2;
+                    }
+                });
+
+                // Bi-gram hits (Chinese)
+                biGrams.forEach(bg => {
+                    if (pName.includes(bg)) {
+                        score += 1;
+                    }
+                });
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = p;
+                }
+            }
+
+            // Threshold: must have a decent level of overlap
+            if (bestScore >= 5) {
+                product = bestMatch;
+            }
         }
 
         if (!product) {

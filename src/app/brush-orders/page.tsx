@@ -56,6 +56,8 @@ export default function BrushOrdersPage() {
   const [selectedShop, setSelectedShop] = useState("全部");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   
   const toggleMonthExpansion = (month: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -441,6 +443,10 @@ export default function BrushOrdersPage() {
       });
       const result = await res.json();
       if (res.ok) {
+        if (result.failed > 0 && result.errors?.length > 0) {
+          setImportErrors(result.errors);
+          setIsErrorModalOpen(true);
+        }
         showToast(`导入完成: 成功 ${result.success} 条, 失败 ${result.failed} 条`);
         fetchData();
       } else {
@@ -1112,7 +1118,7 @@ export default function BrushOrdersPage() {
         onDelete={canBrush ? handleBatchDelete : undefined}
         label="个订单"
       />
-    <ImportModal 
+      <ImportModal 
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImport}
@@ -1131,6 +1137,27 @@ export default function BrushOrdersPage() {
             "备注": "示例模版数据"
           }
         ]}
+      />
+
+      <ConfirmModal
+        isOpen={isErrorModalOpen}
+        onClose={() => setIsErrorModalOpen(false)}
+        onConfirm={() => setIsErrorModalOpen(false)}
+        title="导入结果详情"
+        message={
+          <div className="mt-2 max-h-60 overflow-y-auto">
+            <p className="text-sm text-muted-foreground mb-4">以下数据导入失败，请检查文件后重试：</p>
+            <ul className="space-y-2">
+              {importErrors.map((err, idx) => (
+                <li key={idx} className="text-xs text-destructive bg-destructive/5 p-2 rounded border border-destructive/10">
+                  {err}
+                </li>
+              ))}
+            </ul>
+          </div>
+        }
+        variant="info"
+        confirmLabel="知道了"
       />
     </div>
   );
