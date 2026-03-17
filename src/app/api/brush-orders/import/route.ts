@@ -37,15 +37,35 @@ export async function POST(req: NextRequest) {
     for (const row of data) {
       try {
         // Map keys (supporting both Chinese and Optional * for required fields)
-        const dateStr = row['日期'] || row['*日期'];
-        const type = row['类型'] || row['*类型'];
-        const payment = row['实付'] || row['*实付'];
-        const received = row['到手金额'] || row['*到手金额'];
-        const commission = row['佣金'] || row['*佣金'];
-        const note = row['备注'] || row['*备注'];
+        // Standard headers
+        const dateStr = row['日期'] || row['*日期'] || row['下单时间'];
+        let type = row['类型'] || row['*类型'];
+        const payment = row['实付'] || row['*实付'] || row['实际支付'];
+        const received = row['到手金额'] || row['*到手金额'] || row['预计收入'];
+        const commission = row['佣金'] || row['*佣金'] || 0;
+        let note = row['备注'] || row['*备注'] || "";
         const productName = row['商品名称'] || row['*商品名称'];
         const sku = row['SKU'] || row['*SKU'];
         const quantity = row['数量'] || row['*数量'] || 1;
+        const shopName = row['店铺'] || row['*店铺'] || row['所属门店'];
+        const platformOrderId = row['平台单号'] || row['*平台单号'] || row['订单号'];
+        const deliveryMethod = row['配送方式'];
+
+        // Recognition logic for Meituan Flash Sale
+        if (!type && deliveryMethod) {
+          type = "美团";
+        }
+
+        // FILTER: Only import brush orders (自配送)
+        // If it's a Meituan report (has deliveryMethod) and it's not "自配送", skip it.
+        if (deliveryMethod && deliveryMethod !== "自配送") {
+          continue; 
+        }
+
+        if (deliveryMethod === "自配送") {
+          const typeTag = "[刷单]";
+          note = note ? `${typeTag} ${note}` : typeTag;
+        }
 
         if (!type || !dateStr) {
           results.failed++;
@@ -64,12 +84,23 @@ export async function POST(req: NextRequest) {
           });
         }
         if (!product && productName) {
+          // Try pinyin or exact name
           product = await prisma.product.findFirst({ 
               where: { 
                   name: String(productName), 
                   userId 
               } 
           });
+          
+          if (!product) {
+              // Try a more loose match for long Meituan product names (contains)
+              product = await prisma.product.findFirst({
+                  where: {
+                      name: { contains: String(productName).substring(0, 20) }, // Use prefix for fuzzy match
+                      userId
+                  }
+              });
+          }
         }
 
         if (!product) {
@@ -88,6 +119,8 @@ export async function POST(req: NextRequest) {
             receivedAmount: parseFloat(String(received || 0)),
             commission: parseFloat(String(commission || 0)),
             note: note ? String(note) : null,
+            shopName: shopName ? String(shopName) : null,
+            platformOrderId: platformOrderId ? String(platformOrderId) : null,
             items: {
               create: [
                 {
