@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Metadata } from "next";
 import { createHmac } from "crypto";
 import { CameraOff } from "lucide-react";
+import { getStorageStrategy } from "@/lib/storage";
 
 // 根据图片后缀判断是否是视频
 function isVideoUrl(url: string) {
@@ -70,9 +71,8 @@ export default async function SharePage({ params, searchParams }: { params: Prom
   }
 
   const isVideo = isVideoUrl(item.url) || item.type === "video";
-  const displayUrl = item.url.startsWith("http") || item.url.startsWith("/") 
-    ? item.url 
-    : `/api/uploads/${item.url.replace(/^\/?uploads\//, '')}`;
+  const storage = await getStorageStrategy();
+  const displayUrl = storage.resolveUrl(item.url);
 
   return (
     <div className="min-h-screen h-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans">

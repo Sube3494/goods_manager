@@ -4,6 +4,7 @@ import { Metadata } from "next";
 import { createHmac } from "crypto";
 import { CameraOff } from "lucide-react";
 import { ProductShareClient } from "./ShareClient";
+import { getStorageStrategy } from "@/lib/storage";
 
 function verifySignature(id: string, expiresStr?: string, signature?: string) {
   if (!expiresStr || !signature) return false;
@@ -71,9 +72,15 @@ export default async function ProductSharePage({ params, searchParams }: { param
     notFound();
   }
 
+  const storage = await getStorageStrategy();
+
   // Cast safely for the client component
   return <ProductShareClient 
-    items={product.gallery as unknown as { id: string; url: string; type: string }[]} 
+    items={product.gallery.map(item => ({
+      id: item.id,
+      url: storage.resolveUrl(item.url),
+      type: item.type
+    }))} 
     productName={product.name}
     sku={product.sku || ""}
     description={product.remark || ""}
