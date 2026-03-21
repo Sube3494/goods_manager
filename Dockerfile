@@ -53,7 +53,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # 安装 Prisma CLI（使用淘宝源加速下载并用于启动时自动执行 migrate deploy）
-RUN npm install -g prisma@5.22.0 --registry=https://registry.npmmirror.com
+RUN npm install -g prisma@5.22.0 --registry=https://registry.npmmirror.com && \
+    chmod -R 777 /usr/local/lib/node_modules/prisma/node_modules/@prisma/engines
 
 # 自动建库脚本（shell 脚本，不依赖 npm 包）
 COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
