@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from '@/lib/storage';
+import { parseAsShanghaiTime } from '@/lib/dateUtils';
 
 export async function GET(req: NextRequest) {
   const session = await getAuthorizedUser("brush:manage");
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     const order = await prisma.brushOrder.create({
       data: {
-        date: new Date(date),
+        date: parseAsShanghaiTime(date),
         type,
         shopName: shopName || null,
         userId: session.id,

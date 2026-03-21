@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { SessionUser } from "@/lib/permissions";
+import { parseAsShanghaiTime } from "@/lib/dateUtils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest) {
 
         await prisma.brushOrder.create({
           data: {
-            date: new Date(dateStr),
+            date: parseAsShanghaiTime(dateStr),
             type: String(type),
             status: "Completed", // Default to completed for imports
             userId,

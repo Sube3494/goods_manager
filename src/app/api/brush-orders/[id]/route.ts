@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 import { getStorageStrategy } from '@/lib/storage';
+import { parseAsShanghaiTime } from '@/lib/dateUtils';
 
 export async function GET(
   req: NextRequest,
@@ -79,7 +80,7 @@ export async function PUT(
       return tx.brushOrder.update({
         where: { id },
         data: {
-          date: new Date(date),
+          date: parseAsShanghaiTime(date),
           type,
           shopName: shopName || null,
           paymentAmount: parseFloat(paymentAmount || 0),

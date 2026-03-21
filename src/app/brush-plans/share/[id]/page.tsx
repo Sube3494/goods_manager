@@ -302,7 +302,7 @@ function ItemCard({ item, index, onUpdate }: { item: BrushOrderPlanItem; index: 
         <div className={cn(
             "group relative flex flex-col glass-panel rounded-2xl overflow-hidden transition-all duration-500 cursor-default bg-white dark:bg-zinc-900 border shadow-sm hover:shadow-xl",
             item.done 
-                ? "border-emerald-500/30 dark:border-emerald-500/20 -translate-y-0 opacity-80" 
+                ? "border-emerald-500/30 dark:border-emerald-500/20 translate-y-0 opacity-80" 
                 : "border-zinc-200 dark:border-white/5 hover:-translate-y-1.5"
         )}>
             <div className="relative aspect-square w-full bg-zinc-100 dark:bg-zinc-800/50 overflow-hidden">
