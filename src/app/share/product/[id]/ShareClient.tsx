@@ -72,7 +72,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
 
     return (
         <motion.div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-full h-full flex flex-col items-center justify-center p-4 pb-28 md:p-8 md:pb-36 pointer-events-auto overflow-hidden">
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))] md:p-8 md:pb-40 pointer-events-auto overflow-hidden">
                 {isVideo ? (
                     <div className="flex flex-col items-center justify-center w-full h-full max-w-6xl mx-auto gap-2 relative">
                         {/* Video Container - Compact sizing */}
@@ -80,7 +80,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
                                 <video 
                                     ref={videoRef}
                                     src={item.url} 
-                                    className="max-w-full max-h-[calc(100dvh-200px)] w-auto h-auto object-contain cursor-pointer"
+                                    className="max-w-full max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0px))] w-auto h-auto object-contain cursor-pointer"
                                 disablePictureInPicture
                                 disableRemotePlayback
                                 autoPlay
@@ -188,7 +188,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
                         <GestureImage 
                             src={item.url} 
                             onScaleChange={onScaleChange}
-                            className="max-w-full max-h-[calc(100dvh-200px)] object-contain"
+                            className="max-w-full max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0px))] object-contain"
                         />
                     </div>
                 )}
@@ -261,7 +261,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   }, [currentIndex]);
 
   return (
-    <div className="min-h-screen h-dvh w-full bg-black text-white flex flex-col relative overflow-hidden font-sans select-none touch-none">
+    <div className="flex-1 h-dvh min-h-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans select-none touch-none">
       
       {/* Background Glow */}
       <AnimatePresence mode="wait">
@@ -418,9 +418,9 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
       {/* Bottom Thumbnails & Mobile Controls */}
       <motion.div 
         style={{ opacity: uiOpacity }}
-        className="absolute bottom-6 left-0 right-0 flex justify-center z-50 px-4 pointer-events-none"
+        className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 flex justify-center z-50 px-4 pointer-events-none"
       >
-        <div className="bg-black/40 backdrop-blur-xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-full overflow-hidden">
+        <div className="bg-black/40 backdrop-blur-xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-full overflow-hidden mb-[env(safe-area-inset-bottom,0px)]">
             {items.length > 1 && (
                 <button
                     onClick={() => navigate(-1)}

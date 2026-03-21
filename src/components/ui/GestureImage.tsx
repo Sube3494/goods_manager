@@ -135,7 +135,6 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
         src={src}
         alt={alt}
         className="max-w-full max-h-full object-contain rounded-lg shadow-2xl pointer-events-none block"
-        style={{ maxHeight: '75dvh' }}
         draggable={false}
       />
     </motion.div>
