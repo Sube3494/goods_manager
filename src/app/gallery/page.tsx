@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -737,8 +737,8 @@ function GalleryContent() {
       if (a.sortOrder !== b.sortOrder) {
           return (a.sortOrder || 0) - (b.sortOrder || 0);
       }
-      // 其次按 createdAt 降序 (Secondary: createdAt DESC)
-      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      // 其次按 createdAt 升序 (Secondary: createdAt ASC)
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
   }) : [];
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 

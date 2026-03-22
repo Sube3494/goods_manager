@@ -299,6 +299,25 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
               
             if (isMain) {
               setFormData(prev => ({ ...prev, image: url }));
+              // Synchronize with gallery list as well
+              setGalleryImages(prev => {
+                const existingIndex = prev.findIndex(item => item.id === 'cover-virtual' || item.url === url);
+                const newItem: GalleryItem = {
+                  id: 'cover-virtual',
+                  url,
+                  productId: initialData?.id || "",
+                  uploadDate: new Date().toISOString(),
+                  tags: [],
+                  type: isVideoType ? 'video' : 'image'
+                };
+                
+                if (existingIndex !== -1) {
+                  const next = [...prev];
+                  next[existingIndex] = newItem;
+                  return next;
+                }
+                return [newItem, ...prev];
+              });
             } else {
               setFormData(prev => {
                 if (!prev.image) {
@@ -490,6 +509,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
         // 如果只是虚拟封面项，直接从 UI 移除即可（上面已处理 formData）
         if (isVirtual) {
+          setGalleryImages(prev => prev.filter(i => i.id !== img.id));
           showToast("⚠️ 封面引用已剥离，请记得【点击保存商品】生效", "warning");
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           return;
