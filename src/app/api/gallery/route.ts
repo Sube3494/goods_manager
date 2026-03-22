@@ -94,7 +94,7 @@ export async function GET(request: Request) {
           },
           orderBy: [
             { sortOrder: 'asc' },
-            { createdAt: 'desc' }
+            { createdAt: 'asc' }
           ]
         }
       }

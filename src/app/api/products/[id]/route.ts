@@ -14,7 +14,12 @@ export async function GET(
       include: {
         category: true,
         supplier: true,
-        gallery: true,
+        gallery: {
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' }
+          ]
+        },
         orderItems: {
           include: {
             purchaseOrder: true
