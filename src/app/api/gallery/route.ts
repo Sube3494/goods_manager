@@ -18,11 +18,25 @@ export async function GET(request: Request) {
     const session = await getFreshSession() as SessionUser | null;
     
     // 1. Build product-level filters
+    const andConditions: Array<Record<string, unknown>> = [];
+    
+    // Visibility and permission filtering logic
+    if (!session || !session.id) {
+      // Unauthenticated: only see public products
+      andConditions.push({ isPublic: true });
+    } else if (session.role !== "SUPER_ADMIN") {
+      // Regular user: see own products OR public ones
+      andConditions.push({
+        OR: [
+          { userId: session.id },
+          { isPublic: true }
+        ]
+      });
+    }
+    // SUPER_ADMIN: no extra visibility filtering
+
     const productWhere = {
-      OR: [
-        { userId: session?.id || undefined },
-        { isPublic: true }
-      ],
+      AND: andConditions,
       id: productId || undefined,
       ...(categoryName && categoryName !== "All" ? { category: { name: categoryName } } : {}),
       ...(query ? {
@@ -38,9 +52,14 @@ export async function GET(request: Request) {
       } : {}),
       // Only include products that have gallery items matching visibility
       gallery: {
-        some: {
-          ...(session ? {} : { isPublic: true })
-        }
+        some: (!session || !session.id) 
+          ? { isPublic: true } 
+          : (session.role === "SUPER_ADMIN" ? {} : {
+              OR: [
+                { isPublic: true },
+                { userId: session.id }
+              ]
+            })
       }
     };
 
@@ -89,9 +108,14 @@ export async function GET(request: Request) {
       include: {
         category: { select: { name: true } },
         gallery: {
-          where: {
-            ...(session ? {} : { isPublic: true })
-          },
+          where: (!session || !session.id) 
+            ? { isPublic: true } 
+            : (session.role === "SUPER_ADMIN" ? {} : {
+                OR: [
+                  { isPublic: true },
+                  { userId: session.id }
+                ]
+              }),
           orderBy: [
             { sortOrder: 'asc' },
             { createdAt: 'asc' }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getLightSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 
 export async function GET(
@@ -8,6 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getLightSession();
     const { id } = await params;
     const product = await prisma.product.findUnique({
       where: { id },
@@ -32,6 +33,14 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    // Visibility check
+    const isOwner = session?.id && product.userId === session.id;
+    const isAdmin = session?.role === "SUPER_ADMIN";
+    
+    if (!product.isPublic && !isOwner && !isAdmin) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const storage = await getStorageStrategy();
     const resolvedProduct = {
       ...product,
@@ -53,11 +62,23 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getLightSession();
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id } = await params;
+
+    // Ownership check for non-admin
+    if (session.role !== "SUPER_ADMIN") {
+      const existing = await prisma.product.findUnique({
+        where: { id },
+        select: { userId: true }
+      });
+      if (existing && existing.userId !== session.id) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
+    }
+
     const body = await request.json();
     const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, remark } = body;
 
@@ -96,17 +117,26 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const session = await getLightSession();
+    if (!session || !session.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id } = await params;
 
-    // 获取待删除商品及其关联相册数据
+    // Fetch existing product to check ownership
     const product = await prisma.product.findUnique({
       where: { id },
       include: { gallery: true }
     });
+
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Ownership check for non-admin
+    if (session.role !== "SUPER_ADMIN" && product.userId !== session.id) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
 
     if (product) {
       try {

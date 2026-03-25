@@ -40,7 +40,13 @@ export async function GET(request: Request) {
 
     // 构建查询条件
     const andConditions: Array<Record<string, unknown>> = [];
-    if (session?.id) {
+    
+    // Visibility and permission filtering logic
+    if (!session || !session.id) {
+      // Unauthenticated: only see public products
+      andConditions.push({ isPublic: true });
+    } else if (session.role !== "SUPER_ADMIN") {
+      // Regular user: see own products OR public ones
       andConditions.push({
         OR: [
           { userId: session.id },
@@ -48,6 +54,7 @@ export async function GET(request: Request) {
         ]
       });
     }
+    // SUPER_ADMIN: no extra visibility filtering, sees everything
 
     if (search) {
       andConditions.push({
