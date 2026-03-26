@@ -230,16 +230,17 @@ function GalleryContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [hoveredDev, setHoveredDev] = useState(false);
-
   // iOS 兼容性状态
   const [copyModalConfig, setCopyModalConfig] = useState<{
     isOpen: boolean;
     url: string;
     title: string;
+    mode: 'copy' | 'download';
   }>({
     isOpen: false,
     url: "",
-    title: ""
+    title: "",
+    mode: 'copy'
   });
 
   const isIOS = useMemo(() => {
@@ -769,8 +770,21 @@ function GalleryContent() {
 
   // 下载增强逻辑
   const handleDownload = async (url: string, filename: string) => {
+    // iOS Safari does not support the `download` attribute or Blob URLs for saving to Photos.
+    // The only reliable path is to open the resource directly and guide the user.
+    if (isIOS) {
+      window.open(url, '_blank');
+      setCopyModalConfig({
+        isOpen: true,
+        url: url,
+        title: "保存到相册",
+        mode: 'download',
+      });
+      return;
+    }
+
     try {
-      // 1. 尝试使用 Blob 下载（支持重命名）
+      // 尝试使用 Blob 下载（支持重命名）
       const response = await fetch(url);
       if (!response.ok) throw new Error("Fetch failed");
       const blob = await response.blob();
@@ -781,27 +795,19 @@ function GalleryContent() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      // Delay revocation to ensure Safari has time to start the download
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (error) {
       console.warn("Blob download failed, falling back to direct link:", error);
-      // 2. 兜底方案：直接打开/下载
+      // 兜底方案：直接打开/下载
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
-      link.target = "_blank"; // 移动端建议在新标签页打开以触发系统下载
+      link.target = "_blank";
       link.rel = "noopener noreferrer";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
       showToast("开始尝试直接下载...", "info");
-      
-      if (isIOS) {
-        setTimeout(() => {
-            showToast("若未自动下载，请在打开的页面长按图片保存", "warning");
-        }, 1000);
-      }
     }
   };
 
@@ -1583,7 +1589,8 @@ function GalleryContent() {
                                                         setCopyModalConfig({
                                                             isOpen: true,
                                                             url: url,
-                                                            title: "链接已生成"
+                                                            title: "链接已生成",
+                                                            mode: 'copy',
                                                         });
                                                     }
                                                 } catch {
@@ -1614,7 +1621,8 @@ function GalleryContent() {
                                                         setCopyModalConfig({
                                                             isOpen: true,
                                                             url: url,
-                                                            title: "分享链接已生成"
+                                                            title: "分享链接已生成",
+                                                            mode: 'copy',
                                                         });
                                                     }
                                                 } catch {
@@ -1784,16 +1792,31 @@ function GalleryContent() {
                 isOpen={copyModalConfig.isOpen}
                 title={copyModalConfig.title}
                 message={
-                    <div className="space-y-4">
-                        <p className="text-sm">由于您的系统限制，请点击下方按钮复制，或手动长按选择以下链接：</p>
-                        <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl break-all text-xs font-mono select-all">
-                            {copyModalConfig.url}
-                        </div>
-                    </div>
+                    copyModalConfig.mode === 'download' ? (
+                      <div className="space-y-3">
+                        <p className="text-sm">图片/视频已在新页面打开，请按照以下步骤保存：</p>
+                        <ol className="text-sm space-y-1.5 list-decimal list-inside text-muted-foreground">
+                          <li>切换到刚打开的页面</li>
+                          <li><strong className="text-foreground">长按</strong>图片或视频</li>
+                          <li>点击「存储图像」或「存储到「照片」」</li>
+                        </ol>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                          <p className="text-sm">由于您的系统限制，请点击下方按钮复制，或手动长按选择以下链接：</p>
+                          <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl break-all text-xs font-mono select-all">
+                              {copyModalConfig.url}
+                          </div>
+                      </div>
+                    )
                 }
                 variant="info"
-                confirmLabel="点击复制"
+                confirmLabel={copyModalConfig.mode === 'download' ? '我知道了' : '点击复制'}
                 onConfirm={async () => {
+                    if (copyModalConfig.mode === 'download') {
+                      setCopyModalConfig(prev => ({ ...prev, isOpen: false }));
+                      return;
+                    }
                     const success = await copyToClipboard(copyModalConfig.url);
                     if (success) {
                         showToast("复制成功", "success");

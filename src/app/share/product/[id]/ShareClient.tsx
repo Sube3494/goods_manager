@@ -222,13 +222,29 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
     isOpen: boolean;
     url: string;
     title: string;
+    mode: 'copy' | 'download';
   }>({
     isOpen: false,
     url: "",
-    title: ""
+    title: "",
+    mode: 'copy'
   });
 
   const handleDownload = async (url: string, fileName: string) => {
+    // iOS Safari does not support the `download` attribute on anchor tags,
+    // nor Blob URLs for saving to the photo library.
+    // The only reliable path is to open the resource directly and guide the user.
+    if (isIOS) {
+      window.open(url, '_blank');
+      setCopyModalConfig({
+        isOpen: true,
+        url: url,
+        title: "保存到相册",
+        mode: 'download',
+      });
+      return;
+    }
+
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error("Fetch failed");
@@ -240,7 +256,6 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        // Delay revocation to ensure Safari has time to start the download
         setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (error) {
         console.warn('Download failed, falling back:', error);
@@ -252,12 +267,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
-        if (isIOS) {
-            showToast("由于系统限制，请在打开的页面长按图片保存", "warning");
-        } else {
-            showToast("正在尝试直接打开资源进行下载", "info");
-        }
+        showToast("正在尝试直接打开资源进行下载", "info");
     }
   };
 
@@ -535,16 +545,31 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
         isOpen={copyModalConfig.isOpen}
         title={copyModalConfig.title}
         message={
-            <div className="space-y-4">
+            copyModalConfig.mode === 'download' ? (
+              <div className="space-y-3">
+                <p className="text-sm">图片/视频已在新页面打开，请按照以下步骤保存：</p>
+                <ol className="text-sm space-y-1.5 list-decimal list-inside text-muted-foreground">
+                  <li>切换到刚打开的页面</li>
+                  <li><strong className="text-foreground">长按</strong>图片或视频</li>
+                  <li>点击「存储图像」或「存储到「照片」」</li>
+                </ol>
+              </div>
+            ) : (
+              <div className="space-y-4">
                 <p className="text-sm">由于您的系统限制，请点击下方按钮复制，或手动长按选择以下链接：</p>
                 <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl break-all text-xs font-mono select-all">
                     {copyModalConfig.url}
                 </div>
-            </div>
+              </div>
+            )
         }
         variant="info"
-        confirmLabel="点击复制"
+        confirmLabel={copyModalConfig.mode === 'download' ? '我知道了' : '点击复制'}
         onConfirm={async () => {
+            if (copyModalConfig.mode === 'download') {
+              setCopyModalConfig(prev => ({ ...prev, isOpen: false }));
+              return;
+            }
             const success = await copyToClipboard(copyModalConfig.url);
             if (success) {
                 showToast("复制成功", "success");
