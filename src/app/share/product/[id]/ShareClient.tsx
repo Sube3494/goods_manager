@@ -6,7 +6,7 @@ import { ChevronRight, PlayCircle, Download, Info, Volume2, VolumeX, Maximize } 
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { GestureImage } from "@/components/ui/GestureImage";
-import { useUser } from "@/hooks/useUser";
+
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 const handleDownload = async (url: string, fileName: string) => {
@@ -209,7 +209,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   
   const thumbnailContainerRef = useRef<HTMLDivElement>(null);
 
-  const { user } = useUser();
+
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -223,19 +223,9 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   });
 
   const checkAction = useCallback((action: () => void) => {
-    if (!user) {
-      setConfirmConfig({
-        isOpen: true,
-        title: "登录后下载",
-        message: "您当前为游客身份，登录后即可下载高清媒体素材。",
-        onConfirm: () => {
-          window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
-        },
-      });
-      return;
-    }
+    // 分享页面已通过签名校验，且仅展示公开内容，允许游客直接执行下载
     action();
-  }, [user]);
+  }, []);
 
   const navigate = (dir: number) => {
     const nextIndex = currentIndex + dir;

@@ -255,17 +255,29 @@ function GalleryContent() {
 
   // 统一权限拦截与游客引导逻辑
   const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy", action: () => void) => {
-    if (!user) {
-      // 游客身份：引导登录
+    // 允许游客（未登录）执行 下载、分享、复制 操作
+    // 因为相册列表本身已经对游客仅显示公开内容
+    const isReadAction = permissionKey === "gallery:download" || permissionKey === "gallery:share" || permissionKey === "gallery:copy";
+
+    if (!user && !isReadAction) {
+      // 游客身份且是写操作：引导登录
       setConfirmConfig({
         isOpen: true,
         title: "登录后使用",
-        message: "您当前为游客身份，登录后即可使用下载、分享、复制链接及上传等完整功能。",
+        message: "您当前为游客身份，登录后即可使用更多完整功能。",
         onConfirm: () => {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
         },
       });
       return;
+    }
+
+    // 执行操作：
+    // 1. 如果是游客且为读操作，直接允许
+    // 2. 如果已登录，则检查具体权限
+    if (!user && isReadAction) {
+        action();
+        return;
     }
 
     // 已登录：检查具体权限
