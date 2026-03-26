@@ -781,7 +781,8 @@ function GalleryContent() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      // Delay revocation to ensure Safari has time to start the download
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (error) {
       console.warn("Blob download failed, falling back to direct link:", error);
       // 2. 兜底方案：直接打开/下载

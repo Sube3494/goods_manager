@@ -240,7 +240,8 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(blobUrl);
+        // Delay revocation to ensure Safari has time to start the download
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (error) {
         console.warn('Download failed, falling back:', error);
         const link = document.createElement('a');

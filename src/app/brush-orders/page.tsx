@@ -396,8 +396,8 @@ export default function BrushOrdersPage() {
       };
     });
 
-    // Wrap in setTimeout to allow click state/animations to settle and avoid UI blocking "shudder"
-    setTimeout(async () => {
+    // Execute directly to maintain user gesture chain for Safari compatibility
+    const runExport = async () => {
       try {
         const ExcelJS = (await import("exceljs")).default;
         const { saveAs } = await import("file-saver");
@@ -429,7 +429,9 @@ export default function BrushOrdersPage() {
         console.error("Export failed:", error);
         showToast("导出失败", "error");
       }
-    }, 0);
+    };
+    
+    runExport();
   }, [filteredOrders, showToast]);
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
