@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Search, Calendar, Share2, Edit2, Trash2, Store, Package, ShieldAlert, RotateCcw, Wallet } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
+import { cn, copyToClipboard } from "@/lib/utils";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
 import { BrushOrderPlan, BrushOrderPlanItem } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
@@ -279,8 +279,9 @@ export default function BrushPlansPage() {
                                     <button 
                                         onClick={() => { 
                                             const shareUrl = `${window.location.origin}/brush-plans/share/${plan.id}`;
-                                            navigator.clipboard.writeText(shareUrl).then(() => {
-                                                showToast("链接已复制，去发给刷单员吧", "success");
+                                            copyToClipboard(shareUrl).then((success) => {
+                                                if (success) showToast("链接已复制，去发给刷单员吧", "success");
+                                                else showToast("复制失败，请尝试长按并手动复制", "error");
                                             });
                                         }}
                                         className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-muted/60 sm:bg-muted/80 text-foreground hover:bg-primary hover:text-white dark:hover:bg-white dark:hover:text-zinc-950 transition-all shadow-sm"

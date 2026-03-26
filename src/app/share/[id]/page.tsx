@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Metadata } from "next";
 import { createHmac } from "crypto";
-import { CameraOff, Download } from "lucide-react";
+import { CameraOff } from "lucide-react";
 import { getStorageStrategy } from "@/lib/storage";
+import { DownloadButton } from "@/components/ui/DownloadButton";
 
 // 根据图片后缀判断是否是视频
 function isVideoUrl(url: string) {
@@ -124,14 +125,10 @@ export default async function SharePage({ params, searchParams }: { params: Prom
             <span className="text-white/40 text-[10px] uppercase tracking-widest font-bold">高清素材分享</span>
         </div>
         <div className="w-px h-8 bg-white/10 mx-1" />
-        <a 
-            href={displayUrl}
-            download={`${item.product?.sku || 'MEDIA'}_${item.id}.jpg`}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black hover:scale-110 active:scale-95 transition-all shadow-lg"
-            title="下载原始文件"
-        >
-            <Download size={20} />
-        </a>
+        <DownloadButton 
+            url={displayUrl}
+            filename={`${item.product?.sku || 'MEDIA'}_${item.id}.jpg`}
+        />
       </div>
 
     </div>

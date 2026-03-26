@@ -8,21 +8,11 @@ import { cn } from "@/lib/utils";
 import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { useToast } from "@/components/ui/Toast";
+import { copyToClipboard } from "@/lib/utils";
+import { useMemo } from "react";
 
-const handleDownload = async (url: string, fileName: string) => {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        const link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    } catch (error) {
-        console.error('Download failed:', error);
-    }
-};
+// Moved handleDownload inside component to use hooks
 
 interface ShareItem {
   id: string;
@@ -198,6 +188,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: { item: Sh
 };
 
 export function ProductShareClient({ items, productName, sku, description }: ProductShareClientProps) {
+  const { showToast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const selectedImage = items[currentIndex];
@@ -208,7 +199,6 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   const pointerEvents = useTransform(activeScale, (v) => v > 1.05 ? "none" as const : "auto" as const);
   
   const thumbnailContainerRef = useRef<HTMLDivElement>(null);
-
   const { user } = useUser();
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -221,6 +211,54 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
     message: "",
     onConfirm: () => {},
   });
+
+  // iOS 兼容性支持
+  const isIOS = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
+  }, []);
+
+  const [copyModalConfig, setCopyModalConfig] = useState<{
+    isOpen: boolean;
+    url: string;
+    title: string;
+  }>({
+    isOpen: false,
+    url: "",
+    title: ""
+  });
+
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Fetch failed");
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+        console.warn('Download failed, falling back:', error);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        if (isIOS) {
+            showToast("由于系统限制，请在打开的页面长按图片保存", "warning");
+        } else {
+            showToast("正在尝试直接打开资源进行下载", "info");
+        }
+    }
+  };
 
   const checkAction = useCallback((action: () => void) => {
     if (!user) {
@@ -490,6 +528,31 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
         confirmLabel="立即登录"
         variant="primary"
         className="z-31000"
+      />
+
+      <ConfirmModal
+        isOpen={copyModalConfig.isOpen}
+        title={copyModalConfig.title}
+        message={
+            <div className="space-y-4">
+                <p className="text-sm">由于您的系统限制，请点击下方按钮复制，或手动长按选择以下链接：</p>
+                <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl break-all text-xs font-mono select-all">
+                    {copyModalConfig.url}
+                </div>
+            </div>
+        }
+        variant="info"
+        confirmLabel="点击复制"
+        onConfirm={async () => {
+            const success = await copyToClipboard(copyModalConfig.url);
+            if (success) {
+                showToast("复制成功", "success");
+                setCopyModalConfig(prev => ({ ...prev, isOpen: false }));
+            } else {
+                showToast("复制失败，请尝试手动长按选择文字", "error");
+            }
+        }}
+        onClose={() => setCopyModalConfig(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

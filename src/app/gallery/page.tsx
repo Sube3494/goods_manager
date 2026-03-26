@@ -231,6 +231,22 @@ function GalleryContent() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [hoveredDev, setHoveredDev] = useState(false);
 
+  // iOS 兼容性状态
+  const [copyModalConfig, setCopyModalConfig] = useState<{
+    isOpen: boolean;
+    url: string;
+    title: string;
+  }>({
+    isOpen: false,
+    url: "",
+    title: ""
+  });
+
+  const isIOS = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
+  }, []);
+
   // Scroll listener for Back to Top button
   useEffect(() => {
     const handleScroll = (e: Event) => {
@@ -779,6 +795,12 @@ function GalleryContent() {
       document.body.removeChild(link);
       
       showToast("开始尝试直接下载...", "info");
+      
+      if (isIOS) {
+        setTimeout(() => {
+            showToast("若未自动下载，请在打开的页面长按图片保存", "warning");
+        }, 1000);
+      }
     }
   };
 
@@ -1556,7 +1578,12 @@ function GalleryContent() {
                                                     if (success) {
                                                         showToast(`链接已复制，${expireText}内有效`, "success");
                                                     } else {
-                                                        showToast("复制失败，请尝试长按并手动复制", "error");
+                                                        // iOS 后备方案：弹出手动复制框
+                                                        setCopyModalConfig({
+                                                            isOpen: true,
+                                                            url: url,
+                                                            title: "链接已生成"
+                                                        });
                                                     }
                                                 } catch {
                                                     showToast("生成链接失败", "error");
@@ -1578,11 +1605,17 @@ function GalleryContent() {
                                                     if (!res.ok) throw new Error("Sign failed");
                                                     const { expires, signature, expireText } = await res.json();
                                                     const url = new URL(`/share/product/${productId}?e=${expires}&s=${signature}`, window.location.origin).href;
-                                                    navigator.clipboard.writeText(url).then(() => {
+                                                    const success = await copyToClipboard(url);
+                                                    if (success) {
                                                         showToast(`相册链接已复制，${expireText}内有效`, "success");
-                                                    }).catch(() => {
-                                                        showToast("复制失败", "error");
-                                                    });
+                                                    } else {
+                                                        // iOS 后备方案
+                                                        setCopyModalConfig({
+                                                            isOpen: true,
+                                                            url: url,
+                                                            title: "分享链接已生成"
+                                                        });
+                                                    }
                                                 } catch {
                                                     showToast("生成链接失败", "error");
                                                 }
@@ -1745,6 +1778,31 @@ function GalleryContent() {
         variant={confirmConfig.title === "登录后使用" ? "primary" : "danger"}
         className="z-31000"
     />
+
+            <ConfirmModal
+                isOpen={copyModalConfig.isOpen}
+                title={copyModalConfig.title}
+                message={
+                    <div className="space-y-4">
+                        <p className="text-sm">由于您的系统限制，请点击下方按钮复制，或手动长按选择以下链接：</p>
+                        <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl break-all text-xs font-mono select-all">
+                            {copyModalConfig.url}
+                        </div>
+                    </div>
+                }
+                variant="info"
+                confirmLabel="点击复制"
+                onConfirm={async () => {
+                    const success = await copyToClipboard(copyModalConfig.url);
+                    if (success) {
+                        showToast("复制成功", "success");
+                        setCopyModalConfig(prev => ({ ...prev, isOpen: false }));
+                    } else {
+                        showToast("复制失败，请尝试手动长按选择文字", "error");
+                    }
+                }}
+                onClose={() => setCopyModalConfig(prev => ({ ...prev, isOpen: false }))}
+            />
 
     {isAdmin && (
       <ActionBar 

@@ -6,6 +6,7 @@ import { X, Search, Package, Calendar, CheckCircle2, Copy, Check, Share2 } from 
 import Image from "next/image";
 import { BrushOrderPlan } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
+import { copyToClipboard } from "@/lib/utils";
 import { useState } from "react";
 
 
@@ -22,10 +23,12 @@ export function PlanPreviewModal({ isOpen, onClose, plan }: PlanPreviewModalProp
 
     const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/brush-plans/share/${plan.id}` : '';
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(shareUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = async () => {
+        const success = await copyToClipboard(shareUrl);
+        if (success) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
     };
 
 
