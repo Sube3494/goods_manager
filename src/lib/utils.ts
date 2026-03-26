@@ -40,3 +40,40 @@ export function getRequestOrigin(request: Request): string {
   const url = new URL(request.url);
   return url.origin;
 }
+/**
+ * 健壮的剪贴板复制工具，兼容非 HTTPS 环境及不同浏览器
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  // 1. 优先尝试 Modern API
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.error("Modern Clipboard API failed:", err);
+    }
+  }
+
+  // 2. 兜底尝试 execCommand (适用于非 HTTPS 或较旧浏览器)
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // 隐藏文本框
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    
+    // 选中并执行复制
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    return successful;
+  } catch (err) {
+    console.error("Fallback Clipboard failed:", err);
+    return false;
+  }
+}

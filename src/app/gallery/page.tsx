@@ -12,7 +12,7 @@ import { ActionBar } from "@/components/ui/ActionBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-import { cn } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 import Image from "next/image";
 import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
@@ -255,29 +255,17 @@ function GalleryContent() {
 
   // 统一权限拦截与游客引导逻辑
   const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy", action: () => void) => {
-    // 允许游客（未登录）执行 下载、分享、复制 操作
-    // 因为相册列表本身已经对游客仅显示公开内容
-    const isReadAction = permissionKey === "gallery:download" || permissionKey === "gallery:share" || permissionKey === "gallery:copy";
-
-    if (!user && !isReadAction) {
-      // 游客身份且是写操作：引导登录
+    if (!user) {
+      // 游客身份：引导登录
       setConfirmConfig({
         isOpen: true,
         title: "登录后使用",
-        message: "您当前为游客身份，登录后即可使用更多完整功能。",
+        message: "您当前为游客身份，登录后即可使用下载、分享、复制链接及上传等完整功能。",
         onConfirm: () => {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
         },
       });
       return;
-    }
-
-    // 执行操作：
-    // 1. 如果是游客且为读操作，直接允许
-    // 2. 如果已登录，则检查具体权限
-    if (!user && isReadAction) {
-        action();
-        return;
     }
 
     // 已登录：检查具体权限
@@ -763,9 +751,12 @@ function GalleryContent() {
 
   // Navigation logic
 
+  // 下载增强逻辑
   const handleDownload = async (url: string, filename: string) => {
     try {
+      // 1. 尝试使用 Blob 下载（支持重命名）
       const response = await fetch(url);
+      if (!response.ok) throw new Error("Fetch failed");
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -776,12 +767,18 @@ function GalleryContent() {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error("Download failed:", error);
+      console.warn("Blob download failed, falling back to direct link:", error);
+      // 2. 兜底方案：直接打开/下载
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
-      link.target = "_blank";
+      link.target = "_blank"; // 移动端建议在新标签页打开以触发系统下载
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      
+      showToast("开始尝试直接下载...", "info");
     }
   };
 
@@ -1555,11 +1552,12 @@ function GalleryContent() {
                                                     if (!res.ok) throw new Error("Sign failed");
                                                     const { expires, signature, expireText } = await res.json();
                                                     const url = new URL(`/share/${selectedImage!.id}?e=${expires}&s=${signature}`, window.location.origin).href;
-                                                    navigator.clipboard.writeText(url).then(() => {
+                                                    const success = await copyToClipboard(url);
+                                                    if (success) {
                                                         showToast(`链接已复制，${expireText}内有效`, "success");
-                                                    }).catch(() => {
-                                                        showToast("复制失败", "error");
-                                                    });
+                                                    } else {
+                                                        showToast("复制失败，请尝试长按并手动复制", "error");
+                                                    }
                                                 } catch {
                                                     showToast("生成链接失败", "error");
                                                 }

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Metadata } from "next";
 import { createHmac } from "crypto";
-import { CameraOff } from "lucide-react";
+import { CameraOff, Download } from "lucide-react";
 import { getStorageStrategy } from "@/lib/storage";
 
 // 根据图片后缀判断是否是视频
@@ -95,7 +95,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
           {isVideo ? (
             <video 
               src={displayUrl} 
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain overflow-hidden"
               controls
               playsInline
               autoPlay
@@ -103,17 +103,36 @@ export default async function SharePage({ params, searchParams }: { params: Prom
               loop
             />
           ) : (
-            <Image 
-              src={displayUrl} 
-              alt={item.product?.name || "分享图片"} 
-              fill
-              className="object-contain"
-              sizes="100vw"
-              priority
-              unoptimized
-            />
+            <div className="relative w-full h-full">
+                <Image 
+                    src={displayUrl} 
+                    alt={item.product?.name || "分享图片"} 
+                    fill
+                    className="object-contain"
+                    sizes="100vw"
+                    priority
+                    unoptimized
+                />
+            </div>
           )}
       </main>
+
+      {/* Action Bar */}
+      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-3 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex flex-col mr-4">
+            <span className="text-white/90 text-sm font-black truncate max-w-[150px]">{item.product?.name || '未命名商品'}</span>
+            <span className="text-white/40 text-[10px] uppercase tracking-widest font-bold">高清素材分享</span>
+        </div>
+        <div className="w-px h-8 bg-white/10 mx-1" />
+        <a 
+            href={displayUrl}
+            download={`${item.product?.sku || 'MEDIA'}_${item.id}.jpg`}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black hover:scale-110 active:scale-95 transition-all shadow-lg"
+            title="下载原始文件"
+        >
+            <Download size={20} />
+        </a>
+      </div>
 
     </div>
   );

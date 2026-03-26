@@ -20,7 +20,10 @@ export interface SessionUser extends JWTPayload {
   email: string;
   role: "SUPER_ADMIN" | "USER";
   permissions?: Record<string, boolean> | unknown;
-  roleProfile?: { permissions?: Record<string, boolean> | unknown } | null;
+  roleProfile?: { 
+    name?: string;
+    permissions?: Record<string, boolean> | unknown 
+  } | null;
 }
 
 export const PERMISSION_TREE = [
@@ -132,6 +135,14 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   // SUPER_ADMIN has all permissions
   if (user.role === "SUPER_ADMIN") return true;
   
+  // 基础访客权限兜底：即便数据库中未勾选，代码层也放行部分读取权限
+  // 这里的 user.roleProfile.name 属性来自于实际 Prisma 查询（UserWithRole 类型）
+  const roleName = user.roleProfile?.name;
+  if (roleName === "基础访客") {
+      const basicPerms: Permission[] = ["gallery:download", "gallery:share", "gallery:copy"];
+      if (basicPerms.includes(permission)) return true;
+  }
+
   // 1. Check from dynamic RoleProfile (New System)
   const profilePerms = (user.roleProfile?.permissions as Record<string, boolean>) || {};
   if (profilePerms[permission] || profilePerms["all"]) return true;
