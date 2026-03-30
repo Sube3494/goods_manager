@@ -5,6 +5,7 @@ import { PurchaseOrderItem, TrackingInfo } from "@/lib/types";
 import { Prisma } from "../../../../prisma/generated-client";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { FinanceMath } from "@/lib/math";
 
 // 获取所有采购订单
 export async function GET(request: Request) {
@@ -150,10 +151,10 @@ export async function POST(request: Request) {
           type: type || undefined,
           status: status || "Draft",
           date: date ? new Date(date) : new Date(),
-          totalAmount: Number(totalAmount) || 0,
-          shippingFees: Number(shippingFees) || 0,
-          extraFees: Number(extraFees) || 0,
-          discountAmount: Number(discountAmount) || 0,
+          totalAmount: FinanceMath.add(Number(totalAmount) || 0, 0),
+          shippingFees: FinanceMath.add(Number(shippingFees) || 0, 0),
+          extraFees: FinanceMath.add(Number(extraFees) || 0, 0),
+          discountAmount: FinanceMath.add(Number(discountAmount) || 0, 0),
 
           paymentVouchers: paymentVouchers || [],
           trackingData: trackingData || [],
@@ -166,7 +167,7 @@ export async function POST(request: Request) {
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
               remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
-              costPrice: Number(item.costPrice) || 0
+              costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
             }))
           }
         },

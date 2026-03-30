@@ -1124,19 +1124,19 @@ export default function BrushOrdersPage() {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImport}
-        title="导入刷单记录"
-        description="系统将根据 SKU 自动匹配商品"
-        templateFileName="刷单记录导入模版.xlsx"
+        title="导入全部订单 (智能分流)"
+        description="支持混合导入：系统将自动根据商品名称智能匹配库存，并根据【配送平台】自动分流为真实出库单或刷单记录。缺货的真实订单将自动补偿入库。"
+        templateFileName="订单导入说明.txt"
         templateData={[
           {
-            "*日期": "2024-01-01",
-            "*类型": "淘宝",
-            "*SKU": "SKU001",
-            "数量": 1,
-            "*实付": 95.00,
-            "到手金额": 100.00,
+            "下单日期": "2024-01-01 12:00:00",
+            "来源平台": "美团",
+            "商品": "示例商品名x1+搭配礼盒x1",
+            "配送平台": "闪送 / 自配送",
+            "用户实付金额": 95.00,
+            "商家实收金额": 100.00,
             "佣金": 5.00,
-            "备注": "示例模版数据"
+            "备注": "示例：只要配送平台是自配送，即判定为刷单"
           }
         ]}
       />

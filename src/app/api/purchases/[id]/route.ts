@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
+import { FinanceMath } from "@/lib/math";
 
 export async function PUT(
   request: Request,
@@ -31,10 +32,10 @@ export async function PUT(
         where: { id },
         data: {
           status,
-          totalAmount: totalAmount !== undefined ? Number(totalAmount) : undefined,
-          shippingFees: shippingFees !== undefined ? Number(shippingFees) : undefined,
-          extraFees: extraFees !== undefined ? Number(extraFees) : undefined,
-          discountAmount: discountAmount !== undefined ? Number(discountAmount) : undefined,
+          totalAmount: totalAmount !== undefined ? FinanceMath.add(Number(totalAmount), 0) : undefined,
+          shippingFees: shippingFees !== undefined ? FinanceMath.add(Number(shippingFees), 0) : undefined,
+          extraFees: extraFees !== undefined ? FinanceMath.add(Number(extraFees), 0) : undefined,
+          discountAmount: discountAmount !== undefined ? FinanceMath.add(Number(discountAmount), 0) : undefined,
 
           paymentVouchers: paymentVouchers !== undefined ? paymentVouchers : undefined,
           trackingData: trackingData !== undefined ? trackingData : undefined,
@@ -49,7 +50,7 @@ export async function PUT(
                 supplierId: item.supplierId,
                 quantity: Number(item.quantity) || 0,
                 remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
-                costPrice: Number(item.costPrice) || 0
+                costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
               }))
             }
           })
@@ -87,9 +88,11 @@ export async function PUT(
               if (currentStock <= 0) {
                 newCostPrice = incomingCost;
               } else {
-                const totalValue = (currentStock * currentCost) + (incomingQty * incomingCost);
+                const currentTotalValue = FinanceMath.multiply(currentStock, currentCost);
+                const incomingTotalValue = FinanceMath.multiply(incomingQty, incomingCost);
+                const totalValue = FinanceMath.add(currentTotalValue, incomingTotalValue);
                 const totalQty = currentStock + incomingQty;
-                newCostPrice = totalValue / totalQty;
+                newCostPrice = FinanceMath.divide(totalValue, totalQty);
               }
             }
 

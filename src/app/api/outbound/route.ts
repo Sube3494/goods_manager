@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { Prisma } from '../../../../prisma/generated-client';
 import { getAuthorizedUser } from "@/lib/auth";
 import { InventoryService } from "@/services/inventoryService";
+import { FinanceMath } from "@/lib/math";
  
 interface OutboundItem {
   productId: string;
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
             create: items.map((item: OutboundItem) => ({
               productId: item.productId,
               quantity: item.quantity,
-              price: item.price || 0
+              price: FinanceMath.add(item.price || 0, 0)
             }))
           }
         }

@@ -206,6 +206,8 @@ export interface OutboundOrderItem {
 export interface OutboundOrder {
   id: string;
   type: string;
+  shopName?: string | null;
+  status?: string;
   date: string | Date;
   note?: string;
   totalAmount?: number;

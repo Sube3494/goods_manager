@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { FinanceMath } from "@/lib/math";
 
 // 获取首页仪表盘统计数据
 export async function GET() {
@@ -106,10 +107,10 @@ export async function GET() {
       quantity: item.quantity,
       costPrice: item.costPrice,
       purchaseOrder: item.purchaseOrder,
-      subtotal: item.quantity * item.costPrice
+      subtotal: FinanceMath.multiply(item.costPrice, item.quantity)
     }));
 
-    const totalValue = Number(totalValueResult?.[0]?.sum || 0);
+    const totalValue = FinanceMath.add(Number(totalValueResult?.[0]?.sum || 0), 0); // 顺手清理小数位数
 
     return NextResponse.json({
       productCount,

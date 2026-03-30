@@ -12,6 +12,7 @@ interface ImportModalProps {
   onImport: (data: Record<string, unknown>[] | Record<string, unknown[]>) => void;
   title?: string;
   description?: string;
+  dropzoneText?: string;
   templateData?: Record<string, unknown>[];
   templateFileName?: string;
   multiSheet?: boolean;
@@ -22,7 +23,8 @@ export function ImportModal({
   onClose, 
   onImport,
   title = "导入数据",
-  description = "点击上传或拖拽 Excel 文件",
+  description,
+  dropzoneText = "点击上传或拖拽 Excel 文件",
   templateData,
   templateFileName = "导入模版.xlsx",
   multiSheet = false
@@ -145,11 +147,18 @@ export function ImportModal({
             className="fixed left-1/2 top-1/2 z-60000 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl p-0 shadow-2xl border border-border/50 flex flex-col max-h-[90vh]"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-border/50 p-6 md:p-8 shrink-0">
-              <h2 className="text-xl md:text-2xl font-bold text-foreground">{title}</h2>
-              <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                <X size={20} className="md:size-6" />
-              </button>
+            <div className="flex flex-col border-b border-border/50 p-6 md:p-8 shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl md:text-2xl font-bold text-foreground">{title}</h2>
+                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                  <X size={20} className="md:size-6" />
+                </button>
+              </div>
+              {description && (
+                <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                  {description}
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-8 min-h-0">
@@ -180,7 +189,7 @@ export function ImportModal({
                         <Upload size={32} />
                     </div>
                   </div>
-                  <p className="text-lg font-medium text-foreground">{description}</p>
+                  <p className="text-lg font-medium text-foreground">{dropzoneText}</p>
                   <p className="mt-2 text-sm text-muted-foreground">支持 .xlsx, .xls, .csv 格式</p>
                   
                   {templateData && (

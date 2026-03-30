@@ -44,15 +44,24 @@ export class InventoryService {
         const batchRemaining = batch.remainingQuantity || 0;
         const deductFromThisBatch = Math.min(batchRemaining, remainingToDeduct);
 
-        // 2. 更新批次剩余数量
-        await tx.purchaseOrderItem.update({
-          where: { id: batch.id },
+        // 2. 更新批次剩余数量（带防超卖并发校验）
+        const updateResult = await tx.purchaseOrderItem.updateMany({
+          where: { 
+            id: batch.id,
+            remainingQuantity: {
+              gte: deductFromThisBatch // 确保库存依然足够
+            }
+          },
           data: {
             remainingQuantity: {
               decrement: deductFromThisBatch
             }
           }
         });
+
+        if (updateResult.count === 0) {
+          throw new Error(`并发冲突：商品 ID ${item.productId} 在该批次库存不足。请重试。`);
+        }
 
         remainingToDeduct -= deductFromThisBatch;
       }
@@ -62,15 +71,24 @@ export class InventoryService {
         throw new Error(`商品 ID ${item.productId} 库存不足，缺口: ${remainingToDeduct}`);
       }
 
-      // 4. 更新商品全局库存总量
-      await tx.product.update({
-        where: { id: item.productId },
+      // 4. 更新商品全局库存总量（带防超卖并发校验）
+      const productResult = await tx.product.updateMany({
+        where: { 
+          id: item.productId,
+          stock: {
+            gte: item.quantity
+          }
+        },
         data: {
           stock: {
             decrement: item.quantity
           }
         }
       });
+
+      if (productResult.count === 0) {
+        throw new Error(`并发冲突：商品 ID ${item.productId} 的总库存发生变动导致不足。请重试。`);
+      }
     }
   }
 }

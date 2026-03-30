@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthorizedUser } from "@/lib/auth";
+import { FinanceMath } from "@/lib/math";
 
 export async function GET(req: NextRequest) {
   const session = await getAuthorizedUser("settlement:manage");
@@ -68,11 +69,12 @@ export async function POST(req: NextRequest) {
       data: {
         userId: session.id,
         date: new Date(date || Date.now()),
-        totalNet: parseFloat(totalNet || 0),
-        serviceFeeRate: parseFloat(serviceFeeRate || 0.06),
-        serviceFee: parseFloat(serviceFee || 0),
-        totalAlreadyReceived: parseFloat(totalAlreadyReceived || 0),
-        finalBalance: parseFloat(finalBalance || 0),
+        // 使用 FinanceMath.add(..., 0) 可以安全地将任何输入转化为保留2位小数的安全浮点数
+        totalNet: FinanceMath.add(parseFloat(totalNet || 0), 0),
+        serviceFeeRate: parseFloat(serviceFeeRate || 0.06), // 费率不强求两位小数
+        serviceFee: FinanceMath.add(parseFloat(serviceFee || 0), 0),
+        totalAlreadyReceived: FinanceMath.add(parseFloat(totalAlreadyReceived || 0), 0),
+        finalBalance: FinanceMath.add(parseFloat(finalBalance || 0), 0),
         note: note || null,
         shopName: shopName || null,
         items: {
@@ -88,10 +90,10 @@ export async function POST(req: NextRequest) {
             platformName: item.platformName,
             shopName: item.shopName,
             serviceFeeRate: item.serviceFeeRate,
-            received: item.received,
-            brushing: item.brushing,
-            receivedToCard: item.receivedToCard,
-            net: item.net
+            received: FinanceMath.add(item.received || 0, 0),
+            brushing: FinanceMath.add(item.brushing || 0, 0),
+            receivedToCard: FinanceMath.add(item.receivedToCard || 0, 0),
+            net: FinanceMath.add(item.net || 0, 0)
           }))
         }
       },

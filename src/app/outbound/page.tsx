@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Package, History, RotateCcw, AlertCircle } from "lucide-react";
+import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -26,6 +26,10 @@ export default function OutboundPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [platformFilter, setPlatformFilter] = useState("全部平台");
+  const [selectedShop, setSelectedShop] = useState("全部门店");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -107,6 +111,30 @@ export default function OutboundPage() {
     });
   };
 
+  // 从 note 中提取店铺名的辅助函数
+  const extractShopName = (note: string | undefined | null): string | null => {
+    if (!note) return null;
+    const match = note.match(/^\[店铺:(.*?)\]/);
+    return match ? match[1] : null;
+  };
+
+  // 从 note 中提取平台的辅助函数 (如 [美团导入])
+  const extractPlatform = (note: string | undefined | null): string | null => {
+    if (!note) return null;
+    const match = note.match(/\[(.*?)导入\]/);
+    return match ? match[1] : null;
+  };
+
+  const allShopNames = useMemo(() => {
+    const names = orders.map(o => extractShopName(o.note)).filter(Boolean) as string[];
+    return Array.from(new Set(names)).sort();
+  }, [orders]);
+
+  const allPlatforms = useMemo(() => {
+    const platforms = orders.map(o => extractPlatform(o.note)).filter(Boolean) as string[];
+    return Array.from(new Set(platforms)).sort();
+  }, [orders]);
+
   const filteredOrders = orders.filter(order => {
     // Search query filter
     const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -115,6 +143,14 @@ export default function OutboundPage() {
     
     // Type filter
     const matchesType = typeFilter === "all" || order.type === typeFilter;
+
+    // Platform filter
+    const orderPlatform = extractPlatform(order.note);
+    const matchesPlatform = platformFilter === "全部平台" || orderPlatform === platformFilter;
+
+    // Shop filter
+    const orderShop = extractShopName(order.note);
+    const matchesShop = selectedShop === "全部门店" || orderShop === selectedShop;
     
     // Date filter
     let matchesDate = true;
@@ -125,8 +161,21 @@ export default function OutboundPage() {
       matchesDate = isWithinInterval(orderDate, { start, end });
     }
     
-    return matchesSearch && matchesType && matchesDate;
+    return matchesSearch && matchesType && matchesPlatform && matchesShop && matchesDate;
   });
+
+  const totalItems = filteredOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, startDate, endDate, typeFilter, platformFilter, selectedShop, pageSize]);
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
@@ -204,6 +253,42 @@ export default function OutboundPage() {
                     )}
                 />
             </div>
+            {allPlatforms.length > 0 && (
+                <div className="w-24 sm:w-28 h-full shrink-0">
+                    <CustomSelect
+                        value={platformFilter}
+                        onChange={setPlatformFilter}
+                        options={[
+                          { value: "全部平台", label: "全部平台" },
+                          ...allPlatforms.map(name => ({ value: name, label: name }))
+                        ]}
+                        placeholder="全部平台"
+                        className="h-full"
+                        triggerClassName={cn(
+                            "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
+                            platformFilter !== "全部平台" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                        )}
+                    />
+                </div>
+            )}
+            {allShopNames.length > 0 && (
+                <div className="w-24 sm:w-28 h-full shrink-0">
+                    <CustomSelect
+                        value={selectedShop}
+                        onChange={setSelectedShop}
+                        options={[
+                          { value: "全部门店", label: "全部门店" },
+                          ...allShopNames.map(name => ({ value: name, label: name }))
+                        ]}
+                        placeholder="全部门店"
+                        className="h-full"
+                        triggerClassName={cn(
+                            "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
+                            selectedShop !== "全部门店" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                        )}
+                    />
+                </div>
+            )}
         </div>
       </div>
 
@@ -216,7 +301,7 @@ export default function OutboundPage() {
                <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
                <p className="text-muted-foreground text-sm font-medium">加载中...</p>
             </div>
-          ) : filteredOrders.length > 0 ? (
+          ) : paginatedOrders.length > 0 ? (
             <table className="w-full text-left border-collapse min-w-[900px] table-auto">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
@@ -231,11 +316,23 @@ export default function OutboundPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 <AnimatePresence mode="popLayout">
-                  {filteredOrders.map((order) => {
-                    // @ts-expect-error - status property is available but not in base type
+                  {paginatedOrders.map((order) => {
                     const isReturned = order.status === 'Returned';
                     const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
-                    const displayNote = noteParts ? noteParts[1] : (order.note || "");
+                    const rawNote = noteParts ? noteParts[1] : (order.note || "");
+                    
+                    const shopMatch = rawNote.match(/^\[店铺:(.*?)\]\s*/);
+                    const shopName = shopMatch ? shopMatch[1] : null;
+                    let displayNote = shopMatch ? rawNote.replace(/^\[店铺:.*?\]\s*/, '') : rawNote;
+
+                    const serialMatch = displayNote.match(/^\[流水号:(.*?)\]\s*/);
+                    const serialNum = serialMatch && serialMatch[1] !== '无' ? serialMatch[1] : null;
+                    displayNote = serialMatch ? displayNote.replace(/^\[流水号:.*?\]\s*/, '') : displayNote;
+
+                    // 极致净化：洗掉系统冗长的自动导入单号前缀，只留下纯净的用户真实备注
+                    displayNote = displayNote.replace(/^\[.*?导入\]\s*平台单号:\s*\S+\s*/, '');
+                    displayNote = displayNote.replace(/^\|\s*备注:\s*/, '').trim();
+
                     const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
 
                     return (
@@ -250,7 +347,17 @@ export default function OutboundPage() {
                         }`}
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-center text-[11px] font-mono text-muted-foreground">
-                            #{order.id.slice(-6).toUpperCase()}
+                          <div className="flex flex-col items-center gap-1.5">
+                            {shopName && (
+                              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                <Store size={8} />
+                                {shopName}
+                              </span>
+                            )}
+                            <span className="font-semibold text-muted-foreground/40 text-[10px]">
+                              {serialNum ? `流水单号 #${serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-1.5">
@@ -279,9 +386,9 @@ export default function OutboundPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <div className="flex flex-col items-center gap-1 max-w-[180px] mx-auto">
-                            <p className={`text-xs font-medium leading-relaxed transition-all ${
-                              isReturned ? 'text-muted-foreground/40 line-through' : 'text-foreground'
+                          <div className="flex flex-col items-center gap-1 max-w-[220px] mx-auto">
+                            <p className={`text-[10px] sm:text-xs font-medium leading-relaxed transition-all line-clamp-2 ${
+                              isReturned ? 'text-muted-foreground/40 line-through' : 'text-muted-foreground group-hover:text-foreground'
                             }`} title={displayNote}>
                               {displayNote || <span className="opacity-20 transition-opacity">未填写备注</span>}
                             </p>
@@ -294,28 +401,30 @@ export default function OutboundPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <div className="flex items-center justify-center -space-x-3 transition-transform group-hover:-space-x-1 duration-300">
+                          <div className="flex flex-wrap justify-center gap-2 max-w-[320px] mx-auto">
                             {order.items.slice(0, 3).map((item: OutboundOrderItem) => (
                               <div 
                                 key={item.id} 
-                                className={`relative h-9 w-9 rounded-xl border-2 bg-muted overflow-hidden shadow-sm transition-all ${
-                                  isReturned ? 'border-muted-foreground/10 grayscale' : 'border-white dark:border-gray-900 ring-1 ring-black/5'
-                                }`}
-                                title={`${item.product?.name || "未知商品"} x ${item.quantity}`}
+                                className={`flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default ${isReturned ? 'opacity-40 grayscale' : ''}`}
+                                title={item.product?.name}
                               >
-                                {item.product?.image ? (
-                                  <Image src={item.product.image} alt={item.product.name || ""} fill className="object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
-                                    <Package size={14} />
-                                  </div>
-                                )}
+                                <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                                  {item.product?.image ? (
+                                    <img src={item.product.image} className="w-full h-full object-cover" alt="" />
+                                  ) : (
+                                    <Package size={12} className="text-muted-foreground/50" />
+                                  )}
+                                </div>
+                                <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
+                                  {item.product?.name || '未知商品'}
+                                </span>
+                                <span className="text-[10px] font-black text-primary shrink-0 leading-none">
+                                  x{item.quantity}
+                                </span>
                               </div>
                             ))}
                             {order.items.length > 3 && (
-                              <div className={`h-9 w-9 rounded-xl border-2 flex items-center justify-center text-[10px] font-bold shadow-sm transition-all ${
-                                isReturned ? 'bg-muted/50 text-muted-foreground/30 border-muted-foreground/10' : 'bg-muted text-muted-foreground border-white dark:border-gray-900'
-                              }`}>
+                              <div className={`flex items-center justify-center h-7 px-3 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground ${isReturned ? 'opacity-40 grayscale' : ''}`}>
                                 +{order.items.length - 3}
                               </div>
                             )}
@@ -373,12 +482,24 @@ export default function OutboundPage() {
                   <div className="w-8 h-8 border-4 border-primary/10 border-t-primary rounded-full animate-spin mb-4" />
                   <p className="text-sm font-medium tracking-widest uppercase opacity-50">Loading</p>
                </div>
-            ) : filteredOrders.length > 0 ? (
-              filteredOrders.map((order) => {
-                // @ts-expect-error - status property is available but not in base type
+            ) : paginatedOrders.length > 0 ? (
+              paginatedOrders.map((order) => {
                 const isReturned = order.status === 'Returned';
                 const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
-                const displayNote = noteParts ? noteParts[1] : (order.note || "");
+                const rawNote = noteParts ? noteParts[1] : (order.note || "");
+                
+                const shopMatch = rawNote.match(/^\[店铺:(.*?)\]\s*/);
+                const shopName = shopMatch ? shopMatch[1] : null;
+                let displayNote = shopMatch ? rawNote.replace(/^\[店铺:.*?\]\s*/, '') : rawNote;
+
+                const serialMatch = displayNote.match(/^\[流水号:(.*?)\]\s*/);
+                const serialNum = serialMatch && serialMatch[1] !== '无' ? serialMatch[1] : null;
+                displayNote = serialMatch ? displayNote.replace(/^\[流水号:.*?\]\s*/, '') : displayNote;
+
+                // 极致净化：洗掉系统冗长的自动导入单号前缀，只留下纯净的用户真实备注
+                displayNote = displayNote.replace(/^\[.*?导入\]\s*平台单号:\s*\S+\s*/, '');
+                displayNote = displayNote.replace(/^\|\s*备注:\s*/, '').trim();
+
                 const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
 
                 return (
@@ -401,10 +522,17 @@ export default function OutboundPage() {
                         }`}>
                           {order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
                         </span>
+                        {shopName && (
+                          <span className="text-[9px] font-bold text-blue-500 px-1.5 py-0.5 bg-blue-500/10 rounded border border-blue-500/20 flex items-center gap-0.5">
+                            <Store size={8} /> {shopName}
+                          </span>
+                        )}
                         {isReturned && (
                             <span className="text-[10px] font-bold text-destructive px-2 py-0.5 bg-destructive/5 rounded-md border border-destructive/10">已对冲</span>
                         )}
-                        <span className="text-[10px] font-mono text-muted-foreground/40">#{order.id.slice(-4).toUpperCase()}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground/40 font-semibold">
+                          {serialNum ? `流水单号 #${serialNum}` : `#${order.id.slice(-4).toUpperCase()}`}
+                        </span>
                       </div>
                       {!isReturned && (
                         <button 
@@ -441,26 +569,31 @@ export default function OutboundPage() {
                       </div>
                     </div>
 
-                    <div className="flex -space-x-2.5">
-                      {order.items.slice(0, 5).map((item: OutboundOrderItem) => (
+                    <div className="flex flex-wrap gap-2">
+                      {order.items.slice(0, 4).map((item: OutboundOrderItem) => (
                         <div 
                           key={item.id} 
-                          className={`relative h-10 w-10 rounded-[1.2rem] border-2 bg-muted overflow-hidden shadow-sm transition-all ${
-                            isReturned ? 'border-muted-foreground/5 grayscale-[0.8]' : 'border-white dark:border-gray-900 ring-1 ring-black/5'
-                          }`}
+                          className={`flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[160px] shadow-sm hover:border-primary/30 transition-all cursor-default ${isReturned ? 'opacity-40 grayscale' : ''}`}
+                          title={item.product?.name}
                         >
-                          {item.product?.image ? (
-                            <Image src={item.product.image} alt={item.product.name || ""} fill className="object-cover" />
-                          ) : (
-                            <Package className="w-full h-full p-2.5 text-muted-foreground/20" />
-                          )}
+                          <div className="relative w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                            {item.product?.image ? (
+                              <img src={item.product.image} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                              <Package size={10} className="text-muted-foreground/50" />
+                            )}
+                          </div>
+                          <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
+                            {item.product?.name || '未知商品'}
+                          </span>
+                          <span className="text-[10px] font-black text-primary shrink-0 leading-none">
+                            x{item.quantity}
+                          </span>
                         </div>
                       ))}
-                      {order.items.length > 5 && (
-                        <div className={`h-10 w-10 rounded-[1.2rem] border-2 flex items-center justify-center text-[10px] font-black shadow-sm ${
-                          isReturned ? 'bg-muted/30 text-muted-foreground/20 border-muted-foreground/5' : 'bg-muted text-muted-foreground border-white dark:border-gray-900 ring-1 ring-black/5'
-                        }`}>
-                          +{order.items.length - 5}
+                      {order.items.length > 4 && (
+                        <div className={`flex items-center justify-center h-6 px-2.5 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground ${isReturned ? 'opacity-40 grayscale' : ''}`}>
+                          +{order.items.length - 4}
                         </div>
                       )}
                     </div>
@@ -475,6 +608,93 @@ export default function OutboundPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Pagination Component */}
+      {!isLoading && totalItems > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-6 px-4 sm:px-8 py-3 sm:py-4 rounded-3xl bg-white dark:bg-white/5 border border-border dark:border-white/10 shadow-sm backdrop-blur-sm transition-all"
+          >
+              <div className="flex items-center gap-4 sm:gap-6 order-2 sm:order-1 w-full sm:w-auto justify-between sm:justify-start">
+                  <div className="flex items-center bg-muted/30 dark:bg-white/5 rounded-full p-1 border border-border/50">
+                      <button
+                          type="button"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                      >
+                          <ChevronLeft size={16} />
+                      </button>
+                      
+                      <div className="flex items-center px-1 sm:px-2">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                              let pageNum: number;
+                              if (totalPages <= 5) {
+                                  pageNum = i + 1;
+                              } else {
+                                  if (currentPage <= 3) pageNum = i + 1;
+                                  else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                                  else pageNum = currentPage - 2 + i;
+                              }
+                              
+                              if (pageNum > totalPages) return null;
+                              
+                              return (
+                                  <button
+                                      key={pageNum}
+                                      type="button"
+                                      onClick={() => setCurrentPage(pageNum)}
+                                      className={cn(
+                                          "w-8 h-8 rounded-full text-[10px] sm:text-xs font-bold transition-all",
+                                          currentPage === pageNum 
+                                              ? "bg-primary text-primary-foreground shadow-sm" 
+                                              : "hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                                      )}
+                                  >
+                                      {pageNum}
+                                  </button>
+                              );
+                          })}
+                      </div>
+
+                      <button
+                          type="button"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                      >
+                          <ChevronRight size={16} />
+                      </button>
+                  </div>
+
+                  <span className="text-[10px] sm:text-xs font-bold text-muted-foreground/60 whitespace-nowrap bg-muted/20 px-3 py-1.5 rounded-full border border-border/30">
+                      共 <span className="text-foreground">{totalItems}</span> 条
+                  </span>
+              </div>
+
+              <div className="flex items-center gap-4 order-1 sm:order-2 w-full sm:w-auto justify-between sm:justify-end border-b sm:border-none border-border/10 pb-3 sm:pb-0">
+                  <span className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest opacity-60">每页显示</span>
+                  <div className="flex items-center bg-muted/30 dark:bg-white/5 rounded-full p-1 border border-border/50">
+                      {[10, 20, 50, 100].map((size) => (
+                          <button
+                              key={size}
+                              type="button"
+                              onClick={() => setPageSize(size)}
+                              className={cn(
+                                  "px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all",
+                                  pageSize === size 
+                                      ? "bg-white dark:bg-white/10 text-foreground shadow-sm" 
+                                      : "hover:bg-white/50 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                              )}
+                          >
+                              {size}
+                          </button>
+                      ))}
+                  </div>
+              </div>
+          </motion.div>
+      )}
 
       <OutboundModal 
         isOpen={isModalOpen}

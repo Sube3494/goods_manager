@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Search, Package, Calendar, Eye, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Search, Package, Calendar, Eye, RotateCcw, ChevronLeft, ChevronRight, Store } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOrder } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { startOfDay, endOfDay, parseISO, isWithinInterval } from "date-fns";
 
 import { cn } from "@/lib/utils";
@@ -25,19 +26,26 @@ function InboundContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [selectedShop, setSelectedShop] = useState("全部");
   
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const hasActiveFilters = searchQuery.trim() !== "" || startDate !== "" || endDate !== "";
+  const hasActiveFilters = searchQuery.trim() !== "" || startDate !== "" || endDate !== "" || selectedShop !== "全部";
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     setStartDate("");
     setEndDate("");
+    setSelectedShop("全部");
     setCurrentPage(1);
   }, []);
+
+  const allShopNames = useMemo(() => {
+    const names = inbounds.map(p => p.shopName).filter(Boolean) as string[];
+    return Array.from(new Set(names)).sort();
+  }, [inbounds]);
 
   
 
@@ -75,6 +83,9 @@ function InboundContent() {
            p.id.toLowerCase().includes(query) || 
            p.items.some(item => item.product?.name?.toLowerCase().includes(query));
     
+    // Shop filter
+    const matchesShop = selectedShop === "全部" || p.shopName === selectedShop;
+
     // Date filter
     let matchesDate = true;
     if (startDate || endDate) {
@@ -84,7 +95,7 @@ function InboundContent() {
       matchesDate = isWithinInterval(orderDate, { start, end });
     }
 
-    return matchesSearch && matchesDate;
+    return matchesSearch && matchesShop && matchesDate;
   });
 
   // Pagination Logic
@@ -98,7 +109,7 @@ function InboundContent() {
   // Reset page when search or date changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, startDate, endDate, pageSize]);
+  }, [searchQuery, startDate, endDate, selectedShop, pageSize]);
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
@@ -149,6 +160,25 @@ function InboundContent() {
                 />
             </div>
 
+            {allShopNames.length > 0 && (
+                <div className="w-24 sm:w-28 h-full shrink-0">
+                    <CustomSelect
+                        value={selectedShop}
+                        onChange={setSelectedShop}
+                        options={[
+                          { value: "全部", label: "全部店铺" },
+                          ...allShopNames.map(name => ({ value: name, label: name }))
+                        ]}
+                        placeholder="全部店铺"
+                        className="h-full"
+                        triggerClassName={cn(
+                            "h-full rounded-full border shadow-sm transition-all text-sm",
+                            selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-normal" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                        )}
+                    />
+                </div>
+            )}
+
             {hasActiveFilters && (
                 <button
                     onClick={resetFilters}
@@ -174,8 +204,9 @@ function InboundContent() {
           <table className="w-full text-left border-collapse min-w-[800px] table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库单编号</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">金额总计</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库单信息</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">包含商品</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">总数量</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">状态</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库时间</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">操作</th>
@@ -183,7 +214,11 @@ function InboundContent() {
             </thead>
             <tbody className="divide-y divide-border">
               <AnimatePresence>
-                {paginatedInbounds.map((po) => (
+                {paginatedInbounds.map((po) => {
+                  const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
+                  const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${po.id.slice(-6).toUpperCase()}`;
+
+                  return (
                    <motion.tr 
                     key={po.id}
                     initial={{ opacity: 0 }}
@@ -193,13 +228,57 @@ function InboundContent() {
                     className="hover:bg-muted/20 transition-colors group"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="font-bold text-foreground font-mono text-xs">{po.id}</span>
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                            po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                          }`}>
+                            {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
+                          </span>
+                          {po.shopName && (
+                            <span className="flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 w-fit">
+                              <Store size={10} />
+                              {po.shopName}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-mono text-muted-foreground/30 font-semibold">{serialText}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex flex-wrap justify-center gap-2 max-w-[320px] mx-auto">
+                        {po.items.slice(0, 3).map((item, idx) => (
+                          <div 
+                            key={idx} 
+                            className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default"
+                            title={item.product?.name}
+                          >
+                            <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                              {item.product?.image ? (
+                                <img src={item.product.image} className="w-full h-full object-cover" alt="" />
+                              ) : (
+                                <Package size={12} className="text-muted-foreground/50" />
+                              )}
+                            </div>
+                            <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
+                              {item.product?.name || '未知商品'}
+                            </span>
+                            <span className="text-[10px] font-black text-primary shrink-0 leading-none">
+                              x{item.quantity}
+                            </span>
+                          </div>
+                        ))}
+                        {po.items.length > 3 && (
+                          <div className="flex items-center justify-center h-7 px-3 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
+                            +{po.items.length - 3}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center text-foreground font-bold">
-                        <span className="mr-0.5 opacity-60">￥</span>
-                        {po.totalAmount.toLocaleString()}
-                      </div>
+                      <span className="font-bold text-sm text-foreground">
+                        {po.items.reduce((sum, item) => sum + item.quantity, 0)}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
@@ -224,7 +303,8 @@ function InboundContent() {
                         </button>
                     </td>
                   </motion.tr>
-                ))}
+                );
+              })}
               </AnimatePresence>
             </tbody>
           </table>
@@ -252,7 +332,11 @@ function InboundContent() {
                   <p className="text-sm font-medium tracking-widest uppercase opacity-50">Loading</p>
                </div>
             ) : paginatedInbounds.length > 0 ? (
-              paginatedInbounds.map((po) => (
+              paginatedInbounds.map((po) => {
+                const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
+                const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${po.id.slice(-6).toUpperCase()}`;
+
+                return (
                 <motion.div
                   key={po.id}
                   initial={{ opacity: 0, scale: 0.98 }}
@@ -263,22 +347,69 @@ function InboundContent() {
                   className="rounded-2xl border border-border/50 bg-white/50 dark:bg-white/5 p-4 shadow-sm active:scale-[0.98] transition-all"
                 >
                   <div className="flex items-center justify-between mb-3">
-                     <span className="font-bold text-sm font-mono">{po.id}</span>
-                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase">
+                     <div className="flex flex-col gap-1">
+                       <div className="flex items-center gap-1.5">
+                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                            po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                         }`}>
+                           {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
+                         </span>
+                         {po.shopName && (
+                           <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
+                             <Store size={8} />
+                             {po.shopName}
+                           </span>
+                         )}
+                       </div>
+                       <span className="text-[10px] font-mono text-muted-foreground/30 font-semibold">{serialText}</span>
+                     </div>
+                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase shrink-0">
                         已入库
                      </span>
                   </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-3 mt-1">
+                    {po.items.slice(0, 4).map((item, idx) => (
+                      <div 
+                        key={idx} 
+                        className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[160px] shadow-sm"
+                        title={item.product?.name}
+                      >
+                        <div className="relative w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                          {item.product?.image ? (
+                            <img src={item.product.image} className="w-full h-full object-cover" alt="" />
+                          ) : (
+                            <Package size={10} className="text-muted-foreground/50" />
+                          )}
+                        </div>
+                        <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
+                          {item.product?.name || '未知商品'}
+                        </span>
+                        <span className="text-[10px] font-black text-primary shrink-0 leading-none">
+                          x{item.quantity}
+                        </span>
+                      </div>
+                    ))}
+                    {po.items.length > 4 && (
+                      <div className="flex items-center justify-center h-6 px-2.5 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
+                        +{po.items.length - 4}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex items-center justify-between mt-4 border-t border-border/10 pt-3">
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <Calendar size={12} />
                         <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
                     </div>
-                    <div className="font-bold text-foreground text-sm">
-                        ￥{po.totalAmount.toLocaleString()}
+                    <div className="font-bold text-foreground text-sm flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground font-normal">总计:</span>
+                        {po.items.reduce((sum, item) => sum + item.quantity, 0)} 件
                     </div>
                   </div>
                 </motion.div>
-              ))
+              );
+            })
             ) : (
               <div className="py-20 text-center text-muted-foreground">
                 <p className="text-sm font-medium">暂无记录</p>
