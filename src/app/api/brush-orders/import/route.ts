@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
             });
             
             if (foundByAddress) {
-              matchedInternalShop = foundByAddress.label;
+              matchedInternalShop = (foundByAddress as any).label;
             }
           }
 
