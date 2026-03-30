@@ -160,24 +160,22 @@ function InboundContent() {
                 />
             </div>
 
-            {allShopNames.length > 0 && (
-                <div className="w-24 sm:w-28 h-full shrink-0">
-                    <CustomSelect
-                        value={selectedShop}
-                        onChange={setSelectedShop}
-                        options={[
-                          { value: "全部", label: "全部店铺" },
-                          ...allShopNames.map(name => ({ value: name, label: name }))
-                        ]}
-                        placeholder="全部店铺"
-                        className="h-full"
-                        triggerClassName={cn(
-                            "h-full rounded-full border shadow-sm transition-all text-sm",
-                            selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-normal" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
-                        )}
-                    />
-                </div>
-            )}
+            <div className="w-24 sm:w-28 h-full shrink-0">
+                <CustomSelect
+                    value={selectedShop}
+                    onChange={setSelectedShop}
+                    options={[
+                      { value: "全部", label: "全部店铺" },
+                      ...allShopNames.map(name => ({ value: name, label: name }))
+                    ]}
+                    placeholder="全部店铺"
+                    className="h-full"
+                    triggerClassName={cn(
+                        "h-full rounded-full border shadow-sm transition-all text-sm",
+                        selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-normal" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                    )}
+                />
+            </div>
 
             {hasActiveFilters && (
                 <button
