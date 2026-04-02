@@ -71,6 +71,9 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     });
   }, [pathname]);
 
+  const isLoginRequired = !isLoading && !user && currentNavItem && !currentNavItem.public;
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+
   if (isLoading || isAuthorized === null) {
     return null; // Let the parent layout (MainLayout) handle the global loader for better UX
   }
@@ -81,9 +84,11 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
         <div className="h-20 w-20 rounded-3xl bg-red-500/10 flex items-center justify-center mb-6 border border-red-500/20">
           <ShieldAlert size={40} className="text-red-500" />
         </div>
-        <h1 className="text-2xl font-bold mb-2">访问受限</h1>
+        <h1 className="text-2xl font-bold mb-2">{isLoginRequired ? "请先登录" : "访问受限"}</h1>
         <p className="text-muted-foreground max-w-md mb-8">
-          {currentNavItem
+          {isLoginRequired
+            ? `当前页面${currentNavItem ? `“${currentNavItem.name}”` : ""}需要登录后才能访问。登录后会自动返回当前页面。`
+            : currentNavItem
             ? `当前账号尚未获得“${currentNavItem.name}”的访问许可。${currentNavItem.description || "如果您认为这是一个错误，请联系管理员进行配置。"}`
             : "抱歉，您的账号尚未获得进入该区域的许可。如果您认为这是一个错误，请联系管理员进行配置。"}
         </p>
@@ -93,6 +98,14 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
           </p>
         )}
         <div className="flex flex-wrap items-center justify-center gap-4">
+            {isLoginRequired && (
+              <Link
+                href={loginHref}
+                className="px-6 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+              >
+                去登录
+              </Link>
+            )}
             {user && (
               <button
                 onClick={() => setIsLogoutModalOpen(true)}
@@ -111,7 +124,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
             </button>
             <Link 
                 href="/gallery"
-                className="px-6 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+                className="px-6 h-11 rounded-full border border-border bg-background/70 hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center"
             >
                 回到首页
             </Link>

@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getEffectivePermissions, SessionUser } from "@/lib/permissions";
 
 export async function GET() {
+  const cookieStore = await cookies();
+  const rawSession = cookieStore.get("session")?.value;
   const session = await getSession();
   
   if (!session || !session.user) {
-    return NextResponse.json({ user: null });
+    const response = NextResponse.json({ user: null });
+    if (rawSession) {
+      response.cookies.set("session", "", { expires: new Date(0) });
+    }
+    return response;
   }
 
   // Fetch the latest user data from the database to ensure roles/permissions are up to date
