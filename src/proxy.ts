@@ -12,11 +12,13 @@ import { updateSession } from "@/lib/auth";
 import { jwtVerify } from "jose";
 import { getEffectivePermissions, hasAdminAccess, SessionUser } from "@/lib/permissions";
 
-const secretKey = process.env.JWT_SECRET;
-if (!secretKey) {
-  throw new Error("JWT_SECRET is required");
+function getJwtKey() {
+  const secretKey = process.env.JWT_SECRET;
+  if (!secretKey) {
+    throw new Error("JWT_SECRET is required");
+  }
+  return new TextEncoder().encode(secretKey);
 }
-const key = new TextEncoder().encode(secretKey);
 
 export async function proxy(request: NextRequest) {
   // Update session expiration if session exists
@@ -74,7 +76,7 @@ export async function proxy(request: NextRequest) {
           return NextResponse.json({ error: "Authentication required" }, { status: 401 });
       }
       try {
-          const { payload } = await jwtVerify(session, key);
+          const { payload } = await jwtVerify(session, getJwtKey());
           const sessionUser = payload as SessionUser;
           const effectivePermissions = getEffectivePermissions(sessionUser);
           const hasSystemManage = !!(effectivePermissions["system:manage"] || effectivePermissions["all"]);
@@ -118,7 +120,7 @@ export async function proxy(request: NextRequest) {
   // Redirect authenticated users away from login page
   if (path === "/login" && session) {
     try {
-      const { payload } = await jwtVerify(session, key);
+      const { payload } = await jwtVerify(session, getJwtKey());
       const effectivePermissions = getEffectivePermissions(payload as SessionUser);
       const hasProductRead = effectivePermissions["product:read"] || effectivePermissions["all"];
       
@@ -133,7 +135,7 @@ export async function proxy(request: NextRequest) {
   // Handle root path for authenticated users without product:read permission
   if (path === "/" && session) {
     try {
-      const { payload } = await jwtVerify(session, key);
+      const { payload } = await jwtVerify(session, getJwtKey());
       const effectivePermissions = getEffectivePermissions(payload as SessionUser);
       const hasProductRead = effectivePermissions["product:read"] || effectivePermissions["all"];
       

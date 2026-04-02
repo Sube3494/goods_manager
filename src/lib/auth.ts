@@ -5,12 +5,13 @@ import prisma from "./prisma";
 import { SessionUser, hasPermission, Permission, AdminCapability, hasAdminAccess } from "./permissions";
 import { SystemSetting } from "../../prisma/generated-client";
 
-const secretKey = process.env.JWT_SECRET;
-if (!secretKey) {
-  throw new Error("JWT_SECRET is required");
+function getJwtKey() {
+  const secretKey = process.env.JWT_SECRET;
+  if (!secretKey) {
+    throw new Error("JWT_SECRET is required");
+  }
+  return new TextEncoder().encode(secretKey);
 }
-
-const key = new TextEncoder().encode(secretKey);
 
 const sessionCookieOptions = {
   httpOnly: true,
@@ -26,11 +27,11 @@ export async function encrypt(payload: JWTPayload) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(key);
+    .sign(getJwtKey());
 }
 
 export async function decrypt(input: string): Promise<JWTPayload> {
-  const { payload } = await jwtVerify(input, key, {
+  const { payload } = await jwtVerify(input, getJwtKey(), {
     algorithms: ["HS256"],
   });
   return payload;
