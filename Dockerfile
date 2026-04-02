@@ -50,7 +50,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Prisma schema 与 CLI（仅复制运行时需要的 Prisma 组件，避免整包 node_modules 带来体积与告警）
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
@@ -67,4 +66,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # 启动顺序：自动建库 → 数据库同步 → 启动应用
-CMD ["sh", "-c", "sh scripts/init-db.sh && ./node_modules/.bin/prisma db push --skip-generate --accept-data-loss && node server.js"]
+CMD ["sh", "-c", "sh scripts/init-db.sh && node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss && node server.js"]
