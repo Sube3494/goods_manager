@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import md5 from "blueimp-md5";
 import { SessionUser } from "@/lib/permissions";
-import { getDefaultPostLoginPath, sanitizeCallbackUrl } from "@/lib/authRedirect";
+import { hasPermission } from "@/lib/permissions";
 
 export default function LoginPage() {
   const { showToast } = useToast();
@@ -117,7 +117,7 @@ export default function LoginPage() {
         showToast("登录成功", "success");
         // 获取 URL 里的 callbackUrl
         const params = new URLSearchParams(window.location.search);
-        let targetUrl = sanitizeCallbackUrl(params.get("callbackUrl"));
+        let targetUrl = params.get("callbackUrl");
 
         if (!targetUrl) {
             // 如果没有明确的目的地，查一下当前用户的权限决定默认去哪
@@ -125,7 +125,15 @@ export default function LoginPage() {
                 const meRes = await fetch("/api/auth/me");
                 if (meRes.ok) {
                     const meData = await meRes.json();
-                    targetUrl = getDefaultPostLoginPath(meData.user as SessionUser | null);
+                    const user = meData.user;
+                    if (user) {
+                        const hasProductRead = hasPermission(user as SessionUser, "product:read");
+                        
+                        // 只有超管或具备查看商品权限的才能进后台首页，否则默认进相册
+                        targetUrl = hasProductRead ? "/" : "/gallery";
+                    } else {
+                        targetUrl = "/gallery";
+                    }
                 } else {
                     targetUrl = "/gallery";
                 }
@@ -135,7 +143,7 @@ export default function LoginPage() {
         }
         
         // Use window.location for hard refresh to ensure all states (sidebar, middleware) are clean
-        window.location.href = targetUrl || "/gallery"; 
+        window.location.href = targetUrl || "/"; 
       } else {
         showToast(data.error || "登录失败", "error");
       }

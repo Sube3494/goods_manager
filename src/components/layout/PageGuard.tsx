@@ -4,10 +4,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
 import { navItems } from "@/lib/navigation";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import { buildLoginRedirectUrl, getDefaultPostLoginPath } from "@/lib/authRedirect";
 
 export function PageGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -69,22 +68,8 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     });
   }, [pathname]);
 
-  const needsLogin = !isLoading && !user && !!currentNavItem && !currentNavItem.public;
-  const fallbackHref = getDefaultPostLoginPath(user as SessionUser | null);
-
-  useEffect(() => {
-    if (!needsLogin) return;
-    const query = typeof window !== "undefined" ? window.location.search.replace(/^\?/, "") : "";
-    const callbackUrl = query ? `${pathname}?${query}` : pathname;
-    router.replace(buildLoginRedirectUrl(callbackUrl));
-  }, [needsLogin, pathname, router]);
-
   if (isLoading || isAuthorized === null) {
     return null; // Let the parent layout (MainLayout) handle the global loader for better UX
-  }
-
-  if (needsLogin) {
-    return null;
   }
 
   if (!isAuthorized) {
@@ -107,10 +92,10 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
                 返回上页
             </button>
             <Link 
-                href={fallbackHref}
+                href="/gallery"
                 className="px-6 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-all shadow-lg shadow-primary/20 active:scale-95"
             >
-                返回工作区
+                回到首页
             </Link>
         </div>
       </div>
