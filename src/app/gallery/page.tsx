@@ -1524,7 +1524,6 @@ function GalleryContent() {
                                 onClick={() => setSelectedImage(null)} 
                             />
 
-                             {/* Top Bar Overlay */}
                             <motion.div 
                                 animate={{ 
                                     opacity: isUIVisible ? 1 : 0, 
@@ -1585,7 +1584,6 @@ function GalleryContent() {
                                                     </h3>
                                                 </div>
                                                 
-                                                {/* Specifications */}
                                                 {selectedImage!.product?.specs && Object.keys(selectedImage!.product!.specs as object).length > 0 && (
                                                     <div className="mt-10 space-y-5 font-rounded">
                                                         <div className="flex items-center">
@@ -1727,9 +1725,8 @@ function GalleryContent() {
                                 </div>
                             </motion.div>
 
-                            {/* Main Interaction Area */}
-                             <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
-                                 {relatedImages.length > 1 && (
+                            <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
+                                {relatedImages.length > 1 && (
                                     <motion.div
                                         animate={{ opacity: isUIVisible ? 1 : 0 }}
                                         style={{ pointerEvents: isUIVisible ? "auto" : "none" }}
@@ -1752,7 +1749,7 @@ function GalleryContent() {
                                     </motion.div>
                                 )}
 
-                                 <LightboxMediaItem 
+                                <LightboxMediaItem 
                                     key={selectedImage!.id}
                                     item={selectedImage!}
                                     onScaleChange={(v) => activeScale.set(v)}
@@ -1760,8 +1757,6 @@ function GalleryContent() {
                                 />
                             </div>
 
-                        {/* Bottom Bar Overlay (Minimalist Float) */}
-                        {/* Bottom Bar Overlay (Immersive Float) */}
                          <div className="absolute bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none px-4">
                             <motion.div 
                                 className="bg-zinc-900/40 backdrop-blur-3xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 max-w-full overflow-hidden transition-all duration-700 ring-1 ring-white/5 opacity-100 translate-y-0"
