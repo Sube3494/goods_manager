@@ -359,7 +359,7 @@ export function SubmissionReviewModal({
                                                         {approvedProductImage ? (
                                                             <Image 
                                                                 src={approvedProductImage} 
-                                                                alt="Product" 
+                                                                alt="商品" 
                                                                 width={56} 
                                                                 height={56} 
                                                                 className="w-full h-full object-cover"
@@ -472,7 +472,7 @@ export function SubmissionReviewModal({
                                         <div className="relative w-[90vw] h-[85vh] flex items-center justify-center">
                                             <Image 
                                                 src={previewMedia.url} 
-                                                alt="Preview" 
+                                                alt="预览" 
                                                 fill
                                                 className="rounded-2xl shadow-2xl object-contain" 
                                             />

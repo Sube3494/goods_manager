@@ -1388,7 +1388,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             ) : (
                                                 <Image
                                                   src={img.url}
-                                                  alt={img.product?.name || "Gallery image"}
+                                                  alt={img.product?.name || "图库图片"}
                                                   fill unoptimized
                                                   sizes="(max-width: 768px) 25vw, (max-width: 1200px) 20vw, 15vw"
                                                   className="object-cover transition-transform duration-500 group-hover/img:scale-105"
@@ -1447,7 +1447,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 <div className="absolute top-2 left-2 px-2 py-0.5 bg-primary text-primary-foreground text-[9px] font-medium rounded-md shadow-lg">封面</div>
                                             )}
                                             {isVideo && (
-                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-medium rounded-md shadow-lg uppercase tracking-tighter">Video</div>
+                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-medium rounded-md shadow-lg tracking-tighter">视频</div>
                                             )}
                                         </div>
                                     );
@@ -1639,7 +1639,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
                             src={selectedPreviewImage.url} 
-                            alt="Preview" 
+                            alt="预览" 
                             className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
                             draggable={false}
                         />

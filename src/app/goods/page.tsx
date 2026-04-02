@@ -151,7 +151,7 @@ export default function GoodsPage() {
       .catch(() => setCategories([]));
     
     // Suppliers (Permission based)
-    const canReadSuppliers = user?.role === "SUPER_ADMIN" || user?.permissions?.["supplier:read"];
+    const canReadSuppliers = hasPermission(user as SessionUser | null, "supplier:manage");
     if (canReadSuppliers) {
       fetch("/api/suppliers").then(r => r.ok && r.json()).then(setSuppliers).catch(() => {});
     }

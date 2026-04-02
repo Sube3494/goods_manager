@@ -485,7 +485,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img 
                                 src={img} 
-                                alt="waybill" 
+                                alt="物流面单" 
                                 className="h-full w-full object-cover cursor-pointer hover:scale-105 transition-transform" 
                                 onClick={() => {
                                   if (onViewImages) {
@@ -589,7 +589,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img 
                                     src={url} 
-                                    alt={`payment voucher ${vIdx + 1}`} 
+                                    alt={`付款凭证 ${vIdx + 1}`} 
                                     className="h-full w-full object-cover cursor-zoom-in"
                                     onClick={() => onViewImages?.(paymentVouchers, vIdx)}
                                 />

@@ -46,7 +46,7 @@ export function SubmissionCard({ submission, onClick }: SubmissionCardProps) {
                         mainMedia ? (
                             <Image
                                 src={mainMedia.url}
-                                alt="Submission"
+                                alt="投稿内容"
                                 fill
                                 className="object-cover transition-transform duration-500 group-hover:scale-110"
                             />

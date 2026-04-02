@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { SessionUser } from "@/lib/permissions";
+import { getEffectivePermissions, SessionUser } from "@/lib/permissions";
 
 export async function GET() {
   const session = await getSession();
@@ -35,7 +35,12 @@ export async function GET() {
     }
   }
 
-  const response = NextResponse.json({ user });
+  const response = NextResponse.json({
+    user: {
+      ...user,
+      permissions: getEffectivePermissions(user as unknown as SessionUser),
+    }
+  });
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   return response;
 }

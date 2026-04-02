@@ -7,17 +7,15 @@
  */
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getAuthorizedUser } from "@/lib/auth";
 import { BackupCrypto } from "@/lib/crypto";
-import { SessionUser } from "@/lib/permissions";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession() as SessionUser | null;
-    const userId = session?.id;
-    if (!session || !userId) {
+    const session = await getAuthorizedUser("system:manage");
+    if (!session?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -30,26 +28,23 @@ export async function POST(request: Request) {
     const database = {
       version: "1.0",
       timestamp: new Date().toISOString(),
-      userId,
-      categories: await prisma.category.findMany({ where: { userId } }),
-      products: await prisma.product.findMany({ where: { userId } }),
-      suppliers: await prisma.supplier.findMany({ where: { userId } }),
+      userId: session.id,
+      categories: await prisma.category.findMany(),
+      products: await prisma.product.findMany(),
+      suppliers: await prisma.supplier.findMany(),
       purchaseOrders: await prisma.purchaseOrder.findMany({ 
-          where: { userId },
           include: { items: true } 
       }),
       outboundOrders: await prisma.outboundOrder.findMany({ 
-          where: { userId },
           include: { items: true } 
       }),
       brushOrders: await prisma.brushOrder.findMany({ 
-          where: { userId },
           include: { items: true } 
       }),
-      galleryItems: await prisma.galleryItem.findMany({ where: { userId } }),
-      gallerySubmissions: await prisma.gallerySubmission.findMany({ where: { userId } }),
-      systemSettings: await prisma.systemSetting.findMany({ where: { userId } }),
-      users: await prisma.user.findMany({ where: { id: userId } }),
+      galleryItems: await prisma.galleryItem.findMany(),
+      gallerySubmissions: await prisma.gallerySubmission.findMany(),
+      systemSettings: await prisma.systemSetting.findMany(),
+      users: await prisma.user.findMany(),
       roleProfiles: await prisma.roleProfile.findMany(),
       whitelists: await prisma.emailWhitelist.findMany(),
       invitations: await prisma.invitation.findMany(),
@@ -74,7 +69,6 @@ export async function POST(request: Request) {
 
     // 异步更新备份时间，失败不影响备份文件下载
     prisma.systemSetting.updateMany({
-      where: { userId },
       data: { lastBackup: new Date() }
     }).catch(() => {});
 

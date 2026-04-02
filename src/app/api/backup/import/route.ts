@@ -6,13 +6,13 @@
  * @Description: 
  */
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getAuthorizedUser } from "@/lib/auth";
 import { BackupCrypto } from "@/lib/crypto";
 import { BackupService } from "@/lib/backup-service";
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
+    const session = await getAuthorizedUser("system:manage");
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

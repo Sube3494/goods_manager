@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import * as XLSX from "xlsx";
-import { getSession } from "@/lib/auth";
+import { getAuthorizedUser } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const session = await getSession();
+    const session = await getAuthorizedUser("system:manage");
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -5,18 +5,14 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { LogOut, LogIn } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@/hooks/useUser";
 import md5 from "blueimp-md5";
 
 import { getVisibleNavItems, NavItem } from "@/lib/navigation";
-import { SessionUser } from "@/lib/permissions";
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 interface SidebarProps {
   onClose?: () => void;
@@ -29,6 +25,30 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
   const pathname = usePathname();
   const { showToast } = useToast();
   const { user, isLoading } = useUser();
+  const navContainerRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const [activeIndicator, setActiveIndicator] = useState<{ top: number; left: number; width: number; height: number; opacity: number }>({
+    top: 0,
+    left: 0,
+    width: 0,
+    height: 0,
+    opacity: 0,
+  });
+  const visibleNavItems = useMemo(
+    () => getVisibleNavItems(user as SessionUser | null),
+    [user]
+  );
+  const canManageSystem = hasPermission(user as SessionUser | null, "system:manage");
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const navSections = [
+    { key: "workspace", label: "业务工作台" },
+    { key: "management", label: "管理中心" },
+  ] as const;
+  const activeNavItem = useMemo(() => {
+    return visibleNavItems
+      .filter((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
+      .sort((a, b) => b.href.length - a.href.length)[0] ?? null;
+  }, [pathname, visibleNavItems]);
 
   const handleLogout = async () => {
     try {
@@ -41,10 +61,51 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
     }
   };
 
+  useEffect(() => {
+    const updateIndicator = () => {
+      const container = navContainerRef.current;
+      if (!container) return;
+
+      const activeItem = activeNavItem;
+      if (!activeItem) {
+        setActiveIndicator((prev) => ({ ...prev, opacity: 0 }));
+        return;
+      }
+
+      const target = itemRefs.current[activeItem.href];
+      if (!target) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const nextIndicator = {
+        top: targetRect.top - containerRect.top + container.scrollTop,
+        left: targetRect.left - containerRect.left + container.scrollLeft,
+        width: targetRect.width,
+        height: targetRect.height,
+        opacity: 1,
+      };
+
+      setActiveIndicator((prev) => {
+        if (
+          prev.top === nextIndicator.top &&
+          prev.left === nextIndicator.left &&
+          prev.width === nextIndicator.width &&
+          prev.height === nextIndicator.height &&
+          prev.opacity === nextIndicator.opacity
+        ) {
+          return prev;
+        }
+        return nextIndicator;
+      });
+    };
+
+    updateIndicator();
+    window.addEventListener("resize", updateIndicator);
+    return () => window.removeEventListener("resize", updateIndicator);
+  }, [activeNavItem, isCollapsed, visibleNavItems]);
+
   if (isLoading) return null; // Or a skeleton
   if (pathname === "/login") return null;
-
-  const visibleNavItems = getVisibleNavItems(user as SessionUser | null);
 
   return (
     <>
@@ -85,7 +146,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
               title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
             >
               <div className="h-9 w-9 shrink-0">
-                <Image src="/picknote.png" alt="Logo" width={36} height={36} className="rounded-xl" />
+                <Image src="/picknote.png" alt="PickNote 图标" width={36} height={36} className="rounded-xl" />
               </div>
               {!isCollapsed && (
                 <motion.div 
@@ -102,58 +163,70 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
           </div>
           
 
-          <div className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar scroll-smooth relative">
-            {/* Background highlight pill that physically translates within the container */}
-            <div 
-              className={cn(
-                  "absolute bg-primary z-0 rounded-xl transition-all duration-300 ease-out",
-                  isCollapsed ? "w-10 left-1/2 -translate-x-1/2" : "inset-x-1 lg:inset-x-0"
-              )}
-              style={{
-                  height: '40px',
-                  top: `calc(${visibleNavItems.findIndex((item: NavItem) => pathname === item.href) * (40 + 6)}px)`
-              }}
-              hidden={visibleNavItems.findIndex((item: NavItem) => pathname === item.href) === -1}
+          <div ref={navContainerRef} className="flex-1 space-y-3 overflow-y-auto no-scrollbar scroll-smooth relative">
+            <motion.div
+              className="pointer-events-none absolute rounded-xl bg-primary shadow-lg shadow-primary/20"
+              animate={activeIndicator}
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
             />
+              {navSections.map((section) => {
+                const sectionItems = visibleNavItems.filter((item) => (item.section || "workspace") === section.key);
+                if (sectionItems.length === 0) return null;
 
-            {visibleNavItems.map((item: NavItem) => {
-
-              
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={onClose}
-                  title={isCollapsed ? item.name : undefined}
-                  className={cn(
-                    "relative z-10 group flex items-center rounded-xl transition-all duration-300 outline-none focus:outline-none",
-                    // Lock height to exactly 40px (h-10) for calculations to be perfect
-                    isCollapsed ? "justify-center h-10 w-10 mx-auto" : "px-3 h-10 mx-1 text-sm font-medium",
-                    isActive
-                      ? "text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                  )}
-                >
-                  <item.icon
-                    className={cn(
-                      "h-5 w-5 transition-colors shrink-0",
-                      !isCollapsed && "mr-3",
-                      isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                return (
+                  <div key={section.key} className="space-y-1.5">
+                    {!isCollapsed && (
+                      <div className="px-3 pt-2 pb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/45">
+                            {section.label}
+                          </span>
+                          <span className="h-px flex-1 bg-linear-to-r from-black/8 dark:from-white/10 to-transparent" />
+                        </div>
+                      </div>
                     )}
-                  />
-                  {!isCollapsed && (
-                    <motion.span 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="relative whitespace-nowrap"
-                    >
-                        {item.name}
-                    </motion.span>
-                  )}
-                </Link>
-              );
-            })}
+
+                    {sectionItems.map((item: NavItem) => {
+                    const isActive = activeNavItem?.href === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        ref={(node) => {
+                          itemRefs.current[item.href] = node;
+                        }}
+                        href={item.href}
+                        onClick={onClose}
+                        title={isCollapsed ? item.name : undefined}
+                        className={cn(
+                          "relative z-10 group flex items-center rounded-xl transition-all duration-300 outline-none focus:outline-none",
+                          isCollapsed ? "justify-center h-10 w-10 mx-auto" : "px-3 h-10 mx-1 text-sm font-medium",
+                          isActive
+                            ? "text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        )}
+                      >
+                        <item.icon
+                          className={cn(
+                            "relative z-10 h-5 w-5 transition-colors shrink-0",
+                              !isCollapsed && "mr-3",
+                              isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                            )}
+                          />
+                          {!isCollapsed && (
+                            <motion.span 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="relative z-10 whitespace-nowrap"
+                            >
+                                {item.name}
+                            </motion.span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                );
+              })}
           </div>
           
           <div className={cn("mt-auto pt-4 shrink-0")}>
@@ -172,7 +245,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                         <div className="relative h-8 w-8 rounded-full overflow-hidden border-2 border-white/20 shadow-sm shrink-0 group-hover:border-primary/50 transition-colors">
                             <Image 
                                 src={`https://cravatar.cn/avatar/${md5(user.email || "")}?d=mp`} 
-                                alt="Current user"
+                                alt="当前用户头像"
                                 fill
                                 sizes="32px"
                                 className="object-cover"
@@ -190,6 +263,18 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                             <p className="text-[10px] text-muted-foreground/60 truncate">
                                 {user.role === 'SUPER_ADMIN' ? '超级管理员' : (user.roleProfile?.name || '普通成员')}
                             </p>
+                            {(canManageSystem || isSuperAdmin) && (
+                              <div className="mt-1 flex items-center gap-1">
+                                <span className={cn(
+                                  "inline-flex h-5 items-center rounded-full px-2 text-[9px] font-black tracking-[0.14em] uppercase",
+                                  isSuperAdmin
+                                    ? "bg-red-500/10 text-red-500"
+                                    : "bg-primary/10 text-primary"
+                                )}>
+                                  {isSuperAdmin ? "Root" : "System"}
+                                </span>
+                              </div>
+                            )}
                         </motion.div>
                         )}
                     </Link>

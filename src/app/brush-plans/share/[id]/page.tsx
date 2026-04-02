@@ -214,7 +214,7 @@ export default function SharedPlanPage() {
                                                 </div>
                                                 <div className="h-px flex-1 bg-zinc-200 dark:bg-white/5 mx-6 hidden sm:block" />
                                                 <div className="hidden sm:block text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">
-                                                    {platformName === "美团" ? "Meituan Orders" : platformName === "淘宝" ? "Taobao Orders" : platformName === "京东" ? "JD Orders" : "Misc Tasks"}
+                                                    {platformName === "美团" ? "美团订单" : platformName === "淘宝" ? "淘宝订单" : platformName === "京东" ? "京东订单" : "其他任务"}
                                                 </div>
                                             </div>
 

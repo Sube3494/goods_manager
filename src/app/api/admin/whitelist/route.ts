@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getFreshSession } from "@/lib/auth";
-import { SessionUser } from "@/lib/permissions";
+import { getAuthorizedAdmin, getAuthorizedAdminAny } from "@/lib/auth";
 import { sendInvitationEmail } from "@/lib/email";
 import { getRequestOrigin } from "@/lib/utils";
 
 /**
- * GET /api/admin/whitelist - List all whitelisted emails and invitations (SUPER_ADMIN only)
+ * GET /api/admin/whitelist - List all whitelisted emails and invitations
  */
 export async function GET() {
-  const session = await getFreshSession() as SessionUser | null;
+  const session = await getAuthorizedAdminAny("whitelist:manage", "members:manage", "members:status");
   
-  if (!session || session.role !== "SUPER_ADMIN") {
-    return NextResponse.json({ error: "Forbidden: Super Admin only" }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
@@ -61,8 +60,8 @@ export async function GET() {
  * POST /api/admin/whitelist - Add to whitelist and create Invitation
  */
 export async function POST(request: Request) {
-  const session = await getFreshSession() as SessionUser | null;
-  if (!session || session.role !== "SUPER_ADMIN") {
+  const session = await getAuthorizedAdmin("whitelist:manage");
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -141,8 +140,8 @@ export async function POST(request: Request) {
  * DELETE /api/admin/whitelist?email=...
  */
 export async function DELETE(request: Request) {
-  const session = await getFreshSession() as SessionUser | null;
-  if (!session || session.role !== "SUPER_ADMIN") {
+  const session = await getAuthorizedAdmin("whitelist:manage");
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -12,6 +12,7 @@ import { formatLocalDateTime, formatLocalDate, formatLocalMonth } from "@/lib/da
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -480,7 +481,7 @@ export default function BrushOrdersPage() {
   if (!mounted) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       {/* Header section with unified style */}
       <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
         <div className="flex-1 min-w-0">
@@ -548,7 +549,7 @@ export default function BrushOrdersPage() {
       <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6 md:mb-8">
         {/* Search & Platform */}
         <div className="flex items-center gap-2 flex-1">
-          <div className="h-12 px-5 flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm relative">
+          <div className="h-10 sm:h-11 px-5 flex-1 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-sm relative">
             <Search size={18} className="text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -567,7 +568,7 @@ export default function BrushOrdersPage() {
             )}
           </div>
           
-          <div className="w-24 sm:w-28 shrink-0 h-12">
+          <div className="w-24 sm:w-28 shrink-0 h-10 sm:h-11">
               <CustomSelect
                   value={selectedType}
                   onChange={setSelectedType}
@@ -580,14 +581,14 @@ export default function BrushOrdersPage() {
                   placeholder="全部平台"
                   className="h-full"
                   triggerClassName={cn(
-                      "h-full rounded-full border shadow-sm transition-all text-sm",
+                      "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
                       selectedType !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-normal" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
                   )}
               />
           </div>
           {/* 店铺筛选 */}
           {allShopNames.length > 0 && (
-            <div className="w-24 sm:w-28 shrink-0 h-12">
+            <div className="w-24 sm:w-28 shrink-0 h-10 sm:h-11">
                 <CustomSelect
                     value={selectedShop}
                     onChange={setSelectedShop}
@@ -598,7 +599,7 @@ export default function BrushOrdersPage() {
                     placeholder="全部店铺"
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm transition-all text-sm",
+                        "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
                         selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-normal" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
                     )}
                 />
@@ -608,7 +609,7 @@ export default function BrushOrdersPage() {
 
         {/* Date Range & Reset */}
         <div className="flex items-center gap-2 w-full lg:w-auto">
-            <div className="flex-1 flex items-center gap-1.5 h-12">
+            <div className="flex-1 flex items-center gap-1.5 h-10 sm:h-11">
                 <DatePicker 
                     value={startDate} 
                     onChange={handleStartDateChange} 
@@ -877,16 +878,18 @@ export default function BrushOrdersPage() {
           </table>
           )}
           {filteredOrders.length === 0 && !isLoading && (
-              <div className="py-12 flex flex-col items-center justify-center text-center text-muted-foreground">
-                  <ShoppingBag size={48} className="mb-4 opacity-20" />
-                  <p>暂无记录</p>
-              </div>
+              <EmptyState
+                icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+                title="暂无记录"
+                description="没有找到匹配的刷单数据。"
+                className="py-12"
+              />
           )}
         </div>
         
       </div>
 
-        <div className="md:hidden rounded-3xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+        <div className="md:hidden rounded-2xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
           <div className="p-3 space-y-6">
             {groupedOrders.map((monthGroup) => (
                 <div key={monthGroup.month} className="space-y-3">
@@ -976,7 +979,7 @@ export default function BrushOrdersPage() {
                                             key={order.id} 
                                             onClick={() => handleEdit(order)}
                                             className={cn(
-                                                "bg-white dark:bg-white/5 p-3 rounded-xl border border-border/50 shadow-sm relative overflow-hidden",
+                                                "bg-white dark:bg-white/5 p-3 rounded-xl border border-border/50 shadow-sm relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all",
                                                 selectedIds.includes(order.id) ? 'ring-2 ring-primary ring-inset' : ''
                                             )}
                                         >
@@ -1059,10 +1062,11 @@ export default function BrushOrdersPage() {
             ))}
            
            {filteredOrders.length === 0 && !isLoading && (
-               <div className="py-20 flex flex-col items-center justify-center text-center text-muted-foreground">
-                   <ShoppingBag size={48} className="mb-4 opacity-10" />
-                   <p className="text-sm font-medium">暂无刷单记录</p>
-               </div>
+               <EmptyState
+                 icon={<ShoppingBag size={40} strokeWidth={1.5} />}
+                 title="暂无刷单记录"
+                 description="暂时没有刷单数据。"
+               />
            )}
          </div>
        </div>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
-import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, ChevronLeft, ChevronRight } from "lucide-react";
+
+import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -15,8 +15,9 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Pagination } from "@/components/ui/Pagination";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function OutboundPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([]);
@@ -121,7 +122,7 @@ export default function OutboundPage() {
   // 从 note 中提取平台的辅助函数 (如 [美团导入])
   const extractPlatform = (note: string | undefined | null): string | null => {
     if (!note) return null;
-    const match = note.match(/\[(.*?)导入\]/);
+    const match = note.match(/\[([^\[\]]+)导入\]/);
     return match ? match[1] : null;
   };
 
@@ -286,12 +287,31 @@ export default function OutboundPage() {
                     )}
                 />
             </div>
+
+            {(searchQuery.trim() !== "" || startDate !== "" || endDate !== "" || typeFilter !== "all" || platformFilter !== "全部平台" || selectedShop !== "全部门店") && (
+                <button
+                    onClick={() => {
+                        setSearchQuery("");
+                        setStartDate("");
+                        setEndDate("");
+                        setTypeFilter("all");
+                        setPlatformFilter("全部平台");
+                        setSelectedShop("全部门店");
+                        setCurrentPage(1);
+                    }}
+                    className="h-full px-3 sm:px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+                >
+                    <RotateCcw size={14} />
+                    <span className="hidden sm:inline">重置</span>
+                    <span className="sm:hidden text-[10px]">重置</span>
+                </button>
+            )}
         </div>
       </div>
 
       {/* Orders List */}
       {/* Desktop Table View */}
-      <div className="hidden md:block rounded-3xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
+      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[calc(100vh-280px)]">
           {isLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-center">
@@ -312,7 +332,6 @@ export default function OutboundPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                <AnimatePresence mode="popLayout">
                   {paginatedOrders.map((order) => {
                     const isReturned = order.status === 'Returned';
                     const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
@@ -327,18 +346,14 @@ export default function OutboundPage() {
                     displayNote = serialMatch ? displayNote.replace(/^\[流水号:.*?\]\s*/, '') : displayNote;
 
                     // 极致净化：洗掉系统冗长的自动导入单号前缀，只留下纯净的用户真实备注
-                    displayNote = displayNote.replace(/^\[.*?导入\]\s*平台单号:\s*\S+\s*/, '');
+                    displayNote = displayNote.replace(/^\[([^\[\]]+)导入\]\s*平台单号:\s*\S+\s*/, '');
                     displayNote = displayNote.replace(/^\|\s*备注:\s*/, '').trim();
 
                     const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
 
                     return (
-                      <motion.tr 
+                      <tr 
                         key={order.id}
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
                         className={`transition-all duration-300 group ${
                           isReturned ? 'opacity-40 grayscale-[0.6] bg-muted/5' : 'hover:bg-muted/20'
                         }`}
@@ -452,32 +467,30 @@ export default function OutboundPage() {
                             )}
                           </div>
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                   })}
-                </AnimatePresence>
               </tbody>
             </table>
           ) : (
-            <div className="py-32 flex flex-col items-center justify-center text-center">
-              <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-6 text-muted-foreground/50 border border-dashed border-border transition-transform duration-500">
-                <History size={40} strokeWidth={1.5} />
-              </div>
-              <h3 className="text-xl font-bold text-foreground">暂无出库记录</h3>
-              <p className="text-muted-foreground text-sm mt-2 max-w-[280px]">点击右上角“新增出库申请”开始记录。</p>
-            </div>
+            <EmptyState
+              icon={<History size={40} strokeWidth={1.5} />}
+              title="暂无出库记录"
+              description="点击右上角「新增出库申请」开始记录。"
+              className="py-32"
+            />
           )}
         </div>
       </div>
 
       {/* Mobile Card View (Updated for aesthetic consistency) */}
-      <div className="md:hidden rounded-3xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+      <div className="md:hidden rounded-2xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
         <div className="p-4 space-y-4">
-          <AnimatePresence mode="popLayout">
+          <>
             {isLoading ? (
                <div className="py-12 flex flex-col items-center justify-center text-center text-muted-foreground/50">
                   <div className="w-8 h-8 border-4 border-primary/10 border-t-primary rounded-full animate-spin mb-4" />
-                  <p className="text-sm font-medium tracking-widest uppercase opacity-50">Loading</p>
+                   <p className="text-sm font-medium tracking-widest opacity-50">加载中</p>
                </div>
             ) : paginatedOrders.length > 0 ? (
               paginatedOrders.map((order) => {
@@ -494,18 +507,14 @@ export default function OutboundPage() {
                 displayNote = serialMatch ? displayNote.replace(/^\[流水号:.*?\]\s*/, '') : displayNote;
 
                 // 极致净化：洗掉系统冗长的自动导入单号前缀，只留下纯净的用户真实备注
-                displayNote = displayNote.replace(/^\[.*?导入\]\s*平台单号:\s*\S+\s*/, '');
+                displayNote = displayNote.replace(/^\[([^\[\]]+)导入\]\s*平台单号:\s*\S+\s*/, '');
                 displayNote = displayNote.replace(/^\|\s*备注:\s*/, '').trim();
 
                 const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
 
                 return (
-                  <motion.div
+                  <div
                     key={order.id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
                     className={`rounded-2xl border border-border shadow-sm p-5 space-y-4 transition-all duration-500 ${
                       isReturned ? 'bg-muted/5 opacity-60 grayscale-[0.5]' : 'bg-white/50 dark:bg-white/5 active:scale-[0.98]'
                     }`}
@@ -554,7 +563,7 @@ export default function OutboundPage() {
                         </div>
                         {isReturned && returnReason && (
                           <p className="text-[9px] font-bold text-destructive/50 mt-1 flex items-center gap-1 uppercase tracking-tighter">
-                            <AlertCircle size={8} /> Reason: {returnReason}
+                            <AlertCircle size={8} /> 理由: {returnReason}
                           </p>
                         )}
                       </div>
@@ -594,103 +603,30 @@ export default function OutboundPage() {
                         </div>
                       )}
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })
             ) : (
-              <div className="py-20 text-center">
-                <p className="text-muted-foreground text-sm">暂无记录</p>
-              </div>
+              <EmptyState
+                icon={<History size={40} strokeWidth={1.5} />}
+                title="暂无记录"
+                description="暂时没有出库数据。"
+              />
             )}
-          </AnimatePresence>
+          </>
         </div>
       </div>
 
       {/* Pagination Component */}
       {!isLoading && totalItems > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-6 px-4 sm:px-8 py-3 sm:py-4 rounded-3xl bg-white dark:bg-white/5 border border-border dark:border-white/10 shadow-sm backdrop-blur-sm transition-all"
-          >
-              <div className="flex items-center gap-4 sm:gap-6 order-2 sm:order-1 w-full sm:w-auto justify-between sm:justify-start">
-                  <div className="flex items-center bg-muted/30 dark:bg-white/5 rounded-full p-1 border border-border/50">
-                      <button
-                          type="button"
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          disabled={currentPage === 1}
-                          className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                      >
-                          <ChevronLeft size={16} />
-                      </button>
-                      
-                      <div className="flex items-center px-1 sm:px-2">
-                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                              let pageNum: number;
-                              if (totalPages <= 5) {
-                                  pageNum = i + 1;
-                              } else {
-                                  if (currentPage <= 3) pageNum = i + 1;
-                                  else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                                  else pageNum = currentPage - 2 + i;
-                              }
-                              
-                              if (pageNum > totalPages) return null;
-                              
-                              return (
-                                  <button
-                                      key={pageNum}
-                                      type="button"
-                                      onClick={() => setCurrentPage(pageNum)}
-                                      className={cn(
-                                          "w-8 h-8 rounded-full text-[10px] sm:text-xs font-bold transition-all",
-                                          currentPage === pageNum 
-                                              ? "bg-primary text-primary-foreground shadow-sm" 
-                                              : "hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground"
-                                      )}
-                                  >
-                                      {pageNum}
-                                  </button>
-                              );
-                          })}
-                      </div>
-
-                      <button
-                          type="button"
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          disabled={currentPage === totalPages}
-                          className="p-1.5 rounded-full hover:bg-white dark:hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                      >
-                          <ChevronRight size={16} />
-                      </button>
-                  </div>
-
-                  <span className="text-[10px] sm:text-xs font-bold text-muted-foreground/60 whitespace-nowrap bg-muted/20 px-3 py-1.5 rounded-full border border-border/30">
-                      共 <span className="text-foreground">{totalItems}</span> 条
-                  </span>
-              </div>
-
-              <div className="flex items-center gap-4 order-1 sm:order-2 w-full sm:w-auto justify-between sm:justify-end border-b sm:border-none border-border/10 pb-3 sm:pb-0">
-                  <span className="text-[10px] sm:text-xs font-black text-muted-foreground uppercase tracking-widest opacity-60">每页显示</span>
-                  <div className="flex items-center bg-muted/30 dark:bg-white/5 rounded-full p-1 border border-border/50">
-                      {[10, 20, 50, 100].map((size) => (
-                          <button
-                              key={size}
-                              type="button"
-                              onClick={() => setPageSize(size)}
-                              className={cn(
-                                  "px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all",
-                                  pageSize === size 
-                                      ? "bg-white dark:bg-white/10 text-foreground shadow-sm" 
-                                      : "hover:bg-white/50 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground"
-                              )}
-                          >
-                              {size}
-                          </button>
-                      ))}
-                  </div>
-              </div>
-          </motion.div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       <OutboundModal 

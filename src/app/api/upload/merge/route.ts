@@ -4,19 +4,24 @@ import { tmpdir } from "os";
 import { createReadStream } from "fs";
 import { access, unlink } from "fs/promises";
 import { getStorageStrategy } from "@/lib/storage";
-import { getSession } from "@/lib/auth";
+import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PassThrough, Readable } from "stream";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 const TEMP_DIR = join(tmpdir(), "goods_uploads_temp");
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
+    const session = await getFreshSession() as SessionUser | null;
     const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
     const isGalleryUploadAllowed = settings ? settings.allowGalleryUpload : true;
     
-    if (!session && !isGalleryUploadAllowed) {
+    if (session) {
+      if (!hasPermission(session, "gallery:upload")) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
+    } else if (!isGalleryUploadAllowed) {
       return NextResponse.json({ error: "实物上传功能已关闭" }, { status: 401 });
     }
 

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-import { getFreshSession } from "@/lib/auth";
-import { SessionUser } from "@/lib/permissions";
+import { getAuthorizedAdmin } from "@/lib/auth";
+import { normalizePermissionMap } from "@/lib/permissions";
 
 /**
  * PATCH /api/admin/users/[id] - Update user permissions/role (SUPER_ADMIN only)
@@ -11,8 +11,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getFreshSession() as SessionUser | null;
-  if (!session || session.role !== "SUPER_ADMIN") {
+  const session = await getAuthorizedAdmin("members:manage");
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -25,8 +25,7 @@ export async function PATCH(
       data: {
         role: role !== undefined ? role : undefined,
         roleProfileId: roleProfileId !== undefined ? roleProfileId : undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        permissions: permissions !== undefined ? (permissions as any) : undefined,
+        permissions: permissions !== undefined ? normalizePermissionMap(permissions) : undefined,
       },
     });
 

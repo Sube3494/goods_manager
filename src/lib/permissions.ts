@@ -21,10 +21,18 @@ export interface SessionUser extends JWTPayload {
   role: "SUPER_ADMIN" | "USER";
   permissions?: Record<string, boolean> | unknown;
   roleProfile?: { 
+    id?: string;
     name?: string;
     permissions?: Record<string, boolean> | unknown 
   } | null;
 }
+
+export type PermissionMap = Record<string, boolean>;
+export type AdminCapability =
+  | "roles:manage"
+  | "members:manage"
+  | "members:status"
+  | "whitelist:manage";
 
 export const PERMISSION_TREE = [
   {
@@ -126,6 +134,80 @@ export const PERMISSION_TREE = [
   }
 ];
 
+const BASIC_VISITOR_DEFAULTS: PermissionMap = {
+  "gallery:download": true,
+  "gallery:share": true,
+  "gallery:copy": true,
+};
+
+export const ADMIN_ACCESS_MATRIX: Record<AdminCapability, {
+  label: string;
+  description: string;
+  permission?: Permission;
+  superAdminOnly?: boolean;
+}> = {
+  "roles:manage": {
+    label: "角色模板管理",
+    description: "管理角色模板与权限矩阵",
+    permission: "system:manage",
+  },
+  "members:manage": {
+    label: "成员管理",
+    description: "编辑成员角色、账号和邀请关系",
+    superAdminOnly: true,
+  },
+  "members:status": {
+    label: "成员状态管理",
+    description: "启用或禁用成员账号",
+    superAdminOnly: true,
+  },
+  "whitelist:manage": {
+    label: "白名单与邀请管理",
+    description: "维护白名单、邀请链接和准入控制",
+    superAdminOnly: true,
+  },
+};
+
+export function normalizePermissionMap(source: unknown): PermissionMap {
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return {};
+  }
+
+  return Object.entries(source as Record<string, unknown>).reduce<PermissionMap>((acc, [key, value]) => {
+    if (typeof value === "boolean") {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
+export function getRoleProfilePermissions(user: SessionUser | null): PermissionMap {
+  return normalizePermissionMap(user?.roleProfile?.permissions);
+}
+
+export function getUserPermissionOverrides(user: SessionUser | null): PermissionMap {
+  return normalizePermissionMap(user?.permissions);
+}
+
+export function getEffectivePermissions(user: SessionUser | null): PermissionMap {
+  if (!user) return {};
+  if (user.role === "SUPER_ADMIN") return { all: true };
+
+  const basePermissions = user.roleProfile?.name === "基础访客" ? BASIC_VISITOR_DEFAULTS : {};
+  const profilePermissions = getRoleProfilePermissions(user);
+  const userOverrides = getUserPermissionOverrides(user);
+
+  // Merge order:
+  // 1. Role defaults
+  // 2. RoleProfile grants
+  // 3. User-level overrides (true grants, false revokes)
+  return {
+    ...basePermissions,
+    ...profilePermissions,
+    ...userOverrides,
+  };
+}
+
 /**
  * Check if a user has a specific permission
  */
@@ -134,32 +216,30 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   
   // SUPER_ADMIN has all permissions
   if (user.role === "SUPER_ADMIN") return true;
-  
-  // 基础访客权限兜底：即便数据库中未勾选，代码层也放行部分读取权限
-  // 这里的 user.roleProfile.name 属性来自于实际 Prisma 查询（UserWithRole 类型）
-  const roleName = user.roleProfile?.name;
-  if (roleName === "基础访客") {
-      const basicPerms: Permission[] = ["gallery:download", "gallery:share", "gallery:copy"];
-      if (basicPerms.includes(permission)) return true;
+
+  const effectivePermissions = getEffectivePermissions(user);
+  return !!(effectivePermissions[permission] || effectivePermissions["all"]);
+}
+
+export function hasAdminAccess(user: SessionUser | null, capability: AdminCapability): boolean {
+  if (!user) return false;
+
+  const rule = ADMIN_ACCESS_MATRIX[capability];
+  if (rule.superAdminOnly) {
+    return user.role === "SUPER_ADMIN";
   }
 
-  // 1. Check from dynamic RoleProfile (New System)
-  const profilePerms = (user.roleProfile?.permissions as Record<string, boolean>) || {};
-  if (profilePerms[permission] || profilePerms["all"]) return true;
+  if (rule.permission) {
+    return hasPermission(user, rule.permission);
+  }
 
-  // 2. Check from explicit user permissions (Legacy/Override)
-  const perms = (user.permissions as Record<string, boolean>) || {};
-  return !!(perms[permission] || perms["all"]);
+  return false;
 }
 /**
  * Predefined permission templates for common roles
  */
 export const ROLE_TEMPLATES: Record<string, Record<string, boolean>> = {
-  BASIC_VISITOR: {
-    "gallery:download": true,
-    "gallery:share": true,
-    "gallery:copy": true,
-  }
+  BASIC_VISITOR: BASIC_VISITOR_DEFAULTS
 };
 
 export const TEMPLATE_LABELS: Record<string, string> = {

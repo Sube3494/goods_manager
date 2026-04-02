@@ -43,12 +43,12 @@ export function TopOutboundProducts() {
           <TrendingUp className="text-orange-500" size={16} />
           出库热销榜
         </h3>
-        <p className="text-[10px] text-muted-foreground/30 font-medium uppercase tracking-tighter">Velocity Ranking</p>
+        <p className="text-[10px] text-muted-foreground/30 font-medium tracking-tighter">按出库数量排行</p>
       </div>
       {items.length > 0 && (
         <div className="flex items-center gap-1 bg-orange-500/10 px-2 py-1 rounded-lg border border-orange-500/20 shadow-lg shadow-orange-500/5">
            <Trophy size={10} className="text-orange-500" />
-           <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">TOP {items.length}</span>
+           <span className="text-[10px] font-black text-orange-500 tracking-widest">前 {items.length} 名</span>
         </div>
       )}
     </div>
@@ -77,7 +77,7 @@ export function TopOutboundProducts() {
                <PackageOpen size={48} className="opacity-20" />
                <div className="absolute -inset-4 bg-blue-500/10 blur-3xl rounded-full" />
             </div>
-            <p className="text-xs font-black uppercase tracking-[0.3em] font-mono">Data Not Found</p>
+            <p className="text-xs font-black tracking-[0.3em]">暂无数据</p>
           </div>
         ) : (
           <div className="p-4 space-y-2">
@@ -126,7 +126,7 @@ export function TopOutboundProducts() {
                       </p>
                     </div>
                     <p className="text-[10px] text-muted-foreground/40 font-mono truncate mt-0.5 tracking-tighter">
-                      SKU ID: {item.product.sku}
+                      编码: {item.product.sku}
                     </p>
                   </div>
 
@@ -134,7 +134,7 @@ export function TopOutboundProducts() {
                     <div className="text-xl font-black text-foreground tabular-nums tracking-tighter shadow-primary/20">
                       {item.totalQuantity}
                     </div>
-                    <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] leading-none">Sold Unit</span>
+                    <span className="text-[8px] font-black text-muted-foreground/40 tracking-[0.2em] leading-none">出库量</span>
                   </div>
 
                   <div className="ml-1 opacity-10 group-hover:opacity-100 transition-opacity">

@@ -68,6 +68,13 @@ export async function POST(req: NextRequest) {
         const dateStr = row['下单日期'] || row['日期'] || row['下单时间'] || row['*日期'];
         let platform = row['来源平台'] || row['类型'] || row['*类型'] || "未知平台";
         const deliveryMethod = row['配送平台'] || row['配送方式'];
+        const orderStatus = String(row['状态'] || row['订单状态'] || "").trim();
+
+        // 过滤无效订单：跳过"已删除"、"已取消"、"已退款"的订单
+        if (orderStatus.includes('删除') || orderStatus.includes('取消') || orderStatus.includes('退款')) {
+          results.success++; // 算入静默成功（不用报错）
+          continue;
+        }
         
         // --- 智能平台名称清洗 (Smart Platform Normalization) ---
         // 将各平台长长的细分业务线名称（如“美团闪购”、“淘宝闪购零售”、“京东秒送”）降维成系统基础模块
@@ -86,8 +93,8 @@ export async function POST(req: NextRequest) {
           platform = "快手";
         } else if (platform.includes("拼多多") || platform.includes("多多")) {
           platform = "拼多多";
-        } else if (platform === "其它" || platform === "") {
-          platform = "其它";
+        } else if (platform === "其它" || platform === "未知平台" || platform === "") {
+          platform = "帮我取货";
         }
         
         // 财务字段
@@ -99,9 +106,9 @@ export async function POST(req: NextRequest) {
         let note = row['备注'] || row['*备注'] || "";
         const rawProductName = row['商品'] || row['商品名称'] || row['*商品名称'];
         let shopName = row['平台店铺'] || row['店铺'] || row['*店铺'] || row['所属门店'] || "";
-        const shopAddress = row['门店地址'] || row['店铺地址'] || row['发货地址'] || row['地址'] || row['收件地址'] || row['取货地址'] || "";
+        const shopAddress = row['配送门店'] || row['门店地址'] || row['店铺地址'] || row['发货地址'] || row['收件地址'] || row['取货地址'] || "";
         const platformOrderId = row['订单编号'] || row['平台单号'] || row['*平台单号'] || row['订单号'];
-        const dailySerial = row['流水号'] || row['日流水号'] || "";
+        const dailySerial = row['原流水号'] || row['流水号'] || row['日流水号'] || "";
 
         if (!dateStr || !rawProductName) {
           results.failed++;
@@ -154,18 +161,27 @@ export async function POST(req: NextRequest) {
           // 3. 如果还是没匹配上（比如“私人定制优选礼品”、“帮我取货”这种不包含地名的），
           // 我们通过 Excel 表里可能存在的“地址”列，结合系统配置的真实物理地址来进行逆向推导
           if (!matchedInternalShop && shopAddress && Array.isArray(userDb?.shippingAddresses)) {
-            const foundByAddress = userDb.shippingAddresses.find((addr: any) => {
-              // 从系统配置的地址里提取省/市/区等核心地理信息
-              // 例如 "广东省广州市白云区" -> 提取 "白云" 作为一个强特征
-              const addressStr = addr.address || "";
-              const label = addr.label || "";
-              const coreLocation = label.replace(/(店|一店|二店|分店|总店)$/, '');
-              // 如果 Excel 表里的地址包含了系统核心地名，就认为属于这个店
-              return coreLocation.length >= 2 && String(shopAddress).includes(coreLocation);
-            });
-            
+            const shopAddrStr = String(shopAddress).trim();
+            // 优先：用系统存储的物理地址与配送门店做互向子串匹配
+            // 例: 配送门店="粤顺商务中心4楼423", 系统地址="...粤顺商务中心4楼423..." → 匹配白云店
+            const foundByAddress = shopAddrStr ? userDb.shippingAddresses.find((addr: any) => {
+              const sysAddress = String(addr.address || "").trim();
+              if (!sysAddress) return false;
+              return sysAddress.includes(shopAddrStr) || shopAddrStr.includes(sysAddress);
+            }) : null;
+
             if (foundByAddress) {
               matchedInternalShop = (foundByAddress as any).label;
+            } else if (shopAddrStr) {
+              // 降级：用 label 核心地名匹配配送门店
+              const fallback = userDb.shippingAddresses.find((addr: any) => {
+                const label = addr.label || "";
+                const coreLocation = label.replace(/(店|一店|二店|分店|总店)$/, '');
+                return coreLocation.length >= 2 && shopAddrStr.includes(coreLocation);
+              });
+              if (fallback) {
+                matchedInternalShop = (fallback as any).label;
+              }
             }
           }
 
@@ -268,7 +284,7 @@ export async function POST(req: NextRequest) {
                     status: "Received", // 直接完成
                     totalAmount: 0,
                     date: new Date(),
-                    note: `[流水号:${dailySerial || '无'}] 导入订单(单号:${platformOrderId})时库存不足，系统自动补齐 ${gap} 件`,
+                    note: `[${platform}导入] [流水号:${dailySerial || '无'}] 导入订单(单号:${platformOrderId})时库存不足，系统自动补齐 ${gap} 件`,
                     shopName: shopName ? String(shopName) : null, // 传递清洗后的智能店名
                     userId: userId,
                     items: {

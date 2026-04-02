@@ -89,7 +89,7 @@ const PurchaseItemRow = memo(({
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
                             src={productData.imageUrl} 
-                            alt="product" 
+                            alt="商品" 
                             className="h-full w-full object-cover" 
                         />
                     ) : (
@@ -1352,7 +1352,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                                           {/* eslint-disable-next-line @next/next/no-img-element */}
                                                                           <img 
                                                                               src={img} 
-                                                                              alt={`Waybill ${imgIndex + 1}`} 
+                                                                              alt={`运单 ${imgIndex + 1}`} 
                                                                               className="w-full h-full object-cover cursor-zoom-in hover:scale-110 transition-transform"
                                                                               onClick={() => {
                                                                                   const flatImages = formData.trackingData?.flatMap(t => 

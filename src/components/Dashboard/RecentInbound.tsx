@@ -36,11 +36,11 @@ const itemAnim: Variants = {
 };
 
 const TitleSection = ({ onViewAll }: { onViewAll: () => void }) => (
-  <div className="mb-6 flex items-center justify-between px-2">
+  <div className="p-4 sm:p-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0">
     <div className="flex items-center gap-3">
       <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground/60">最近指挥入库</h2>
       <div className="relative flex">
-        <span className="rounded-full bg-primary px-2.5 py-0.5 text-[9px] font-black text-primary-foreground shadow-lg shadow-primary/20">NEW</span>
+        <span className="rounded-full bg-primary px-2.5 py-0.5 text-[9px] font-black text-primary-foreground shadow-lg shadow-primary/20">最新</span>
         <span className="absolute inset-0 rounded-full bg-primary animate-ping opacity-20" />
       </div>
     </div>
@@ -48,7 +48,7 @@ const TitleSection = ({ onViewAll }: { onViewAll: () => void }) => (
       onClick={onViewAll}
       className="group flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary transition-all"
     >
-      History
+      历史记录
       <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
     </button>
   </div>
@@ -63,9 +63,9 @@ export function RecentInbound({ items, isLoading }: Props) {
 
   if (isLoading) {
     return (
-      <div className="h-full w-full rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-6 backdrop-blur-xl">
+      <div className="h-full w-full rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 backdrop-blur-xl overflow-hidden">
         <TitleSection onViewAll={handleViewAll} />
-        <div className="space-y-4">
+        <div className="space-y-4 p-4 sm:p-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-[72px] animate-pulse rounded-2xl bg-black/3 dark:bg-white/5 border border-black/3 dark:border-white/5" />
           ))}
@@ -76,28 +76,28 @@ export function RecentInbound({ items, isLoading }: Props) {
 
   if (!items || items.length === 0) {
     return (
-      <div className="h-full w-full rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-6 backdrop-blur-xl">
+      <div className="h-full w-full rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 backdrop-blur-xl overflow-hidden">
         <TitleSection onViewAll={handleViewAll} />
         <div className="flex flex-col items-center justify-center py-12 text-center opacity-30">
           <div className="relative mb-4">
             <Package size={40} className="text-muted-foreground" />
             <div className="absolute -inset-2 bg-primary/20 blur-2xl rounded-full" />
           </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Empty Logs</p>
+          <p className="text-xs font-bold tracking-widest text-muted-foreground">暂无入库记录</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full max-w-full min-w-0 overflow-hidden rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-4 sm:p-6 backdrop-blur-xl flex flex-col shadow-xs dark:shadow-none">
+    <div className="h-full w-full max-w-full min-w-0 overflow-hidden rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 backdrop-blur-xl flex flex-col shadow-xs dark:shadow-none">
       <TitleSection onViewAll={handleViewAll} />
 
       <motion.div
         variants={containerAnim}
         initial="hidden"
         animate="show"
-        className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar"
+        className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6 custom-scrollbar"
       >
         {items.map((item, index) => {
           const productName = item.product?.name || "未知商品";
@@ -155,7 +155,7 @@ export function RecentInbound({ items, isLoading }: Props) {
                 <div className="font-mono text-[13px] sm:text-sm font-black text-foreground tabular-nums tracking-tighter self-end sm:self-auto shrink-0">￥{item.subtotal.toLocaleString()}</div>
                 <div className="flex items-center justify-end gap-1 mt-0.5 sm:mt-1 text-[8px] sm:text-[9px] font-bold text-muted-foreground/40 uppercase tracking-wider min-w-0">
                   <Clock size={10} strokeWidth={3} className="shrink-0" />
-                  <span className="truncate">{item.purchaseOrder.date ? formatDistanceToNow(new Date(item.purchaseOrder.date), { addSuffix: true, locale: zhCN }) : 'UNK'}</span>
+                  <span className="truncate">{item.purchaseOrder.date ? formatDistanceToNow(new Date(item.purchaseOrder.date), { addSuffix: true, locale: zhCN }) : '未知'}</span>
                 </div>
               </div>
             </motion.div>

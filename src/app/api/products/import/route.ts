@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
-import { SessionUser } from "@/lib/permissions";
+import { getAuthorizedUser } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
 
 function generatePinyinSearchText(name: string): string {
@@ -20,10 +20,13 @@ function isInvalidSupplier(name: string): boolean {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession() as SessionUser | null;
+    const session = await getAuthorizedUser() as SessionUser | null;
     const userId = session?.id;
     if (!session || !userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!hasPermission(session, "product:create") || !hasPermission(session, "product:update")) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
     const { products } = await request.json();
@@ -111,6 +114,12 @@ export async function POST(request: Request) {
             });
 
             if (product) {
+                if (session.role !== "SUPER_ADMIN" && product.userId !== userId) {
+                    failCount++;
+                    errors.push({ sku, reason: "该 SKU 属于其他用户，无法更新" });
+                    continue;
+                }
+
                 // UPDATE: Replenishment & metadata update
                 const currentStock = product.stock;
                 const currentCost = product.costPrice || 0;
@@ -234,7 +243,9 @@ export async function POST(request: Request) {
                 let finalCategoryId: string;
                 if (categoryName) {
                     let category = await prisma.category.findFirst({
-                        where: { name: categoryName }
+                        where: session.role === "SUPER_ADMIN"
+                          ? { name: categoryName }
+                          : { name: categoryName, userId }
                     });
                     
                     if (!category) {
@@ -245,7 +256,9 @@ export async function POST(request: Request) {
                     finalCategoryId = category.id;
                 } else {
                     const defaultCat = await prisma.category.findFirst({
-                        where: { name: "其他分类" }
+                        where: session.role === "SUPER_ADMIN"
+                          ? { name: "其他分类" }
+                          : { name: "其他分类", userId }
                     });
                     if (defaultCat) {
                         finalCategoryId = defaultCat.id;

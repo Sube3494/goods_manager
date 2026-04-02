@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import md5 from "blueimp-md5";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export default function LoginPage() {
   const { showToast } = useToast();
@@ -125,11 +126,10 @@ export default function LoginPage() {
                     const meData = await meRes.json();
                     const user = meData.user;
                     if (user) {
-                        const isSuperAdmin = user.role === "SUPER_ADMIN";
-                        const hasProductRead = user.roleProfile?.permissions?.["product:read"] || user.permissions?.["product:read"] || user.roleProfile?.permissions?.["all"] || user.permissions?.["all"];
+                        const hasProductRead = hasPermission(user as SessionUser, "product:read");
                         
                         // 只有超管或具备查看商品权限的才能进后台首页，否则默认进相册
-                        targetUrl = (isSuperAdmin || hasProductRead) ? "/" : "/gallery";
+                        targetUrl = hasProductRead ? "/" : "/gallery";
                     } else {
                         targetUrl = "/gallery";
                     }
@@ -226,7 +226,7 @@ export default function LoginPage() {
             >
               <Image 
                 src="/picknote.png" 
-                alt="Logo" 
+                alt="PickNote 图标" 
                 width={140} 
                 height={50} 
                 priority
@@ -435,7 +435,7 @@ export default function LoginPage() {
                             <div className="relative w-full h-full rounded-full overflow-hidden bg-primary/10">
                                 <Image 
                                     src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
-                                    alt="Admin Avatar"
+                                    alt="管理员头像"
                                     fill
                                     sizes="80px"
                                     className="object-cover"
@@ -459,7 +459,7 @@ export default function LoginPage() {
                         <div className="relative aspect-square w-full max-w-[200px] mx-auto bg-white rounded-3xl p-3 shadow-2xl group/qr ring-1 ring-zinc-100 dark:ring-white/10">
                              <Image 
                                 src="/wechat.png" 
-                                alt="WeChat QR" 
+                                alt="微信二维码" 
                                 fill 
                                 sizes="200px" 
                                 className="object-cover rounded-2xl" 

@@ -4,12 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, AlertTriangle, Info, CheckCircle2, LogIn, Fingerprint, ShieldAlert } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "@/lib/utils";
 
 interface ConfirmModalProps {
   isOpen: boolean;

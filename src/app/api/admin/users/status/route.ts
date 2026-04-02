@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getFreshSession } from "@/lib/auth";
-import { SessionUser } from "@/lib/permissions";
+import { getAuthorizedAdmin } from "@/lib/auth";
 
 export async function PATCH(request: Request) {
-  const session = await getFreshSession() as SessionUser | null;
-  // Determine if ADMIN or SUPER_ADMIN can do this. Usually SUPER_ADMIN.
-  if (!session || session.role !== "SUPER_ADMIN") {
+  const session = await getAuthorizedAdmin("members:status");
+  if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

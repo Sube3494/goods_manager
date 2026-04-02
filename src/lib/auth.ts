@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies, headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "./prisma";
-import { SessionUser, hasPermission, Permission } from "./permissions";
+import { SessionUser, hasPermission, Permission, AdminCapability, hasAdminAccess } from "./permissions";
 import { SystemSetting } from "../../prisma/generated-client";
 
 const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
@@ -169,5 +169,27 @@ export async function getAuthorizedUser(permission?: Permission): Promise<Sessio
         return null;
     }
     
+    return session;
+}
+
+export async function getAuthorizedAdmin(capability: AdminCapability): Promise<SessionUser | null> {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.id) return null;
+
+    if (!hasAdminAccess(session, capability)) {
+        return null;
+    }
+
+    return session;
+}
+
+export async function getAuthorizedAdminAny(...capabilities: AdminCapability[]): Promise<SessionUser | null> {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.id) return null;
+
+    if (!capabilities.some((capability) => hasAdminAccess(session, capability))) {
+        return null;
+    }
+
     return session;
 }

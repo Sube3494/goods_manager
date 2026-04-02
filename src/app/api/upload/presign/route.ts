@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import { getStorageStrategy } from "@/lib/storage";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export async function POST(request: Request) {
   try {
-    // Check auth or system setting for guest upload
-    const session = await getSession();
+    const session = await getFreshSession() as SessionUser | null;
     const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
-    
-    // Default to allowed if settings missing
     const isGalleryUploadAllowed = settings ? settings.allowGalleryUpload : true;
 
-    // Allow if admin (session) or if gallery upload is allowed for guests
-    if (!session && !isGalleryUploadAllowed) {
+    if (session) {
+      if (!hasPermission(session, "gallery:upload")) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
+    } else if (!isGalleryUploadAllowed) {
       return NextResponse.json({ error: "实物上传功能已关闭" }, { status: 401 });
     }
 

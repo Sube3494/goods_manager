@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getAuthorizedUser } from "@/lib/auth";
 
 // 审核提交 (仅管理员)
 export async function PATCH(
@@ -8,10 +8,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    const user = session?.user as { role?: string } | undefined;
-
-    if (!session || user?.role !== "admin") {
+    const session = await getAuthorizedUser("gallery:audit");
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

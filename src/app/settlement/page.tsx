@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Wallet, RefreshCw, Receipt, History, Save, Loader2, Store } from "lucide-react";
-import { useToast } from "@/components/ui/Toast";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, CheckCircle2, History, Loader2, Percent, Receipt, RefreshCw, Save, Store, TrendingUp, Wallet } from "lucide-react";
+import { format } from "date-fns";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
+import { DatePicker } from "@/components/ui/DatePicker";
+import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { User } from "@/lib/types";
@@ -15,12 +17,27 @@ interface PlatformData {
   shopName: string;
   platformName: string;
   serviceFeeRate: number;
-  received: number; // 账面到手 (A)
-  brushing: number; // 刷单到手
-  receivedToCard: number; // 已结账
+  received: number;
+  brushing: number;
+  receivedToCard: number;
+}
+
+interface ShopGroup {
+  shopName: string;
+  serviceFeeRate: number;
+  entries: Array<PlatformData & { net: number; fee: number; alreadyReceivedNet: number }>;
+  totalReceived: number;
+  totalToCard: number;
+  totalNet: number;
+  totalServiceFee: number;
+  totalAlreadyReceived: number;
+  finalBalance: number;
+  filledCount: number;
+  isConfirmed: boolean;
 }
 
 const DEFAULT_PLATFORMS = ["美团闪购", "京东秒送", "淘宝闪购"];
+const money = (value: number) => `¥${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function SettlementPage() {
   const { user, isLoading: userLoading } = useUser();
@@ -29,128 +46,180 @@ export default function SettlementPage() {
   const router = useRouter();
   const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
 
-  // 多选店铺状态 (存储选中的店铺标签)
   const [selectedShops, setSelectedShops] = useState<string[]>([]);
-  
-  // 核心数据状态：基于 (店铺 + 平台) 动态生成的行
+  const [activeShop, setActiveShop] = useState("");
+  const [confirmedShops, setConfirmedShops] = useState<string[]>([]);
   const [entries, setEntries] = useState<PlatformData[]>([]);
   const [note, setNote] = useState("");
+  const [businessDate, setBusinessDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [isSaving, setIsSaving] = useState(false);
 
-  // 当选中的店铺变化时，同步 entries
   useEffect(() => {
     if (selectedShops.length === 0) {
       setEntries([]);
+      setActiveShop("");
+      setConfirmedShops([]);
       return;
     }
 
-    setEntries(prev => {
-      const newEntries: PlatformData[] = [];
-      
-      selectedShops.forEach(shopLabel => {
-        const shopInfo = shops.find(s => s.label === shopLabel);
-        const rate = shopInfo?.serviceFeeRate ?? 0.06;
-        
-        DEFAULT_PLATFORMS.forEach(pName => {
-          const entryId = `${shopLabel}-${pName}`;
-          // 尝试保留已有数据
-          const existing = prev.find(e => e.id === entryId);
-          if (existing) {
-            newEntries.push({ ...existing, serviceFeeRate: rate });
-          } else {
-            newEntries.push({
-              id: entryId,
-              shopName: shopLabel,
-              platformName: pName,
-              serviceFeeRate: rate,
-              received: 0,
-              brushing: 0,
-              receivedToCard: 0
-            });
-          }
+    setEntries((prev) => {
+      const next: PlatformData[] = [];
+      selectedShops.forEach((shopLabel) => {
+        const rate = shops.find((item) => item.label === shopLabel)?.serviceFeeRate ?? 0.06;
+        DEFAULT_PLATFORMS.forEach((platformName) => {
+          const id = `${shopLabel}-${platformName}`;
+          const existing = prev.find((entry) => entry.id === id);
+          next.push(
+            existing
+              ? { ...existing, serviceFeeRate: rate }
+              : { id, shopName: shopLabel, platformName, serviceFeeRate: rate, received: 0, brushing: 0, receivedToCard: 0 }
+          );
         });
       });
-      
-      return newEntries;
+      return next;
     });
   }, [selectedShops, shops]);
 
-  // 计算逻辑
-  const stats = useMemo(() => {
-    const list = entries.map(e => ({
-      ...e,
-      net: e.received - e.brushing,
-      fee: (e.received - e.brushing) * e.serviceFeeRate
-    }));
+  useEffect(() => {
+    if (selectedShops.length > 0 && (!activeShop || !selectedShops.includes(activeShop))) {
+      setActiveShop(selectedShops[0]);
+    }
+  }, [activeShop, selectedShops]);
 
-    const totalNet = list.reduce((sum, e) => sum + e.net, 0);
-    const totalServiceFee = list.reduce((sum, e) => sum + e.fee, 0);
-    
-    // 计算已到账业绩部分
-    const totalAlreadyReceivedNet = list.reduce((sum, e) => {
-      if (e.received <= 0) return sum;
-      return sum + (e.receivedToCard / e.received) * e.net;
-    }, 0);
+  const groups = useMemo<ShopGroup[]>(() => {
+    return selectedShops.map((shopName) => {
+      const shopEntries = entries.filter((entry) => entry.shopName === shopName).map((entry) => {
+        const net = entry.received - entry.brushing;
+        const fee = net * entry.serviceFeeRate;
+        const alreadyReceivedNet = entry.received > 0 ? (entry.receivedToCard / entry.received) * net : 0;
+        return { ...entry, net, fee, alreadyReceivedNet };
+      });
+      const totalReceived = shopEntries.reduce((sum, entry) => sum + entry.received, 0);
+      const totalToCard = shopEntries.reduce((sum, entry) => sum + entry.receivedToCard, 0);
+      const totalNet = shopEntries.reduce((sum, entry) => sum + entry.net, 0);
+      const totalServiceFee = shopEntries.reduce((sum, entry) => sum + entry.fee, 0);
+      const totalAlreadyReceived = shopEntries.reduce((sum, entry) => sum + entry.alreadyReceivedNet, 0);
+      return {
+        shopName,
+        serviceFeeRate: shopEntries[0]?.serviceFeeRate ?? 0,
+        entries: shopEntries,
+        totalReceived,
+        totalToCard,
+        totalNet,
+        totalServiceFee,
+        totalAlreadyReceived,
+        finalBalance: totalNet - totalServiceFee - totalAlreadyReceived,
+        filledCount: shopEntries.filter((entry) => entry.received > 0 || entry.brushing > 0 || entry.receivedToCard > 0).length,
+        isConfirmed: confirmedShops.includes(shopName),
+      };
+    });
+  }, [confirmedShops, entries, selectedShops]);
 
-    const finalBalance = totalNet - totalServiceFee - totalAlreadyReceivedNet;
+  const activeGroup = groups.find((group) => group.shopName === activeShop) ?? null;
+  const confirmedGroups = groups.filter((group) => group.isConfirmed);
+  const summary = {
+    shopCount: confirmedGroups.length,
+    totalReceived: confirmedGroups.reduce((sum, group) => sum + group.totalReceived, 0),
+    totalNet: confirmedGroups.reduce((sum, group) => sum + group.totalNet, 0),
+    totalServiceFee: confirmedGroups.reduce((sum, group) => sum + group.totalServiceFee, 0),
+    totalAlreadyReceived: confirmedGroups.reduce((sum, group) => sum + group.totalAlreadyReceived, 0),
+    totalToCard: confirmedGroups.reduce((sum, group) => sum + group.totalToCard, 0),
+    finalBalance: confirmedGroups.reduce((sum, group) => sum + group.finalBalance, 0),
+  };
 
-    return {
-      list,
-      totalNet,
-      totalServiceFee,
-      totalAlreadyReceived: totalAlreadyReceivedNet,
-      finalBalance
-    };
-  }, [entries]);
+  const handleInputChange = (id: string, field: "received" | "brushing" | "receivedToCard", value: string) => {
+    const changed = entries.find((entry) => entry.id === id);
+    if (changed && confirmedShops.includes(changed.shopName)) {
+      setConfirmedShops((prev) => prev.filter((shopName) => shopName !== changed.shopName));
+    }
+    const numeric = Number.parseFloat(value) || 0;
+    setEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, [field]: numeric } : entry)));
+  };
 
-  const handleInputChange = (id: string, field: 'received' | 'brushing' | 'receivedToCard', value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: numValue } : e));
+  const toggleShop = (shopLabel: string) => {
+    setSelectedShops((prev) => {
+      const exists = prev.includes(shopLabel);
+      const next = exists ? prev.filter((item) => item !== shopLabel) : [...prev, shopLabel];
+      if (exists) {
+        setConfirmedShops((confirmed) => confirmed.filter((item) => item !== shopLabel));
+      } else {
+        setActiveShop(shopLabel);
+      }
+      return next;
+    });
+  };
+
+  const handleShopCardClick = (shopLabel: string) => {
+    if (selectedShops.includes(shopLabel)) {
+      setActiveShop(shopLabel);
+      return;
+    }
+    toggleShop(shopLabel);
+  };
+
+  const confirmActiveShop = () => {
+    if (!activeGroup || activeGroup.totalNet === 0) {
+      showToast("当前店铺暂无可结算数据", "error");
+      return;
+    }
+    setConfirmedShops((prev) => (prev.includes(activeGroup.shopName) ? prev : [...prev, activeGroup.shopName]));
+    showToast(`${activeGroup.shopName} 已确认结算`, "success");
   };
 
   const resetData = () => {
-    setEntries(prev => prev.map(e => ({ ...e, received: 0, brushing: 0, receivedToCard: 0 })));
+    setEntries((prev) => prev.map((entry) => ({ ...entry, received: 0, brushing: 0, receivedToCard: 0 })));
+    setConfirmedShops([]);
     setNote("");
-    showToast("结算数据已重置", "success");
+    setBusinessDate(format(new Date(), "yyyy-MM-dd"));
+    showToast("本页录入数据已清空", "success");
   };
 
   const saveSettlement = async () => {
-    if (stats.totalNet === 0) {
-      showToast("无可保存的结算数据", "error");
+    if (selectedShops.length === 0 || confirmedGroups.length === 0) {
+      showToast("请先完成至少一家店铺的结算", "error");
+      return;
+    }
+    if (confirmedGroups.length !== selectedShops.length) {
+      showToast("还有店铺未确认结算，暂不能保存总单", "error");
       return;
     }
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/settlements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/settlements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          date: new Date(),
-          totalNet: stats.totalNet,
-          serviceFeeRate: 0, // 混合费率时，主表记录 0，明细记录实际费率
-          serviceFee: stats.totalServiceFee,
-          totalAlreadyReceived: stats.totalAlreadyReceived,
-          finalBalance: stats.finalBalance,
-          note: note,
-          shopName: selectedShops.join(", "),
-          items: stats.list.map(e => ({
-            platformName: e.platformName,
-            shopName: e.shopName,
-            serviceFeeRate: e.serviceFeeRate,
-            received: e.received,
-            brushing: e.brushing,
-            receivedToCard: e.receivedToCard,
-            net: e.net
-          }))
-        })
+          date: businessDate ? new Date(`${businessDate}T00:00:00`) : new Date(),
+          totalNet: summary.totalNet,
+          serviceFeeRate: 0,
+          serviceFee: summary.totalServiceFee,
+          totalAlreadyReceived: summary.totalAlreadyReceived,
+          finalBalance: summary.finalBalance,
+          note,
+          shopName: confirmedGroups.map((group) => group.shopName).join(", "),
+          items: confirmedGroups.flatMap((group) =>
+            group.entries.map((entry) => ({
+              platformName: entry.platformName,
+              shopName: entry.shopName,
+              serviceFeeRate: entry.serviceFeeRate,
+              received: entry.received,
+              brushing: entry.brushing,
+              receivedToCard: entry.receivedToCard,
+              net: entry.net,
+            }))
+          ),
+        }),
       });
-
       if (!response.ok) throw new Error("保存失败");
-      
       showToast("结算单已存入历史记录", "success");
       router.refresh();
       setSelectedShops([]);
+      setConfirmedShops([]);
+      setEntries([]);
+      setActiveShop("");
+      setNote("");
+      setBusinessDate(format(new Date(), "yyyy-MM-dd"));
     } catch (error) {
       console.error(error);
       showToast("保存失败，请重试", "error");
@@ -163,233 +232,331 @@ export default function SettlementPage() {
   if (!canManage) return null;
 
   return (
-    <div className="space-y-8 pb-10 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-8 relative">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">
-            结算对账
-          </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">
-            支持同时核算多个店铺，自动按各店费率汇总。
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Link 
-            href="/settlement/history"
-            className="flex items-center justify-center gap-2 h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted transition-all active:scale-95 text-sm font-medium"
-          >
-            <History size={16} />
-            <span>历史记录</span>
-          </Link>
-          <button 
-            onClick={resetData}
-            className="flex items-center justify-center gap-2 h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted transition-all active:scale-95 text-sm font-medium"
-          >
-            <RefreshCw size={16} />
-            <span>重置</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Shop Selection - Multi Select Simulation */}
-      <div className="bg-muted/10 p-6 rounded-3xl border border-border/50">
-        <div className="flex items-center gap-2 mb-4">
-          <Store size={18} className="text-primary" />
-          <h3 className="font-bold text-sm uppercase tracking-wider">选择参与结算的店铺</h3>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {shops.map(shop => (
-            <button
-              key={shop.id}
-              onClick={() => {
-                setSelectedShops(prev => 
-                  prev.includes(shop.label) 
-                    ? prev.filter(s => s !== shop.label) 
-                    : [...prev, shop.label]
-                );
-              }}
-              className={`px-6 py-2.5 rounded-2xl text-sm font-bold transition-all border ${
-                selectedShops.includes(shop.label)
-                  ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20'
-                  : 'bg-white dark:bg-white/5 border-border hover:border-primary/50 text-muted-foreground'
-              }`}
-            >
-              {shop.label} ({(shop.serviceFeeRate ?? 0.06) * 100}%)
-            </button>
-          ))}
-          {shops.length === 0 && (
-            <p className="text-sm text-muted-foreground">暂无店铺配置，请前往个人资料页添加。</p>
-          )}
-        </div>
-      </div>
-
-      {selectedShops.length > 0 ? (
-        <div className="flex flex-col gap-8">
-          {/* Data Entry Table */}
-          <div className="rounded-3xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-border/50 bg-muted/5">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Receipt className="text-primary" size={20} />
-                账目明细
-              </h2>
+    <div className="w-full space-y-6 pb-20 2xl:px-4">
+      <div className="relative overflow-hidden rounded-[28px] border border-border/60 bg-white/85 p-5 shadow-sm dark:bg-white/5">
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-gradient-to-l from-primary/8 via-primary/4 to-transparent" />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+              <Receipt size={14} className="text-primary" />
+              逐店结算
             </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead>
-                  <tr className="bg-muted/10">
-                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest">店铺/平台</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest text-center">账单到手 (A)</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest text-center">刷单到手</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-muted-foreground uppercase tracking-widest text-center">已结账 (到卡)</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-primary uppercase tracking-widest text-center">费率</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-primary uppercase tracking-widest text-center">真实业绩</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {entries.map((e) => (
-                    <tr key={e.id} className="hover:bg-muted/5 transition-colors group">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-primary font-black uppercase mb-0.5">{e.shopName}</span>
-                          <span className="font-bold text-foreground">{e.platformName}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="relative inline-block w-40 text-left">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">¥</span>
-                          <input 
-                            type="number"
-                            value={e.received || ""}
-                            onChange={(eVal) => handleInputChange(e.id, 'received', eVal.target.value)}
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm text-right font-bold"
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="relative inline-block w-40 text-left">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">¥</span>
-                          <input 
-                            type="number"
-                            value={e.brushing || ""}
-                            onChange={(eVal) => handleInputChange(e.id, 'brushing', eVal.target.value)}
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-muted/20 border border-transparent focus:border-primary/50 focus:bg-white dark:focus:bg-white/5 transition-all outline-none font-mono text-sm text-right font-bold"
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="relative inline-block w-40 text-left">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]">¥</span>
-                          <input 
-                            type="number"
-                            value={e.receivedToCard || ""}
-                            onChange={(eVal) => handleInputChange(e.id, 'receivedToCard', eVal.target.value)}
-                            className="w-full h-10 pl-7 pr-3 rounded-xl bg-orange-500/5 border border-orange-500/20 focus:border-orange-500 transition-all font-mono text-sm text-right text-rose-500 font-bold"
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-xs font-black text-muted-foreground bg-muted/30 px-2 py-1 rounded-lg">
-                          {(e.serviceFeeRate * 100).toFixed(0)}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center font-mono font-bold text-primary">
-                        ¥{(e.received - e.brushing).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="bg-primary/5 border-t-2 border-primary/20">
-                    <td className="px-6 py-6 font-black text-primary uppercase text-xs tracking-widest">总计汇总</td>
-                    <td className="px-6 py-6 text-center font-mono font-bold text-foreground">
-                      ¥{entries.reduce((sum, e) => sum + e.received, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-6 py-6 text-center font-mono font-bold text-orange-500">
-                      ¥{entries.reduce((sum, e) => sum + e.brushing, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td colSpan={2} />
-                    <td className="px-6 py-6 text-center font-mono font-black text-primary text-xl">
-                      ¥{stats.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">计算对账</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+              左侧选店和切换，中间处理当前店，右侧看已确认总单。
+            </p>
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/settlement/history" className="flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/90 px-5 text-sm font-bold transition-all hover:bg-muted">
+              <History size={16} />
+              历史记录
+            </Link>
+            <button onClick={resetData} className="flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/90 px-5 text-sm font-bold transition-all hover:bg-muted">
+              <RefreshCw size={16} />
+              清空本页
+            </button>
+          </div>
+        </div>
+      </div>
 
-          {/* Final Summary Card */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="rounded-3xl p-8 bg-white dark:bg-white/5 border border-border shadow-xl flex flex-col relative overflow-hidden h-full">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-                <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-8">
-                    <Wallet size={20} className="text-primary" />
-                    <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">多店合并净得预测</span>
-                  </div>
-                  
-                  <div className="mb-12">
-                    <h3 className="text-6xl font-black tracking-tighter text-primary">
-                      ¥{stats.finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </h3>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center py-3 border-b border-border/50">
-                      <span className="text-sm font-bold text-muted-foreground">合计真实业绩 (A-B)</span>
-                      <span className="font-mono font-bold text-lg">¥{stats.totalNet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+      <div className="grid gap-6 2xl:grid-cols-[240px_minmax(860px,1fr)_320px]">
+        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <section className="rounded-[24px] border border-border/60 bg-white p-4 shadow-sm dark:bg-white/5">
+            <div className="mb-4 flex items-center gap-2">
+              <Store size={18} className="text-primary" />
+              <h2 className="text-sm font-black uppercase tracking-[0.2em]">店铺结算列表</h2>
+            </div>
+            <div className="grid gap-2.5 sm:grid-cols-2 2xl:grid-cols-1">
+              {shops.map((shop) => {
+                const selected = selectedShops.includes(shop.label);
+                const focused = activeShop === shop.label;
+                const confirmed = confirmedShops.includes(shop.label);
+                return (
+                  <button
+                    key={shop.id}
+                    type="button"
+                    onClick={() => handleShopCardClick(shop.label)}
+                    className={`relative w-full rounded-[20px] border p-3 text-left transition-all ${
+                      focused
+                        ? "border-transparent bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                        : selected
+                          ? "border-primary/40 bg-primary/6 shadow-sm ring-1 ring-primary/15"
+                          : "border-border/60 bg-background hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className={`text-sm font-black ${focused ? "text-primary-foreground" : "text-foreground"}`}>{shop.label}</div>
+                        <div className={`mt-1 text-xs font-bold ${focused ? "text-primary-foreground/80" : "text-muted-foreground"}`}>费率 {(shop.serviceFeeRate ?? 0.06) * 100}%</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {selected ? (
+                          <CheckCircle2 size={16} className={focused ? "text-primary-foreground" : confirmed ? "text-primary" : "text-muted-foreground"} />
+                        ) : (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                            未加入
+                          </span>
+                        )}
+                        {selected && (
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] ${
+                            confirmed
+                                ? "bg-primary/10 text-primary"
+                                : "bg-muted text-muted-foreground"
+                          }`}>
+                            {confirmed ? "已确认" : "待结算"}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center py-3 border-b border-border/50">
-                      <span className="text-sm font-bold text-muted-foreground">累计各店服务费扣点</span>
-                      <span className="font-mono font-bold text-orange-500">-¥{stats.totalServiceFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {stats.totalAlreadyReceived > 0 && (
-                      <div className="flex justify-between items-center py-3">
-                        <span className="text-sm font-bold text-muted-foreground">累计已到账金额</span>
-                        <span className="font-mono font-bold text-rose-500">-¥{stats.totalAlreadyReceived.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    {selected && (
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className={`text-xs ${focused ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                          {focused ? "当前处理店铺" : "点击切到这家店"}
+                        </div>
+                        <span
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleShop(shop.label);
+                          }}
+                          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                            focused
+                              ? "bg-white/15 text-primary-foreground/85 hover:text-primary-foreground"
+                              : "bg-background text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          移除
+                        </span>
                       </div>
                     )}
+                    {!selected && <div className="mt-3 text-xs text-muted-foreground">点击加入本次结算</div>}
+                  </button>
+                );
+              })}
+              {shops.length === 0 && <p className="text-sm text-muted-foreground">暂无店铺配置，请先去个人资料补充店铺和费率。</p>}
+            </div>
+          </section>
+        </aside>
+
+        <main className="min-w-0 space-y-6">
+          {activeGroup ? (
+            <>
+              <section className="rounded-[26px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
+                <div className="border-b border-border/60 bg-muted/10 px-5 py-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">当前店铺工作区</div>
+                      <h2 className="mt-1 text-2xl font-black tracking-tight">{activeGroup.shopName}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">只处理这一家店，确认后再进入总单。</p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[340px]">
+                      <div className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2.5">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店到账</div>
+                        <div className="mt-1.5 text-lg font-black">{money(activeGroup.totalReceived)}</div>
+                      </div>
+                      <div className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2.5">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店真业绩</div>
+                        <div className="mt-1.5 text-lg font-black text-primary">{money(activeGroup.totalNet)}</div>
+                      </div>
+                      <div className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2.5">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店应补</div>
+                        <div className="mt-1.5 text-lg font-black text-primary">{money(activeGroup.finalBalance)}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                <div className="space-y-3 p-4 sm:p-5">
+                  {activeGroup.entries.map((entry) => (
+                    <div key={entry.id} className="rounded-[22px] border border-border/60 bg-background/90 p-4 shadow-sm transition-all hover:border-primary/20">
+                      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">平台</div>
+                          <div className="mt-1 text-xl font-black tracking-tight">{entry.platformName}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
+                            <Percent size={12} />
+                            费率 {(entry.serviceFeeRate * 100).toFixed(1)}%
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 px-3 py-1 text-xs font-bold text-primary">
+                            <TrendingUp size={12} />
+                            真实业绩 {money(entry.net)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-3">
+                        <label className="space-y-2">
+                          <span className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">账单到手 (A)</span>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
+                            <input type="number" inputMode="decimal" value={entry.received || ""} onChange={(event) => handleInputChange(entry.id, "received", event.target.value)} className="h-[52px] w-full rounded-2xl border border-border bg-white pl-9 pr-4 text-right font-mono text-base font-bold outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:bg-white/5" placeholder="0.00" />
+                          </div>
+                        </label>
+                        <label className="space-y-2">
+                          <span className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">刷单到手 (B)</span>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
+                            <input type="number" inputMode="decimal" value={entry.brushing || ""} onChange={(event) => handleInputChange(entry.id, "brushing", event.target.value)} className="h-[52px] w-full rounded-2xl border border-border bg-white pl-9 pr-4 text-right font-mono text-base font-bold outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:bg-white/5" placeholder="0.00" />
+                          </div>
+                        </label>
+                        <label className="space-y-2">
+                          <span className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">已打款到卡</span>
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-orange-500">¥</span>
+                            <input type="number" inputMode="decimal" value={entry.receivedToCard || ""} onChange={(event) => handleInputChange(entry.id, "receivedToCard", event.target.value)} className="h-[52px] w-full rounded-2xl border border-orange-500/20 bg-orange-500/5 pl-9 pr-4 text-right font-mono text-base font-bold text-rose-500 outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10" placeholder="0.00" />
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="mt-3 grid gap-3 rounded-[18px] bg-muted/20 p-3 sm:grid-cols-3">
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">真实业绩</div>
+                          <div className="mt-1 font-mono text-lg font-black text-primary">{money(entry.net)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">预计服务费</div>
+                          <div className="mt-1 font-mono text-lg font-black text-orange-500">{money(entry.fee)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">已到账占比折算</div>
+                          <div className="mt-1 font-mono text-lg font-black text-rose-500">{money(entry.alreadyReceivedNet)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[24px] border border-border/60 bg-white p-5 shadow-sm dark:bg-white/5">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店真实业绩</div>
+                    <div className="mt-1.5 font-mono text-xl font-black text-primary">{money(activeGroup.totalNet)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店服务费</div>
+                    <div className="mt-1.5 font-mono text-xl font-black text-orange-500">{money(activeGroup.totalServiceFee)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店已到账部分</div>
+                    <div className="mt-1.5 font-mono text-xl font-black text-rose-500">{money(activeGroup.totalAlreadyReceived)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店最终应补</div>
+                    <div className="mt-1.5 font-mono text-xl font-black text-primary">{money(activeGroup.finalBalance)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 rounded-[20px] border border-dashed border-border/70 bg-muted/10 p-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店结算动作</div>
+                    <div className={`mt-1.5 text-lg font-black ${activeGroup.isConfirmed ? "text-primary" : "text-foreground"}`}>
+                      {activeGroup.isConfirmed ? "已确认，已进入右侧总单" : "确认本店后，右侧总单才会计入这家店"}
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">如果继续修改这家店的金额，会自动回到待确认状态。</p>
+                  </div>
+                  <button type="button" onClick={confirmActiveShop} disabled={activeGroup.totalNet === 0} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40">
+                    <CheckCircle2 size={16} />
+                    确认 {activeGroup.shopName} 结算
+                  </button>
+                </div>
+              </section>
+            </>
+          ) : (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center rounded-[30px] border-2 border-dashed border-border bg-muted/5 px-6 text-center">
+              <div className="flex h-18 w-18 items-center justify-center rounded-full bg-primary/8">
+                <Store size={34} className="text-primary" />
+              </div>
+              <p className="mt-5 text-xl font-black tracking-tight">先在左侧选择要结算的店铺</p>
+              <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">选中后，中间这里只处理当前店铺的结算，不再把多家店的录入区堆在一起。</p>
+            </div>
+          )}
+        </main>
+
+        <aside className="space-y-6 2xl:sticky 2xl:top-6 2xl:self-start">
+          <section className="overflow-hidden rounded-[24px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
+            <div className="border-b border-border/60 bg-muted/10 px-5 py-4">
+              <div className="relative">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-muted-foreground">
+                  <Wallet size={14} className="text-primary" />
+                  汇总总单
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">这里只统计已经确认结算的店铺。</p>
+                <div className="mt-3 text-3xl font-black tracking-tight text-primary">{money(summary.finalBalance)}</div>
               </div>
             </div>
 
-            <div className="lg:col-span-1 space-y-6">
-              <div className="rounded-3xl p-8 bg-white dark:bg-white/5 border border-border h-full flex flex-col justify-between">
-                <div>
-                  <h4 className="font-bold text-sm mb-4">结算备注</h4>
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="输入本次多店结算的备注..."
-                    className="w-full h-32 p-4 text-sm rounded-2xl bg-muted/30 border-transparent focus:border-primary/50 transition-all outline-none resize-none"
-                  />
-                </div>
-                
-                <div className="pt-8">
-                  <button 
-                    onClick={saveSettlement}
-                    disabled={isSaving || stats.totalNet === 0}
-                    className="w-full h-16 rounded-2xl bg-primary text-primary-foreground font-black text-lg flex items-center justify-center gap-3 shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30"
-                  >
-                    {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
-                    保存结算单
-                  </button>
+            <div className="space-y-5 p-5">
+              <div className="space-y-3">
+                <label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">业务日期</label>
+                <div className="h-[52px]">
+                  <DatePicker value={businessDate} onChange={setBusinessDate} placeholder="选择业务日期" showClear={false} triggerClassName="h-[52px] rounded-2xl bg-background" />
                 </div>
               </div>
+
+                <div className="grid gap-2.5">
+                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
+                  <span className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
+                    <CalendarDays size={15} />
+                    已确认店铺
+                  </span>
+                  <span className="font-mono text-sm font-black">{summary.shopCount}/{selectedShops.length} 家</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
+                  <span className="text-sm font-bold text-muted-foreground">汇总到账</span>
+                  <span className="font-mono text-sm font-black">{money(summary.totalReceived)}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
+                  <span className="text-sm font-bold text-muted-foreground">汇总真实业绩</span>
+                  <span className="font-mono text-sm font-black">{money(summary.totalNet)}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
+                  <span className="text-sm font-bold text-muted-foreground">汇总服务费</span>
+                  <span className="font-mono text-sm font-black text-orange-500">-{money(summary.totalServiceFee)}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
+                  <span className="text-sm font-bold text-muted-foreground">汇总已到账部分</span>
+                  <span className="font-mono text-sm font-black text-rose-500">-{money(summary.totalAlreadyReceived)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label htmlFor="settlement-note" className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">总单备注</label>
+                <textarea id="settlement-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="补充这次整单结算的说明..." className="h-32 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10" />
+              </div>
+
+              <div className="rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 text-sm text-muted-foreground">
+                顺序是：左侧选店，处理中间当前店，确认本店后，再进入右侧总单。
+              </div>
+
+              <button onClick={saveSettlement} disabled={isSaving || summary.shopCount === 0 || summary.shopCount !== selectedShops.length} className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40">
+                {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                保存结算单
+              </button>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="h-[40vh] rounded-3xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-4 text-muted-foreground bg-muted/5">
-          <Store size={48} className="opacity-20 text-primary" />
-          <p className="font-bold">请在上方选择一个或多个店铺开始核算</p>
-        </div>
-      )}
+          </section>
+
+          <section className="rounded-[24px] border border-border/60 bg-white p-4 shadow-sm dark:bg-white/5">
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">已确认店铺</div>
+            <div className="mt-3 space-y-2.5">
+              {confirmedGroups.length === 0 ? (
+                <p className="text-sm text-muted-foreground">确认后的店铺会出现在这里，准备进入保存总单。</p>
+              ) : (
+                confirmedGroups.map((group) => (
+                  <div key={group.shopName} className="rounded-2xl border border-border/60 bg-background p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-black">{group.shopName}</div>
+                      <span className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-primary">已确认</span>
+                    </div>
+                    <div className="mt-2 text-sm text-muted-foreground">本店应补 {money(group.finalBalance)}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

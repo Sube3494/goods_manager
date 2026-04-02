@@ -60,6 +60,14 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     return true;
   }, [pathname, user, isLoading]);
 
+  const currentNavItem = useMemo(() => {
+    const sortedNavItems = [...navItems].sort((a, b) => b.href.length - a.href.length);
+    return sortedNavItems.find(item => {
+      if (item.href === "/") return pathname === "/";
+      return pathname === item.href || pathname.startsWith(item.href + "/");
+    });
+  }, [pathname]);
+
   if (isLoading || isAuthorized === null) {
     return null; // Let the parent layout (MainLayout) handle the global loader for better UX
   }
@@ -72,7 +80,9 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
         </div>
         <h1 className="text-2xl font-bold mb-2">访问受限</h1>
         <p className="text-muted-foreground max-w-md mb-8">
-          抱歉，您的账号尚未获得进入该区域的许可。如果您认为这是一个错误，请联系管理员进行配置。
+          {currentNavItem
+            ? `当前账号尚未获得“${currentNavItem.name}”的访问许可。${currentNavItem.description || "如果您认为这是一个错误，请联系管理员进行配置。"}`
+            : "抱歉，您的账号尚未获得进入该区域的许可。如果您认为这是一个错误，请联系管理员进行配置。"}
         </p>
         <div className="flex gap-4">
             <button 

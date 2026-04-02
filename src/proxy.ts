@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { updateSession } from "@/lib/auth";
 import { jwtVerify } from "jose";
-import { SessionUser } from "@/lib/permissions";
+import { getEffectivePermissions, hasAdminAccess, SessionUser } from "@/lib/permissions";
 
 const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
 const key = new TextEncoder().encode(secretKey);
@@ -72,9 +72,34 @@ export async function proxy(request: NextRequest) {
       }
       try {
           const { payload } = await jwtVerify(session, key);
-          
-          if (payload.role !== "SUPER_ADMIN") {
+          const sessionUser = payload as SessionUser;
+          const effectivePermissions = getEffectivePermissions(sessionUser);
+          const hasSystemManage = !!(effectivePermissions["system:manage"] || effectivePermissions["all"]);
+          const isRolesPath = path === "/admin/roles" || path.startsWith("/admin/roles/") || path === "/api/admin/roles" || path.startsWith("/api/admin/roles/");
+          const isMembersPath =
+            path === "/admin/members" ||
+            path.startsWith("/admin/members/") ||
+            path === "/api/admin/whitelist" ||
+            path.startsWith("/api/admin/whitelist?") ||
+            path === "/api/admin/users/status" ||
+            path.startsWith("/api/admin/users/status") ||
+            path === "/api/admin/users" ||
+            path.startsWith("/api/admin/users/");
+          const hasMembersAccess =
+            hasAdminAccess(sessionUser, "members:manage") ||
+            hasAdminAccess(sessionUser, "members:status") ||
+            hasAdminAccess(sessionUser, "whitelist:manage");
+
+          if (!isRolesPath && !isMembersPath && payload.role !== "SUPER_ADMIN") {
             return NextResponse.json({ error: "Forbidden: Super Admin only" }, { status: 403 });
+          }
+
+          if (isRolesPath && payload.role !== "SUPER_ADMIN" && !hasSystemManage) {
+            return NextResponse.json({ error: "Forbidden: System managers only" }, { status: 403 });
+          }
+
+          if (isMembersPath && payload.role !== "SUPER_ADMIN" && !hasMembersAccess) {
+            return NextResponse.json({ error: "Forbidden: Members managers only" }, { status: 403 });
           }
 
           // Optimization: Inject role/id into headers for the API to trust later
@@ -91,9 +116,8 @@ export async function proxy(request: NextRequest) {
   if (path === "/login" && session) {
     try {
       const { payload } = await jwtVerify(session, key);
-      const perms = (payload.permissions as Record<string, boolean>) || {};
-      const profilePerms = (payload.roleProfile as SessionUser["roleProfile"])?.permissions as Record<string, boolean> || {};
-      const hasProductRead = perms["product:read"] || perms["all"] || profilePerms["product:read"] || profilePerms["all"];
+      const effectivePermissions = getEffectivePermissions(payload as SessionUser);
+      const hasProductRead = effectivePermissions["product:read"] || effectivePermissions["all"];
       
       // If user has product:read or is super admin, go to dashboard, else go to gallery
       const target = (payload.role === "SUPER_ADMIN" || hasProductRead) ? "/" : "/gallery";
@@ -107,9 +131,8 @@ export async function proxy(request: NextRequest) {
   if (path === "/" && session) {
     try {
       const { payload } = await jwtVerify(session, key);
-      const perms = (payload.permissions as Record<string, boolean>) || {};
-      const profilePerms = (payload.roleProfile as SessionUser["roleProfile"])?.permissions as Record<string, boolean> || {};
-      const hasProductRead = perms["product:read"] || perms["all"] || profilePerms["product:read"] || profilePerms["all"];
+      const effectivePermissions = getEffectivePermissions(payload as SessionUser);
+      const hasProductRead = effectivePermissions["product:read"] || effectivePermissions["all"];
       
       if (payload.role !== "SUPER_ADMIN" && !hasProductRead) {
         return NextResponse.redirect(new URL("/gallery", request.nextUrl));

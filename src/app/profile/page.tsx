@@ -104,7 +104,7 @@ export default function ProfilePage() {
                {user?.email ? (
                  <Image 
                    src={`https://cravatar.cn/avatar/${md5(user.email)}?d=mp&s=200`} 
-                   alt="Current user"
+                   alt="当前用户头像"
                    fill
                    className="object-cover transition-transform group-hover/avatar:scale-110"
                  />

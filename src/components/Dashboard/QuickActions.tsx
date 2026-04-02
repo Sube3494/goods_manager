@@ -2,6 +2,16 @@ import { ArrowDownRight, ShoppingBag, PackagePlus, PackageMinus, Image as ImageI
 import { motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/hooks/useUser";
+import { hasAdminAccess, hasPermission, SessionUser } from "@/lib/permissions";
+
+type QuickAction = {
+  label: string;
+  icon: typeof Settings;
+  path: string;
+  color: string;
+  bg: string;
+};
 
 const container: Variants = {
   hidden: { opacity: 0 },
@@ -29,13 +39,22 @@ const itemAnim: Variants = {
 
 export function QuickActions() {
   const router = useRouter();
+  const { user } = useUser();
+  const sessionUser = user as SessionUser | null;
+  const canManageRoles = hasPermission(sessionUser, "system:manage");
+  const canManageMembers =
+    hasAdminAccess(sessionUser, "members:manage") ||
+    hasAdminAccess(sessionUser, "members:status") ||
+    hasAdminAccess(sessionUser, "whitelist:manage");
 
-  const otherActions = [
-    { label: "采购单管理", icon: ShoppingBag, path: "/purchases", color: "text-blue-500", bg: "bg-blue-500/10 dark:bg-blue-500/5" },
-    { label: "供应商名录", icon: ArrowDownRight, path: "/suppliers", color: "text-purple-500", bg: "bg-purple-500/10 dark:bg-purple-500/5" },
+  const otherActions: QuickAction[] = [
+    hasPermission(sessionUser, "purchase:manage") ? { label: "采购单管理", icon: ShoppingBag, path: "/purchases", color: "text-blue-500", bg: "bg-blue-500/10 dark:bg-blue-500/5" } : null,
+    hasPermission(sessionUser, "supplier:manage") ? { label: "供应商名录", icon: ArrowDownRight, path: "/suppliers", color: "text-emerald-500", bg: "bg-emerald-500/10 dark:bg-emerald-500/5" } : null,
     { label: "商品实物图库", icon: ImageIcon, path: "/gallery", color: "text-orange-500", bg: "bg-orange-500/10 dark:bg-orange-500/5" },
-    { label: "系统数据备份", icon: Database, path: "/settings?tab=data", color: "text-indigo-500", bg: "bg-indigo-500/10 dark:bg-indigo-500/5" },
-  ];
+    canManageRoles ? { label: "角色权限", icon: Settings, path: "/admin/roles", color: "text-rose-500", bg: "bg-rose-500/10 dark:bg-rose-500/5" } : null,
+    hasPermission(sessionUser, "system:manage") ? { label: "系统备份", icon: Database, path: "/settings?tab=data", color: "text-indigo-500", bg: "bg-indigo-500/10 dark:bg-indigo-500/5" } : null,
+    canManageMembers ? { label: "成员中心", icon: Settings, path: "/admin/members", color: "text-sky-500", bg: "bg-sky-500/10 dark:bg-sky-500/5" } : null,
+  ].filter((action): action is QuickAction => Boolean(action));
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 p-4 sm:p-6 backdrop-blur-xl shadow-xs dark:shadow-none">
@@ -62,7 +81,7 @@ export function QuickActions() {
             </div>
             <div className="relative z-10 flex flex-col items-start translate-x-1">
               <span className="text-base font-black tracking-tight leading-tight">登记新入库</span>
-              <span className="text-[10px] opacity-70 font-medium font-mono uppercase">Batch Inbound</span>
+              <span className="text-[10px] opacity-70 font-medium">批量导入入库</span>
             </div>
             {/* Glossy Overlay */}
             <div className="absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 ease-in-out group-hover:translate-x-full" />
@@ -79,13 +98,15 @@ export function QuickActions() {
             </div>
             <div className="flex flex-col items-start translate-x-1">
               <span className="text-base font-black tracking-tight leading-tight">登记新出库</span>
-              <span className="text-[10px] text-muted-foreground font-medium uppercase font-mono">Outbound</span>
+              <span className="text-[10px] text-muted-foreground font-medium">销售·领用·损耗</span>
             </div>
           </motion.button>
 
           {/* Secondary Actions Grid */}
           <div className="sm:col-span-2 grid grid-cols-2 gap-3">
-            {otherActions.map((action, i) => (
+            {otherActions.map((action, i) => {
+              const ActionIcon = action.icon;
+              return (
               <motion.button 
                 key={action.path + i}
                 onClick={() => router.push(action.path)}
@@ -94,13 +115,14 @@ export function QuickActions() {
               >
                 <div className="flex items-center gap-3">
                   <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-colors", action.bg, action.color)}>
-                    <action.icon size={16} />
+                    <ActionIcon size={16} />
                   </div>
                   <span className="text-xs font-bold text-foreground/80 group-hover:text-foreground">{action.label}</span>
                 </div>
                 <ChevronRight size={12} className="text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-0.5" />
               </motion.button>
-            ))}
+              );
+            })}
           </div>
         </motion.div>
         
@@ -111,7 +133,7 @@ export function QuickActions() {
             className="flex items-center gap-2 text-[10px] font-black text-muted-foreground/30 hover:text-primary transition-colors uppercase tracking-[0.3em]"
           >
             <Settings size={12} />
-            Advanced System Configuration
+            系统高级配置
           </motion.button>
         </div>
       </div>
