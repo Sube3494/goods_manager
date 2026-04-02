@@ -5,7 +5,7 @@ import { useUser } from "@/hooks/useUser";
 import { navItems } from "@/lib/navigation";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { useMemo } from "react";
-import { ShieldAlert } from "lucide-react";
+import { LogIn, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 
 export function PageGuard({ children }: { children: React.ReactNode }) {
@@ -67,6 +67,8 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
       return pathname === item.href || pathname.startsWith(item.href + "/");
     });
   }, [pathname]);
+  const loginHref = useMemo(() => `/login?callbackUrl=${encodeURIComponent(pathname || "/")}`, [pathname]);
+  const isGuestBlocked = !user;
 
   if (isLoading || isAuthorized === null) {
     return null; // Let the parent layout (MainLayout) handle the global loader for better UX
@@ -80,11 +82,22 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
         </div>
         <h1 className="text-2xl font-bold mb-2">访问受限</h1>
         <p className="text-muted-foreground max-w-md mb-8">
-          {currentNavItem
+          {isGuestBlocked
+            ? `当前页面需要登录后访问。${currentNavItem ? `登录后可继续进入“${currentNavItem.name}”。` : "登录后即可继续浏览当前内容。"}`
+            : currentNavItem
             ? `当前账号尚未获得“${currentNavItem.name}”的访问许可。${currentNavItem.description || "如果您认为这是一个错误，请联系管理员进行配置。"}`
             : "抱歉，您的账号尚未获得进入该区域的许可。如果您认为这是一个错误，请联系管理员进行配置。"}
         </p>
         <div className="flex gap-4">
+            {isGuestBlocked && (
+              <Link
+                href={loginHref}
+                className="px-6 h-11 rounded-full bg-primary text-primary-foreground flex items-center gap-2 justify-center hover:opacity-90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+              >
+                <LogIn size={16} />
+                立即登录
+              </Link>
+            )}
             <button 
                 onClick={() => router.back()}
                 className="px-6 h-11 rounded-full border border-border hover:bg-white/5 transition-all active:scale-95"
