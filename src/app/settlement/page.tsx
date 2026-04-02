@@ -464,7 +464,7 @@ export default function SettlementPage() {
               </section>
             </>
           ) : (
-            <div className="flex min-h-[60vh] flex-col items-center justify-center rounded-[30px] border-2 border-dashed border-border bg-muted/5 px-6 text-center">
+            <div className="flex min-h-[60dvh] flex-col items-center justify-center rounded-[30px] border-2 border-dashed border-border bg-muted/5 px-6 text-center">
               <div className="flex h-18 w-18 items-center justify-center rounded-full bg-primary/8">
                 <Store size={34} className="text-primary" />
               </div>

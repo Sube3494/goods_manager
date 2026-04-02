@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
-import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink, Volume2, VolumeX, Maximize } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink, Volume2, VolumeX, Maximize, Images, Clapperboard } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -971,7 +971,7 @@ function GalleryContent() {
           </div>
 
         {/* Responsive Grid / Waterfall */}
-        <div className="w-full grid gap-3 sm:gap-5 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="w-full grid gap-3 sm:gap-5 grid-cols-2 lg:grid-cols-5">
                {groupedProducts.map((group, idx) => {
                     // Use product.image as cover URL directly (it may not be a gallery item)
                     // then fall back to the first non-video item, then to any first item
@@ -1045,7 +1045,7 @@ function GalleryContent() {
                                             src={coverUrl} 
                                             alt={group.product.name} 
                                             fill 
-                                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                                             className="object-cover transition-all duration-700 opacity-0 group-hover:scale-105" 
                                             priority={idx < 6}
                                             onLoad={(e) => {
@@ -1063,17 +1063,24 @@ function GalleryContent() {
                                 )}
 
                                 {group.items.length > 1 && (
-                                  <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
-                                    {imageCount > 0 && (
-                                      <div className="h-6 min-w-[24px] px-2 flex items-center justify-center bg-black/55 text-white text-[11px] font-bold leading-none pointer-events-none rounded-full border border-white/10 backdrop-blur-md">
-                                        图 {imageCount}
-                                      </div>
-                                    )}
-                                    {videoCount > 0 && (
-                                      <div className="h-6 min-w-[24px] px-2 flex items-center justify-center bg-black/55 text-white text-[11px] font-bold leading-none pointer-events-none rounded-full border border-white/10 backdrop-blur-md">
-                                        视 {videoCount}
-                                      </div>
-                                    )}
+                                  <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
+                                    <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/52 px-2.5 py-1.5 text-white shadow-lg backdrop-blur-lg">
+                                      {imageCount > 0 && (
+                                        <div className="flex items-center gap-1 text-white/88">
+                                          <Images size={11} />
+                                          <span className="text-[10px] font-black tabular-nums leading-none">{imageCount}</span>
+                                        </div>
+                                      )}
+                                      {imageCount > 0 && videoCount > 0 && (
+                                        <span className="h-3 w-px bg-white/18" />
+                                      )}
+                                      {videoCount > 0 && (
+                                        <div className="flex items-center gap-1 text-white/88">
+                                          <Clapperboard size={11} />
+                                          <span className="text-[10px] font-black tabular-nums leading-none">{videoCount}</span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                                 
@@ -1115,7 +1122,7 @@ function GalleryContent() {
 
         {/* Skeleton Grid for Initial Loading */}
         {isLoading && (
-            <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-5">
                 {[...Array(8)].map((_, i) => (
                     <div key={i} className="rounded-2xl sm:rounded-3xl overflow-hidden border border-border/50 bg-white dark:bg-zinc-900/50 flex flex-col h-full animate-pulse">
                         <div className="aspect-4/5 sm:aspect-square bg-muted relative overflow-hidden">
@@ -1938,7 +1945,7 @@ function GalleryContent() {
 export default function GalleryPage() {
   return (
     <Suspense fallback={
-        <div className="flex items-center justify-center h-[50vh] text-muted-foreground">
+        <div className="flex items-center justify-center h-[50dvh] text-muted-foreground">
             正在加载相册...
         </div>
     }>

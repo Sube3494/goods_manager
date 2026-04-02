@@ -35,7 +35,7 @@ export default async function ProductSharePage({ params, searchParams }: { param
 
   if (isExpiredOrInvalid) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      <div className="min-h-dynamic-screen bg-black text-white flex flex-col items-center justify-center p-6 safe-x safe-y relative overflow-hidden font-sans">
         <div className="absolute inset-0 bg-grid-white/[0.02] -z-10" />
         <div className="absolute top-[30%] -left-[10%] w-[500px] h-[500px] bg-red-500/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute -bottom-[20%] right-[10%] w-[500px] h-[500px] bg-neutral-800/30 rounded-full blur-[100px] pointer-events-none" />

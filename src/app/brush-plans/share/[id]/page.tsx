@@ -75,13 +75,13 @@ export default function SharedPlanPage() {
     };
 
     if (loading) return (
-        <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="min-h-dynamic-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 safe-x safe-y">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
     );
 
     if (isExpired) return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6 text-center">
+        <div className="min-h-dynamic-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6 safe-x safe-y text-center">
             <div className="w-16 h-16 rounded-3xl bg-amber-100 flex items-center justify-center text-amber-600 mb-4 opacity-70">
                 <Calendar size={32} />
             </div>
@@ -91,7 +91,7 @@ export default function SharedPlanPage() {
     );
 
     if (!plan) return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6 text-center">
+        <div className="min-h-dynamic-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6 safe-x safe-y text-center">
             <div className="w-16 h-16 rounded-3xl bg-red-100 flex items-center justify-center text-red-500 mb-4 opacity-70">
                 <Package size={32} />
             </div>
@@ -108,9 +108,9 @@ export default function SharedPlanPage() {
     }, { total: 0 });
 
     return (
-        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col no-scrollbar">
+        <div className="min-h-dynamic-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col no-scrollbar">
             {/* Optimized Shared Header */}
-            <header className="sticky top-0 z-20 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-200 dark:border-white/5 p-4 sm:p-6">
+            <header className="sticky top-0 z-20 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-200 dark:border-white/5 p-4 sm:p-6 safe-top">
                 <div className="max-w-6xl mx-auto w-full">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20">
@@ -158,7 +158,7 @@ export default function SharedPlanPage() {
             </header>
 
             {/* Grouped View */}
-            <main className="flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 pb-32">
+            <main className="flex-1 max-w-6xl mx-auto w-full p-4 sm:p-6 pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">
                 {(() => {
                     const platforms = ["美团", "淘宝", "京东", "其他"];
                     
@@ -251,7 +251,7 @@ export default function SharedPlanPage() {
             </main>
 
             {/* Sticky Summary Bar */}
-            <div className="fixed bottom-0 left-0 right-0 z-30 p-4 sm:p-6 bg-linear-to-t from-zinc-50 dark:from-zinc-950 via-zinc-50/90 dark:via-zinc-950/90 to-transparent pointer-events-none">
+            <div className="fixed bottom-0 left-0 right-0 z-30 p-4 sm:p-6 safe-bottom bg-linear-to-t from-zinc-50 dark:from-zinc-950 via-zinc-50/90 dark:via-zinc-950/90 to-transparent pointer-events-none">
                 <div className="max-w-4xl mx-auto w-full pointer-events-auto">
                     <div className="glass-panel p-4 rounded-3xl border border-white/20 dark:border-white/5 shadow-2xl bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl flex items-center justify-between gap-6">
                         <div className="flex items-center gap-4">

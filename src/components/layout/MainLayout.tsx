@@ -92,7 +92,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
     return (
     <ToastProvider>
-        <div className="w-full min-h-screen bg-transparent text-foreground relative flex font-sans overflow-x-hidden">
+        <div className="w-full min-h-dynamic-screen bg-transparent text-foreground relative flex font-sans overflow-x-hidden safe-x">
         {/* Ambient Background - Static blobs, no GPU hint needed */}
         <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/3 dark:bg-blue-600/2 rounded-full blur-2xl" />
@@ -109,7 +109,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         )}
         
         <div className={cn(
-            "flex-1 flex flex-col min-h-screen relative z-10 w-full transform-gpu",
+            "flex-1 flex flex-col min-h-dynamic-screen relative z-10 w-full transform-gpu",
             canAnimate && "transition-[padding] duration-200 ease-in-out will-change-[padding]",
             showSidebar ? (isCollapsed ? "lg:pl-28" : "lg:pl-72") : "pl-0"
         )}>
@@ -159,7 +159,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             />
             <main className={cn(
                 "flex-1 w-full",
-                !isFullScreenPage && "pt-4 px-4 sm:px-6 lg:px-10 pb-10",
+                !isFullScreenPage && "pt-4 px-4 sm:px-6 lg:px-10 pb-10 safe-bottom",
             )}>
                 <div className={cn(
                     "h-full animate-fade-in",

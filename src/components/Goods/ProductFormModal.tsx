@@ -868,7 +868,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-70001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            className="fixed left-1/2 top-1/2 z-70001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">{initialData ? "编辑商品" : "新增商品"}</h2>
@@ -1562,7 +1562,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
               onClick={() => setSelectedPreviewImage(null)}
             />
             
-            <div className="relative w-full max-w-5xl h-[85vh] flex items-center justify-center pointer-events-none">
+            <div className="relative w-full max-w-5xl h-[85dvh] flex items-center justify-center pointer-events-none">
               {/* Close Button */}
               <button 
                 onClick={() => setSelectedPreviewImage(null)}
@@ -1630,7 +1630,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {selectedPreviewImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedPreviewImage.url) ? (
                             <video 
                                 src={selectedPreviewImage.url} 
-                                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+                                className="max-w-full max-h-[85dvh] object-contain rounded-2xl shadow-2xl"
                                 controls
                                 ref={videoPreviewRef}
                             />
@@ -1640,7 +1640,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         <img 
                             src={selectedPreviewImage.url} 
                             alt="预览" 
-                            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+                            className="max-w-full max-h-[85dvh] object-contain rounded-2xl shadow-2xl"
                             draggable={false}
                         />
                     )}

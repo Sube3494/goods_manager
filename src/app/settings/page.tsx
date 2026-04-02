@@ -36,7 +36,7 @@ interface SystemInfo {
 export default function SettingsPage() {
   return (
     <Suspense fallback={
-      <div className="flex h-[60vh] items-center justify-center">
+      <div className="flex h-[60dvh] items-center justify-center">
         <div className="animate-pulse text-muted-foreground font-medium">准备配置中心...</div>
       </div>
     }>
@@ -290,7 +290,7 @@ function SettingsContent() {
 
   if (isLoading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
+      <div className="flex h-[60dvh] items-center justify-center">
         <div className="animate-pulse text-muted-foreground font-medium">读取系统配置中...</div>
       </div>
     );

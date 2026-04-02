@@ -97,8 +97,8 @@ export function PurchaseOverviewModal({ isOpen, onClose, purchases }: PurchaseOv
             transition={{ type: "spring", stiffness: 450, damping: 35 }}
             className={`fixed left-1/2 top-1/2 z-60001 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-900/70 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col ${
               isFullscreen 
-                ? "w-screen h-screen max-w-none max-h-none rounded-none border-none" 
-                : "w-[calc(100%-24px)] max-w-6xl max-h-[85vh] rounded-3xl border border-border/50"
+                ? "w-screen h-dynamic-screen max-w-none max-h-none rounded-none border-none" 
+                : "w-[calc(100%-24px)] max-w-6xl max-h-safe-modal rounded-3xl border border-border/50"
             }`}
           >
             {/* Header */}

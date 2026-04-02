@@ -411,7 +411,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-            "relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden bg-white dark:bg-gray-900/80 backdrop-blur-2xl rounded-3xl shadow-2xl border transition-all flex flex-col",
+            "relative z-10 w-full max-w-6xl max-h-safe-modal overflow-hidden bg-white dark:bg-gray-900/80 backdrop-blur-2xl rounded-3xl shadow-2xl border transition-all flex flex-col",
             isDragging ? "border-primary scale-[1.01] ring-4 ring-primary/10" : "border-zinc-200 dark:border-white/10"
         )}
       >
@@ -980,7 +980,7 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
             </button>
 
             <div className="w-full h-full flex items-center justify-center p-4 sm:p-12 pointer-events-none">
-              <div className="w-full h-full max-w-5xl max-h-[90vh] pointer-events-auto">
+              <div className="w-full h-full max-w-5xl max-h-safe-modal pointer-events-auto">
                 {/* Assuming GestureImage is imported from './GestureImage' or similar */}
                 <GestureImage src={previewImage} />
               </div>

@@ -18,7 +18,7 @@ export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: Mobil
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   return (
-    <header className="lg:hidden relative px-4 py-2 flex items-center justify-between">
+    <header className="lg:hidden relative px-4 py-2 safe-top flex items-center justify-between">
       <div className="flex items-center gap-3 pointer-events-auto">
         {showMenu && (
           <button

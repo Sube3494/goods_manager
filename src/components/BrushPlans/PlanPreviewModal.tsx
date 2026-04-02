@@ -47,7 +47,7 @@ export function PlanPreviewModal({ isOpen, onClose, plan }: PlanPreviewModalProp
                         initial={{ opacity: 0, scale: 0.9, y: 30 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                        className="fixed left-1/2 top-1/2 z-100001 w-[calc(100%-32px)] max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-[32px] bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                        className="fixed left-1/2 top-1/2 z-100001 w-[calc(100%-32px)] max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-[32px] bg-white dark:bg-zinc-950 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
                     >
                         {/* Header for preview - optimized for screenshot */}
                         <div className="bg-primary/5 p-6 border-b border-primary/10">

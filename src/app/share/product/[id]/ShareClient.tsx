@@ -310,7 +310,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   }, [currentIndex]);
 
   return (
-    <div className="flex-1 h-dvh min-h-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans select-none touch-none">
+    <div className="flex-1 h-dynamic-screen min-h-dynamic-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans select-none touch-none">
       
       {/* Background Glow */}
       <AnimatePresence mode="wait">

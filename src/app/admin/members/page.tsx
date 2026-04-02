@@ -15,7 +15,7 @@ export default function MembersPage() {
 
   if (isUserLoading) {
     return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="flex flex-col items-center justify-center min-h-[60dvh] gap-4">
             <Loader2 className="animate-spin text-primary" size={40} />
             <p className="text-muted-foreground animate-pulse text-sm">正在核验访问权限...</p>
         </div>
@@ -24,7 +24,7 @@ export default function MembersPage() {
 
   if (!canAccessMembersCenter) {
     return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center animate-in fade-in zoom-in-95 duration-500">
+        <div className="flex flex-col items-center justify-center min-h-[60dvh] gap-6 text-center animate-in fade-in zoom-in-95 duration-500">
             <div className="h-20 w-20 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-2">
                 <ShieldAlert size={40} />
             </div>

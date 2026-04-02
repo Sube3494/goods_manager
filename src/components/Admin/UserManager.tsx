@@ -61,7 +61,7 @@ function RoleAssignmentModal({
 
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
-            <div className="w-full max-w-lg overflow-hidden rounded-[28px] sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative max-h-[88vh] sm:max-h-[80vh]">
+            <div className="w-full max-w-lg overflow-hidden rounded-[28px] sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative max-h-safe-modal">
                 <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-border bg-background/95 backdrop-blur">
                     <h3 className="text-lg sm:text-xl font-black text-foreground">设置成员角色</h3>
                     <p className="text-xs sm:text-sm text-muted-foreground mt-1">请选择一个角色以更新该成员的访问权限集</p>

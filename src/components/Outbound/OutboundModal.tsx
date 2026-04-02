@@ -215,7 +215,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-[calc(100%-32px)] sm:w-full max-w-4xl h-[600px] max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-white/10 shadow-2xl flex flex-col"
+          className="relative w-[calc(100%-32px)] sm:w-full max-w-4xl h-[600px] max-h-safe-modal overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-white/10 shadow-2xl flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/5 p-4 sm:p-6 shrink-0">

@@ -80,7 +80,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
 
   if (!isAuthorized) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center animate-in fade-in zoom-in duration-500">
+      <div className="flex flex-col items-center justify-center min-h-[60dvh] p-8 text-center animate-in fade-in zoom-in duration-500">
         <div className="h-20 w-20 rounded-3xl bg-red-500/10 flex items-center justify-center mb-6 border border-red-500/20">
           <ShieldAlert size={40} className="text-red-500" />
         </div>

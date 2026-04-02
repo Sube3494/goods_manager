@@ -713,7 +713,7 @@ function PurchasesContent() {
       {/* Table/List View */}
       {/* Desktop Table View */}
       <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
-        <div className="overflow-auto max-h-[calc(100vh-220px)]">
+        <div className="overflow-auto max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0px))]">
           {isLoading && purchases.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center text-center">
                <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
@@ -1049,7 +1049,7 @@ function PurchasesContent() {
 export default function PurchasesPage() {
   return (
     <Suspense fallback={
-        <div className="flex h-[50vh] items-center justify-center text-muted-foreground">
+        <div className="flex h-[50dvh] items-center justify-center text-muted-foreground">
             正在加载采购数据...
         </div>
     }>

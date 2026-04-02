@@ -192,7 +192,7 @@ export function SubmissionReviewModal({
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="relative z-10 w-full max-w-6xl max-h-[90vh] bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl rounded-2xl md:rounded-3xl flex flex-col overflow-hidden"
+                        className="relative z-10 w-full max-w-6xl max-h-safe-modal bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl rounded-2xl md:rounded-3xl flex flex-col overflow-hidden"
                     >
                         {/* Header */}
                         <div className="flex items-center justify-between p-4 md:p-6 shrink-0">
@@ -464,12 +464,12 @@ export function SubmissionReviewModal({
                                         <video 
                                             src={previewMedia.url} 
                                             controls 
-                                            className="max-h-[85vh] rounded-2xl shadow-2xl"
+                                            className="max-h-[85dvh] rounded-2xl shadow-2xl"
                                             ref={videoPreviewRef}
                                         />
 
                                     ) : (
-                                        <div className="relative w-[90vw] h-[85vh] flex items-center justify-center">
+                                        <div className="relative w-[90vw] h-[85dvh] flex items-center justify-center">
                                             <Image 
                                                 src={previewMedia.url} 
                                                 alt="预览" 

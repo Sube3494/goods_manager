@@ -609,7 +609,7 @@ function SetupPurchaseDetailContent() {
           </div>
       </div>
 
-      <div className="overflow-auto max-h-[calc(100vh-250px)]">
+      <div className="overflow-auto max-h-[calc(100dvh-250px-env(safe-area-inset-bottom,0px))]">
           {filteredItems.length === 0 ? (
               <div className="py-20 text-center text-muted-foreground">
                  <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />

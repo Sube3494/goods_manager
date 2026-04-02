@@ -119,7 +119,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
       />
 
       <aside className={cn(
-        "fixed left-4 top-4 z-50 h-[calc(100vh-2rem)] rounded-2xl glass border-border transition-[width,transform] duration-200 ease-in-out lg:translate-x-0 outline-none group/sidebar",
+        "fixed left-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 h-safe-sidebar rounded-2xl glass border-border transition-[width,transform] duration-200 ease-in-out lg:translate-x-0 outline-none group/sidebar",
         isCollapsed ? "w-20" : "w-64",
         isOpen ? "translate-x-0" : "-translate-x-[120%]"
       )}>

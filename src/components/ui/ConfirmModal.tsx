@@ -83,7 +83,7 @@ export function ConfirmModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-4 sm:p-6 lg:pl-(--sidebar-width) transition-[padding] duration-200", className)}>
+        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-4 sm:p-6 safe-y safe-x lg:pl-(--sidebar-width) transition-[padding] duration-200", className)}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -97,7 +97,7 @@ export function ConfirmModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", damping: 25, stiffness: 350 }}
-            className="relative z-10 w-full max-w-[420px] rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col"
+            className="relative z-10 w-full max-w-[420px] max-h-safe-modal rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Subtle Gradient Accent */}
             <div className={cn("absolute top-0 left-0 right-0 h-40 bg-linear-to-b opacity-20 pointer-events-none", currentStyle.accent)} />
@@ -110,7 +110,7 @@ export function ConfirmModal({
               <X size={18} strokeWidth={2.5} />
             </button>
 
-            <div className="px-8 pt-10 pb-8 flex flex-col items-center text-center">
+            <div className="px-8 pt-10 pb-8 flex flex-col items-center text-center overflow-y-auto">
               {/* Icon Section */}
               <motion.div 
                 initial={{ scale: 0.5, opacity: 0 }}

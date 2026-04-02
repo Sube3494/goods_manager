@@ -41,7 +41,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
 
   if (isExpiredOrInvalid) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      <div className="min-h-dynamic-screen bg-black text-white flex flex-col items-center justify-center p-6 safe-x safe-y relative overflow-hidden font-sans">
         {/* 背景氛围点缀 */}
         <div className="absolute inset-0 bg-grid-white/[0.02] -z-10" />
         <div className="absolute top-[30%] -left-[10%] w-[500px] h-[500px] bg-red-500/10 rounded-full blur-[120px] pointer-events-none" />
@@ -76,7 +76,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
   const displayUrl = storage.resolveUrl(item.url);
 
   return (
-    <div className="min-h-screen h-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans">
+    <div className="min-h-dynamic-screen h-dynamic-screen w-full bg-black text-white flex flex-col relative overflow-hidden font-sans">
       
       {/* Background Ambient Glow */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -119,7 +119,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
       </main>
 
       {/* Action Bar */}
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-3 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="fixed bottom-[calc(2.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-3 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex flex-col mr-4">
             <span className="text-white/90 text-sm font-black truncate max-w-[150px]">{item.product?.name || '未命名商品'}</span>
             <span className="text-white/40 text-[10px] uppercase tracking-widest font-bold">高清素材分享</span>

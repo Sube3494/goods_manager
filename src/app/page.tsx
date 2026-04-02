@@ -64,7 +64,7 @@ export default function Home() {
 
   if (isUserLoading) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[60vh]">
+      <div className="flex items-center justify-center h-full min-h-[60dvh]">
         <Loader2 className="animate-spin text-muted-foreground" size={32} />
       </div>
     );
