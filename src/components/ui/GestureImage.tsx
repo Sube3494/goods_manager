@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { motion, useMotionValue, useSpring, animate } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+const SOFT_SPRING_CONFIG = { stiffness: 180, damping: 25, mass: 0.5 };
+const HARD_SPRING_CONFIG = { stiffness: 5000, damping: 200, mass: 0.05 };
+
 interface GestureImageProps {
   src: string;
   alt?: string;
@@ -11,10 +14,11 @@ interface GestureImageProps {
   onScaleChange?: (scale: number) => void;
 }
 
-export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }: GestureImageProps) => {
+export const GestureImage = ({ src, alt = "预览", className, onScaleChange }: GestureImageProps) => {
   const scaleValue = useMotionValue(1);
   const xValue = useMotionValue(0);
   const yValue = useMotionValue(0);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const [isDragging, setIsDragging] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -23,12 +27,9 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
   const dragStart = useRef({ x: 0, y: 0 });
   const lastTapTime = useRef(0);
 
-  const softSpringConfig = { stiffness: 180, damping: 25, mass: 0.5 };
-  const hardSpringConfig = { stiffness: 5000, damping: 200, mass: 0.05 };
-
-  const smoothScale = useSpring(scaleValue, softSpringConfig);
-  const smoothX = useSpring(xValue, isDragging ? hardSpringConfig : softSpringConfig);
-  const smoothY = useSpring(yValue, isDragging ? hardSpringConfig : softSpringConfig);
+  const smoothScale = useSpring(scaleValue, SOFT_SPRING_CONFIG);
+  const smoothX = useSpring(xValue, isDragging ? HARD_SPRING_CONFIG : SOFT_SPRING_CONFIG);
+  const smoothY = useSpring(yValue, isDragging ? HARD_SPRING_CONFIG : SOFT_SPRING_CONFIG);
 
   useEffect(() => {
     return scaleValue.on("change", (v) => {
@@ -36,6 +37,29 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
       setIsZoomed(v > 1.05);
     });
   }, [scaleValue, onScaleChange]);
+
+  useEffect(() => {
+    animate(scaleValue, 1, SOFT_SPRING_CONFIG);
+    animate(xValue, 0, SOFT_SPRING_CONFIG);
+    animate(yValue, 0, SOFT_SPRING_CONFIG);
+  }, [src, scaleValue, xValue, yValue]);
+
+  const zoomToPoint = (clientX: number, clientY: number, nextScale: number) => {
+    const container = containerRef.current;
+    const currentScale = scaleValue.get();
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const pointerX = clientX - rect.left - centerX;
+    const pointerY = clientY - rect.top - centerY;
+    const ratio = nextScale / currentScale;
+
+    xValue.set(pointerX - (pointerX - xValue.get()) * ratio);
+    yValue.set(pointerY - (pointerY - yValue.get()) * ratio);
+    scaleValue.set(nextScale);
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
@@ -49,11 +73,11 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
       const now = Date.now();
       if (now - lastTapTime.current < 300) {
         if (scaleValue.get() > 1.1) {
-          animate(scaleValue, 1, softSpringConfig);
-          animate(xValue, 0, softSpringConfig);
-          animate(yValue, 0, softSpringConfig);
+          animate(scaleValue, 1, SOFT_SPRING_CONFIG);
+          animate(xValue, 0, SOFT_SPRING_CONFIG);
+          animate(yValue, 0, SOFT_SPRING_CONFIG);
         } else {
-          animate(scaleValue, 2.5, softSpringConfig);
+          animate(scaleValue, 2.5, SOFT_SPRING_CONFIG);
         }
         lastTapTime.current = 0;
         return;
@@ -92,8 +116,8 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
     lastPinchDistance.current = null;
     
     if (scaleValue.get() <= 1.05) {
-      animate(xValue, 0, softSpringConfig);
-      animate(yValue, 0, softSpringConfig);
+      animate(xValue, 0, SOFT_SPRING_CONFIG);
+      animate(yValue, 0, SOFT_SPRING_CONFIG);
     }
   };
 
@@ -104,16 +128,51 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
     const newScale = Math.min(Math.max(currentScale + (delta > 0 ? 0.3 : -0.3), 1), 5);
     
     if (newScale === 1) {
-      animate(scaleValue, 1, softSpringConfig);
-      animate(xValue, 0, softSpringConfig);
-      animate(yValue, 0, softSpringConfig);
+      animate(scaleValue, 1, SOFT_SPRING_CONFIG);
+      animate(xValue, 0, SOFT_SPRING_CONFIG);
+      animate(yValue, 0, SOFT_SPRING_CONFIG);
     } else {
-      scaleValue.set(newScale);
+      zoomToPoint(e.clientX, e.clientY, newScale);
     }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === "touch" || scaleValue.get() <= 1.05) return;
+    setIsDragging(true);
+    dragStart.current = {
+      x: e.clientX - xValue.get(),
+      y: e.clientY - yValue.get(),
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || e.pointerType === "touch") return;
+    xValue.set(e.clientX - dragStart.current.x);
+    yValue.set(e.clientY - dragStart.current.y);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType !== "touch" && e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    setIsDragging(false);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    if (scaleValue.get() > 1.1) {
+      animate(scaleValue, 1, SOFT_SPRING_CONFIG);
+      animate(xValue, 0, SOFT_SPRING_CONFIG);
+      animate(yValue, 0, SOFT_SPRING_CONFIG);
+      return;
+    }
+
+    zoomToPoint(e.clientX, e.clientY, 2.5);
   };
 
   return (
     <motion.div
+      ref={containerRef}
       className={cn(
         "relative flex items-center justify-center select-none touch-none w-full h-full",
         isZoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in",
@@ -129,6 +188,11 @@ export const GestureImage = ({ src, alt = "Preview", className, onScaleChange }:
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onDoubleClick={handleDoubleClick}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

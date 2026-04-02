@@ -17,19 +17,12 @@ interface ImageGalleryProps {
 export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: ImageGalleryProps) {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [direction, setDirection] = useState(0);
-    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-
-    // State derived from props pattern: Reset state immediately when opening
-    if (isOpen && !prevIsOpen) {
-        setPrevIsOpen(true);
-        setCurrentIndex(initialIndex);
-        setDirection(0);
-        // Reset transform too?
-        // setTransform({ scale: 1, x: 0, y: 0 }); // Can't update transform here as it's state, will trigger infinite loop if not careful?
-        // Actually, we can if we manage it correctly. But let's rely on useEffect for transform reset on index change.
-    } else if (!isOpen && prevIsOpen) {
-        setPrevIsOpen(false);
-    }
+    const [mounted, setMounted] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [isMuted, setIsMuted] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
     
     // Transform state
     const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
@@ -40,8 +33,14 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
     // But we still need side effects like body scroll.
     useEffect(() => {
         if (isOpen) {
-             // Ensure transform is reset on open too
-            const handle = requestAnimationFrame(() => setTransform({ scale: 1, x: 0, y: 0 }));
+            const handle = requestAnimationFrame(() => {
+                setCurrentIndex(initialIndex);
+                setDirection(0);
+                setTransform({ scale: 1, x: 0, y: 0 });
+                setIsPlaying(false);
+                setProgress(0);
+                setCurrentTime(0);
+            });
             document.body.style.overflow = 'hidden';
             return () => cancelAnimationFrame(handle);
         } else {
@@ -50,7 +49,7 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
         return () => {
             document.body.style.overflow = '';
         };
-    }, [isOpen]); // dependency on isOpen only is fine as index/transform handled elsewhere/above
+    }, [isOpen, initialIndex]);
 
     // Reset transform on image change
     useEffect(() => {
@@ -61,6 +60,9 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
     // Handle Keyboard
     const navigate = useCallback((dir: number) => {
         setDirection(dir);
+        setIsPlaying(false);
+        setProgress(0);
+        setCurrentTime(0);
         setCurrentIndex(prev => (prev + dir + images.length) % images.length);
     }, [images.length]);
 
@@ -142,21 +144,6 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
         setIsDragging(false);
     };
 
-    const [mounted, setMounted] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [isMuted, setIsMuted] = useState(false);
-    const videoRef = useRef<HTMLVideoElement>(null);
-
-    // Optimized state reset using render-reset pattern instead of useEffect to avoid cascading renders
-    const [prevIndex, setPrevIndex] = useState(currentIndex);
-    if (currentIndex !== prevIndex) {
-        setPrevIndex(currentIndex);
-        setIsPlaying(false);
-        setProgress(0);
-        setCurrentTime(0);
-    }
     useEffect(() => {
         const handle = requestAnimationFrame(() => setMounted(true));
         return () => cancelAnimationFrame(handle);
@@ -385,7 +372,7 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
                                     ) : images[currentIndex] ? (
                                         <Image
                                             src={images[currentIndex]}
-                                            alt={`Gallery Item ${currentIndex + 1}`}
+                                            alt={`图片 ${currentIndex + 1}`}
                                             fill
                                             className="object-contain"
                                             draggable={false}

@@ -307,26 +307,47 @@ function GalleryContent() {
   // UI 自动隐藏逻辑
   const [isUIVisible, setIsUIVisible] = useState(true);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   // 鼠标移动 / 触摸开始：始终显示 UI
   const handleInteraction = useCallback(() => {
     setIsUIVisible(true);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-  }, []);
+    if (selectedImage && !showInfo) {
+      idleTimerRef.current = setTimeout(() => {
+        setIsUIVisible(false);
+      }, 2200);
+    }
+  }, [selectedImage, showInfo]);
 
 
   useEffect(() => {
-    const currentTimer = idleTimerRef.current;
     if (selectedImage) {
         handleInteraction();
     } else {
         setIsUIVisible(true);
-        if (currentTimer) clearTimeout(currentTimer);
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     }
-    return () => { if (currentTimer) clearTimeout(currentTimer); };
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
   }, [selectedImage, handleInteraction]);
 
-  const [showInfo, setShowInfo] = useState(false);
+  useEffect(() => {
+    setShowInfo(false);
+  }, [selectedImage?.id]);
+
+  useEffect(() => {
+    if (showInfo) {
+      setIsUIVisible(true);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      return;
+    }
+
+    if (selectedImage) {
+      handleInteraction();
+    }
+  }, [showInfo, selectedImage, handleInteraction]);
 
   // Auto-scroll selected thumbnail into view
   useEffect(() => {
@@ -359,19 +380,27 @@ function GalleryContent() {
   });
 
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchInitialMeta = async () => {
       try {
-        const res = await fetch("/api/system/info");
-        if (res.ok) {
-          const data = await res.json();
+        const [settingsRes, categoriesRes] = await Promise.all([
+          fetch("/api/system/info"),
+          fetch("/api/categories"),
+        ]);
+
+        if (settingsRes.ok) {
+          const data = await settingsRes.json();
           setIsUploadAllowed(data.allowGalleryUpload ?? true);
         }
+
+        if (categoriesRes.ok) {
+          setCategories(await categoriesRes.json());
+        }
       } catch (error) {
-        console.error("Failed to fetch settings:", error);
+        console.error("Failed to fetch gallery meta:", error);
       }
     };
     
-    fetchSettings();
+    fetchInitialMeta();
   }, []);
   
   // Upload States
@@ -418,15 +447,11 @@ function GalleryContent() {
 
       const galleryUrl = `/api/gallery?${params.toString()}`;
       
-      const [galleryRes, categoriesRes] = await Promise.all([
-        fetch(galleryUrl),
-        fetch("/api/categories") 
-      ]);
+      const galleryRes = await fetch(galleryUrl);
 
-      if (galleryRes.ok && categoriesRes.ok) {
+      if (galleryRes.ok) {
         const galleryResponse = await galleryRes.json();
         const galleryData = galleryResponse.items || [];
-        const categoriesData = await categoriesRes.json();
         
         // Extract products directly from gallery items (they are populated by Prisma include)
         const uniqueProductsMap = new Map<string, Product>();
@@ -449,16 +474,16 @@ function GalleryContent() {
         
         currentPageRef.current = targetPage;
         setHasMore(galleryResponse.hasMore ?? false);
-        
-        // Update auxiliary state
-        setCategories(categoriesData);
-        
-        // Append unique products to the unified store
-        setProducts(prev => {
+
+        if (isFirstPage) {
+          setProducts(productsArray);
+        } else {
+          setProducts(prev => {
             const existingProductIds = new Set(prev.map(p => p.id));
             const newProducts = productsArray.filter(p => !existingProductIds.has(p.id));
             return [...prev, ...newProducts];
-        });
+          });
+        }
       }
     } catch (error) {
       console.error("Gallery fetch failed:", error);
@@ -507,7 +532,6 @@ function GalleryContent() {
       document.body.style.overscrollBehavior = 'unset';
     };
   }, [selectedImage, isUploadModalOpen]);
-
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -740,33 +764,58 @@ function GalleryContent() {
 
   // Navigation logic: match the same order as ProductFormModal gallery
   // (main cover image first, then by createdAt ascending)
-  const relatedImages = selectedImage ? items.filter(img => {
+  const relatedImages = useMemo(() => {
+    if (!selectedImage) return [];
+
+    return items.filter(img => {
       const isCorrectProduct = img.productId === selectedImage.productId;
       const isVisible = isAdmin || img.isPublic;
       return isCorrectProduct && isVisible;
-  }).sort((a, b) => {
+    }).sort((a, b) => {
       const mainUrl = selectedImage.product?.image;
       if (mainUrl) {
-          if (a.url === mainUrl) return -1;
-          if (b.url === mainUrl) return 1;
+        if (a.url === mainUrl) return -1;
+        if (b.url === mainUrl) return 1;
       }
       // 优先按 sortOrder 升序 (Priority: sortOrder ASC)
       if (a.sortOrder !== b.sortOrder) {
-          return (a.sortOrder || 0) - (b.sortOrder || 0);
+        return (a.sortOrder || 0) - (b.sortOrder || 0);
       }
       // 其次按 createdAt 升序 (Secondary: createdAt ASC)
       return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-  }) : [];
+    });
+  }, [selectedImage, items, isAdmin]);
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 
-  const navigate = (dir: number) => {
+  const navigate = useCallback((dir: number) => {
     if (!selectedImage) return;
     const nextIndex = currentIndex + dir;
     if (nextIndex < 0 || nextIndex >= relatedImages.length) return;
     setSelectedImage(relatedImages[nextIndex]);
-  };
+  }, [selectedImage, currentIndex, relatedImages]);
 
   // Navigation logic
+
+  useEffect(() => {
+    if (!selectedImage) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showInfo) {
+          setShowInfo(false);
+        } else {
+          setSelectedImage(null);
+        }
+        return;
+      }
+
+      if (e.key === "ArrowLeft") navigate(-1);
+      if (e.key === "ArrowRight") navigate(1);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedImage, showInfo, navigate]);
 
   // 下载增强逻辑
   const handleDownload = async (url: string, filename: string) => {
@@ -867,7 +916,7 @@ function GalleryContent() {
                 </div>
                 <div className="flex flex-col gap-0.5 justify-center items-center">
                   <span className="text-[10px] sm:text-[13px] font-bold text-foreground/80 tracking-tight leading-none">素材提供 & 开发者</span>
-                  <span className="text-[8px] sm:text-[10px] font-black text-primary tracking-widest opacity-80 uppercase">CONTRIBUTORS</span>
+                  <span className="text-[8px] sm:text-[10px] font-black text-primary tracking-widest opacity-80">贡献者</span>
                 </div>
               </div>
             )}
@@ -922,7 +971,7 @@ function GalleryContent() {
           </div>
 
         {/* Responsive Grid / Waterfall */}
-        <div className="w-full grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="w-full grid gap-3 sm:gap-5 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                {groupedProducts.map((group, idx) => {
                     // Use product.image as cover URL directly (it may not be a gallery item)
                     // then fall back to the first non-video item, then to any first item
@@ -933,15 +982,17 @@ function GalleryContent() {
                     const isVideoCover = !group.product.image && (
                       fallbackItem?.type === 'video' || /\.(mp4|mov|webm)$/i.test(fallbackItem?.url || '')
                     );
+                    const videoCount = group.items.filter(item => item.type === 'video' || /\.(mp4|mov|webm)$/i.test(item.url)).length;
+                    const imageCount = group.items.length - videoCount;
 
                     return (
                     <div
                         key={group.product.id}
-                        className="break-inside-avoid mb-3 sm:mb-6"
+                        className="break-inside-avoid"
                     >
                         <div 
                             className={cn(
-                                "group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/50 transition-all duration-500 flex flex-col h-full hover:shadow-2xl hover:shadow-primary/5 cursor-pointer",
+                                "group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/40 transition-all duration-500 flex flex-col h-full hover:shadow-2xl hover:shadow-primary/5 cursor-pointer",
                                 group.product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20" : ""
                             )}
                             onClick={() => handleOpenProductPreview(group)}
@@ -959,7 +1010,7 @@ function GalleryContent() {
                                 </div>
                             )}
 
-                            <div className="relative aspect-square sm:aspect-4/3 overflow-hidden bg-muted">
+                            <div className="relative aspect-square overflow-hidden bg-muted">
                                 {isVideoCover ? (
                                     <div className="relative w-full h-full">
                                         <video 
@@ -1010,12 +1061,20 @@ function GalleryContent() {
                                         />
                                     </>
                                 )}
-                                
-                                {/* 媒体数量 (Media Count) - 完美契合右上角 */}
-                                 {group.items.length > 1 && (
-                                    <div className="absolute top-0 right-0 z-20 h-6 min-w-[24px] px-2 flex items-center justify-center bg-black/50 text-white text-[12px] font-bold leading-none pointer-events-none rounded-bl-[16px] rounded-tr-[16px]">
-                                        {group.items.length}
-                                    </div>
+
+                                {group.items.length > 1 && (
+                                  <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+                                    {imageCount > 0 && (
+                                      <div className="h-6 min-w-[24px] px-2 flex items-center justify-center bg-black/55 text-white text-[11px] font-bold leading-none pointer-events-none rounded-full border border-white/10 backdrop-blur-md">
+                                        图 {imageCount}
+                                      </div>
+                                    )}
+                                    {videoCount > 0 && (
+                                      <div className="h-6 min-w-[24px] px-2 flex items-center justify-center bg-black/55 text-white text-[11px] font-bold leading-none pointer-events-none rounded-full border border-white/10 backdrop-blur-md">
+                                        视 {videoCount}
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                                 
                                 <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/95 via-black/40 to-transparent opacity-100 transition-opacity duration-500 flex flex-col justify-end p-2.5 sm:p-5 pt-12 sm:pt-16">
