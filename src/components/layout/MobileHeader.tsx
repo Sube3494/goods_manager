@@ -6,7 +6,6 @@ import { useUser } from "@/hooks/useUser";
 import Link from "next/link";
 import { useState } from "react";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { usePathname } from "next/navigation";
 
 interface MobileHeaderProps {
   onToggleSidebar: () => void;
@@ -17,8 +16,6 @@ interface MobileHeaderProps {
 export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: MobileHeaderProps) {
   const { user, isLoading } = useUser();
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-  const pathname = usePathname();
-  const loginHref = `/login?callbackUrl=${encodeURIComponent(pathname || "/")}`;
 
   return (
     <header className="lg:hidden relative px-4 py-2 flex items-center justify-between">
@@ -37,7 +34,7 @@ export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: Mobil
       <div className="flex items-center gap-3 pointer-events-auto">
         {!user && !isLoading && (
             <Link 
-                href={loginHref}
+                href="/login"
                 className="flex items-center gap-2 px-4 h-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-all shadow-sm active:scale-95"
             >
                 <LogIn size={16} />

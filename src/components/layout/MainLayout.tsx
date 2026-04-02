@@ -33,7 +33,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/login";
   const isSharePage = pathname?.startsWith("/share") || pathname?.startsWith("/brush-plans/share");
   const isFullScreenPage = isLoginPage || isSharePage;
-  const loginHref = `/login?callbackUrl=${encodeURIComponent(pathname || "/")}`;
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
   const visibleItems = getVisibleNavItems(user as SessionUser | null);
@@ -126,7 +125,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center gap-3">
                         {!user && !isLoading && (
                             <Link 
-                                href={loginHref}
+                                href="/login"
                                 className="flex items-center gap-2 px-4 h-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm active:scale-95"
                             >
                                 <LogIn size={16} />
