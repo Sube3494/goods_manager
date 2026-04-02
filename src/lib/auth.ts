@@ -5,8 +5,19 @@ import prisma from "./prisma";
 import { SessionUser, hasPermission, Permission, AdminCapability, hasAdminAccess } from "./permissions";
 import { SystemSetting } from "../../prisma/generated-client";
 
-const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
+const secretKey = process.env.JWT_SECRET;
+if (!secretKey) {
+  throw new Error("JWT_SECRET is required");
+}
+
 const key = new TextEncoder().encode(secretKey);
+
+const sessionCookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+};
 
 export const SESSION_DURATION = 60 * 60 * 24 * 7; // 1 week
 
@@ -82,11 +93,11 @@ export async function login(userData: Partial<SessionUser>) {
     expires 
   });
   
-  (await cookies()).set("session", session, { expires, httpOnly: true });
+  (await cookies()).set("session", session, { ...sessionCookieOptions, expires });
 }
 
 export async function logout() {
-  (await cookies()).set("session", "", { expires: new Date(0) });
+  (await cookies()).set("session", "", { ...sessionCookieOptions, expires: new Date(0) });
 }
 
 interface SessionPayload extends JWTPayload {
@@ -107,7 +118,7 @@ export async function updateSession(request: NextRequest) {
     res.cookies.set({
       name: "session",
       value: await encrypt(parsed),
-      httpOnly: true,
+      ...sessionCookieOptions,
       expires: parsed.expires,
     });
     return res;

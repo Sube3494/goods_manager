@@ -5,11 +5,40 @@ import { existsSync } from "fs";
 import prisma from "./prisma";
 import { BackupCrypto } from "./crypto";
 import { createClient } from "webdav";
+import { Prisma } from "../../prisma/generated-client";
 
 export interface BackupFile {
   name: string;
   size: number;
   createdAt: Date;
+}
+
+interface BackupOrderWithItems {
+  items?: Record<string, unknown>[];
+  [key: string]: unknown;
+}
+
+interface BackupPayload {
+  roleProfiles?: Record<string, unknown>[];
+  systemSettings?: Record<string, unknown>[];
+  whitelists?: Record<string, unknown>[];
+  users?: Record<string, unknown>[];
+  invitations?: Record<string, unknown>[];
+  registrationRequests?: Record<string, unknown>[];
+  pageViews?: Record<string, unknown>[];
+  verificationCodes?: Record<string, unknown>[];
+  categories?: Record<string, unknown>[];
+  suppliers?: Record<string, unknown>[];
+  products?: Record<string, unknown>[];
+  purchaseOrders?: BackupOrderWithItems[];
+  outboundOrders?: BackupOrderWithItems[];
+  brushOrders?: BackupOrderWithItems[];
+  galleryItems?: Record<string, unknown>[];
+  gallerySubmissions?: Record<string, unknown>[];
+}
+
+function castMany<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
 }
 
 export class BackupService {
@@ -136,7 +165,7 @@ export class BackupService {
   /**
    * 通用恢复逻辑：清空并重新填充数据库
    */
-  static async restoreFromData(data: any) {
+  static async restoreFromData(data: BackupPayload) {
     await prisma.$transaction(async (tx) => {
       // 1. 清空现有数据 (按外键依赖顺序逆序删除)
       await tx.brushOrderItem.deleteMany();
@@ -161,42 +190,42 @@ export class BackupService {
       await tx.roleProfile.deleteMany();
 
       // 2. 导入数据 (按依赖顺序顺序插入)
-      if (data.roleProfiles) await tx.roleProfile.createMany({ data: data.roleProfiles });
-      if (data.systemSettings) await tx.systemSetting.createMany({ data: data.systemSettings });
-      if (data.whitelists) await tx.emailWhitelist.createMany({ data: data.whitelists });
-      if (data.users) await tx.user.createMany({ data: data.users });
-      if (data.invitations) await tx.invitation.createMany({ data: data.invitations });
-      if (data.registrationRequests) await tx.registrationRequest.createMany({ data: data.registrationRequests });
-      if (data.pageViews) await tx.pageView.createMany({ data: data.pageViews });
-      if (data.verificationCodes) await tx.verificationCode.createMany({ data: data.verificationCodes });
-      if (data.categories) await tx.category.createMany({ data: data.categories });
-      if (data.suppliers) await tx.supplier.createMany({ data: data.suppliers });
-      if (data.products) await tx.product.createMany({ data: data.products });
+      if (data.roleProfiles) await tx.roleProfile.createMany({ data: castMany<Prisma.RoleProfileCreateManyInput>(data.roleProfiles) });
+      if (data.systemSettings) await tx.systemSetting.createMany({ data: castMany<Prisma.SystemSettingCreateManyInput>(data.systemSettings) });
+      if (data.whitelists) await tx.emailWhitelist.createMany({ data: castMany<Prisma.EmailWhitelistCreateManyInput>(data.whitelists) });
+      if (data.users) await tx.user.createMany({ data: castMany<Prisma.UserCreateManyInput>(data.users) });
+      if (data.invitations) await tx.invitation.createMany({ data: castMany<Prisma.InvitationCreateManyInput>(data.invitations) });
+      if (data.registrationRequests) await tx.registrationRequest.createMany({ data: castMany<Prisma.RegistrationRequestCreateManyInput>(data.registrationRequests) });
+      if (data.pageViews) await tx.pageView.createMany({ data: castMany<Prisma.PageViewCreateManyInput>(data.pageViews) });
+      if (data.verificationCodes) await tx.verificationCode.createMany({ data: castMany<Prisma.VerificationCodeCreateManyInput>(data.verificationCodes) });
+      if (data.categories) await tx.category.createMany({ data: castMany<Prisma.CategoryCreateManyInput>(data.categories) });
+      if (data.suppliers) await tx.supplier.createMany({ data: castMany<Prisma.SupplierCreateManyInput>(data.suppliers) });
+      if (data.products) await tx.product.createMany({ data: castMany<Prisma.ProductCreateManyInput>(data.products) });
       
       // 3. 级联订单处理
       if (data.purchaseOrders) {
         for (const order of data.purchaseOrders) {
             const { items, ...orderData } = order;
             await tx.purchaseOrder.create({ data: orderData });
-            if (items?.length) await tx.purchaseOrderItem.createMany({ data: items });
+            if (items?.length) await tx.purchaseOrderItem.createMany({ data: castMany<Prisma.PurchaseOrderItemCreateManyInput>(items) });
         }
       }
       if (data.outboundOrders) {
         for (const order of data.outboundOrders) {
             const { items, ...orderData } = order;
             await tx.outboundOrder.create({ data: orderData });
-            if (items?.length) await tx.outboundOrderItem.createMany({ data: items });
+            if (items?.length) await tx.outboundOrderItem.createMany({ data: castMany<Prisma.OutboundOrderItemCreateManyInput>(items) });
         }
       }
       if (data.brushOrders) {
         for (const order of data.brushOrders) {
             const { items, ...orderData } = order;
-            await tx.brushOrder.create({ data: orderData });
-            if (items?.length) await tx.brushOrderItem.createMany({ data: items });
+            await tx.brushOrder.create({ data: orderData as Prisma.BrushOrderCreateInput });
+            if (items?.length) await tx.brushOrderItem.createMany({ data: castMany<Prisma.BrushOrderItemCreateManyInput>(items) });
         }
       }
-      if (data.galleryItems) await tx.galleryItem.createMany({ data: data.galleryItems });
-      if (data.gallerySubmissions) await tx.gallerySubmission.createMany({ data: data.gallerySubmissions });
+      if (data.galleryItems) await tx.galleryItem.createMany({ data: castMany<Prisma.GalleryItemCreateManyInput>(data.galleryItems) });
+      if (data.gallerySubmissions) await tx.gallerySubmission.createMany({ data: castMany<Prisma.GallerySubmissionCreateManyInput>(data.gallerySubmissions) });
     }, {
       timeout: 30000 // 恢复操作可能较重，增加超时时间
     });

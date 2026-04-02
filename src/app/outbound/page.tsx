@@ -422,7 +422,7 @@ export default function OutboundPage() {
                               >
                                 <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
                                   {item.product?.image ? (
-                                    <img src={item.product.image} className="w-full h-full object-cover" alt="" />
+                                    <Image src={item.product.image} className="object-cover" alt="" fill sizes="24px" />
                                   ) : (
                                     <Package size={12} className="text-muted-foreground/50" />
                                   )}
@@ -584,7 +584,7 @@ export default function OutboundPage() {
                         >
                           <div className="relative w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
                             {item.product?.image ? (
-                              <img src={item.product.image} className="w-full h-full object-cover" alt="" />
+                              <Image src={item.product.image} className="object-cover" alt="" fill sizes="20px" />
                             ) : (
                               <Package size={10} className="text-muted-foreground/50" />
                             )}

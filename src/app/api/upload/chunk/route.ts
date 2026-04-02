@@ -5,6 +5,7 @@ import { writeFile, mkdir, readdir, access } from "fs/promises";
 import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { validateUploadFile } from "@/lib/uploadValidation";
 
 const TEMP_DIR = join(tmpdir(), "goods_uploads_temp");
 
@@ -55,11 +56,18 @@ export async function POST(request: Request) {
     const fileId = formData.get("fileId") as string;
     const chunkIndexStr = formData.get("chunkIndex") as string;
     const chunk = formData.get("chunk") as Blob;
+    const fileName = formData.get("fileName") as string;
+    const fileType = formData.get("fileType") as string;
 
     const chunkIndex = parseInt(chunkIndexStr, 10);
 
-    if (!fileId || isNaN(chunkIndex) || !chunk) {
+    if (!fileId || isNaN(chunkIndex) || !chunk || !fileName || !fileType) {
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
+    }
+
+    const validation = validateUploadFile(fileName, fileType);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     await initTempDir();

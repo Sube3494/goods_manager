@@ -3,6 +3,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { validateUploadFile } from "@/lib/uploadValidation";
 
 export async function POST(request: Request) {
   try {
@@ -22,6 +23,11 @@ export async function POST(request: Request) {
 
     if (!fileName) {
        return NextResponse.json({ error: "Missing fileName for presign" }, { status: 400 });
+     }
+
+    const validation = validateUploadFile(fileName, fileType || "application/octet-stream");
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const storage = await getStorageStrategy();

@@ -21,6 +21,7 @@ import { Product, GalleryItem, Category } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
 import md5 from "blueimp-md5";
+import { buildLoginRedirectUrl } from "@/lib/authRedirect";
 
 
 interface LightboxMediaItemProps {
@@ -279,7 +280,8 @@ function GalleryContent() {
         title: "登录后使用",
         message: "您当前为游客身份，登录后即可使用下载、分享、复制链接及上传等完整功能。",
         onConfirm: () => {
-          window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+          const callbackUrl = `${window.location.pathname}${window.location.search}`;
+          window.location.href = buildLoginRedirectUrl(callbackUrl);
         },
       });
       return;

@@ -21,6 +21,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Docker 启动脚本，无需 ESLint 检查
     "scripts/**",
+    // 数据处理脚本和生成产物不纳入主应用质量闸门
+    "data-processing/**",
+    "prisma/generated-client/**",
   ]),
 ]);
 

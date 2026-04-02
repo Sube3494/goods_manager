@@ -167,6 +167,8 @@ export async function uploadFileWithChunking(
       formData.append("fileId", fileId);
       formData.append("chunkIndex", i.toString());
       formData.append("chunk", chunk);
+      formData.append("fileName", file.name);
+      formData.append("fileType", file.type || "application/octet-stream");
 
       const res = await fetch("/api/upload/chunk", {
         method: "POST",

@@ -12,7 +12,10 @@ import { updateSession } from "@/lib/auth";
 import { jwtVerify } from "jose";
 import { getEffectivePermissions, hasAdminAccess, SessionUser } from "@/lib/permissions";
 
-const secretKey = process.env.JWT_SECRET || "default-secret-key-change-in-prod";
+const secretKey = process.env.JWT_SECRET;
+if (!secretKey) {
+  throw new Error("JWT_SECRET is required");
+}
 const key = new TextEncoder().encode(secretKey);
 
 export async function proxy(request: NextRequest) {
@@ -23,8 +26,8 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Define public paths that don't require authentication
-  // STRICT MODE: Only Login, Gallery, Settings, and Share are public.
-  const publicPaths = ["/login", "/gallery", "/settings", "/share", "/brush-plans/share"];
+  // STRICT MODE: Only Login, Gallery, and share pages are public.
+  const publicPaths = ["/login", "/gallery", "/share", "/brush-plans/share"];
 
   // 1. Always allow public static files (images, favicon, etc) - handled by matcher
 

@@ -3,6 +3,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { isAllowedUploadExtension } from "@/lib/uploadValidation";
 
 /**
  * POST /api/upload/check
@@ -28,6 +29,10 @@ export async function POST(request: Request) {
 
     if (!hash || !ext) {
       return NextResponse.json({ error: "Missing hash or ext" }, { status: 400 });
+    }
+
+    if (!isAllowedUploadExtension(String(ext))) {
+      return NextResponse.json({ error: "仅支持上传图片或视频文件" }, { status: 400 });
     }
 
     const fileName = `${hash}.${ext}`;

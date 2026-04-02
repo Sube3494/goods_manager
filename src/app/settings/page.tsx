@@ -16,6 +16,16 @@ import { DataTab } from "@/components/Settings/DataTab";
 import { SystemTab } from "@/components/Settings/SystemTab";
 import { hasAdminAccess, SessionUser } from "@/lib/permissions";
 
+type ActiveTab = "general" | "storage" | "data" | "system";
+
+interface TabMeta {
+  id: ActiveTab;
+  label: string;
+  icon: typeof Zap;
+  desc: string;
+  accent: string;
+}
+
 interface SystemInfo {
   version: string;
   dbType: string;
@@ -51,8 +61,8 @@ function SettingsContent() {
   const [isTesting, setIsTesting] = useState(false);
 
   // Initialize tab based on search params
-  const initialTab = (searchParams.get("tab") as "general" | "storage" | "data" | "system") || (isSuperAdmin ? "general" : "data");
-  const [activeTab, setActiveTab] = useState<"general" | "storage" | "data" | "system">(initialTab);
+  const initialTab = (searchParams.get("tab") as ActiveTab) || (isSuperAdmin ? "general" : "data");
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
 
   // Storage settings
   const [storageType, setStorageType] = useState<"local" | "minio">("local");
@@ -222,26 +232,26 @@ function SettingsContent() {
 
   // Sync tab from URL if it changes while on page
   useEffect(() => {
-    const tab = searchParams.get("tab") as "general" | "storage" | "data" | "system";
+    const tab = searchParams.get("tab") as ActiveTab | null;
     if (tab && ["general", "storage", "data", "system"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
 
-  const tabs = useMemo(
-    () =>
-      (isSuperAdmin
-        ? [
-            { id: "general", label: "常规设置", icon: Zap, desc: "主题偏好、预警阈值与工作台体验。", accent: "from-amber-500/20 via-orange-500/10 to-transparent" },
-            { id: "storage", label: "存储中心", icon: Database, desc: "文件驱动、对象存储与冲突处理策略。", accent: "from-sky-500/20 via-cyan-500/10 to-transparent" },
-            { id: "data", label: "数据管理", icon: ShieldCheck, desc: "备份归档、恢复流程和高风险数据操作。", accent: "from-emerald-500/20 via-teal-500/10 to-transparent" },
-            { id: "system", label: "关于系统", icon: Info, desc: "版本、运行环境与模块概览。", accent: "from-violet-500/20 via-fuchsia-500/10 to-transparent" },
-          ]
-        : [
-            { id: "data", label: "备份与恢复", icon: Database, desc: "导出当前数据、查看归档并下载备份。", accent: "from-emerald-500/20 via-teal-500/10 to-transparent" },
-          ]) as const,
-    [isSuperAdmin]
-  );
+  const tabs = useMemo<TabMeta[]>(() => {
+    if (isSuperAdmin) {
+      return [
+        { id: "general", label: "常规设置", icon: Zap, desc: "主题偏好、预警阈值与工作台体验。", accent: "from-amber-500/20 via-orange-500/10 to-transparent" },
+        { id: "storage", label: "存储中心", icon: Database, desc: "文件驱动、对象存储与冲突处理策略。", accent: "from-sky-500/20 via-cyan-500/10 to-transparent" },
+        { id: "data", label: "数据管理", icon: ShieldCheck, desc: "备份归档、恢复流程和高风险数据操作。", accent: "from-emerald-500/20 via-teal-500/10 to-transparent" },
+        { id: "system", label: "关于系统", icon: Info, desc: "版本、运行环境与模块概览。", accent: "from-violet-500/20 via-fuchsia-500/10 to-transparent" },
+      ];
+    }
+
+    return [
+      { id: "data", label: "备份与恢复", icon: Database, desc: "导出当前数据、查看归档并下载备份。", accent: "from-emerald-500/20 via-teal-500/10 to-transparent" },
+    ];
+  }, [isSuperAdmin]);
 
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const overviewCards = [

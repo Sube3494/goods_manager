@@ -3,6 +3,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { validateUploadFile } from "@/lib/uploadValidation";
 
 export async function POST(request: Request) {
   try {
@@ -32,6 +33,11 @@ export async function POST(request: Request) {
       const file = formData.get("file") as File | null;
       if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
 
+      const validation = validateUploadFile(file.name, file.type);
+      if (!validation.ok) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+
       const storage = await getStorageStrategy();
       const folder = request.headers.get("x-folder") || undefined;
       const useTimestamp = request.headers.get("x-use-timestamp") === "true";
@@ -56,10 +62,15 @@ export async function POST(request: Request) {
 
     if (!fileName) {
        return NextResponse.json({ error: "Missing x-file-name header for raw upload" }, { status: 400 });
+     }
+
+    const validation = validateUploadFile(decodeURIComponent(fileName), fileType);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    if (!request.body) {
-       return NextResponse.json({ error: "Empty request body" }, { status: 400 });
+     if (!request.body) {
+        return NextResponse.json({ error: "Empty request body" }, { status: 400 });
     }
 
     const storage = await getStorageStrategy();

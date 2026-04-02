@@ -8,6 +8,7 @@ import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PassThrough, Readable } from "stream";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { validateUploadFile } from "@/lib/uploadValidation";
 
 const TEMP_DIR = join(tmpdir(), "goods_uploads_temp");
 
@@ -30,6 +31,11 @@ export async function POST(request: Request) {
 
     if (!fileId || !fileName || !totalChunks) {
       return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+    }
+
+    const validation = validateUploadFile(fileName, fileType || "application/octet-stream");
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     // Verify all chunks exist

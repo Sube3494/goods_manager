@@ -5,6 +5,12 @@ import { SessionUser } from "@/lib/permissions";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { OrderParser } from "@/lib/orderParser";
 import { InventoryService } from "@/services/inventoryService";
+import { AddressItem, BrushShopItem } from "@/lib/types";
+
+interface UserImportProfile {
+  shippingAddresses?: AddressItem[] | null;
+  brushShops?: BrushShopItem[] | string[] | null;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,14 +46,15 @@ export async function POST(req: NextRequest) {
       select: { shippingAddresses: true, brushShops: true }
     });
 
+    const userProfile = userDb as UserImportProfile | null;
     const internalShops = new Set<string>();
-    if (Array.isArray(userDb?.shippingAddresses)) {
-      userDb.shippingAddresses.forEach((a: any) => {
+    if (Array.isArray(userProfile?.shippingAddresses)) {
+      userProfile.shippingAddresses.forEach((a) => {
         if (a.label) internalShops.add(a.label);
       });
     }
-    if (Array.isArray(userDb?.brushShops)) {
-      userDb.brushShops.forEach((s: any) => {
+    if (Array.isArray(userProfile?.brushShops)) {
+      userProfile.brushShops.forEach((s) => {
         if (typeof s === 'string') internalShops.add(s);
         else if (s.name) internalShops.add(s.name);
       });
@@ -101,9 +108,7 @@ export async function POST(req: NextRequest) {
         const payment = row['用户实付金额'] || row['实付'] || row['*实付'] || row['实际支付'] || 0;
         const received = row['商家实收金额'] || row['到手金额'] || row['*到手金额'] || row['预计收入'] || 0;
         const commission = row['佣金'] || row['*佣金'] || 0;
-        const shippingFee = row['配送费'] || 0;
-        
-        let note = row['备注'] || row['*备注'] || "";
+        const note = row['备注'] || row['*备注'] || "";
         const rawProductName = row['商品'] || row['商品名称'] || row['*商品名称'];
         let shopName = row['平台店铺'] || row['店铺'] || row['*店铺'] || row['所属门店'] || "";
         const shopAddress = row['配送门店'] || row['门店地址'] || row['店铺地址'] || row['发货地址'] || row['收件地址'] || row['取货地址'] || "";
@@ -160,27 +165,27 @@ export async function POST(req: NextRequest) {
 
           // 3. 如果还是没匹配上（比如“私人定制优选礼品”、“帮我取货”这种不包含地名的），
           // 我们通过 Excel 表里可能存在的“地址”列，结合系统配置的真实物理地址来进行逆向推导
-          if (!matchedInternalShop && shopAddress && Array.isArray(userDb?.shippingAddresses)) {
+          if (!matchedInternalShop && shopAddress && Array.isArray(userProfile?.shippingAddresses)) {
             const shopAddrStr = String(shopAddress).trim();
             // 优先：用系统存储的物理地址与配送门店做互向子串匹配
             // 例: 配送门店="粤顺商务中心4楼423", 系统地址="...粤顺商务中心4楼423..." → 匹配白云店
-            const foundByAddress = shopAddrStr ? userDb.shippingAddresses.find((addr: any) => {
+            const foundByAddress = shopAddrStr ? userProfile.shippingAddresses.find((addr) => {
               const sysAddress = String(addr.address || "").trim();
               if (!sysAddress) return false;
               return sysAddress.includes(shopAddrStr) || shopAddrStr.includes(sysAddress);
             }) : null;
 
             if (foundByAddress) {
-              matchedInternalShop = (foundByAddress as any).label;
+              matchedInternalShop = foundByAddress.label;
             } else if (shopAddrStr) {
               // 降级：用 label 核心地名匹配配送门店
-              const fallback = userDb.shippingAddresses.find((addr: any) => {
+              const fallback = userProfile.shippingAddresses.find((addr) => {
                 const label = addr.label || "";
                 const coreLocation = label.replace(/(店|一店|二店|分店|总店)$/, '');
                 return coreLocation.length >= 2 && shopAddrStr.includes(coreLocation);
               });
               if (fallback) {
-                matchedInternalShop = (fallback as any).label;
+                matchedInternalShop = fallback.label;
               }
             }
           }
@@ -207,7 +212,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 匹配商品库
-        const matchedItems: { productId: string, quantity: number, matchedProduct: any }[] = [];
+        const matchedItems: { productId: string, quantity: number }[] = [];
         let matchFailed = false;
         for (const item of parsedItems) {
           const product = OrderParser.findBestMatchProduct(item.rawName, allProducts);
@@ -220,7 +225,6 @@ export async function POST(req: NextRequest) {
           matchedItems.push({
             productId: product.id,
             quantity: item.quantity,
-            matchedProduct: product
           });
         }
 
@@ -311,7 +315,7 @@ export async function POST(req: NextRequest) {
                 ? `[店铺:${shopName}] [流水号:${dailySerial || '无'}] [${platform}导入] 平台单号: ${platformOrderId} ${note ? ' | 备注: ' + note : ''}`
                 : `[流水号:${dailySerial || '无'}] [${platform}导入] 平台单号: ${platformOrderId} ${note ? ' | 备注: ' + note : ''}`;
 
-            const outboundOrder = await tx.outboundOrder.create({
+            await tx.outboundOrder.create({
               data: {
                 type: "Sale",
                 date: parseAsShanghaiTime(dateStr),
