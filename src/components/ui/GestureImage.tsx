@@ -200,6 +200,8 @@ export const GestureImage = ({ src, alt = "预览", className, onScaleChange }: 
         alt={alt}
         className="max-w-full max-h-full object-contain rounded-lg shadow-2xl pointer-events-none block"
         draggable={false}
+        decoding="async"
+        fetchPriority="high"
       />
     </motion.div>
   );

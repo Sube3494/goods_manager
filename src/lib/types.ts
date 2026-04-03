@@ -122,6 +122,7 @@ export interface Category {
 export interface GalleryItem {
   id: string;
   url: string;
+  thumbnailUrl?: string | null;
   productId: string;
   product?: Product;
   purchaseOrderId?: string;
@@ -132,6 +133,15 @@ export interface GalleryItem {
   workspaceId?: string;
   sortOrder?: number;
   createdAt?: string;
+}
+
+export interface GalleryGroupSummary {
+  productId: string;
+  product: Product;
+  coverItem: GalleryItem | null;
+  totalCount: number;
+  imageCount: number;
+  videoCount: number;
 }
 
 export interface RecentInboundItem {

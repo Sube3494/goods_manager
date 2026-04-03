@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   }
 
     try {
-    const { email: rawEmail, roleProfileId } = await request.json();
+    const { email: rawEmail, roleProfileId, remark } = await request.json();
     const email = rawEmail?.toLowerCase().trim();
 
     if (!email) {
@@ -85,10 +85,12 @@ export async function POST(request: Request) {
             where: { email },
             update: {
                 roleProfileId: roleProfileId || null,
+                remark: remark !== undefined ? (String(remark).trim() || null) : undefined,
             },
             create: {
                 email,
                 roleProfileId: roleProfileId || null,
+                remark: remark ? String(remark).trim() : null,
             },
         });
 
@@ -132,6 +134,38 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Failed to update whitelist and invitation:", error);
     return NextResponse.json({ error: "Failed to update whitelist" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await getAuthorizedAdminAny("whitelist:manage", "members:manage");
+  if (!session) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const { email: rawEmail, roleProfileId, remark } = await request.json();
+    const email = rawEmail?.toLowerCase().trim();
+
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    const updated = await prisma.emailWhitelist.update({
+      where: { email },
+      data: {
+        roleProfileId: roleProfileId !== undefined ? (roleProfileId || null) : undefined,
+        remark: remark !== undefined ? (String(remark).trim() || null) : undefined,
+      },
+      include: {
+        roleProfile: true,
+      }
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("Failed to update whitelist entry:", error);
+    return NextResponse.json({ error: "Failed to update whitelist entry" }, { status: 500 });
   }
 }
 

@@ -18,6 +18,7 @@ import { triggerBrowserDownload } from "@/lib/download";
 interface ShareItem {
   id: string;
   url: string;
+  thumbnailUrl?: string | null;
   type: string;
 }
 
@@ -494,7 +495,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
                                     <PlayCircle size={20} className="text-white/90 absolute" />
                                 </div>
                             ) : (
-                                <Image src={img.url} alt="" fill sizes="50px" className="object-cover" />
+                                <Image src={img.thumbnailUrl || img.url} alt="" fill sizes="50px" className="object-cover" />
                             )}
                         </div>
                     );

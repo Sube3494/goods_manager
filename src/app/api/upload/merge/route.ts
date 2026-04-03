@@ -89,7 +89,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
         ...result,
-        url: storage.resolveUrl(result.url)
+        url: storage.resolveUrl(result.url),
+        path: result.url
     });
 
   } catch (error) {

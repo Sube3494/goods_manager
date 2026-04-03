@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -23,6 +23,7 @@ interface RoleProfile {
 interface WhitelistEntry {
   id: string;
   email: string;
+  remark?: string | null;
   roleProfileId: string | null;
   roleProfile?: RoleProfile;
   invitationToken?: string | null;
@@ -35,6 +36,69 @@ interface WhitelistEntry {
     roleProfileId: string | null;
     roleProfile?: RoleProfile;
   };
+}
+
+function RemarkModal({
+  email,
+  initialRemark,
+  onClose,
+  onSave,
+  isSaving,
+}: {
+  email: string;
+  initialRemark?: string | null;
+  onClose: () => void;
+  onSave: (remark: string) => void;
+  isSaving: boolean;
+}) {
+  const [remark, setRemark] = useState(initialRemark || "");
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
+      <div className="w-full max-w-lg overflow-hidden rounded-[28px] sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative">
+        <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-border bg-background/95 backdrop-blur">
+          <h3 className="text-lg sm:text-xl font-black text-foreground">成员备注</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-all">{email}</p>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          <textarea
+            value={remark}
+            onChange={(e) => setRemark(e.target.value)}
+            placeholder="写点方便识别的备注，比如客户昵称、团队名或来源渠道"
+            rows={4}
+            maxLength={60}
+            className="w-full rounded-2xl border border-border bg-white dark:bg-white/5 px-4 py-3 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 resize-none"
+          />
+          <div className="mt-2 text-right text-[11px] text-muted-foreground">{remark.length}/60</div>
+        </div>
+
+        <div className="p-4 sm:p-6 border-t border-border flex justify-end gap-3 bg-muted/5">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-bold"
+          >
+            取消
+          </button>
+          <button
+            disabled={isSaving}
+            onClick={() => onSave(remark)}
+            className="px-6 sm:px-8 py-2.5 rounded-xl bg-primary text-primary-foreground font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 className="animate-spin" size={18} /> : "保存备注"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
 }
 
 function RoleAssignmentModal({ 
@@ -129,6 +193,7 @@ export function UserManager() {
   // Invite State
   const [newEmail, setNewEmail] = useState("");
   const [targetRoleId, setTargetRoleId] = useState("");
+  const [newRemark, setNewRemark] = useState("");
   const [isInviting, setIsInviting] = useState(false);
   const [deleteEmail, setDeleteEmail] = useState<string | null>(null);
 
@@ -136,6 +201,8 @@ export function UserManager() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [currentRoleId, setCurrentRoleId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingRemarkEntry, setEditingRemarkEntry] = useState<WhitelistEntry | null>(null);
+  const [isSavingRemark, setIsSavingRemark] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!canViewEntries) {
@@ -202,12 +269,14 @@ export function UserManager() {
         body: JSON.stringify({ 
           email: newEmail, 
           roleProfileId: targetRoleId,
+          remark: newRemark,
         }),
       });
 
       if (res.ok) {
         showToast("邀请已发送", "success");
         setNewEmail("");
+        setNewRemark("");
         const guestRole = roles.find(r => r.name === "基础访客");
         setTargetRoleId(guestRole ? guestRole.id : "");
         fetchData();
@@ -270,6 +339,33 @@ export function UserManager() {
     }
   };
 
+  const handleRemarkSave = async (remark: string) => {
+    if (!editingRemarkEntry || !canManageWhitelist) return;
+    setIsSavingRemark(true);
+    try {
+      const res = await fetch("/api/admin/whitelist", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: editingRemarkEntry.email,
+          remark,
+        }),
+      });
+
+      if (res.ok) {
+        showToast("备注已更新", "success");
+        setEditingRemarkEntry(null);
+        fetchData();
+      } else {
+        showToast("备注更新失败", "error");
+      }
+    } catch {
+      showToast("网络错误", "error");
+    } finally {
+      setIsSavingRemark(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {canManageWhitelist && (
@@ -278,7 +374,7 @@ export function UserManager() {
             <Mail className="text-primary" size={18} />
             邀请新成员
           </h3>
-          <form onSubmit={handleAdd} className="space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-3">
+          <form onSubmit={handleAdd} className="space-y-3">
             <div className="flex gap-2 flex-1">
               <div className="flex-1 relative">
                 <input
@@ -302,15 +398,28 @@ export function UserManager() {
               </div>
             </div>
 
-            <div className="w-full sm:w-auto shrink-0">
-              <button
-                type="submit"
-                disabled={isInviting}
-                className="w-full h-10 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isInviting ? <Loader2 className="animate-spin" size={14} /> : <Plus size={16} />}
-                发送邀请
-              </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="备注一下这个成员，方便后续识别"
+                  value={newRemark}
+                  onChange={(e) => setNewRemark(e.target.value)}
+                  maxLength={60}
+                  className="w-full h-10 px-4 rounded-xl bg-white dark:bg-white/5 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                />
+              </div>
+
+              <div className="w-full sm:w-auto shrink-0">
+                <button
+                  type="submit"
+                  disabled={isInviting}
+                  className="w-full h-10 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isInviting ? <Loader2 className="animate-spin" size={14} /> : <Plus size={16} />}
+                  发送邀请
+                </button>
+              </div>
             </div>
           </form>
           <p className="mt-4 text-xs text-muted-foreground flex items-center gap-1.5 px-1">
@@ -364,6 +473,11 @@ export function UserManager() {
                           <div className="flex flex-col min-w-0">
                             <span className="text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
                             <span className="text-[10px] text-muted-foreground font-mono truncate">{entry.email}</span>
+                            {entry.remark ? (
+                              <span className="mt-1 inline-flex max-w-fit items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                {entry.remark}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -401,6 +515,15 @@ export function UserManager() {
                                    <Settings2 size={18} />
                                  </button>
                                ) : null}
+                               {canManageWhitelist && (
+                                 <button
+                                   onClick={() => setEditingRemarkEntry(entry)}
+                                   className="p-2.5 rounded-xl text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600 transition-all"
+                                   title="编辑备注"
+                                 >
+                                   <NotebookPen size={18} />
+                                 </button>
+                               )}
                                {canManageWhitelist && (
                                  <button
                                     onClick={() => setDeleteEmail(entry.email)}
@@ -445,6 +568,11 @@ export function UserManager() {
                     <div className="flex flex-col min-w-0 flex-1">
                       <span className="text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
                       <span className="text-[10px] text-muted-foreground font-mono truncate">{entry.email}</span>
+                      {entry.remark ? (
+                        <span className="mt-1 inline-flex max-w-fit items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                          {entry.remark}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   
@@ -467,6 +595,15 @@ export function UserManager() {
                   
                   {/* 操作按钮 */}
                   <div className="flex items-center justify-end gap-2 pl-[52px]">
+                    {canManageWhitelist && (
+                      <button
+                        onClick={() => setEditingRemarkEntry(entry)}
+                        className="flex-1 h-9 rounded-xl bg-amber-500/5 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/10 flex items-center justify-center gap-2"
+                      >
+                        <NotebookPen size={14} />
+                        备注
+                      </button>
+                    )}
                     {isRegistered && canManageMembers && (
                       <button
                         onClick={() => {
@@ -504,6 +641,16 @@ export function UserManager() {
              onClose={() => setEditingUserId(null)}
              onSave={handleRoleSave}
              isSaving={isSaving}
+         />
+       )}
+
+       {editingRemarkEntry && canManageWhitelist && (
+         <RemarkModal
+           email={editingRemarkEntry.email}
+           initialRemark={editingRemarkEntry.remark}
+           onClose={() => setEditingRemarkEntry(null)}
+           onSave={handleRemarkSave}
+           isSaving={isSavingRemark}
          />
        )}
  

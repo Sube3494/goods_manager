@@ -27,26 +27,29 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { isPublic, url: newUrl } = body;
+    const { isPublic, url: newUrl, path: newPath, thumbnailUrl: newThumbnailUrl, thumbnailPath: newThumbnailPath } = body;
+    const storage = await getStorageStrategy();
+    const normalizedUrl = storage.stripUrl(newPath || newUrl);
+    const normalizedThumbnailUrl = storage.stripUrl(newThumbnailPath || newThumbnailUrl);
 
     // 获取旧数据用于清理文件
     const oldItem = await prisma.galleryItem.findUnique({
       where: { id },
-      select: { url: true }
+      select: { url: true, thumbnailUrl: true }
     });
 
     const updated = await prisma.galleryItem.update({
       where: { id },
       data: { 
         ...(isPublic !== undefined ? { isPublic } : {}),
-        ...(newUrl ? { url: newUrl } : {})
+        ...(normalizedUrl ? { url: normalizedUrl } : {}),
+        ...(newThumbnailUrl !== undefined || newThumbnailPath !== undefined ? { thumbnailUrl: normalizedThumbnailUrl || null } : {})
       },
     });
 
     // 如果 URL 发生了变化，清理旧物理文件
-    if (newUrl && oldItem && oldItem.url !== newUrl) {
+    if (normalizedUrl && oldItem && oldItem.url !== normalizedUrl) {
       try {
-        const storage = await getStorageStrategy();
         // 检查是否有其他记录仍在使用该旧 URL
         const refCount = await prisma.galleryItem.count({
           where: { url: oldItem.url }
@@ -60,10 +63,24 @@ export async function PATCH(
       }
     }
 
-    const storage = await getStorageStrategy();
+    if ((newThumbnailUrl !== undefined || newThumbnailPath !== undefined) && oldItem?.thumbnailUrl && oldItem.thumbnailUrl !== normalizedThumbnailUrl) {
+      try {
+        const thumbnailRefCount = await prisma.galleryItem.count({
+          where: { thumbnailUrl: oldItem.thumbnailUrl }
+        });
+
+        if (thumbnailRefCount === 0) {
+          await storage.delete(oldItem.thumbnailUrl);
+        }
+      } catch (storageError) {
+        console.error("Failed to cleanup old thumbnail after update:", storageError);
+      }
+    }
+
     return NextResponse.json({
       ...updated,
-      url: storage.resolveUrl(updated.url)
+      url: storage.resolveUrl(updated.url),
+      thumbnailUrl: updated.thumbnailUrl ? storage.resolveUrl(updated.thumbnailUrl) : storage.resolveUrl(updated.url)
     });
   } catch (error) {
     console.error("Failed to update gallery item:", error);
@@ -89,7 +106,7 @@ export async function DELETE(
 
     const item = await prisma.galleryItem.findUnique({
       where: { id },
-      select: { url: true }
+      select: { url: true, thumbnailUrl: true }
     });
 
     if (!item) {
@@ -116,6 +133,14 @@ export async function DELETE(
       try {
         const storage = await getStorageStrategy();
         await storage.delete(item.url);
+        if (item.thumbnailUrl) {
+          const thumbnailRefCount = await prisma.galleryItem.count({
+            where: { thumbnailUrl: item.thumbnailUrl }
+          });
+          if (thumbnailRefCount === 0) {
+            await storage.delete(item.thumbnailUrl);
+          }
+        }
       } catch (storageError) {
         console.error("Failed to delete physical file:", storageError);
       }

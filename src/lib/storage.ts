@@ -167,6 +167,8 @@ export class LocalStorageStrategy implements StorageStrategy {
   resolveUrl(path: string): string {
     if (!path) return path;
     if (path.startsWith('http')) return path;
+    if (path.startsWith('/api/uploads/')) return path;
+    if (path.startsWith('api/uploads/')) return `/${path}`;
     
     // 统一将 /uploads/... 或 uploads/... 映射到我们的分发 API
     let cleanPath = path;
@@ -179,6 +181,12 @@ export class LocalStorageStrategy implements StorageStrategy {
 
   stripUrl(url: string | null | undefined): string | null {
     if (!url) return null;
+    if (url.startsWith('/api/uploads/')) {
+      return `/uploads/${url.substring('/api/uploads/'.length)}`;
+    }
+    if (url.startsWith('api/uploads/')) {
+      return `/uploads/${url.substring('api/uploads/'.length)}`;
+    }
     if (!url.startsWith('http')) return url;
     
     try {

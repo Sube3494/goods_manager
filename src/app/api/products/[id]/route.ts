@@ -47,7 +47,8 @@ export async function GET(
       image: product.image ? storage.resolveUrl(product.image) : null,
       gallery: product.gallery.map(item => ({
         ...item,
-        url: storage.resolveUrl(item.url)
+        url: storage.resolveUrl(item.url),
+        thumbnailUrl: item.thumbnailUrl ? storage.resolveUrl(item.thumbnailUrl) : storage.resolveUrl(item.url)
       }))
     };
 
@@ -148,6 +149,7 @@ export async function DELETE(
         // 相册图片
         product.gallery.forEach(item => {
           if (item.url) urlsToDelete.push(item.url);
+          if (item.thumbnailUrl) urlsToDelete.push(item.thumbnailUrl);
         });
 
         // 执行物理删除

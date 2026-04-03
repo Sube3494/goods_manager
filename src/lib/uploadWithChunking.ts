@@ -58,7 +58,7 @@ export async function uploadFileWithChunking(
   file: File,
   folder?: string,
   onProgress?: (percent: number) => void
-): Promise<{ url: string; type: string; skipped?: boolean; name?: string }> {
+): Promise<{ url: string; path?: string; type: string; skipped?: boolean; name?: string }> {
   file = await maybeCompressImageBeforeUpload(file);
 
   // ── 去重预检：计算 SHA-256 后询问服务端是否已有相同文件 ──
@@ -82,6 +82,7 @@ export async function uploadFileWithChunking(
           if (onProgress) onProgress(100);
           return {
             url: checkData.url,
+            path: checkData.relativeUrl,
             type: isVideo ? "video" : "image",
             skipped: true,
             // 将 relativeUrl 透传，供调用方写入 GalleryItem.url
@@ -125,6 +126,7 @@ export async function uploadFileWithChunking(
                   if (onProgress) onProgress(100);
                   resolve({
                     url: presignData.publicUrl,
+                    path: presignData.name,
                     type: isVideo ? "video" : "image",
                     name: presignData.name,
                   });

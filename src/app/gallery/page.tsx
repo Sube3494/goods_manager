@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
-import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
+import { uploadGalleryMedia } from "@/lib/galleryUpload";
 import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink, Volume2, VolumeX, Maximize, Images, Clapperboard } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
@@ -18,7 +18,7 @@ import Image from "next/image";
 import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
-import { Product, GalleryItem, Category } from "@/lib/types";
+import { Product, GalleryItem, Category, GalleryGroupSummary } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
 import md5 from "blueimp-md5";
@@ -198,13 +198,14 @@ function GalleryContent() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [groups, setGroups] = useState<GalleryGroupSummary[]>([]);
+  const [productMediaMap, setProductMediaMap] = useState<Record<string, GalleryItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   
   // Pagination State
   const [hasMore, setHasMore] = useState(true);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
-  const itemsRef = useRef<GalleryItem[]>([]);
+  const groupsRef = useRef<GalleryGroupSummary[]>([]);
   const currentPageRef = useRef(1);
   const thumbnailContainerRef = useRef<HTMLDivElement>(null);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
@@ -223,10 +224,10 @@ function GalleryContent() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Sync ref with items
+  // Sync ref with groups
   useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
+    groupsRef.current = groups;
+  }, [groups]);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -433,7 +434,7 @@ function GalleryContent() {
   const [isUploading, setIsUploading] = useState<boolean | string>(false);
   const [uploadForm, setUploadForm] = useState<{
     productId: string;
-    urls: { url: string; type: 'image' | 'video' }[],
+    urls: { url: string; path: string; type: 'image' | 'video'; thumbnailUrl?: string; thumbnailPath?: string }[],
     tags: string
   }>({
     productId: "",
@@ -450,11 +451,35 @@ function GalleryContent() {
 
   const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<number[]>([]);
 
+  const items = useMemo(() => Object.values(productMediaMap).flat(), [productMediaMap]);
+
+  const ensureProductMediaLoaded = useCallback(async (productId: string) => {
+    const existingItems = productMediaMap[productId];
+    if (existingItems?.length) {
+      return existingItems;
+    }
+
+    const res = await fetch(`/api/gallery/product/${productId}`);
+    if (!res.ok) {
+      throw new Error("Failed to fetch gallery product items");
+    }
+
+    const data = await res.json();
+    const nextItems = data.items || [];
+
+    setProductMediaMap((prev) => ({
+      ...prev,
+      [productId]: nextItems,
+    }));
+
+    return nextItems as GalleryItem[];
+  }, [productMediaMap]);
+
   const fetchData = useCallback(async (isFirstPage = true) => {
     try {
       const targetPage = isFirstPage ? 1 : currentPageRef.current + 1;
       
-      if (isFirstPage && itemsRef.current.length === 0) {
+      if (isFirstPage && groupsRef.current.length === 0) {
         setIsLoading(true);
       }
       if (!isFirstPage) {
@@ -474,24 +499,16 @@ function GalleryContent() {
 
       if (galleryRes.ok) {
         const galleryResponse = await galleryRes.json();
-        const galleryData = galleryResponse.items || [];
-        
-        // Extract products directly from gallery items (they are populated by Prisma include)
-        const uniqueProductsMap = new Map<string, Product>();
-        galleryData.forEach((item: GalleryItem) => {
-          if (item.product && item.productId && !uniqueProductsMap.has(item.productId)) {
-            uniqueProductsMap.set(item.productId, item.product);
-          }
-        });
-        const productsArray = Array.from(uniqueProductsMap.values());
+        const galleryData = galleryResponse.groups || [];
+        const productsArray = galleryData.map((group: GalleryGroupSummary) => group.product).filter(Boolean);
         
         if (isFirstPage) {
-            setItems(galleryData);
+            setGroups(galleryData);
         } else {
-            setItems(prev => {
-                const existingIds = new Set(prev.map(i => i.id));
-                const newItems = galleryData.filter((i: GalleryItem) => !existingIds.has(i.id));
-                return [...prev, ...newItems];
+            setGroups(prev => {
+                const existingIds = new Set(prev.map(group => group.productId));
+                const newGroups = galleryData.filter((group: GalleryGroupSummary) => !existingIds.has(group.productId));
+                return [...prev, ...newGroups];
             });
         }
         
@@ -584,7 +601,7 @@ function GalleryContent() {
     try {
       // -- 并发控制逻辑 (Concurrency Control) --
       const CONCURRENCY_LIMIT = 3;
-      const results: PromiseSettledResult<{ url: string; type: 'image' | 'video' }>[] = [];
+      const results: PromiseSettledResult<{ url: string; path: string; type: 'image' | 'video'; thumbnailUrl?: string; thumbnailPath?: string }>[] = [];
       let completedCount = 0;
       let activePromises: Promise<void>[] = [];
 
@@ -592,11 +609,11 @@ function GalleryContent() {
         const file = filesToUpload[index];
         const uploadTask = async () => {
           try {
-            const data = await uploadFileWithChunking(file, "gallery", (pct) => {
+            const data = await uploadGalleryMedia(file, "gallery", (pct) => {
               setIsUploading(`文件 ${index + 1}/${filesToUpload.length} : ${pct}%`);
             });
             
-            results.push({ status: 'fulfilled', value: data as { url: string; type: 'image'|'video' } });
+            results.push({ status: 'fulfilled', value: data });
           } catch (err) {
             results.push({ status: 'rejected', reason: err });
           } finally {
@@ -624,7 +641,7 @@ function GalleryContent() {
       // -- 并发控制结束 --
 
       const successfulFiles = results
-        .filter((r): r is PromiseFulfilledResult<{ url: string; type: 'image' | 'video' }> => r.status === 'fulfilled')
+        .filter((r): r is PromiseFulfilledResult<{ url: string; path: string; type: 'image' | 'video'; thumbnailUrl?: string; thumbnailPath?: string }> => r.status === 'fulfilled')
         .map(r => r.value);
       
       const failedCount = results.filter(r => r.status === 'rejected').length;
@@ -675,8 +692,15 @@ function GalleryContent() {
         if (res.ok) {
           setIsUploadModalOpen(false);
           setUploadForm({ productId: "", urls: [], tags: "" });
+          if (uploadForm.productId) {
+            setProductMediaMap(prev => {
+              const next = { ...prev };
+              delete next[uploadForm.productId];
+              return next;
+            });
+          }
           showToast("发布成功", "success");
-          fetchData();
+          fetchData(true);
         }
       } catch (error) {
         console.error("Gallery submit failed:", error);
@@ -719,40 +743,26 @@ function GalleryContent() {
   // Server-side filtered items
   const filteredItems = items;
 
-  // Grouped logic: unique products with items
-  const groupedProducts = useMemo(() => {
-    const groups: Map<string, { product: Product, items: GalleryItem[] }> = new Map();
-    const productOrder: string[] = [];
-    
-    filteredItems.forEach(item => {
-      const pid = item.productId;
-      if (!pid) return; // Safety
-      
-      if (!groups.has(pid)) {
-        // Prepare a robust product object for display
-        const productData = item.product || { id: pid, name: '未知商品', sku: 'N/A' };
-        // Ensure id is present in the object used for grouping
-        if (!productData.id) productData.id = pid;
-        
-        groups.set(pid, { product: productData as Product, items: [] });
-        productOrder.push(pid);
-      }
-      groups.get(pid)?.items.push(item);
-    });
-    
-    return productOrder.map(pid => groups.get(pid)!);
-  }, [filteredItems]);
+  const groupedProducts = groups;
 
-  const handleOpenProductPreview = (group: { product: Product; items: GalleryItem[] }) => {
-    // Prefer the product's main image item; fall back to first non-video, then first item
-    const mainImageItem = group.product.image
-      ? group.items.find(item => item.url === group.product.image)
-      : null;
-    const firstItem = mainImageItem ||
-      group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) ||
-      group.items[0];
-    if (firstItem) {
-      openLightbox(firstItem);
+  const handleOpenProductPreview = async (group: GalleryGroupSummary) => {
+    try {
+      const mediaItems = await ensureProductMediaLoaded(group.productId);
+      if (!mediaItems.length) return;
+
+      // Prefer the product's main image item; fall back to first non-video, then first item
+      const mainImageItem = group.product.image
+        ? mediaItems.find(item => item.url === group.product.image)
+        : null;
+      const firstItem = mainImageItem ||
+        mediaItems.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) ||
+        mediaItems[0];
+      if (firstItem) {
+        openLightbox(firstItem);
+      }
+    } catch (error) {
+      console.error("Failed to open product preview:", error);
+      showToast("加载预览失败，请稍后重试", "error");
     }
   };
 
@@ -772,7 +782,7 @@ function GalleryContent() {
           if (res.ok) {
             showToast(`成功删除 ${count} 个项目`, "success");
             setSelectedIds([]);
-            fetchData();
+            fetchData(true);
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           } else {
             showToast("删除失败", "error");
@@ -790,7 +800,7 @@ function GalleryContent() {
   const relatedImages = useMemo(() => {
     if (!selectedImage) return [];
 
-    return items.filter(img => {
+    return (productMediaMap[selectedImage.productId] || []).filter(img => {
       const isCorrectProduct = img.productId === selectedImage.productId;
       const isVisible = isAdmin || img.isPublic;
       return isCorrectProduct && isVisible;
@@ -807,7 +817,7 @@ function GalleryContent() {
       // 其次按 createdAt 升序 (Secondary: createdAt ASC)
       return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
     });
-  }, [selectedImage, items, isAdmin]);
+  }, [selectedImage, productMediaMap, isAdmin]);
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
 
   const navigate = useCallback((dir: number) => {
@@ -977,17 +987,14 @@ function GalleryContent() {
         {/* Responsive Grid / Waterfall */}
         <div className="w-full grid gap-3 sm:gap-5 grid-cols-2 lg:grid-cols-5">
                {groupedProducts.map((group, idx) => {
-                    // Use product.image as cover URL directly (it may not be a gallery item)
-                    // then fall back to the first non-video item, then to any first item
-                    const fallbackItem =
-                      group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) ||
-                      group.items[0];
-                    const coverUrl = group.product.image || fallbackItem?.url || '';
-                    const isVideoCover = !group.product.image && (
-                      fallbackItem?.type === 'video' || /\.(mp4|mov|webm)$/i.test(fallbackItem?.url || '')
-                    );
-                    const videoCount = group.items.filter(item => item.type === 'video' || /\.(mp4|mov|webm)$/i.test(item.url)).length;
-                    const imageCount = group.items.length - videoCount;
+                    const coverUrl = group.coverItem?.thumbnailUrl || group.coverItem?.url || group.product.image || '';
+                    const isVideoCover = !group.product.image || group.coverItem?.url === coverUrl ? (
+                      group.coverItem?.type === 'video' || /\.(mp4|mov|webm)$/i.test(group.coverItem?.url || '')
+                    ) : false;
+                    const videoCount = group.videoCount;
+                    const imageCount = group.imageCount;
+
+                    if (!coverUrl) return null;
 
                     return (
                     <div
@@ -999,7 +1006,7 @@ function GalleryContent() {
                                 "group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white dark:bg-white/5 border border-border dark:border-white/10 hover:border-primary/40 transition-all duration-500 flex flex-col h-full hover:shadow-2xl hover:shadow-primary/5 cursor-pointer",
                                 group.product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20" : ""
                             )}
-                            onClick={() => handleOpenProductPreview(group)}
+                            onClick={() => { void handleOpenProductPreview(group); }}
                         >
                             {/* Full Card Discontinued Overlay */}
                             {group.product.isDiscontinued && (
@@ -1023,7 +1030,7 @@ function GalleryContent() {
                                             muted
                                             loop
                                             playsInline
-                                            preload="metadata"
+                                            preload="none"
                                             onMouseOver={e => {
                                                 const v = e.currentTarget;
                                                 const playPromise = v.play();
@@ -1051,7 +1058,8 @@ function GalleryContent() {
                                             fill 
                                             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                                             className="object-cover transition-all duration-700 opacity-0 group-hover:scale-105" 
-                                            priority={idx < 6}
+                                            priority={idx < 3}
+                                            loading={idx < 3 ? "eager" : "lazy"}
                                             onLoad={(e) => {
                                                 const img = e.currentTarget;
                                                 img.classList.remove('opacity-0');
@@ -1066,7 +1074,7 @@ function GalleryContent() {
                                     </>
                                 )}
 
-                                {group.items.length > 1 && (
+                                {group.totalCount > 1 && (
                                   <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
                                     <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/52 px-2.5 py-1.5 text-white shadow-lg backdrop-blur-lg">
                                       {imageCount > 0 && (
@@ -1115,7 +1123,7 @@ function GalleryContent() {
         )}
 
         {/* Load Complete State */}
-        {!hasMore && !isLoading && !isNextPageLoading && items.length > 0 && (
+        {!hasMore && !isLoading && !isNextPageLoading && groupedProducts.length > 0 && (
             <div className="py-12 w-full flex flex-col items-center justify-center animate-in fade-in duration-1000">
                 <div className="h-px w-12 bg-linear-to-r from-transparent via-border to-transparent mb-4" />
                 <p className="text-xs sm:text-sm text-muted-foreground/50 font-medium tracking-widest uppercase italic">
@@ -1146,7 +1154,7 @@ function GalleryContent() {
         )}
 
         {/* Enhanced Empty State */}
-        {!isLoading && filteredItems.length === 0 && (
+        {!isLoading && groupedProducts.length === 0 && (
             <div className="py-24 sm:py-32 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
                 <div className="relative">
                     <div className="h-28 w-28 rounded-full bg-primary/5 flex items-center justify-center text-primary/20 dark:text-primary/10">
@@ -1807,13 +1815,13 @@ function GalleryContent() {
                                                         className="w-full h-full object-cover opacity-60" 
                                                         muted 
                                                         playsInline 
-                                                        preload="metadata"
+                                                        preload="none"
                                                     />
                                                     <PlayCircle size={20} className="text-white/90 absolute" />
                                                 </div>
                                             ) : (
                                                 <Image 
-                                                    src={img.url} 
+                                                    src={img.thumbnailUrl || img.url} 
                                                     alt="Thumbnail" 
                                                     fill
                                                     sizes="50px"

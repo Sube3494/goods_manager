@@ -31,7 +31,7 @@ interface ProductFormModalProps {
 }
 
 import { createPortal } from "react-dom";
-import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
+import { uploadGalleryMedia } from "@/lib/galleryUpload";
 
 export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: ProductFormModalProps) {
   const { user } = useUser();
@@ -270,10 +270,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             }
 
             // 使用基于切片与断点续传的流通道优化处理
-            const data = await uploadFileWithChunking(file, "gallery", (pct) => {
+            const data = await uploadGalleryMedia(file, "gallery", (pct) => {
                setIsUploading(`文件 ${completedCount + 1}/${filesArray.length} : ${pct}%`);
             });
-            const { url, type, skipped } = data;
+            const { url, path, type, skipped, thumbnailUrl, thumbnailPath } = data;
             
             // 使用函数式状态更新，避免闭包中的陈旧依赖导致重复或遗漏
             let isDuplicate = false;
@@ -305,6 +305,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 const newItem: GalleryItem = {
                   id: 'cover-virtual',
                   url,
+                  thumbnailUrl: thumbnailUrl || url,
                   productId: initialData?.id || "",
                   uploadDate: new Date().toISOString(),
                   tags: [],
@@ -332,6 +333,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
                     url,
+                    path,
+                    thumbnailUrl,
+                    thumbnailPath,
                     productId: initialData.id,
                     type: isVideoType ? 'video' : 'image'
                   })
@@ -346,6 +350,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                 const tempImg: GalleryItem = {
                   id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
                   url,
+                  thumbnailUrl: thumbnailUrl || url,
                   productId: "", 
                   uploadDate: new Date().toISOString(),
                   tags: [],
@@ -682,21 +687,26 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
       // 2. 上传
       const rotatedFile = new File([blob], `rotated_${Date.now()}.jpg`, { type: "image/jpeg" });
-      const uploadRes = await uploadFileWithChunking(rotatedFile, "gallery");
+      const uploadRes = await uploadGalleryMedia(rotatedFile, "gallery");
 
       // 3. 更新数据库 (如果是已保存的项)
       if (!img.id.startsWith("temp-") && img.id !== 'cover-virtual') {
         const res = await fetch(`/api/gallery/${img.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: uploadRes.url }),
+          body: JSON.stringify({
+            url: uploadRes.url,
+            path: uploadRes.path,
+            thumbnailUrl: uploadRes.thumbnailUrl,
+            thumbnailPath: uploadRes.thumbnailPath,
+          }),
         });
         if (!res.ok) throw new Error("Failed to update database");
       }
 
       // 4. 更新本地状态 (Update local state)
       setGalleryImages(prev => prev.map(item => 
-        item.id === img.id ? { ...item, url: uploadRes.url } : item
+        item.id === img.id ? { ...item, url: uploadRes.url, thumbnailUrl: uploadRes.thumbnailUrl || uploadRes.url } : item
       ));
 
       // 如果当前是封面，同步更新表单封面数据
@@ -1387,7 +1397,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 </div>
                                             ) : (
                                                 <Image
-                                                  src={img.url}
+                                                  src={img.thumbnailUrl || img.url}
                                                   alt={img.product?.name || "图库图片"}
                                                   fill unoptimized
                                                   sizes="(max-width: 768px) 25vw, (max-width: 1200px) 20vw, 15vw"

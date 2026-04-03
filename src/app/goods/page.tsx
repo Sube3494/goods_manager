@@ -396,7 +396,11 @@ export default function GoodsPage() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 productId: product.id,
-                urls: tempItems.map(item => ({ url: item.url, type: item.type }))
+                urls: tempItems.map(item => ({
+                  url: item.url,
+                  thumbnailUrl: item.thumbnailUrl,
+                  type: item.type
+                }))
               })
             });
           }

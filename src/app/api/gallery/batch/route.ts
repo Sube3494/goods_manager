@@ -31,7 +31,7 @@ export async function DELETE(request: Request) {
     // 获取所有待删除项的 URL
     const items = await prisma.galleryItem.findMany({
       where: { id: { in: ids } },
-      select: { url: true, id: true }
+      select: { url: true, thumbnailUrl: true, id: true }
     });
 
     // 清除涉及这些 URL 的商品封面引用
@@ -50,11 +50,21 @@ export async function DELETE(request: Request) {
 
     // 对每个唯一 URL 检查是否还有其他 GalleryItem 引用，没有才物理删除
     const uniqueUrls = [...new Set(urls)];
+    const uniqueThumbnailUrls = [...new Set(items.map(item => item.thumbnailUrl).filter(Boolean))] as string[];
     if (uniqueUrls.length > 0) {
       const storage = await getStorageStrategy();
       await Promise.allSettled(
         uniqueUrls.map(async (url: string) => {
           const remaining = await prisma.galleryItem.count({ where: { url } });
+          if (remaining === 0) {
+            await storage.delete(url);
+          }
+        })
+      );
+
+      await Promise.allSettled(
+        uniqueThumbnailUrls.map(async (url: string) => {
+          const remaining = await prisma.galleryItem.count({ where: { thumbnailUrl: url } });
           if (remaining === 0) {
             await storage.delete(url);
           }

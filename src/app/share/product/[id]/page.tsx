@@ -79,6 +79,7 @@ export default async function ProductSharePage({ params, searchParams }: { param
     items={product.gallery.map(item => ({
       id: item.id,
       url: storage.resolveUrl(item.url),
+      thumbnailUrl: item.thumbnailUrl ? storage.resolveUrl(item.thumbnailUrl) : storage.resolveUrl(item.url),
       type: item.type
     }))} 
     productName={product.name}

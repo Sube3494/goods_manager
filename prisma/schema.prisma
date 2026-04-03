@@ -143,6 +143,7 @@ model OutboundOrderItem {
 model GalleryItem {
   id        String   @id @default(cuid())
   url       String
+  thumbnailUrl String?
   productId String
   tags      String[] @default([])
   isPublic  Boolean  @default(true)
@@ -221,6 +222,7 @@ model EmailWhitelist {
   email         String       @unique
   role          Role         @default(USER)
   permissions   Json?        @default("{}")
+  remark        String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   roleProfileId String?

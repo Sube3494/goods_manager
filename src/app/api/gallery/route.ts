@@ -3,7 +3,6 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { getStorageStrategy } from "@/lib/storage";
-import { GalleryItem } from "../../../../prisma/generated-client";
 
 // 获取相册图片
 export async function GET(request: Request) {
@@ -63,11 +62,7 @@ export async function GET(request: Request) {
       }
     };
 
-    // 2. Add gallery-specific filters if any (e.g. tags)
-    // If tags are provided in query, we might need a more complex nested filter
-    // For now, simple query handles it via product fields.
-
-    // 3. Get all matching products for natural sort + pagination
+    // 2. Get all matching products for natural sort + pagination
     const allMatchingProducts = await prisma.product.findMany({
       where: productWhere,
       select: {
@@ -80,11 +75,11 @@ export async function GET(request: Request) {
     const total = allMatchingProducts.length;
     const skip = (page - 1) * pageSize;
 
-    // 4. Fetch System Settings for sort direction
+    // 3. Fetch System Settings for sort direction
     const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
     const sortDesc = settings?.gallerySortDesc ?? true;
 
-    // 5. Perform natural sort for products in memory
+    // 4. Perform natural sort for products in memory
     allMatchingProducts.sort((a, b) => {
       const skuA = a.sku || "";
       const skuB = b.sku || "";
@@ -100,7 +95,7 @@ export async function GET(request: Request) {
 
     const storage = await getStorageStrategy();
 
-    // 5. Fetch full data for these products including their gallery items
+    // 5. Fetch the current page products with only the media needed for summary cards
     const productsData = await prisma.product.findMany({
       where: {
         id: { in: productIds }
@@ -127,26 +122,45 @@ export async function GET(request: Request) {
     // 6. Sort results back to match pagedProducts order
     const sortedProducts = productIds.map(id => productsData.find(p => p.id === id)).filter(Boolean);
 
-    // 7. Flatten to "items" structure for frontend compatibility
-    const flattenedItems: (GalleryItem & { product: Record<string, unknown> })[] = [];
-    sortedProducts.forEach(product => {
-      if (!product) return;
-      product.gallery.forEach(item => {
-        flattenedItems.push({
-          ...item,
-          url: storage.resolveUrl(item.url),
-          product: {
-            ...product,
-            gallery: undefined, 
-            image: product.image ? storage.resolveUrl(product.image) : null
-          } as Record<string, unknown>
-        });
-      });
-    });
+    const groups = sortedProducts.map(product => {
+      if (!product) return null;
+
+      const resolvedProduct = {
+        ...product,
+        gallery: undefined,
+        image: product.image ? storage.resolveUrl(product.image) : null
+      };
+
+      const resolvedGallery = product.gallery.map(item => ({
+        ...item,
+        url: storage.resolveUrl(item.url),
+        thumbnailUrl: item.thumbnailUrl ? storage.resolveUrl(item.thumbnailUrl) : storage.resolveUrl(item.url),
+        product: resolvedProduct
+      }));
+
+      const mainImageItem = resolvedProduct.image
+        ? resolvedGallery.find(item => item.url === resolvedProduct.image)
+        : null;
+      const coverItem = mainImageItem ||
+        resolvedGallery.find(item => item.type !== "video" && !/\.(mp4|mov|webm)$/i.test(item.url)) ||
+        resolvedGallery[0] ||
+        null;
+      const videoCount = resolvedGallery.filter(item => item.type === "video" || /\.(mp4|mov|webm)$/i.test(item.url)).length;
+      const imageCount = resolvedGallery.length - videoCount;
+
+      return {
+        productId: product.id,
+        product: resolvedProduct,
+        coverItem,
+        totalCount: resolvedGallery.length,
+        imageCount,
+        videoCount
+      };
+    }).filter(Boolean);
 
     return NextResponse.json({
-      items: flattenedItems,
-      total, // Now total represents product groups
+      groups,
+      total,
       page,
       pageSize,
       hasMore: skip + pagedProducts.length < total
@@ -177,19 +191,24 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { url, urls, productId, tags, isPublic, type } = body;
+    const { url, path, thumbnailUrl, thumbnailPath, urls, productId, tags, isPublic, type } = body;
+    const storage = await getStorageStrategy();
 
     // Handle batch creation if urls array is provided
     if (urls && Array.isArray(urls) && urls.length > 0) {
         const data = urls.map((u: string | { url: string; type?: string }) => ({
-            url: typeof u === 'string' ? u : u.url,
+            url: storage.stripUrl(typeof u === 'string' ? u : ("path" in u && typeof u.path === "string" ? u.path : u.url)) || "",
+            thumbnailUrl: typeof u === 'string'
+              ? null
+              : ("thumbnailPath" in u && typeof u.thumbnailPath === "string"
+                  ? storage.stripUrl(u.thumbnailPath)
+                  : ("thumbnailUrl" in u && typeof u.thumbnailUrl === "string" ? storage.stripUrl(u.thumbnailUrl) : null)),
             productId,
             tags: tags || [],
             isPublic: isPublic ?? true,
             type: (typeof u !== 'string' && u.type) ? u.type : "image",
             userId: session.id
         }));
-
         const result = await prisma.galleryItem.createMany({
             data
         });
@@ -200,7 +219,8 @@ export async function POST(request: Request) {
     // Fallback to single item creation
     const item = await prisma.galleryItem.create({
       data: {
-        url: url || "", // Ensure url is not undefined if falling back
+        url: storage.stripUrl(path || url) || "", // Ensure url is not undefined if falling back
+        thumbnailUrl: storage.stripUrl(thumbnailPath || thumbnailUrl) || null,
         productId,
         tags: tags || [],
         isPublic: isPublic ?? true,
@@ -209,10 +229,10 @@ export async function POST(request: Request) {
       }
     });
 
-    const storage = await getStorageStrategy();
     return NextResponse.json({
       ...item,
-      url: storage.resolveUrl(item.url)
+      url: storage.resolveUrl(item.url),
+      thumbnailUrl: item.thumbnailUrl ? storage.resolveUrl(item.thumbnailUrl) : storage.resolveUrl(item.url)
     });
   } catch (error) {
     console.error("Failed to create gallery item:", error);

@@ -38,7 +38,7 @@ export async function PATCH(
       });
 
       if (status === "approved" && submission.urls) {
-        const fullUrls = submission.urls as { url: string; type?: string }[];
+        const fullUrls = submission.urls as { url: string; type?: string; thumbnailUrl?: string | null }[];
         
         // If selectedIndices is provided, filter the URLs
         const approvedUrls = (selectedIndices && Array.isArray(selectedIndices))
@@ -50,6 +50,7 @@ export async function PATCH(
           await tx.galleryItem.createMany({
             data: approvedUrls.map(u => ({
               url: u.url,
+              thumbnailUrl: u.thumbnailUrl || null,
               type: u.type || "image",
               productId: productId,
               isPublic: true,
