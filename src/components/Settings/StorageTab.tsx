@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, HardDrive, Link2, ShieldCheck, Zap } from "lucide-react";
+import { Database, HardDrive, ImageUp, Link2, ShieldCheck, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
@@ -26,6 +26,9 @@ interface StorageTabProps {
   setMinioPublicUrl: (val: string) => void;
   testConnection: () => Promise<void>;
   isTesting: boolean;
+  backfillGalleryThumbnails: () => Promise<void>;
+  isBackfillingThumbnails: boolean;
+  thumbnailBackfillRemaining: number | null;
   saveSettings: (newSettings: Record<string, unknown>, options?: { silent?: boolean }) => Promise<void>;
 }
 
@@ -40,27 +43,15 @@ export function StorageTab({
   minioUseSSL, setMinioUseSSL,
   minioPublicUrl, setMinioPublicUrl,
   testConnection, isTesting,
+  backfillGalleryThumbnails, isBackfillingThumbnails,
+  thumbnailBackfillRemaining,
   saveSettings,
 }: StorageTabProps) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        {[
-          { label: "当前驱动", value: storageType === "local" ? "本地存储" : "MinIO", hint: storageType === "local" ? "文件保存在本机服务器" : "文件通过对象存储统一管理" },
-          { label: "重名策略", value: uploadConflictStrategy === "overwrite" ? "直接覆盖" : uploadConflictStrategy === "rename" ? "自动重命名" : "跳过上传", hint: "控制重复文件名上传时的系统行为" },
-          { label: "连接保护", value: minioUseSSL ? "HTTPS" : "HTTP", hint: storageType === "minio" ? "决定对象存储是否使用加密传输" : "本地存储不依赖远程连接" },
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl border border-border/60 bg-white/75 px-4 py-4 shadow-sm dark:bg-white/5">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">{item.label}</div>
-            <div className="mt-2 text-2xl font-black tracking-tight text-foreground">{item.value}</div>
-            <div className="mt-1 text-xs text-muted-foreground">{item.hint}</div>
-          </div>
-        ))}
-      </div>
-
       <section className="overflow-hidden rounded-[26px] border border-border/60 bg-white/75 shadow-sm dark:bg-white/5">
         <div className="border-b border-border/50 bg-white/50 px-4 py-4 md:px-5 dark:bg-white/[0.03]">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500 ring-1 ring-indigo-500/25">
                 <Database size={17} />
@@ -70,14 +61,14 @@ export function StorageTab({
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">先确定文件放在哪里，再定义重名文件如何处理，避免基础行为分散在不同卡片里。</p>
               </div>
             </div>
-            <button onClick={testConnection} disabled={isTesting || storageType === "local"} className="inline-flex h-10 items-center gap-2 rounded-2xl bg-foreground px-4 text-xs font-black text-background disabled:opacity-40">
+            <button onClick={testConnection} disabled={isTesting || storageType === "local"} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-xs font-black text-background disabled:opacity-40 lg:w-auto">
               {isTesting ? <div className="h-3 w-3 rounded-full border-2 border-background border-t-transparent animate-spin" /> : <Zap size={14} />}
               测试连接
             </button>
           </div>
         </div>
         <div className="space-y-3 p-4 md:p-5">
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+          <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
             <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500"><HardDrive size={16} /></div>
@@ -178,6 +169,33 @@ export function StorageTab({
               <div className="mt-1 text-xs text-muted-foreground">当前文件将直接保存在服务器本地目录中，不需要额外配置对象存储连接。</div>
             </div>
           )}
+
+          <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
+                  <ImageUp size={16} />
+                </div>
+                <div>
+                  <div className="text-sm font-black text-foreground">历史缩略图补齐</div>
+                  <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    为旧相册图片补生成缩略图，完成后列表封面会优先走小图，首屏加载会更轻一些。
+                  </div>
+                  <div className="mt-2 text-xs font-bold text-foreground/80">
+                    {thumbnailBackfillRemaining === null ? "正在统计待补数量..." : `待补 ${thumbnailBackfillRemaining} 张`}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={backfillGalleryThumbnails}
+                disabled={isBackfillingThumbnails}
+                className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-xs font-black text-background disabled:opacity-40 lg:w-auto"
+              >
+                {isBackfillingThumbnails ? <div className="h-3 w-3 rounded-full border-2 border-background border-t-transparent animate-spin" /> : <ImageUp size={14} />}
+                一键补齐
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </div>

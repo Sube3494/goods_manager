@@ -60,6 +60,8 @@ function SettingsContent() {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [isLoading, setIsLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
+  const [isBackfillingThumbnails, setIsBackfillingThumbnails] = useState(false);
+  const [thumbnailBackfillRemaining, setThumbnailBackfillRemaining] = useState<number | null>(null);
 
   // Initialize tab based on search params
   const initialTab = (searchParams.get("tab") as ActiveTab) || (isSuperAdmin ? "general" : "data");
@@ -82,7 +84,7 @@ function SettingsContent() {
   const lastSavedSettings = useRef<Record<string, unknown>>({});
   const isInitialized = useRef(false);
 
-  const { showToast } = useToast();
+  const { showToast, updateToast, removeToast } = useToast();
   const { theme, setTheme } = useTheme();
 
   const testConnection = async () => {
@@ -114,12 +116,89 @@ function SettingsContent() {
     }
   };
 
+  const backfillGalleryThumbnails = useCallback(async () => {
+    if (isBackfillingThumbnails) return;
+
+    setIsBackfillingThumbnails(true);
+    const toastId = showToast("开始补生成历史缩略图...", "info", 0);
+    let totalGenerated = 0;
+    let totalSkipped = 0;
+    let totalFailed = 0;
+
+    try {
+      let remaining = 1;
+      let lastRemaining = Number.POSITIVE_INFINITY;
+
+      while (remaining > 0) {
+        const res = await fetch("/api/gallery/thumbnails/backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ limit: 60 }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "补生成失败");
+        }
+
+        const data = await res.json();
+        totalGenerated += data.generated ?? 0;
+        totalSkipped += data.skipped ?? 0;
+        totalFailed += data.failed ?? 0;
+        remaining = data.remaining ?? 0;
+        setThumbnailBackfillRemaining(remaining);
+
+        updateToast(
+          toastId,
+          `已处理 ${totalGenerated + totalSkipped + totalFailed} 张，新增缩略图 ${totalGenerated}，剩余 ${remaining}`,
+          "info"
+        );
+
+        if ((data.processed ?? 0) === 0 || (remaining === lastRemaining && (data.generated ?? 0) === 0)) {
+          break;
+        }
+
+        lastRemaining = remaining;
+      }
+
+      updateToast(
+        toastId,
+        `补齐完成，新增 ${totalGenerated} 张，跳过 ${totalSkipped} 张，失败 ${totalFailed} 张`,
+        totalFailed > 0 ? "warning" : "success"
+      );
+      window.setTimeout(() => removeToast(toastId), 3000);
+    } catch (error) {
+      updateToast(
+        toastId,
+        error instanceof Error ? error.message : "历史缩略图补齐失败",
+        "error"
+      );
+      window.setTimeout(() => removeToast(toastId), 4000);
+    } finally {
+      setIsBackfillingThumbnails(false);
+    }
+  }, [isBackfillingThumbnails, removeToast, showToast, updateToast]);
+
+  const fetchThumbnailBackfillRemaining = useCallback(async () => {
+    try {
+      const res = await fetch("/api/gallery/thumbnails/backfill");
+      if (!res.ok) {
+        throw new Error("Failed to fetch thumbnail backfill count");
+      }
+
+      const data = await res.json();
+      setThumbnailBackfillRemaining(data.remaining ?? 0);
+    } catch {
+      setThumbnailBackfillRemaining(null);
+    }
+  }, []);
+
   useEffect(() => {
     const initData = async () => {
         try {
             const [settingsRes, infoRes] = await Promise.all([
                 fetch("/api/system/settings"),
-                fetch("/api/system/info")
+                fetch("/api/system/info"),
             ]);
 
             if (settingsRes.ok) {
@@ -159,7 +238,8 @@ function SettingsContent() {
         }
     };
     initData();
-  }, [showToast]);
+    void fetchThumbnailBackfillRemaining();
+  }, [fetchThumbnailBackfillRemaining, showToast]);
 
   const saveSettings = useCallback(async (newSettings: Record<string, unknown>, options: { silent?: boolean } = {}) => {
     setSaveStatus("saving");
@@ -359,14 +439,14 @@ function SettingsContent() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="min-w-0 space-y-4">
           <div className="rounded-[24px] md:rounded-[26px] border border-border/60 bg-white/70 dark:bg-white/5 p-3 shadow-sm backdrop-blur-xl">
             <div className="mb-2 px-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
               设置分区
             </div>
-            <div className="-mx-1 overflow-x-auto px-1 xl:mx-0 xl:px-0">
-            <div className="flex gap-2 xl:block xl:space-y-1.5 xl:gap-0 min-w-max xl:min-w-0">
+            <div className="px-1">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
@@ -374,19 +454,19 @@ function SettingsContent() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "group relative min-w-[170px] sm:min-w-[220px] xl:min-w-0 xl:w-full overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all",
+                      "group relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all",
                       isActive
                         ? "border-primary/20 bg-primary/[0.07] shadow-sm"
                         : "border-transparent hover:border-border/60 hover:bg-black/[0.025] dark:hover:bg-white/[0.03]"
                     )}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className={cn("mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border", isActive ? "border-primary/15 bg-primary text-primary-foreground" : "border-border/60 bg-background text-foreground/70")}>
+                    <div className="flex items-center gap-3">
+                      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", isActive ? "border-primary/15 bg-primary text-primary-foreground" : "border-border/60 bg-background text-foreground/70")}>
                         <tab.icon size={16} />
                       </div>
-                      <div className="min-w-0">
-                        <div className={cn("text-sm font-black", isActive ? "text-foreground" : "text-foreground/85")}>{tab.label}</div>
-                        <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{tab.desc}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className={cn("text-sm font-black shrink-0", isActive ? "text-foreground" : "text-foreground/85")}>{tab.label}</div>
+                        <div className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">{tab.desc}</div>
                       </div>
                     </div>
                     {isActive && (
@@ -408,7 +488,7 @@ function SettingsContent() {
               <div className="mb-2 px-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
                 管理入口
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-1">
                 <Link
                   href="/admin/roles"
                   className="group flex items-start gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3 hover:border-primary/25 hover:bg-primary/[0.04] transition-all"
@@ -441,12 +521,6 @@ function SettingsContent() {
         </aside>
 
         <div className="min-w-0 overflow-hidden rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 dark:bg-white/5 p-4 md:p-6 shadow-sm backdrop-blur-xl">
-          <div className="mb-4 md:mb-5 flex flex-col gap-2 border-b border-border/50 pb-4">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">当前分区</div>
-            <div className="text-xl md:text-2xl font-black tracking-tight text-foreground">{activeTabMeta.label}</div>
-            <div className="text-sm text-muted-foreground leading-relaxed">{activeTabMeta.desc}</div>
-          </div>
-
           <div className="grid grid-cols-1 w-full gap-6 min-w-0 overflow-hidden">
         {activeTab === "general" && (
           <GeneralTab
@@ -480,6 +554,9 @@ function SettingsContent() {
             setMinioPublicUrl={setMinioPublicUrl}
             testConnection={testConnection}
             isTesting={isTesting}
+            backfillGalleryThumbnails={backfillGalleryThumbnails}
+            isBackfillingThumbnails={isBackfillingThumbnails}
+            thumbnailBackfillRemaining={thumbnailBackfillRemaining}
             saveSettings={saveSettings}
           />
         )}
