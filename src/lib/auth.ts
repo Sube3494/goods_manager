@@ -184,6 +184,17 @@ export async function getAuthorizedUser(permission?: Permission): Promise<Sessio
     return session;
 }
 
+export async function getAuthorizedUserAny(...permissions: Permission[]): Promise<SessionUser | null> {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session || !session.id) return null;
+
+    if (permissions.length > 0 && !permissions.some((permission) => hasPermission(session, permission))) {
+        return null;
+    }
+
+    return session;
+}
+
 export async function getAuthorizedAdmin(capability: AdminCapability): Promise<SessionUser | null> {
     const session = await getFreshSession() as SessionUser | null;
     if (!session || !session.id) return null;

@@ -500,7 +500,9 @@ function GalleryContent() {
       if (galleryRes.ok) {
         const galleryResponse = await galleryRes.json();
         const galleryData = galleryResponse.groups || [];
-        const productsArray = galleryData.map((group: GalleryGroupSummary) => group.product).filter(Boolean);
+        const productsArray: Product[] = galleryData
+          .map((group: GalleryGroupSummary) => group.product)
+          .filter((product: Product | null | undefined): product is Product => Boolean(product));
         
         if (isFirstPage) {
             setGroups(galleryData);

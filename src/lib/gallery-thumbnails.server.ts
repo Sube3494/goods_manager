@@ -4,17 +4,18 @@ import { existsSync } from "fs";
 import { join } from "path";
 import prisma from "@/lib/prisma";
 import { getStorageStrategy } from "@/lib/storage";
+import type { Prisma } from "../../prisma/generated-client";
 
 const THUMBNAIL_MAX_SIZE = 480;
 const THUMBNAIL_QUALITY = 78;
 
-const missingThumbnailWhere = {
+const missingThumbnailWhere: Prisma.GalleryItemWhereInput = {
   type: { not: "video" as const },
   OR: [
     { thumbnailUrl: null },
     { thumbnailUrl: "" },
   ],
-} as const;
+};
 
 function resolveLocalUploadPath(relativeUrl: string) {
   let baseDir = join(process.cwd(), "public");

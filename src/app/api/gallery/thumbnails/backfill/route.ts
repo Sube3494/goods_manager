@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getAuthorizedAdminAny } from "@/lib/auth";
+import { getAuthorizedUserAny } from "@/lib/auth";
 import { backfillGalleryThumbnails, countGalleryItemsMissingThumbnails } from "@/lib/gallery-thumbnails.server";
 
 export async function GET() {
-  const session = await getAuthorizedAdminAny("system:manage", "gallery:audit");
+  const session = await getAuthorizedUserAny("system:manage", "gallery:audit");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getAuthorizedAdminAny("system:manage", "gallery:audit");
+  const session = await getAuthorizedUserAny("system:manage", "gallery:audit");
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
