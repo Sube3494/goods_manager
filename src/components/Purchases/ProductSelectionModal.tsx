@@ -374,11 +374,11 @@ export function ProductSelectionModal({
                          <button
                           key={product.id}
                           type="button"
-                          onClick={() => toggleProduct(product)}
+                         onClick={() => toggleProduct(product)}
                             className={cn(
                              imageOnly
                                ? "group relative aspect-square overflow-hidden rounded-2xl border transition-all cursor-pointer"
-                               : "group relative flex items-center gap-3 sm:gap-5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer",
+                               : "group relative flex w-full items-center gap-3 sm:gap-5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer",
                              isSelected 
                                ? "bg-white dark:bg-white/5 border-primary shadow-md" 
                                : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
