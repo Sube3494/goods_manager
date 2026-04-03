@@ -83,7 +83,7 @@ export function ConfirmModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-4 sm:p-6 safe-y safe-x lg:pl-(--sidebar-width) transition-[padding] duration-200", className)}>
+        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-3 sm:p-6 safe-y safe-x lg:pl-(--sidebar-width) transition-[padding] duration-200", className)}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -97,7 +97,7 @@ export function ConfirmModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", damping: 25, stiffness: 350 }}
-            className="relative z-10 w-full max-w-[420px] max-h-safe-modal rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col"
+            className="relative z-10 w-full max-w-[420px] max-h-safe-modal rounded-[28px] sm:rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Subtle Gradient Accent */}
             <div className={cn("absolute top-0 left-0 right-0 h-40 bg-linear-to-b opacity-20 pointer-events-none", currentStyle.accent)} />
@@ -105,19 +105,19 @@ export function ConfirmModal({
             {/* Close Button */}
             <button 
               onClick={onClose} 
-              className="absolute top-5 right-5 z-20 rounded-full p-2.5 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-all active:scale-90"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 z-20 rounded-full p-2.5 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-all active:scale-90"
             >
               <X size={18} strokeWidth={2.5} />
             </button>
 
-            <div className="px-8 pt-10 pb-8 flex flex-col items-center text-center overflow-y-auto">
+            <div className="px-5 sm:px-8 pt-8 sm:pt-10 pb-6 sm:pb-8 flex flex-col items-center text-center overflow-y-auto min-w-0">
               {/* Icon Section */}
               <motion.div 
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1, type: "spring", stiffness: 400, damping: 20 }}
                 className={cn(
-                  "w-20 h-20 rounded-[28px] flex items-center justify-center border-2 mb-8 relative group",
+                  "w-18 h-18 sm:w-20 sm:h-20 rounded-[24px] sm:rounded-[28px] flex items-center justify-center border-2 mb-6 sm:mb-8 relative group shrink-0",
                   currentStyle.iconBg
                 )}
               >
@@ -129,20 +129,20 @@ export function ConfirmModal({
 
               {/* Text Section */}
               <div className="space-y-3 relative z-10">
-                <h2 className="text-2xl font-black text-foreground tracking-tight leading-none">
+                <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight leading-tight break-words">
                   {title}
                 </h2>
-                <div className="text-[15px] font-medium text-muted-foreground leading-relaxed px-2">
+                <div className="text-sm sm:text-[15px] font-medium text-muted-foreground leading-relaxed px-1 sm:px-2 break-words">
                   {message}
                 </div>
               </div>
             </div>
 
             {/* Footer Buttons */}
-            <div className="p-8 pt-0 grid grid-cols-2 gap-4 relative z-10">
+            <div className="p-5 sm:p-8 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-10 min-w-0">
               <button
                 onClick={onClose}
-                className="h-14 rounded-2xl text-[15px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all active:scale-[0.97]"
+                className="min-w-0 h-12 sm:h-14 rounded-2xl px-4 text-sm sm:text-[15px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all active:scale-[0.97]"
               >
                 {cancelLabel}
               </button>
@@ -152,7 +152,7 @@ export function ConfirmModal({
                   onClose();
                 }}
                 className={cn(
-                  "h-14 rounded-2xl text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-2",
+                  "min-w-0 h-12 sm:h-14 rounded-2xl px-4 text-sm sm:text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight",
                   currentStyle.confirm
                 )}
               >
