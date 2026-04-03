@@ -11,7 +11,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { copyToClipboard } from "@/lib/utils";
 import { useMemo } from "react";
-import { triggerBrowserDownload } from "@/lib/download";
+import { inferFileExtensionFromUrl, triggerBrowserDownload, triggerIOSMediaShare } from "@/lib/download";
 
 // Moved handleDownload inside component to use hooks
 
@@ -235,8 +235,14 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   const handleDownload = async (url: string, fileName: string) => {
     // iOS Safari does not support the `download` attribute on anchor tags,
     // nor Blob URLs for saving to the photo library.
-    // The only reliable path is to open the resource directly and guide the user.
+    // Prefer the native share sheet first because it can save videos directly to Photos.
     if (isIOS) {
+      const shared = await triggerIOSMediaShare(url, fileName);
+      if (shared) {
+        showToast("已打开系统分享面板，可选择“存储到照片”", "success");
+        return;
+      }
+
       window.open(url, '_blank');
       setCopyModalConfig({
         isOpen: true,
@@ -405,7 +411,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
                     checkAction(() => {
                         const timestamp = new Date().getTime();
                         const isVideo = selectedImage.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage.url);
-                        const ext = isVideo ? 'mp4' : 'jpg';
+                        const ext = inferFileExtensionFromUrl(selectedImage.url, isVideo ? 'mp4' : 'jpg');
                         const fileName = `${sku || 'MEDIA'}_${timestamp}.${ext}`;
                         handleDownload(selectedImage.url, fileName);
                     });

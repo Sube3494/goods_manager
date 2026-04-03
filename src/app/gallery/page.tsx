@@ -13,7 +13,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn, copyToClipboard } from "@/lib/utils";
-import { triggerBrowserDownload } from "@/lib/download";
+import { inferFileExtensionFromUrl, triggerBrowserDownload, triggerIOSMediaShare } from "@/lib/download";
 import Image from "next/image";
 import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
@@ -855,8 +855,14 @@ function GalleryContent() {
   // 下载增强逻辑
   const handleDownload = async (url: string, filename: string) => {
     // iOS Safari does not support the `download` attribute or Blob URLs for saving to Photos.
-    // The only reliable path is to open the resource directly and guide the user.
+    // Prefer the native share sheet first because it can save videos directly to Photos.
     if (isIOS) {
+      const shared = await triggerIOSMediaShare(url, filename);
+      if (shared) {
+        showToast("已打开系统分享面板，可选择“存储到照片”", "success");
+        return;
+      }
+
       window.open(url, '_blank');
       setCopyModalConfig({
         isOpen: true,
@@ -1720,7 +1726,7 @@ function GalleryContent() {
                                                 const product = selectedImage!.product;
                                                 const timestamp = new Date().getTime();
                                                 const isVideo = selectedImage!.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(selectedImage!.url);
-                                                const ext = isVideo ? 'mp4' : 'jpg';
+                                                const ext = inferFileExtensionFromUrl(selectedImage!.url, isVideo ? 'mp4' : 'jpg');
                                                 const fileName = `${product?.sku || 'MEDIA'}_${timestamp}.${ext}`;
                                                 handleDownload(selectedImage!.url, fileName);
                                             });
