@@ -378,7 +378,7 @@ export function ProductSelectionModal({
                             className={cn(
                              imageOnly
                                ? "group relative aspect-square overflow-hidden rounded-2xl border transition-all cursor-pointer"
-                               : "group relative flex w-full items-center gap-3 sm:gap-5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer",
+                               : "group relative flex w-full items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer min-h-[108px] text-left",
                              isSelected 
                                ? "bg-white dark:bg-white/5 border-primary shadow-md" 
                                : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
@@ -417,7 +417,7 @@ export function ProductSelectionModal({
                           </div>
                           
                            {!imageOnly && (
-                           <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pr-10">
+                           <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5 pr-10">
                             <div className="flex items-center gap-2">
                              <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
                              {selectedIds.includes(product.id) && (
@@ -448,7 +448,7 @@ export function ProductSelectionModal({
                              )}
 
                              {showPrice && (
-                                <div className="mt-1.5">
+                                <div className="mt-2">
                                 <span className="text-sm font-medium text-primary">
                                     ￥{product.costPrice}
                                 </span>

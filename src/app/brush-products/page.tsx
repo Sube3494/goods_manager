@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Search, Tags, Package, Trash2, RotateCcw, Store, Download } from "lucide-react";
+import { Plus, Search, Tags, Package, RotateCcw, Store, Download, Check } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { BrushProduct, Product } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
@@ -10,7 +10,46 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-import { formatLocalDate } from "@/lib/dateUtils";
+import { ActionBar } from "@/components/ui/ActionBar";
+
+async function blobToDataUrl(blob: Blob) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to read blob as data URL"));
+      }
+    };
+    reader.onerror = () => reject(reader.error || new Error("Failed to read blob"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getExcelImageSource(imageUrl?: string | null) {
+  if (!imageUrl) return null;
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
+    const mimeType = blob.type.toLowerCase();
+    const extension =
+      mimeType.includes("png") ? "png" :
+      mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpeg" :
+      null;
+
+    if (!extension) return null;
+
+    const base64 = await blobToDataUrl(blob);
+    return { base64, extension: extension as "png" | "jpeg" };
+  } catch (error) {
+    console.error("Failed to prepare export image:", imageUrl, error);
+    return null;
+  }
+}
 
 export default function BrushProductsPage() {
   const { user } = useUser();
@@ -22,6 +61,7 @@ export default function BrushProductsPage() {
   const [supplierFilter, setSupplierFilter] = useState("");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [editingKeywords, setEditingKeywords] = useState<Record<string, string>>({});
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -85,6 +125,11 @@ export default function BrushProductsPage() {
       return matchesSearch && matchesSupplier;
     });
   }, [items, searchQuery, supplierFilter]);
+  const anySelected = selectedProductIds.length > 0;
+
+  useEffect(() => {
+    setSelectedProductIds((prev) => prev.filter((id) => items.some((item) => item.productId === id)));
+  }, [items]);
 
   const handleAddProducts = async (products: Product[]) => {
     try {
@@ -105,33 +150,27 @@ export default function BrushProductsPage() {
     }
   };
 
-  const handleRemoveProduct = (productId: string, productName: string) => {
-    setConfirmConfig({
-      isOpen: true,
-      title: "移出刷单商品库",
-      message: `确定将「${productName}」移出刷单商品库吗？不会删除原商品资料。`,
-      onConfirm: async () => {
-        try {
-          const res = await fetch("/api/brush-products", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productIds: [productId] }),
-          });
-
-          if (!res.ok) throw new Error("Delete failed");
-
-          showToast("已移出刷单商品库", "success");
-          setItems((prev) => prev.filter((item) => item.productId !== productId));
-        } catch (error) {
-          console.error("Failed to remove brush product:", error);
-          showToast("移除失败", "error");
-        }
-      },
-    });
-  };
-
   const handleKeywordChange = (productId: string, value: string) => {
     setEditingKeywords((prev) => ({ ...prev, [productId]: value }));
+  };
+
+  const toggleSelectProduct = (productId: string) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+  };
+
+  const toggleSelectAllFiltered = () => {
+    const filteredIds = filteredItems.map((item) => item.productId);
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedProductIds.includes(id));
+
+    setSelectedProductIds((prev) => {
+      if (allSelected) {
+        return prev.filter((id) => !filteredIds.includes(id));
+      }
+
+      return Array.from(new Set([...prev, ...filteredIds]));
+    });
   };
 
   const handleSaveKeyword = async (product: Product) => {
@@ -178,6 +217,34 @@ export default function BrushProductsPage() {
     setSupplierFilter("");
   };
 
+  const handleBatchRemove = () => {
+    if (selectedProductIds.length === 0) return;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: "批量移出刷单商品库",
+      message: `确定将选中的 ${selectedProductIds.length} 个商品移出刷单商品库吗？不会删除原商品资料。`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch("/api/brush-products", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productIds: selectedProductIds }),
+          });
+
+          if (!res.ok) throw new Error("Batch delete failed");
+
+          showToast(`已移出 ${selectedProductIds.length} 个刷单商品`, "success");
+          setItems((prev) => prev.filter((item) => !selectedProductIds.includes(item.productId)));
+          setSelectedProductIds([]);
+        } catch (error) {
+          console.error("Failed to batch remove brush products:", error);
+          showToast("批量移除失败", "error");
+        }
+      },
+    });
+  };
+
   const handleExport = useCallback(async () => {
     showToast("正在准备导出数据...", "info");
     try {
@@ -187,6 +254,7 @@ export default function BrushProductsPage() {
       }
 
       const exportData = filteredItems.map((item) => ({
+        商品图片: "",
         商品名称: item.product.name,
         "SKU/店内码": item.product.sku || "",
         供应商: item.product.supplier?.name || "",
@@ -212,7 +280,11 @@ export default function BrushProductsPage() {
       worksheet.columns = headers.map((header) => ({
         header,
         key: header,
-        width: header === "商品名称" ? 34 : header === "刷单关键词" || header === "备注" ? 24 : 18,
+        width:
+          header === "商品图片" ? 18 :
+          header === "商品名称" ? 34 :
+          header === "刷单关键词" || header === "备注" ? 24 :
+          18,
       }));
 
       worksheet.eachRow((row: import("exceljs").Row) => {
@@ -222,12 +294,42 @@ export default function BrushProductsPage() {
         });
       });
 
+      const preparedImages = await Promise.all(
+        filteredItems.map((item) => getExcelImageSource(item.product.image))
+      );
+
+      preparedImages.forEach((image, index) => {
+        const rowNumber = index + 2;
+        const row = worksheet.getRow(rowNumber);
+        row.height = 96;
+
+        if (!image) {
+          worksheet.getCell(`A${rowNumber}`).value = "无图";
+          worksheet.getCell(`A${rowNumber}`).alignment = { horizontal: "center", vertical: "middle" };
+          return;
+        }
+
+        const imageId = workbook.addImage({
+          base64: image.base64,
+          extension: image.extension,
+        });
+
+        worksheet.addImage(imageId, {
+          tl: { col: 0.2, row: rowNumber - 1 + 0.15 },
+          ext: { width: 72, height: 72 },
+        });
+      });
+
       const buffer = await workbook.xlsx.writeBuffer();
+      const timestamp = new Date()
+        .toLocaleString("sv-SE", { hour12: false })
+        .replace(" ", "_")
+        .replace(/:/g, "-");
       saveAs(
         new Blob([buffer], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         }),
-        `刷单商品库_${formatLocalDate(new Date())}.xlsx`
+        `刷单商品库_${timestamp}.xlsx`
       );
       showToast(`已导出 ${filteredItems.length} 条刷单商品`, "success");
     } catch (error) {
@@ -250,32 +352,38 @@ export default function BrushProductsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">刷单商品库</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-4xl">刷单商品库</h1>
+            <span className="inline-flex items-center rounded-2xl border border-border/70 bg-white/70 px-3 py-1 text-xs font-bold text-foreground dark:bg-white/5">
+              {items.length}
+            </span>
+          </div>
           <p className="text-muted-foreground mt-2 text-sm sm:text-lg">从现有商品库中挑选一批刷单专用商品，供刷单安排快速选用。</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
           <button
             onClick={handleExport}
-            className="h-11 sm:h-12 min-w-0 px-4 sm:px-5 rounded-full border border-border bg-white/80 text-foreground font-bold text-sm hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-border bg-white/80 px-4 text-sm font-bold text-foreground transition-all active:scale-95 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 sm:h-12 sm:px-5"
           >
             <Download size={16} className="rotate-180" />
-            导出
+            <span className="truncate">导出</span>
           </button>
           <button
             onClick={() => setIsPickerOpen(true)}
-            className="h-11 sm:h-12 min-w-0 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95 hover:-translate-y-0.5 sm:h-12 sm:px-6"
           >
             <Plus size={18} />
-            <span className="truncate">从商品库添加</span>
+            <span className="truncate sm:hidden">添加</span>
+            <span className="hidden truncate sm:inline">从商品库添加</span>
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
-        <div className="h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+        <div className="flex h-11 items-center gap-3 rounded-2xl border border-border bg-white px-5 transition-all focus-within:ring-2 focus-within:ring-primary/10 dark:bg-white/5">
           <Search size={18} className="text-muted-foreground" />
           <input
             type="text"
@@ -295,14 +403,14 @@ export default function BrushProductsPage() {
             value={supplierFilter}
             onChange={setSupplierFilter}
             className="h-full"
-            triggerClassName="h-full rounded-full text-sm"
+            triggerClassName="h-full rounded-2xl text-sm"
           />
         </div>
 
         {(searchQuery || supplierFilter) && (
           <button
             onClick={resetFilters}
-            className="h-11 px-4 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all inline-flex items-center justify-center gap-2 md:justify-self-start"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary transition-all hover:bg-primary/10 md:justify-self-start"
           >
             <RotateCcw size={14} />
             重置
@@ -313,21 +421,29 @@ export default function BrushProductsPage() {
       {isLoading ? (
         <div className="py-20 text-center text-muted-foreground">加载中...</div>
       ) : filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 min-[560px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-5">
           {filteredItems.map((item) => {
             const product = item.product;
             const editingValue = editingKeywords[product.id] ?? item.brushKeyword ?? "";
             const isDirty = editingValue !== (item.brushKeyword ?? "");
+            const isSelected = selectedProductIds.includes(product.id);
             return (
-              <div key={item.id} className="group rounded-[28px] border border-border bg-white dark:bg-white/5 p-3 sm:p-4 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
-                <div className="relative aspect-square overflow-hidden rounded-[22px] bg-muted border border-border/50">
+              <div
+                key={item.id}
+                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-all duration-200 cursor-pointer dark:bg-white/5 ${
+                  isSelected
+                    ? "border-primary/40 ring-2 ring-primary/10 shadow-lg shadow-primary/10 bg-primary/5"
+                    : "border-border hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-primary/10"
+                }`}
+              >
+                <div className="relative aspect-4/3 w-full overflow-hidden bg-secondary/30">
                     {product.image ? (
                       <Image
                         src={product.image}
                         alt={product.name}
                         fill
-                        sizes="(max-width: 640px) 45vw, (max-width: 1280px) 30vw, 20vw"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
                         unoptimized
                       />
                     ) : (
@@ -336,30 +452,40 @@ export default function BrushProductsPage() {
                       </div>
                     )}
                   <button
-                    onClick={() => handleRemoveProduct(product.id, product.name)}
-                    className="absolute right-3 top-3 h-9 w-9 rounded-2xl bg-black/45 text-white backdrop-blur-md transition-all hover:bg-red-500 hover:text-white inline-flex items-center justify-center"
-                    title="移出刷单商品库"
+                    type="button"
+                    onClick={() => toggleSelectProduct(product.id)}
+                    className={`absolute top-3 left-3 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                      isSelected
+                        ? "scale-110 border-foreground bg-foreground text-background dark:text-black"
+                        : anySelected
+                          ? "border-white/50 bg-white/50 text-transparent dark:border-white/20 dark:bg-zinc-800/50"
+                          : "border-white/50 bg-white/50 text-transparent opacity-0 group-hover:opacity-100 hover:border-foreground/50 dark:border-white/20 dark:bg-zinc-800/50"
+                    }`}
+                    title={isSelected ? "取消选择" : "选择商品"}
                   >
-                    <Trash2 size={16} />
+                    <Check size={14} strokeWidth={4} />
                   </button>
                 </div>
 
-                <div className="mt-4 min-w-0">
-                  <h3 className="text-sm sm:text-base font-black leading-snug line-clamp-2 min-h-[2.75rem]">
+                <div className="flex flex-1 flex-col p-3 sm:p-5">
+                  <h3
+                    className="mb-2 text-[13px] font-bold leading-snug text-foreground transition-colors group-hover:text-primary break-words sm:mb-2.5 sm:text-[15px]"
+                    title={product.name}
+                  >
                     {product.name}
                   </h3>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {product.sku && <span className="font-mono px-2 py-1 rounded-lg bg-muted/50">{product.sku}</span>}
+                  <div className="flex min-h-[22px] flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    {product.sku && <span className="flex h-5 items-center rounded-full bg-secondary/80 px-2 py-0.5 font-mono text-[10px] leading-none">{product.sku}</span>}
                     {product.supplier?.name && (
-                      <span className="inline-flex items-center gap-1">
-                        <Store size={12} />
+                      <span className="flex h-5 items-center gap-1 rounded-full border border-zinc-500/10 bg-zinc-500/5 px-2 py-0.5 text-[10px] leading-none">
+                        <Store size={10} />
                         {product.supplier.name}
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-4 rounded-2xl bg-muted/30 border border-border/50 px-3 py-3">
+                  <div className="mt-4 border-t border-white/10 pt-4">
                     <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">刷单关键词</div>
                     <textarea
                       value={editingValue}
@@ -381,7 +507,7 @@ export default function BrushProductsPage() {
                   </div>
 
                   {product.remark && (
-                    <div className="mt-3 rounded-2xl bg-amber-500/5 border border-amber-500/10 px-3 py-3 text-xs text-amber-700 dark:text-amber-400 line-clamp-2">
+                    <div className="mt-3 line-clamp-2 rounded-xl border border-amber-500/10 bg-amber-500/5 px-3 py-3 text-xs text-amber-700 dark:text-amber-400">
                       {product.remark}
                     </div>
                   )}
@@ -417,6 +543,15 @@ export default function BrushProductsPage() {
         variant="warning"
         onConfirm={confirmConfig.onConfirm}
         onClose={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      <ActionBar
+        selectedCount={selectedProductIds.length}
+        totalCount={filteredItems.length}
+        onToggleSelectAll={toggleSelectAllFiltered}
+        onClear={() => setSelectedProductIds([])}
+        onDelete={handleBatchRemove}
+        label="个商品"
       />
     </div>
   );
