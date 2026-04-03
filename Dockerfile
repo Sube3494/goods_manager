@@ -1,12 +1,20 @@
+# syntax=docker/dockerfile:1.7
+
 # ================================
 # Stage 1: 依赖安装
 # ================================
 FROM node:20-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV npm_config_registry="https://registry.npmmirror.com"
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile && pnpm store prune && pnpm add sharp
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --frozen-lockfile && \
+    pnpm store prune
 
 # ================================
 # Stage 2: 构建
@@ -15,6 +23,9 @@ FROM node:20-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@latest --activate && \
     apk add --no-cache openssl
 WORKDIR /app
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV npm_config_registry="https://registry.npmmirror.com"
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
