@@ -9,6 +9,7 @@ import { PurchaseOrder, PurchaseStatus, User as UserType } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
+import { Pagination } from "@/components/ui/Pagination";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
@@ -63,6 +64,8 @@ function PurchasesContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [shopFilter, setShopFilter] = useState<string>("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -94,6 +97,7 @@ function PurchasesContent() {
     setSearchQuery("");
     setStatusFilter("All");
     setShopFilter("All");
+    setCurrentPage(1);
     
     // Also clean URL params if necessary
     const params = new URLSearchParams(searchParams);
@@ -110,7 +114,7 @@ function PurchasesContent() {
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const pRes = await fetch("/api/purchases");
+      const pRes = await fetch("/api/purchases?page=1&pageSize=99999");
       
       if (pRes.ok) {
         const data = await pRes.json();
@@ -331,6 +335,23 @@ function PurchasesContent() {
       return queryMatch && matchesStatus && matchesShop;
     });
   }, [purchases, searchQuery, statusFilter, shopFilter]);
+
+  const totalItems = filteredPurchases.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginatedPurchases = filteredPurchases.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, shopFilter, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleExport = useCallback(async (specificPO?: PurchaseOrder) => {
     const targets = specificPO ? [specificPO] : filteredPurchases;
@@ -719,7 +740,7 @@ function PurchasesContent() {
                <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
                <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
             </div>
-          ) : filteredPurchases.length > 0 ? (
+          ) : paginatedPurchases.length > 0 ? (
           <table className="w-full text-left border-collapse min-w-[800px] table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/30">
@@ -734,7 +755,7 @@ function PurchasesContent() {
             </thead>
             <tbody className="divide-y divide-border">
               <AnimatePresence>
-                {filteredPurchases.map((po) => (
+                {paginatedPurchases.map((po) => (
                    <motion.tr 
                     key={po.id}
                     initial={{ opacity: 0 }}
@@ -874,8 +895,8 @@ function PurchasesContent() {
                 <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
                 <p className="text-muted-foreground text-sm font-medium">加载中...</p>
              </div>
-          ) : filteredPurchases.length > 0 ? (
-            filteredPurchases.map((po) => (
+          ) : paginatedPurchases.length > 0 ? (
+            paginatedPurchases.map((po) => (
               <motion.div
                 key={po.id}
                 layout
@@ -1002,6 +1023,17 @@ function PurchasesContent() {
            )}
         </AnimatePresence>
       </div>
+
+      {!isLoading && totalItems > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
 
 
 
