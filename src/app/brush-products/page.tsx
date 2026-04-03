@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Search, Tags, Package, Trash2, RotateCcw, Store } from "lucide-react";
+import { Plus, Search, Tags, Package, Trash2, RotateCcw, Store, Download } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { BrushProduct, Product } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
@@ -10,6 +10,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { formatLocalDate } from "@/lib/dateUtils";
 
 export default function BrushProductsPage() {
   const { user } = useUser();
@@ -177,6 +178,64 @@ export default function BrushProductsPage() {
     setSupplierFilter("");
   };
 
+  const handleExport = useCallback(async () => {
+    showToast("正在准备导出数据...", "info");
+    try {
+      if (filteredItems.length === 0) {
+        showToast("没有可导出的刷单商品", "error");
+        return;
+      }
+
+      const exportData = filteredItems.map((item) => ({
+        商品名称: item.product.name,
+        "SKU/店内码": item.product.sku || "",
+        供应商: item.product.supplier?.name || "",
+        刷单关键词: item.brushKeyword || "",
+        备注: item.product.remark || "",
+        加入时间: item.createdAt ? new Date(item.createdAt).toLocaleString() : "",
+      }));
+
+      const ExcelJS = (await import("exceljs")).default;
+      const { saveAs } = await import("file-saver");
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("刷单商品库");
+
+      const headers = Object.keys(exportData[0]);
+      const headerRow = worksheet.addRow(headers);
+      headerRow.font = { bold: true };
+
+      exportData.forEach((row) => {
+        worksheet.addRow(headers.map((header) => row[header as keyof typeof row]));
+      });
+
+      worksheet.columns = headers.map((header) => ({
+        header,
+        key: header,
+        width: header === "商品名称" ? 34 : header === "刷单关键词" || header === "备注" ? 24 : 18,
+      }));
+
+      worksheet.eachRow((row: import("exceljs").Row) => {
+        row.eachCell((cell: import("exceljs").Cell) => {
+          cell.font = { ...cell.font, name: "微软雅黑" };
+          cell.alignment = { vertical: "middle", wrapText: true };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `刷单商品库_${formatLocalDate(new Date())}.xlsx`
+      );
+      showToast(`已导出 ${filteredItems.length} 条刷单商品`, "success");
+    } catch (error) {
+      console.error("Failed to export brush products:", error);
+      showToast("导出失败，请重试", "error");
+    }
+  }, [filteredItems, showToast]);
+
   if (!canManage) {
     return (
       <div className="py-24 text-center">
@@ -191,22 +250,31 @@ export default function BrushProductsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">刷单商品库</h1>
           <p className="text-muted-foreground mt-2 text-sm sm:text-lg">从现有商品库中挑选一批刷单专用商品，供刷单安排快速选用。</p>
         </div>
 
-        <button
-          onClick={() => setIsPickerOpen(true)}
-          className="h-11 sm:h-12 px-5 sm:px-6 rounded-full bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-95 inline-flex items-center justify-center gap-2"
-        >
-          <Plus size={18} />
-          从商品库添加
-        </button>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <button
+            onClick={handleExport}
+            className="h-11 sm:h-12 min-w-0 px-4 sm:px-5 rounded-full border border-border bg-white/80 text-foreground font-bold text-sm hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+          >
+            <Download size={16} className="rotate-180" />
+            导出
+          </button>
+          <button
+            onClick={() => setIsPickerOpen(true)}
+            className="h-11 sm:h-12 min-w-0 px-4 sm:px-6 rounded-full bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+          >
+            <Plus size={18} />
+            <span className="truncate">从商品库添加</span>
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px_auto] gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
         <div className="h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
           <Search size={18} className="text-muted-foreground" />
           <input
@@ -234,7 +302,7 @@ export default function BrushProductsPage() {
         {(searchQuery || supplierFilter) && (
           <button
             onClick={resetFilters}
-            className="h-11 px-4 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all inline-flex items-center justify-center gap-2"
+            className="h-11 px-4 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all inline-flex items-center justify-center gap-2 md:justify-self-start"
           >
             <RotateCcw size={14} />
             重置
@@ -245,7 +313,7 @@ export default function BrushProductsPage() {
       {isLoading ? (
         <div className="py-20 text-center text-muted-foreground">加载中...</div>
       ) : filteredItems.length > 0 ? (
-        <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-5">
           {filteredItems.map((item) => {
             const product = item.product;
             const editingValue = editingKeywords[product.id] ?? item.brushKeyword ?? "";
