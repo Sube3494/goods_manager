@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import { BackupService } from "@/lib/backup-service";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { readFile } from "fs/promises";
-import { existsSync } from "fs";
+import { stat } from "fs/promises";
+import { createReadStream, existsSync } from "fs";
+import { Readable } from "stream";
+
+function buildContentDisposition(fileName: string) {
+  const safeFileName = fileName.replace(/["\r\n]/g, "_");
+  const encodedFileName = encodeURIComponent(fileName);
+  return `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -26,13 +33,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
-    const fileBuffer = await readFile(filePath);
+    const fileStat = await stat(filePath);
     
-    return new Response(fileBuffer, {
+    return new Response(Readable.toWeb(createReadStream(filePath)) as ReadableStream, {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Length': String(fileStat.size),
+        'Content-Disposition': buildContentDisposition(fileName),
       }
     });
   } catch (error) {

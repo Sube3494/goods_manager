@@ -2,6 +2,49 @@ import imageCompression from "browser-image-compression";
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
 
+const IMAGE_COMPRESSION_TARGETS = {
+  maxWidthOrHeight: 2560,
+  maxSizeMB: 2.2,
+  initialQuality: 0.96,
+  maxIteration: 6,
+} as const;
+
+async function maybeCompressImageBeforeUpload(file: File) {
+  if (!file.type.startsWith("image/") || file.type.includes("gif")) {
+    return file;
+  }
+
+  // Smaller assets don't benefit much from client-side recompression.
+  if (file.size <= 900 * 1024) {
+    return file;
+  }
+
+  try {
+    const compressedFile = await imageCompression(file, {
+      ...IMAGE_COMPRESSION_TARGETS,
+      useWebWorker: true,
+      preserveExif: true,
+    });
+
+    if (compressedFile.size >= file.size) {
+      return file;
+    }
+
+    const savedRatio = ((file.size - compressedFile.size) / file.size) * 100;
+    console.log(
+      `[Image Compression] ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (saved ${savedRatio.toFixed(1)}%)`
+    );
+
+    return new File([compressedFile], file.name, {
+      type: compressedFile.type || file.type,
+      lastModified: file.lastModified,
+    });
+  } catch (error) {
+    console.warn("图片压缩失败，降级使用原文件:", error);
+    return file;
+  }
+}
+
 /** 计算文件的 SHA-256 哈希（十六进制字符串） */
 async function computeFileSha256(file: File): Promise<string> {
   const buffer = await file.arrayBuffer();
@@ -16,33 +59,7 @@ export async function uploadFileWithChunking(
   folder?: string,
   onProgress?: (percent: number) => void
 ): Promise<{ url: string; type: string; skipped?: boolean; name?: string }> {
-
-  // ── 图片压缩预处理（保持画质，压缩体积） ──
-  // 只处理常见的图片格式，排除 gif (避免破坏动画)
-  if (file.type.startsWith("image/") && !file.type.includes("gif")) {
-    try {
-      const options = {
-        maxSizeMB: 1.5, // 目标最大体积 1.5MB 可以在保留画质的同时极大减小多数手机照片体积
-        maxWidthOrHeight: 2560, // 保持足够大的分辨率
-        useWebWorker: true,
-        initialQuality: 0.85, // 较高的初始质量配置，不压缩画质
-      };
-      
-      const compressedBlob = await imageCompression(file, options);
-      
-      // 只有压缩后比原文件小才使用压缩版本
-      if (compressedBlob.size < file.size) {
-        const originalSize = file.size;
-        file = new File([compressedBlob], file.name, {
-          type: compressedBlob.type || file.type,
-          lastModified: Date.now(),
-        });
-        console.log(`[Image Compression] ${(originalSize / 1024 / 1024).toFixed(2)}MB -> ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-      }
-    } catch (error) {
-      console.warn("图片压缩失败，降级使用原文件:", error);
-    }
-  }
+  file = await maybeCompressImageBeforeUpload(file);
 
   // ── 去重预检：计算 SHA-256 后询问服务端是否已有相同文件 ──
   // 仅对小文件（非分块上传路径）做去重；大文件仍走分块上传

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Truck, Plus, Trash2, CheckCircle2, Camera, ExternalLink, Copy } from "lucide-react";
 import { TrackingInfo } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
+import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
 
 export interface TrackingNumberModalProps {
   isOpen: boolean;
@@ -234,22 +235,9 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
     if (type === 'payment') setIsUploadingVoucher(true);
     
     const uploadPromises = Array.from(files).map(async (file) => {
-      const uploadData = new FormData();
-      uploadData.append("file", file);
       try {
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: uploadData,
-          headers: {
-            "x-folder": type === 'payment' ? "vouchers" : "labels",
-            "x-use-timestamp": "true"
-          }
-        });
-        if (res.ok) {
-          const { url } = await res.json();
-          return url as string;
-        }
-        console.error(`${type} upload failed with status: ${res.status}`);
+        const result = await uploadFileWithChunking(file, type === 'payment' ? "vouchers" : "labels");
+        return result.url as string;
       } catch (error) {
         console.error(`${type} upload failed:`, error);
       }

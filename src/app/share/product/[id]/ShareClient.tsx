@@ -11,6 +11,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { copyToClipboard } from "@/lib/utils";
 import { useMemo } from "react";
+import { triggerBrowserDownload } from "@/lib/download";
 
 // Moved handleDownload inside component to use hooks
 
@@ -246,28 +247,11 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
     }
 
     try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Fetch failed");
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      triggerBrowserDownload(url, fileName);
     } catch (error) {
-        console.warn('Download failed, falling back:', error);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast("正在尝试直接打开资源进行下载", "info");
+      console.warn("Download failed, falling back:", error);
+      window.open(url, "_blank", "noopener,noreferrer");
+      showToast("正在尝试直接打开资源进行下载", "info");
     }
   };
 

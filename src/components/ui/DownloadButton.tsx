@@ -2,6 +2,7 @@
 
 import { Download, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { triggerBrowserDownload } from "@/lib/download";
 
 interface DownloadButtonProps {
   url: string;
@@ -21,7 +22,11 @@ export function DownloadButton({ url, filename }: DownloadButtonProps) {
       e.preventDefault();
       window.open(url, '_blank');
       setShowGuide(true);
+      return;
     }
+
+    e.preventDefault();
+    triggerBrowserDownload(url, filename);
   };
 
   return (

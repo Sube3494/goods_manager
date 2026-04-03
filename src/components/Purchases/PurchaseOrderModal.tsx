@@ -7,6 +7,7 @@ import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, L
 import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
+import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
 import { ImageGallery } from "@/components/ui/ImageGallery";
 import { useToast } from "@/components/ui/Toast";
 import { sortPurchaseItems } from "@/lib/pinyin";
@@ -663,22 +664,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     if (type === 'payment') setIsUploadingVoucher(true);
 
     const uploadPromises = Array.from(files).map(async (file) => {
-      const uploadData = new FormData();
-      uploadData.append("file", file);
       try {
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: uploadData,
-          headers: {
-            "x-folder": type === 'payment' ? "vouchers" : "labels",
-            "x-use-timestamp": "true"
-          }
-        });
-        if (res.ok) {
-          const { url } = await res.json();
-          return url as string;
-        }
-        console.error(`${type} upload failed with status: ${res.status}`);
+        const result = await uploadFileWithChunking(file, type === 'payment' ? "vouchers" : "labels");
+        return result.url as string;
       } catch (error) {
         console.error(`${type} upload failed:`, error);
       }

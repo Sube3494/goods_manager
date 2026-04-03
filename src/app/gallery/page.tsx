@@ -13,6 +13,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn, copyToClipboard } from "@/lib/utils";
+import { triggerBrowserDownload } from "@/lib/download";
 import Image from "next/image";
 import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
@@ -833,29 +834,10 @@ function GalleryContent() {
     }
 
     try {
-      // 尝试使用 Blob 下载（支持重命名）
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Fetch failed");
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      triggerBrowserDownload(url, filename);
     } catch (error) {
-      console.warn("Blob download failed, falling back to direct link:", error);
-      // 兜底方案：直接打开/下载
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      console.warn("Direct download failed, falling back to new tab:", error);
+      window.open(url, "_blank", "noopener,noreferrer");
       showToast("开始尝试直接下载...", "info");
     }
   };

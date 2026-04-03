@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { join } from "path";
-import { readFile, access } from "fs/promises";
-import { existsSync } from "fs";
+import { access, stat } from "fs/promises";
+import { createReadStream, existsSync } from "fs";
+import { Readable } from "stream";
+
+function buildContentDisposition(fileName: string) {
+  const safeFileName = fileName.replace(/["\r\n]/g, "_");
+  const encodedFileName = encodeURIComponent(fileName);
+  return `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`;
+}
 
 export async function GET(
   request: NextRequest,
@@ -10,6 +17,7 @@ export async function GET(
   try {
     const { path } = await params;
     const filePath = path.join("/");
+    const requestedFileName = request.nextUrl.searchParams.get("download");
     
     // 确定上传目录
     let baseDir = join(process.cwd(), "public", "uploads");
@@ -35,7 +43,7 @@ export async function GET(
       return new NextResponse("Not Found", { status: 404 });
     }
 
-    const fileBuffer = await readFile(fullPath);
+    const fileStat = await stat(fullPath);
     
     // 简单的 MIME 类型判断
     const ext = filePath.split(".").pop()?.toLowerCase();
@@ -57,10 +65,12 @@ export async function GET(
       contentType = mimeTypes[ext];
     }
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(Readable.toWeb(createReadStream(fullPath)) as ReadableStream, {
       headers: {
         "Content-Type": contentType,
+        "Content-Length": String(fileStat.size),
         "Cache-Control": "public, max-age=31536000, immutable", // 强缓存
+        ...(requestedFileName ? { "Content-Disposition": buildContentDisposition(requestedFileName) } : {}),
       },
     });
   } catch (error) {

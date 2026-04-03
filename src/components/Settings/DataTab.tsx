@@ -7,6 +7,7 @@ import { BackupModal } from "@/components/Settings/BackupModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import { useToast } from "@/components/ui/Toast";
+import { triggerBlobDownload, triggerBrowserDownload } from "@/lib/download";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,10 @@ export function DataTab({
   const showAnalytics = mode === "full";
   const showLogicControls = mode === "full";
   const showDangerZone = canManageDangerZone;
+
+  const downloadBackupFile = (fileName: string) => {
+    triggerBrowserDownload(`/api/system/backup/download?fileName=${encodeURIComponent(fileName)}`, fileName);
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -401,7 +406,7 @@ export function DataTab({
                       </div>
                     </div>
                     <div className="mt-4 flex items-center gap-2">
-                      <button onClick={() => window.open(`/api/system/backup/download?fileName=${item.name}`, "_blank")} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-background text-xs font-black text-primary">
+                      <button onClick={() => downloadBackupFile(item.name)} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-background text-xs font-black text-primary">
                         <Download size={13} />
                         下载
                       </button>
@@ -428,7 +433,7 @@ export function DataTab({
                       <td className="whitespace-nowrap px-4 py-3 text-center tabular-nums text-muted-foreground"><div className="flex items-center justify-center gap-1.5"><Calendar size={10} className="opacity-40" />{formatLocalDateTime(new Date(item.createdAt))}</div></td>
                       <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-muted-foreground">{(item.size / 1024 / 1024).toFixed(2)} MB</td>
                       <td className="px-4 py-3"><div className="flex items-center justify-center gap-1.5">
-                        <button onClick={() => window.open(`/api/system/backup/download?fileName=${item.name}`, "_blank")} className="rounded-lg p-1.5 text-primary hover:bg-primary/15"><Download size={14} /></button>
+                        <button onClick={() => downloadBackupFile(item.name)} className="rounded-lg p-1.5 text-primary hover:bg-primary/15"><Download size={14} /></button>
                         {showDangerZone && <button onClick={() => setBackupConfig({ isOpen: true, type: "import", file: { name: item.name } as File })} className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-500/15"><RotateCcw size={14} /></button>}
                         {showDangerZone && <button onClick={async () => { try { const res = await fetch(`/api/system/backup?fileName=${item.name}`, { method: "DELETE" }); if (res.ok) { showToast("备份已删除", "success"); setBackups((prev) => prev.filter((row) => row.name !== item.name)); } } catch { showToast("操作失败", "error"); } }} className="rounded-lg p-1.5 text-red-500 hover:bg-red-500/15"><Trash2 size={14} /></button>}
                       </div></td>
@@ -451,11 +456,7 @@ export function DataTab({
           if (!res.ok) { const err = await res.json(); throw new Error(err.error || "导出失败"); }
           const blob = await res.blob();
           onProgress(100);
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `PickNote_备份数据_${new Date().toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(" ", "_").replace(/:/g, "")}.pnk`;
-          a.click();
+          triggerBlobDownload(blob, `PickNote_备份数据_${new Date().toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(" ", "_").replace(/:/g, "")}.pnk`);
           return;
         }
         const isServerRestore = !backupConfig.file || !("size" in backupConfig.file);
