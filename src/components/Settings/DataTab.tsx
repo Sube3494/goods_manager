@@ -17,6 +17,8 @@ interface AnalyticsData { today: { pv: number; uv: number }; month: { pv: number
 interface DataTabProps {
   allowGalleryUpload: boolean;
   toggleGalleryUpload: () => void;
+  requireLoginForLightbox: boolean;
+  toggleRequireLoginForLightbox: () => void;
   gallerySortDesc: boolean;
   setGallerySortDesc: (val: boolean) => void;
   shareExpireDuration: number | "";
@@ -29,7 +31,7 @@ interface DataTabProps {
 }
 
 export function DataTab({
-  allowGalleryUpload, toggleGalleryUpload, gallerySortDesc, setGallerySortDesc,
+  allowGalleryUpload, toggleGalleryUpload, requireLoginForLightbox, toggleRequireLoginForLightbox, gallerySortDesc, setGallerySortDesc,
   shareExpireDuration, setShareExpireDuration, shareExpireUnit, setShareExpireUnit,
   saveSettings, mode = "full", canManageDangerZone = true,
 }: DataTabProps) {
@@ -255,6 +257,10 @@ export function DataTab({
           <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">允许实物照片上传</div><div className="mt-1 text-xs text-muted-foreground">开启后，应用前端及管理台会允许用户向后端存储上传物理文件。</div></div>
             <Switch checked={allowGalleryUpload} onChange={toggleGalleryUpload} />
+          </div>
+          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><div className="text-sm font-black text-foreground">灯箱预览需要登录</div><div className="mt-1 text-xs text-muted-foreground">开启后，游客仍可浏览实物相册列表，但点击进入灯箱大图或视频预览时会先跳转登录。</div></div>
+            <Switch checked={requireLoginForLightbox} onChange={toggleRequireLoginForLightbox} />
           </div>
           <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">实物相册排序方式</div><div className="mt-1 text-xs text-muted-foreground">决定实物相册中商品组默认按编号升序还是降序排列。</div></div>

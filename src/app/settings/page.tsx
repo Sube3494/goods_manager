@@ -54,6 +54,7 @@ function SettingsContent() {
   const canManageMembers = hasAdminAccess(sessionUser, "members:manage");
   const [lowStockThreshold, setLowStockThreshold] = useState<number | "">(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
+  const [requireLoginForLightbox, setRequireLoginForLightbox] = useState<boolean>(false);
   const [gallerySortDesc, setGallerySortDesc] = useState<boolean>(true);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
@@ -125,6 +126,7 @@ function SettingsContent() {
                 const data = await settingsRes.json();
                 setLowStockThreshold(data.lowStockThreshold);
                 setAllowGalleryUpload(data.allowGalleryUpload ?? true);
+                setRequireLoginForLightbox(data.requireLoginForLightbox ?? false);
                 setGallerySortDesc(data.gallerySortDesc ?? true);
                 
                 // Storage settings
@@ -165,6 +167,7 @@ function SettingsContent() {
     const payload = {
         lowStockThreshold,
         allowGalleryUpload,
+        requireLoginForLightbox,
         gallerySortDesc,
         storageType,
         minioEndpoint,
@@ -203,6 +206,7 @@ function SettingsContent() {
   }, [
     lowStockThreshold, 
     allowGalleryUpload, 
+    requireLoginForLightbox,
     gallerySortDesc,
     storageType, 
     minioEndpoint, 
@@ -286,6 +290,12 @@ function SettingsContent() {
     const newValue = !allowGalleryUpload;
     setAllowGalleryUpload(newValue);
     saveSettings({ allowGalleryUpload: newValue });
+  };
+
+  const toggleRequireLoginForLightbox = () => {
+    const newValue = !requireLoginForLightbox;
+    setRequireLoginForLightbox(newValue);
+    saveSettings({ requireLoginForLightbox: newValue });
   };
 
   if (isLoading) {
@@ -478,6 +488,8 @@ function SettingsContent() {
           <DataTab
             allowGalleryUpload={allowGalleryUpload}
             toggleGalleryUpload={toggleGalleryUpload}
+            requireLoginForLightbox={requireLoginForLightbox}
+            toggleRequireLoginForLightbox={toggleRequireLoginForLightbox}
             gallerySortDesc={gallerySortDesc}
             setGallerySortDesc={setGallerySortDesc}
             shareExpireDuration={shareExpireDuration}

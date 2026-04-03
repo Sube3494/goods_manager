@@ -422,18 +422,18 @@ export default function LoginPage() {
                 className="fixed inset-0 z-100 flex items-center justify-center p-4 backdrop-blur-sm sm:backdrop-blur-xl bg-black/20 dark:bg-black/60"
                 onClick={() => setIsContactModalOpen(false)}
             >
-                <motion.div 
-                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full max-w-sm bg-background/80 dark:bg-zinc-900/90 backdrop-blur-2xl border border-zinc-200 dark:border-white/10 shadow-3xl rounded-[2.5rem] p-8 flex flex-col items-center gap-6 relative overflow-hidden"
-                >
-                    <div className="absolute inset-0 bg-linear-to-b from-primary/10 to-transparent pointer-events-none" />
-                    
-                    <div className="relative">
-                        <div className="w-20 h-20 rounded-full border-4 border-primary/20 p-1 shadow-2xl shadow-primary/20">
-                            <div className="relative w-full h-full rounded-full overflow-hidden bg-primary/10">
+                  <motion.div 
+                      initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full max-w-sm bg-background/80 dark:bg-zinc-900/90 backdrop-blur-2xl border border-zinc-200 dark:border-white/10 shadow-3xl rounded-[2.5rem] px-8 pt-8 pb-6 flex flex-col items-center gap-5 relative overflow-hidden"
+                  >
+                      <div className="absolute inset-0 bg-linear-to-b from-primary/10 to-transparent pointer-events-none" />
+                      
+                      <div className="relative">
+                          <div className="w-[76px] h-[76px] rounded-full border-4 border-primary/20 p-1 shadow-2xl shadow-primary/20">
+                              <div className="relative w-full h-full rounded-full overflow-hidden bg-primary/10">
                                 <Image 
                                     src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
                                     alt="管理员头像"
@@ -441,41 +441,45 @@ export default function LoginPage() {
                                     sizes="80px"
                                     className="object-cover"
                                 />
-                            </div>
-                        </div>
-                        <div className="absolute -bottom-1 -right-1 bg-green-500 w-5 h-5 rounded-full border-4 border-white dark:border-zinc-900" />
-                    </div>
+                              </div>
+                          </div>
+                          <div className="absolute -bottom-1 -right-1 bg-green-500 w-[18px] h-[18px] rounded-full border-[3px] border-white dark:border-zinc-900" />
+                      </div>
 
-                    <div className="text-center space-y-2 relative z-10">
-                        <h2 className="text-2xl font-black tracking-tighter text-foreground">联系管理员</h2>
-                        <p className="text-sm text-muted-foreground px-4 leading-relaxed font-medium">您的邮箱尚未获得访问授权，<br/>请添加管理员微信进行申请。</p>
-                    </div>
+                      <div className="text-center space-y-1.5 relative z-10">
+                          <h2 className="text-2xl font-black tracking-tighter text-foreground">联系管理员</h2>
+                          <p className="text-sm text-muted-foreground px-4 leading-relaxed font-medium">
+                            您的<span className="font-black text-foreground">邮箱</span>尚未获得访问授权
+                            <br />
+                            请添加<span className="font-black text-foreground">管理员微信</span>进行申请
+                          </p>
+                      </div>
 
-                    <div className="w-full space-y-4 relative z-10">
-                        <div className="bg-zinc-50 dark:bg-white/5 rounded-2xl p-4 border border-zinc-100 dark:border-white/5 flex flex-col items-center gap-2 group/wechat">
-                            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/60">管理员微信号</span>
-                            <span className="text-xl font-mono font-bold text-primary select-all tracking-wider">Sube3494</span>
-                        </div>
+                      <div className="w-full space-y-3.5 relative z-10">
+                          <div className="bg-zinc-50 dark:bg-white/5 rounded-2xl px-4 py-3.5 border border-zinc-100 dark:border-white/5 flex flex-col items-center gap-1.5 group/wechat">
+                              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/60">管理员微信号</span>
+                              <span className="text-xl font-mono font-bold text-primary select-all tracking-wider">Sube3494</span>
+                          </div>
 
-                        <div className="relative aspect-square w-full max-w-[200px] mx-auto bg-white rounded-3xl p-3 shadow-2xl group/qr ring-1 ring-zinc-100 dark:ring-white/10">
-                             <Image 
-                                src="/wechat.png" 
-                                alt="微信二维码" 
-                                fill 
-                                sizes="200px" 
-                                className="object-cover rounded-2xl" 
-                                priority
-                                unoptimized 
-                            />
-                        </div>
-                    </div>
+                          <div className="relative aspect-square w-full max-w-[156px] mx-auto bg-white rounded-2xl p-2.5 shadow-2xl group/qr ring-1 ring-zinc-100 dark:ring-white/10">
+                               <Image 
+                                  src="/wechat.png" 
+                                  alt="微信二维码" 
+                                  fill 
+                                  sizes="156px" 
+                                  className="object-cover rounded-xl" 
+                                  priority
+                                  unoptimized 
+                              />
+                          </div>
+                      </div>
 
-                    <button 
-                        onClick={() => setIsContactModalOpen(false)}
-                        className="w-full py-4 rounded-2xl bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:scale-[0.98]"
-                    >
-                        知道了
-                    </button>
+                      <button 
+                          onClick={() => setIsContactModalOpen(false)}
+                          className="mt-1 w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5 active:scale-[0.98]"
+                      >
+                          知道了
+                      </button>
                 </motion.div>
             </motion.div>
         )}

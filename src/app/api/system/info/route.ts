@@ -29,6 +29,7 @@ export async function GET() {
         where: { id: "system" },
         select: {
             allowGalleryUpload: true,
+            requireLoginForLightbox: true,
             allowDataImport: true,
             lastBackup: true
         }
@@ -42,6 +43,7 @@ export async function GET() {
       lastBackup: settings?.lastBackup ? new Date(settings.lastBackup).toLocaleString('zh-CN') : "尚未进行过物理备份",
       // Public flags
       allowGalleryUpload: settings?.allowGalleryUpload ?? true,
+      requireLoginForLightbox: settings?.requireLoginForLightbox ?? false,
       allowDataImport: settings?.allowDataImport ?? true
     });
   } catch {

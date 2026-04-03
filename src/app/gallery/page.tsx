@@ -212,6 +212,7 @@ function GalleryContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isUploadAllowed, setIsUploadAllowed] = useState(false);
+  const [requireLoginForLightbox, setRequireLoginForLightbox] = useState(false);
 
   // Debouncing search
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -380,6 +381,26 @@ function GalleryContent() {
     onConfirm: () => {},
   });
 
+  const promptLoginForLightbox = useCallback(() => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "请先登录",
+      message: "登录后查看",
+      onConfirm: () => {
+        window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+      },
+    });
+  }, []);
+
+  const openLightbox = useCallback((item: GalleryItem) => {
+    if (!user && requireLoginForLightbox) {
+      promptLoginForLightbox();
+      return;
+    }
+
+    setSelectedImage(item);
+  }, [promptLoginForLightbox, requireLoginForLightbox, user]);
+
   useEffect(() => {
     const fetchInitialMeta = async () => {
       try {
@@ -391,6 +412,7 @@ function GalleryContent() {
         if (settingsRes.ok) {
           const data = await settingsRes.json();
           setIsUploadAllowed(data.allowGalleryUpload ?? true);
+          setRequireLoginForLightbox(data.requireLoginForLightbox ?? false);
         }
 
         if (categoriesRes.ok) {
@@ -730,7 +752,7 @@ function GalleryContent() {
       group.items.find(item => item.type !== 'video' && !/\.(mp4|mov|webm)$/i.test(item.url)) ||
       group.items[0];
     if (firstItem) {
-      setSelectedImage(firstItem);
+      openLightbox(firstItem);
     }
   };
 
@@ -792,8 +814,8 @@ function GalleryContent() {
     if (!selectedImage) return;
     const nextIndex = currentIndex + dir;
     if (nextIndex < 0 || nextIndex >= relatedImages.length) return;
-    setSelectedImage(relatedImages[nextIndex]);
-  }, [selectedImage, currentIndex, relatedImages]);
+    openLightbox(relatedImages[nextIndex]);
+  }, [selectedImage, currentIndex, relatedImages, openLightbox]);
 
   // Navigation logic
 
@@ -1768,7 +1790,7 @@ function GalleryContent() {
                                             data-selected={isSelected}
                                             onClick={() => {
                                                 if (!isSelected) {
-                                                    setSelectedImage(img);
+                                                    openLightbox(img);
                                                 }
                                             }}
                                             className={cn(
@@ -1826,8 +1848,8 @@ function GalleryContent() {
         onConfirm={confirmConfig.onConfirm}
         message={confirmConfig.message}
         title={confirmConfig.title}
-        confirmLabel={confirmConfig.title === "登录后使用" ? "立即登录" : "确认删除"}
-        variant={confirmConfig.title === "登录后使用" ? "primary" : "danger"}
+        confirmLabel={confirmConfig.title === "登录后使用" || confirmConfig.title === "请先登录" ? "立即登录" : "确认删除"}
+        variant={confirmConfig.title === "登录后使用" || confirmConfig.title === "请先登录" ? "primary" : "danger"}
         className="z-31000"
     />
 

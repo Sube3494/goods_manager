@@ -22,6 +22,7 @@ export async function GET() {
         lowStockThreshold: 10,
         allowDataImport: true,
         allowGalleryUpload: true,
+        requireLoginForLightbox: false,
         gallerySortDesc: true,
         storageType: "local",
         uploadConflictStrategy: "hash",
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
     const { 
       lowStockThreshold, 
       allowGalleryUpload, 
+      requireLoginForLightbox,
       gallerySortDesc,
       allowDataImport,
       storageType,
@@ -80,6 +82,7 @@ export async function POST(request: Request) {
     const updateData: Prisma.SystemSettingUpdateInput = {};
     if (typeof lowStockThreshold === 'number') updateData.lowStockThreshold = lowStockThreshold;
     if (typeof allowGalleryUpload === 'boolean') updateData.allowGalleryUpload = allowGalleryUpload;
+    if (typeof requireLoginForLightbox === 'boolean') updateData.requireLoginForLightbox = requireLoginForLightbox;
     if (typeof gallerySortDesc === 'boolean') updateData.gallerySortDesc = gallerySortDesc;
     if (typeof allowDataImport === 'boolean') updateData.allowDataImport = allowDataImport;
     
@@ -113,6 +116,7 @@ export async function POST(request: Request) {
         lowStockThreshold: (typeof lowStockThreshold === 'number') ? lowStockThreshold : 10,
         allowDataImport: (typeof allowDataImport === 'boolean') ? allowDataImport : true,
         allowGalleryUpload: (typeof allowGalleryUpload === 'boolean') ? allowGalleryUpload : true,
+        requireLoginForLightbox: (typeof requireLoginForLightbox === 'boolean') ? requireLoginForLightbox : false,
         gallerySortDesc: (typeof gallerySortDesc === 'boolean') ? gallerySortDesc : true,
         storageType: storageType || "local",
         uploadConflictStrategy: "hash",
