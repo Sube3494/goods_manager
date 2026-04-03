@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, brushKeyword } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
 
     const storage = await getStorageStrategy();
 
@@ -82,7 +82,6 @@ export async function POST(request: Request) {
         isDiscontinued: isDiscontinued ?? false,
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         remark: remark || null,
-        brushKeyword: brushKeyword || null,
         userId: user.id,
       },
       include: {
@@ -132,7 +131,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, brushKeyword } = body;
+    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
 
     const storage = await getStorageStrategy();
 
@@ -165,8 +164,7 @@ export async function PUT(request: Request) {
         // If undefined entirely, don't update it to avoid wiping out accidently.
         // It accepts `null` to clear it, or the object to save.
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
-        remark: remark !== undefined ? remark : undefined,
-        brushKeyword: brushKeyword !== undefined ? brushKeyword : undefined
+        remark: remark !== undefined ? remark : undefined
       },
       include: {
         category: true,

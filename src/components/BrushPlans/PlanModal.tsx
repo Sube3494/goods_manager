@@ -21,6 +21,7 @@ interface PlanModalProps {
 }
 
 const PLATFORMS = ["美团", "淘宝", "京东"];
+type BrushSelectableProduct = Product & { brushKeyword?: string };
 
 export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = false }: PlanModalProps) {
     const { showToast } = useToast();
@@ -69,6 +70,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         const newItems = [...(formData.items || [])];
 
         selectedProducts.forEach(product => {
+            const brushProduct = product as BrushSelectableProduct;
             const platformKey = platform || "美团";
             const isDuplicate = (formData.items || []).some(
                 (item: BrushOrderPlanItem) => item.productId === product.id && (item.platform || "美团") === platformKey
@@ -80,7 +82,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                     product: product,
                     productName: product.name,
                     quantity: 1,
-                    searchKeyword: product.brushKeyword || "",
+                    searchKeyword: brushProduct.brushKeyword || "",
                     platform: platform || "美团",
                     done: false,
                 });
@@ -193,7 +195,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                 onClick={() => setIsSelectionModalOpen(true)}
                                                 className="text-xs sm:text-sm font-bold text-primary flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 transition-all"
                                             >
-                                                <Plus size={16} /> 选择商品
+                                                <Plus size={16} /> 从刷单商品库选择
                                             </button>
                                         </div>
 
@@ -312,7 +314,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                             ) : (
                                                 <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed rounded-3xl border-gray-100 dark:border-white/5 text-muted-foreground">
                                                     <Package size={48} className="opacity-10 mb-4" />
-                                                    <p className="text-sm font-bold opacity-40">点击右上角“选择商品”开始规划</p>
+                                                    <p className="text-sm font-bold opacity-40">点击右上角“从刷单商品库选择”开始规划</p>
                                                 </div>
                                             )}
                                         </div>
@@ -355,6 +357,10 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 onClose={() => setIsSelectionModalOpen(false)}
                 onSelect={(products, platform) => handleBatchAdd(products, platform)}
                 selectedIds={(formData.items || []).map(i => i.productId!).filter(Boolean)}
+                fetchPath="/api/brush-products/products"
+                title="选择刷单商品"
+                allowCreate={false}
+                imageOnly
             />
         </>
     );

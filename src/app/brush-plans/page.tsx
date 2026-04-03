@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, Calendar, Share2, Edit2, Trash2, Store, Package, ShieldAlert, RotateCcw } from "lucide-react";
+import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
@@ -16,7 +16,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export default function BrushPlansPage() {
     const { user } = useUser();
-    const canManage = hasPermission(user as SessionUser | null, "brush_plan:manage");
+    const canManage = hasPermission(user as SessionUser | null, "brush:manage");
     const { showToast } = useToast();
     const [plans, setPlans] = useState<BrushOrderPlan[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -175,8 +175,8 @@ export default function BrushPlansPage() {
                 )}
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))_auto] xl:items-center">
-                <div className="h-12 px-5 min-w-0 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all sm:col-span-2 xl:col-span-1">
+            <div className="space-y-3">
+                <div className="h-12 px-5 min-w-0 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
                     <Search size={18} className="text-muted-foreground" />
                     <input
                         type="text"
@@ -186,56 +186,57 @@ export default function BrushPlansPage() {
                         className="bg-transparent border-none outline-none w-full text-sm font-medium"
                     />
                 </div>
-                <div className="h-12 min-w-0">
-                    <DatePicker
-                        value={filterDate}
-                        onChange={setFilterDate}
-                        placeholder="日期筛选"
-                        className="h-full w-full"
-                        triggerClassName="rounded-full h-full text-sm"
-                    />
-                </div>
-                {user?.shippingAddresses && user.shippingAddresses.length > 0 && (
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
+                    <div className="h-12 min-w-0">
+                        <DatePicker
+                            value={filterDate}
+                            onChange={setFilterDate}
+                            placeholder="日期筛选"
+                            className="h-full w-full"
+                            triggerClassName="rounded-full h-full text-sm"
+                        />
+                    </div>
+                    {user?.shippingAddresses && user.shippingAddresses.length > 0 && (
+                        <div className="h-12 min-w-0">
+                            <CustomSelect
+                                options={[
+                                    { value: "", label: "所有店铺" },
+                                    ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
+                                ]}
+                                value={filterShop}
+                                onChange={(val) => setFilterShop(val)}
+                                className="h-full w-full"
+                                triggerClassName="rounded-full h-full text-sm font-medium"
+                            />
+                        </div>
+                    )}
                     <div className="h-12 min-w-0">
                         <CustomSelect
                             options={[
-                                { value: "", label: "所有店铺" },
-                                ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
+                                { value: "", label: "所有平台" },
+                                { value: "美团", label: "美团" },
+                                { value: "淘宝", label: "淘宝" },
+                                { value: "京东", label: "京东" },
                             ]}
-                            value={filterShop}
-                            onChange={(val) => setFilterShop(val)}
+                            value={filterPlatform}
+                            onChange={(val) => setFilterPlatform(val)}
                             className="h-full w-full"
                             triggerClassName="rounded-full h-full text-sm font-medium"
                         />
                     </div>
-                )}
-                <div className="h-12 min-w-0">
-                    <CustomSelect
-                        options={[
-                            { value: "", label: "所有平台" },
-                            { value: "美团", label: "美团" },
-                            { value: "淘宝", label: "淘宝" },
-                            { value: "京东", label: "京东" },
-                        ]}
-                        value={filterPlatform}
-                        onChange={(val) => setFilterPlatform(val)}
-                        className="h-full w-full"
-                        triggerClassName="rounded-full h-full text-sm font-medium"
-                    />
+                    {(searchQuery || filterDate || filterShop || filterPlatform) && (
+                        <button
+                            onClick={resetFilters}
+                            className="h-12 px-5 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+                        >
+                            <RotateCcw size={14} /> 重置
+                        </button>
+                    )}
                 </div>
-                {(searchQuery || filterDate || filterShop || filterPlatform) && (
-                    <button
-                        onClick={resetFilters}
-                        className="h-12 px-5 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-                    >
-                        <RotateCcw size={14} /> 重置
-                    </button>
-                )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
                 {filteredPlans.map(plan => {
-                    const totalItems = plan.items.length;
                     const platforms = Array.from(new Set(plan.items.map((i: BrushOrderPlanItem) => i.platform).filter((p): p is string => !!p)));
 
                     return (
@@ -251,10 +252,33 @@ export default function BrushPlansPage() {
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <h3 className="text-base sm:text-lg font-black tracking-tight text-foreground leading-tight truncate">
-                                                {formatLocalDate(plan.date)}
+                                                {plan.shopName || "通用店铺"}
                                             </h3>
+                                            <span className="text-xs font-bold text-muted-foreground">·</span>
+                                            <span className="text-sm font-bold text-muted-foreground">
+                                                {formatLocalDate(plan.date)}
+                                            </span>
                                         </div>
-                                        <p className="mt-1 text-[11px] font-bold text-muted-foreground">{plan.shopName || "通用店铺"}</p>
+                                        <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                            <span className="text-[11px] font-bold text-muted-foreground">
+                                                {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份任务
+                                            </span>
+                                            <span className="text-[11px] font-bold text-muted-foreground/50">·</span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {platforms.map((platform: string) => {
+                                                    let platformStyle = "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:border-white/10";
+                                                    if (platform === "美团") platformStyle = "bg-[#FFD000]/10 text-[#222222] border-[#FFD000]/20 dark:text-[#FFD000]";
+                                                    if (platform === "淘宝") platformStyle = "bg-[#FF5000]/10 text-[#FF5000] border-[#FF5000]/20";
+                                                    if (platform === "京东") platformStyle = "bg-[#E1251B]/10 text-[#E1251B] border-[#E1251B]/20";
+                                                    
+                                                    return (
+                                                        <div key={platform} className={cn("px-2 py-0.5 rounded-lg text-[10px] font-black border", platformStyle)}>
+                                                            {platform}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
@@ -281,46 +305,6 @@ export default function BrushPlansPage() {
                                             </button>
                                         </>
                                     )}
-                                </div>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-4 sm:gap-3">
-                                <div className="rounded-2xl border border-border/50 bg-background/70 px-3 py-3">
-                                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/55">下单总数</div>
-                                    <div className="mt-1 text-xl font-black text-foreground">
-                                        {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)}
-                                        <span className="ml-1 text-xs text-muted-foreground">份</span>
-                                    </div>
-                                </div>
-                                <div className="rounded-2xl border border-border/50 bg-background/70 px-3 py-3">
-                                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/55">平台</div>
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                {platforms.map((platform: string) => {
-                                    let platformStyle = "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:border-white/10";
-                                    if (platform === "美团") platformStyle = "bg-[#FFD000]/10 text-[#222222] border-[#FFD000]/20 dark:text-[#FFD000]";
-                                    if (platform === "淘宝") platformStyle = "bg-[#FF5000]/10 text-[#FF5000] border-[#FF5000]/20";
-                                    if (platform === "京东") platformStyle = "bg-[#E1251B]/10 text-[#E1251B] border-[#E1251B]/20";
-                                    
-                                    return (
-                                        <div key={platform} className={cn("px-2 py-1 rounded-lg text-[10px] font-black border", platformStyle)}>
-                                            {platform}
-                                        </div>
-                                    );
-                                })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-3 pt-3 sm:mt-4 sm:pt-4 border-t border-zinc-100 dark:border-white/5">
-                                <div className="flex items-center justify-between gap-3 mb-2">
-                                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground">
-                                        <Store className="w-3.5 h-3.5 opacity-50" />
-                                        <span className="truncate">{plan.shopName || "通用店铺"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-                                        <Package className="w-3.5 h-3.5 opacity-50" />
-                                        {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份
-                                    </div>
                                 </div>
                             </div>
                         </div>

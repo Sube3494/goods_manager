@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, CheckCircle, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, ListTodo } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, CheckCircle, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft } from "lucide-react";
 import { AdminCapability, Permission, hasAdminAccess } from "./permissions";
 
 export interface NavItem {
@@ -7,7 +7,7 @@ export interface NavItem {
   icon: LucideIcon;
   adminOnly?: boolean;
   superAdminOnly?: boolean;
-  permission?: Permission;
+  permission?: Permission | Permission[];
   adminCapability?: AdminCapability | AdminCapability[];
   public?: boolean;
   description?: string;
@@ -21,8 +21,15 @@ export const navItems: NavItem[] = [
   { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true, permission: "supplier:manage", description: "供应商资料与联络信息", section: "workspace" },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true, permission: "purchase:manage", description: "日常采购与到货记录", section: "workspace" },
   { name: "开店进货", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "setup_purchase:manage", description: "开店批次与商品准备", section: "workspace" },
-  { name: "刷单管理", href: "/brush-orders", icon: CreditCard, adminOnly: true, permission: "brush:manage", description: "刷单订单与导入处理", section: "workspace" },
-  { name: "刷单安排", href: "/brush-plans", icon: ListTodo, adminOnly: true, permission: "brush_plan:manage", description: "刷单计划与执行追踪", section: "workspace" },
+  {
+    name: "刷单中心",
+    href: "/brush",
+    icon: PanelsTopLeft,
+    adminOnly: true,
+    permission: "brush:manage",
+    description: "整合刷单商品库、任务与订单",
+    section: "workspace",
+  },
   { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true, permission: "inbound:manage", description: "入库登记与批量导入", section: "workspace" },
   { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true, permission: "outbound:manage", description: "销售、领用与损耗出库", section: "workspace" },
   { name: "结算对账", href: "/settlement", icon: CreditCard, adminOnly: true, permission: "settlement:manage", description: "对账与结算记录", section: "workspace" },
@@ -38,7 +45,10 @@ import { hasPermission, SessionUser } from "./permissions";
 export function getVisibleNavItems(user: SessionUser | null) {
   return navItems.filter((item) => {
     if (item.superAdminOnly && user?.role !== "SUPER_ADMIN") return false;
-    if (item.permission && !hasPermission(user, item.permission)) return false;
+    if (item.permission) {
+      const permissions = Array.isArray(item.permission) ? item.permission : [item.permission];
+      if (!permissions.some((permission) => hasPermission(user, permission))) return false;
+    }
     if (item.adminCapability) {
       const capabilities = Array.isArray(item.adminCapability) ? item.adminCapability : [item.adminCapability];
       if (!capabilities.some((capability) => hasAdminAccess(user, capability))) return false;

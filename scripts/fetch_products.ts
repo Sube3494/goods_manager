@@ -10,7 +10,6 @@ async function main() {
       sku: true,
       categoryId: true,
       remark: true,
-      brushKeyword: true,
     },
   });
 

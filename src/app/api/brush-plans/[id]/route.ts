@@ -19,7 +19,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getAuthorizedUser("brush_plan:manage");
+    const session = await getAuthorizedUser("brush:manage");
     if (!session) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
@@ -76,7 +76,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getAuthorizedUser("brush_plan:manage");
+    const session = await getAuthorizedUser("brush:manage");
     if (!session) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
@@ -189,7 +189,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getAuthorizedUser("brush_plan:manage");
+    const session = await getAuthorizedUser("brush:manage");
     if (!session) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }

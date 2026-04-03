@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2, Search } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2 } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import Image from "next/image";
@@ -46,8 +46,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {},
-    remark: initialData?.remark || "",
-    brushKeyword: initialData?.brushKeyword || ""
+    remark: initialData?.remark || ""
   });
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -218,8 +217,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           isDiscontinued: initialData.isDiscontinued ?? false,
           isPublic: initialData.isPublic ?? true,
           specs: initialData.specs as Record<string, string> || {},
-          remark: initialData.remark || "",
-          brushKeyword: initialData.brushKeyword || ""
+          remark: initialData.remark || ""
         });
         fetchGallery(initialData.id, initialData.image || "");
       } else {
@@ -234,8 +232,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
           isDiscontinued: false,
           isPublic: true,
           specs: {},
-          remark: "",
-          brushKeyword: ""
+          remark: ""
         });
       }
     }
@@ -652,8 +649,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         costPrice: Number(formData.costPrice),
         stock: Number(formData.stock),
         specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
-        id: initialData?.id,
-        brushKeyword: formData.brushKeyword
+        id: initialData?.id
     }, galleryImages);
     onClose();
   };
@@ -1058,21 +1054,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             </div>
                         </div>
 
-                        {/* Brush Keyword */}
-                        <div className="space-y-2 col-span-2">
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Search size={16} /> 刷单搜索关键词
-                            </label>
-                            <div className="relative">
-                                <input 
-                                    type="text" 
-                                    value={formData.brushKeyword}
-                                    onChange={(e) => setFormData({...formData, brushKeyword: e.target.value})}
-                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10"
-                                    placeholder="预设刷单时使用的关键词"
-                                />
-                            </div>
-                        </div>
                     </div>
 
                             {/* Inbound History */}

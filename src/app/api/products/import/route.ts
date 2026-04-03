@@ -66,7 +66,6 @@ export async function POST(request: Request) {
             const isDiscontinued = isDiscontinuedText === "已停产" || isDiscontinuedText === "是" || isDiscontinuedText === "true" ? true : false;
             
             const remarkText = String(item['备注'] || item.remark || "");
-            const brushKeywordText = String(item['刷单关键词'] || item['搜索关键词'] || item.brushKeyword || "");
 
             // 2. 解析规格参数 (specs)
             const specs: Record<string, string> = {};
@@ -142,8 +141,7 @@ export async function POST(request: Request) {
                     isPublic,
                     isDiscontinued,
                     specs: Object.keys(specs).length > 0 ? specs : undefined,
-                    ...(remarkText ? { remark: remarkText } : {}),
-                    ...(brushKeywordText ? { brushKeyword: brushKeywordText } : {})
+                    ...(remarkText ? { remark: remarkText } : {})
                 };
 
                 // Handle supplier update
@@ -327,7 +325,6 @@ export async function POST(request: Request) {
                         isPublic,
                         isDiscontinued,
                         remark: remarkText || undefined,
-                        brushKeyword: brushKeywordText || undefined,
                         specs: Object.keys(specs).length > 0 ? specs : undefined
                     }
                 });

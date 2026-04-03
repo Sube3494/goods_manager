@@ -16,7 +16,7 @@ interface BrushPlanItemInput {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getAuthorizedUser("brush_plan:manage");
+  const session = await getAuthorizedUser("brush:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getAuthorizedUser("brush_plan:manage");
+    const session = await getAuthorizedUser("brush:manage");
     if (!session) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }

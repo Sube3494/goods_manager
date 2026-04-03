@@ -9,7 +9,6 @@ export type Permission =
   | "inbound:manage"
   | "outbound:manage"
   | "brush:manage"
-  | "brush_plan:manage"
   | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy" | "gallery:audit"
   | "settlement:manage"
   | "system:manage"
@@ -88,17 +87,10 @@ export const PERMISSION_TREE = [
     ]
   },
   {
-    key: "brush_orders",
-    label: "刷单订单",
+    key: "brush_center",
+    label: "刷单中心",
     children: [
-      { key: "brush:manage", label: "刷单订单" },
-    ]
-  },
-  {
-    key: "brush_plans",
-    label: "刷单安排",
-    children: [
-      { key: "brush_plan:manage", label: "刷单安排" },
+      { key: "brush:manage", label: "刷单中心" },
     ]
   },
   {

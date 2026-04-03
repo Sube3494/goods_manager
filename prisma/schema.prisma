@@ -40,7 +40,7 @@ model Product {
   isDiscontinued  Boolean             @default(false)
   remark          String?
   userId          String?
-  brushKeyword    String?             // 默认刷单搜索关键词
+  brushProducts   BrushProduct[]
   brushOrderItems     BrushOrderItem[]
   brushOrderPlanItems BrushOrderPlanItem[]
   gallery         GalleryItem[]
@@ -191,6 +191,7 @@ model User {
   roleProfileId      String?
   brushOrders        BrushOrder[]
   brushOrderPlans    BrushOrderPlan[]
+  brushProducts      BrushProduct[]
   categories         Category[]
   galleryItems       GalleryItem[]
   gallerySubmissions GallerySubmission[]
@@ -227,6 +228,22 @@ model EmailWhitelist {
   updatedAt     DateTime     @updatedAt
   roleProfileId String?
   roleProfile   RoleProfile? @relation(fields: [roleProfileId], references: [id])
+}
+
+model BrushProduct {
+  id        String   @id @default(cuid())
+  userId    String?
+  productId String
+  isActive  Boolean  @default(true)
+  brushKeyword String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([productId])
 }
 
 model VerificationCode {

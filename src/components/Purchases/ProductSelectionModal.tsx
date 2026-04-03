@@ -23,9 +23,18 @@ interface ProductSelectionModalProps {
   selectedIds: string[];
   singleSelect?: boolean;
   showPrice?: boolean;
+  fetchPath?: string;
+  title?: string;
+  allowCreate?: boolean;
+  showPlatformSelector?: boolean;
+  imageOnly?: boolean;
 }
 
-function ProductSkeleton() {
+function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
+  if (imageOnly) {
+    return <div className="aspect-square rounded-2xl border border-border/60 bg-white dark:bg-white/5 animate-pulse" />;
+  }
+
   return (
     <div className="flex items-center gap-5 p-4 rounded-2xl border border-border/60 bg-white dark:bg-white/5 animate-pulse">
       <div className="h-12 w-12 rounded-lg bg-muted" />
@@ -37,9 +46,23 @@ function ProductSkeleton() {
   );
 }
 
-export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, singleSelect = false, showPrice = true }: ProductSelectionModalProps) {
+export function ProductSelectionModal({
+  isOpen,
+  onClose,
+  onSelect,
+  selectedIds,
+  singleSelect = false,
+  showPrice = true,
+  fetchPath = "/api/products",
+  title = "选择商品",
+  allowCreate = true,
+  showPlatformSelector = true,
+  imageOnly = false,
+}: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
+  const [showImageName, setShowImageName] = useState(true);
+  const [showImageSupplier, setShowImageSupplier] = useState(true);
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -67,6 +90,8 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       setSelectedProducts([]);
       setSearchQuery("");
       setSelectedSupplierId("");
+      setShowImageName(true);
+      setShowImageSupplier(true);
       // 不再清空 products，除非是首次初始化或需要强制刷新
       // setProducts([]); 
       setIsLoading(products.length === 0);
@@ -108,7 +133,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       });
 
       const [pRes, sRes] = await Promise.all([
-        fetch(`/api/products?${queryParams.toString()}`),
+        fetch(`${fetchPath}?${queryParams.toString()}`),
         mode === 'initial' ? fetch("/api/suppliers") : Promise.resolve(null)
       ]);
 
@@ -143,7 +168,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
         setIsNextPageLoading(false);
       }
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, fetchPath]);
 
   useEffect(() => {
     if (!isOpen || !isInitialized) return;
@@ -256,14 +281,16 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
       >
              <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
               <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold text-foreground">选择商品</h2>
-                <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/40 active:scale-95 transition-all text-xs font-medium border border-primary/20"
-                    title="新添商品"
-                  >
-                    <Plus size={14} /> 新添商品
-                </button>
+                <h2 className="text-2xl font-bold text-foreground">{title}</h2>
+                {allowCreate && (
+                  <button
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/40 active:scale-95 transition-all text-xs font-medium border border-primary/20"
+                      title="新添商品"
+                    >
+                      <Plus size={14} /> 新添商品
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button 
@@ -302,30 +329,65 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar min-h-0 relative">
+              {imageOnly && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowImageName(prev => !prev)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
+                      showImageName
+                        ? "border-primary/30 bg-primary/10 text-primary"
+                        : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    名称
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImageSupplier(prev => !prev)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
+                      showImageSupplier
+                        ? "border-primary/30 bg-primary/10 text-primary"
+                        : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    供应商
+                  </button>
+                </div>
+              )}
+
+              <div className={cn("flex-1 overflow-y-auto no-scrollbar min-h-0 relative", imageOnly ? "" : "space-y-2")}>
                  {(isLoading && products.length === 0) ? (
-                    <div className="space-y-2">
+                    <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
                         {[...Array(6)].map((_, i) => (
-                           <ProductSkeleton key={i} />
+                           <ProductSkeleton key={i} imageOnly={imageOnly} />
                         ))}
                     </div>
                  ) : (
-                    <div className="space-y-2">
+                    <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
+                      const supplierName = product.supplierId ? suppliers.find(s => s.id === product.supplierId)?.name : "";
                       return (
-                         <div 
+                         <button
                           key={product.id}
+                          type="button"
                           onClick={() => toggleProduct(product)}
                             className={cn(
-                             "group relative flex items-center gap-3 sm:gap-5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer",
+                             imageOnly
+                               ? "group relative aspect-square overflow-hidden rounded-2xl border transition-all cursor-pointer"
+                               : "group relative flex items-center gap-3 sm:gap-5 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer",
                              isSelected 
                                ? "bg-white dark:bg-white/5 border-primary shadow-md" 
                                : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
                            )}
                         >
                           <div className={cn(
-                            "absolute top-3 right-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110",
+                            imageOnly
+                              ? "absolute top-2.5 right-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110"
+                              : "absolute top-3 right-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110",
                             isSelected 
                               ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20" 
                               : "bg-black/20 dark:bg-black/40 border-white/50 backdrop-blur-sm"
@@ -333,13 +395,17 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                             {isSelected && <Check size={12} strokeWidth={4} />}
                           </div>
 
-                          <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative">
+                          <div className={cn(
+                            imageOnly
+                              ? "h-full w-full overflow-hidden bg-muted relative"
+                              : "h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
+                          )}>
                             {product.image ? (
                                 <Image 
                                     src={product.image} 
                                     alt={product.name} 
-                                    width={48} 
-                                    height={48} 
+                                    width={imageOnly ? 240 : 48} 
+                                    height={imageOnly ? 240 : 48} 
                                     className="h-full w-full object-cover" 
                                     unoptimized
                                 />
@@ -350,6 +416,7 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                             )}
                           </div>
                           
+                           {!imageOnly && (
                            <div className="flex-1 min-w-0 flex flex-col justify-center py-1 pr-10">
                             <div className="flex items-center gap-2">
                              <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
@@ -386,9 +453,32 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
                                     ￥{product.costPrice}
                                 </span>
                                 </div>
-                            )}
+                             )}
                           </div>
-                        </div>
+                           )}
+                           {imageOnly && (
+                            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/35 to-transparent px-2.5 pb-2.5 pt-10 text-left">
+                              {selectedIds.includes(product.id) && (
+                                <div className="mb-1 inline-flex rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-200">
+                                  已在计划中
+                                </div>
+                              )}
+                              {showImageName && (
+                                <div className="line-clamp-2 text-xs font-bold leading-snug text-white/95">
+                                  {product.name}
+                                </div>
+                              )}
+                              {(product.sku || supplierName) && (showImageName || showImageSupplier) && (
+                                <div className="mt-1 line-clamp-1 text-[10px] text-white/65">
+                                  {[
+                                    showImageName ? product.sku : null,
+                                    showImageSupplier ? supplierName : null
+                                  ].filter(Boolean).join(" · ")}
+                                </div>
+                              )}
+                            </div>
+                           )}
+                        </button>
                       );
                     })}
                     
@@ -414,26 +504,30 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
             </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5 gap-4">
-               <div className="flex flex-col gap-2 w-full sm:w-auto">
-                 <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>
-                 <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
-                    {PLATFORMS.map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setTargetPlatform(p)}
-                        className={cn(
-                          "px-4 py-1.5 rounded-lg text-xs font-black transition-all",
-                          targetPlatform === p 
-                            ? "bg-white dark:bg-white/10 text-primary shadow-sm border border-border" 
-                            : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                        )}
-                      >
-                        {p}
-                      </button>
-                    ))}
+               {showPlatformSelector ? (
+                 <div className="flex flex-col gap-2 w-full sm:w-auto">
+                   <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>
+                   <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
+                      {PLATFORMS.map(p => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setTargetPlatform(p)}
+                          className={cn(
+                            "px-4 py-1.5 rounded-lg text-xs font-black transition-all",
+                            targetPlatform === p 
+                              ? "bg-white dark:bg-white/10 text-primary shadow-sm border border-border" 
+                              : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                   </div>
                  </div>
-               </div>
+               ) : (
+                 <div />
+               )}
 
                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
                 <div className="text-xs sm:text-sm font-medium text-muted-foreground mr-2">
@@ -458,11 +552,13 @@ export function ProductSelectionModal({ isOpen, onClose, onSelect, selectedIds, 
             </div>
           </div>
           
-          <ProductFormModal 
-            isOpen={isCreateModalOpen}
-            onClose={() => setIsCreateModalOpen(false)}
-            onSubmit={handleQuickCreate}
-          />
+          {allowCreate && (
+            <ProductFormModal 
+              isOpen={isCreateModalOpen}
+              onClose={() => setIsCreateModalOpen(false)}
+              onSubmit={handleQuickCreate}
+            />
+          )}
         </>,
     document.body
   );

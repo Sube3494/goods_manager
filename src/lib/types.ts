@@ -52,13 +52,23 @@ export interface Product {
   image?: string;
   isPublic?: boolean;
   isDiscontinued?: boolean;
-  brushKeyword?: string;
   specs?: Record<string, string>;
   remark?: string;
   supplierId?: string;
   supplier?: Supplier;
   workspaceId?: string;
   gallery?: GalleryItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BrushProduct {
+  id: string;
+  userId?: string;
+  productId: string;
+  isActive?: boolean;
+  brushKeyword?: string;
+  product: Product;
   createdAt?: string;
   updatedAt?: string;
 }

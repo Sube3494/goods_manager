@@ -66,7 +66,7 @@ export async function DELETE(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { ids, categoryId, supplierId, isPublic, isDiscontinued, costPrice, brushKeyword } = await request.json();
+    const { ids, categoryId, supplierId, isPublic, isDiscontinued, costPrice } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
@@ -81,7 +81,6 @@ export async function PATCH(request: NextRequest) {
     if (isPublic !== undefined) updateData.isPublic = isPublic;
     if (isDiscontinued !== undefined) updateData.isDiscontinued = isDiscontinued;
     if (costPrice !== undefined) updateData.costPrice = costPrice;
-    if (brushKeyword !== undefined) updateData.brushKeyword = brushKeyword;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

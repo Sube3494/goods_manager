@@ -56,8 +56,13 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     }
 
     // Permission Check
-    if (currentNavItem.permission && !hasPermission(sessionUser, currentNavItem.permission)) {
-        return false;
+    if (currentNavItem.permission) {
+        const permissions = Array.isArray(currentNavItem.permission)
+          ? currentNavItem.permission
+          : [currentNavItem.permission];
+        if (!permissions.some((permission) => hasPermission(sessionUser, permission))) {
+          return false;
+        }
     }
 
     return true;

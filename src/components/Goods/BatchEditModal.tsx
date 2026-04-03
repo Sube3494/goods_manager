@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Tag, Truck, CheckCircle, Eye, Activity, Search } from "lucide-react";
+import { X, Tag, Truck, CheckCircle, Eye, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Category, Supplier } from "@/lib/types";
@@ -16,7 +16,6 @@ interface BatchEditModalProps {
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
     costPrice?: number;
-    brushKeyword?: string;
   }) => void;
   categories: Category[];
   suppliers: Supplier[];
@@ -36,7 +35,6 @@ const BatchEditForm = ({
   const [visibility, setVisibility] = useState<string>("keep");
   const [productionStatus, setProductionStatus] = useState<string>("keep");
   const [costPrice, setCostPrice] = useState<string>("");
-  const [brushKeyword, setBrushKeyword] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +44,6 @@ const BatchEditForm = ({
       isPublic?: boolean; 
       isDiscontinued?: boolean; 
       costPrice?: number;
-      brushKeyword?: string;
     } = {};
     
     if (categoryId !== "keep") data.categoryId = categoryId;
@@ -54,7 +51,6 @@ const BatchEditForm = ({
     if (visibility !== "keep") data.isPublic = visibility === "public";
     if (productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
     if (costPrice.trim() !== "") data.costPrice = parseFloat(costPrice);
-    if (brushKeyword.trim() !== "") data.brushKeyword = brushKeyword.trim();
 
     onConfirm(data);
     onClose();
@@ -165,25 +161,6 @@ const BatchEditForm = ({
               />
             </div>
           </div>
-
-          {/* Brush Keyword Input */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
-              <Search size={16} /> 刷单关键词
-            </label>
-            <div className="relative group/keyword">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <Search size={16} />
-              </span>
-              <input
-                type="text"
-                placeholder="保持原关键词"
-                value={brushKeyword}
-                onChange={(e) => setBrushKeyword(e.target.value)}
-                className="w-full h-12 pl-10 pr-4 rounded-2xl bg-muted/30 border border-white/5 focus:border-primary/30 outline-none transition-all font-bold"
-              />
-            </div>
-          </div>
         </div>
 
         <div className="pt-4 flex flex-col-reverse sm:flex-row gap-3">
@@ -196,7 +173,7 @@ const BatchEditForm = ({
           </button>
           <button
             type="submit"
-            disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep" && costPrice.trim() === "" && brushKeyword.trim() === ""}
+            disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep" && costPrice.trim() === ""}
             className="flex-2 rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
           >
             <CheckCircle size={18} />

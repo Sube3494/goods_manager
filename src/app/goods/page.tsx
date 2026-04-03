@@ -292,7 +292,6 @@ export default function GoodsPage() {
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
     costPrice?: number;
-    brushKeyword?: string;
   }) => {
     const count = selectedIds.length;
     try {
@@ -470,7 +469,6 @@ export default function GoodsPage() {
           "公开状态": g.isPublic ? "公开" : "私密",
           "生产状态": g.isDiscontinued ? "已停止生产" : "正常供应",
           "备注": g.remark || "",
-          "刷单关键词": g.brushKeyword || "",
           "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
         };
 
@@ -780,8 +778,7 @@ export default function GoodsPage() {
             "图库图片": "https://example.com/p1.jpg\nhttps://example.com/p2.jpg",
             "公开状态": "公开",
             "商品参数": "材质: 不锈钢\n规格: 100ml",
-            "备注": "这是一条示例备注文本",
-            "刷单关键词": "示例关键词"
+            "备注": "这是一条示例备注文本"
           }
         ]}
       />
