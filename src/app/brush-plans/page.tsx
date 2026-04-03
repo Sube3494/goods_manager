@@ -236,11 +236,7 @@ export default function BrushPlansPage() {
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
                 {filteredPlans.map(plan => {
                     const totalItems = plan.items.length;
-                    const doneItems = plan.items.filter((i: BrushOrderPlanItem) => i.done).length;
-                    const isAllDone = totalItems > 0 && doneItems === totalItems;
-
                     const platforms = Array.from(new Set(plan.items.map((i: BrushOrderPlanItem) => i.platform).filter((p): p is string => !!p)));
-                    const progress = Math.round((doneItems / totalItems) * 100) || 0;
 
                     return (
                         <div key={plan.id} className="group relative flex flex-col rounded-[20px] sm:rounded-[24px] border border-border bg-white dark:bg-gray-900/60 p-3.5 sm:p-4 shadow-sm hover:border-primary/25 hover:shadow-xl transition-all duration-300">
@@ -248,7 +244,7 @@ export default function BrushPlansPage() {
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className={cn(
                                         "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 shadow-sm border border-transparent",
-                                        isAllDone ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-primary/10 text-primary border-primary/20'
+                                        "bg-primary/10 text-primary border-primary/20"
                                     )}>
                                         <Calendar className="w-5 h-5" strokeWidth={2} />
                                     </div>
@@ -257,20 +253,8 @@ export default function BrushPlansPage() {
                                             <h3 className="text-base sm:text-lg font-black tracking-tight text-foreground leading-tight truncate">
                                                 {formatLocalDate(plan.date)}
                                             </h3>
-                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10">
-                                                <div className={cn(
-                                                    "w-1.5 h-1.5 rounded-full animate-pulse shadow-[0_0_8px]",
-                                                    isAllDone ? "bg-emerald-500 shadow-emerald-500/50" : "bg-amber-500 shadow-amber-500/50"
-                                                )} />
-                                                <span className={cn(
-                                                    "text-[9px] font-black uppercase tracking-widest",
-                                                    isAllDone ? "text-emerald-500" : "text-amber-500"
-                                                )}>
-                                                    {isAllDone ? '已完成' : '进行中'}
-                                                </span>
-                                            </div>
                                         </div>
-                                        <p className="mt-1 text-[11px] font-bold text-muted-foreground">{plan.shopName || "通用店铺"} · {totalItems} 个订单项</p>
+                                        <p className="mt-1 text-[11px] font-bold text-muted-foreground">{plan.shopName || "通用店铺"}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
@@ -300,16 +284,15 @@ export default function BrushPlansPage() {
                                 </div>
                             </div>
 
-                            <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-4 sm:gap-3 sm:grid-cols-4">
+                            <div className="mt-3 grid grid-cols-2 gap-2.5 sm:mt-4 sm:gap-3">
                                 <div className="rounded-2xl border border-border/50 bg-background/70 px-3 py-3">
-                                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/55">完成进度</div>
-                                    <div className="mt-1 text-xl font-black text-foreground">{progress}<span className="ml-1 text-xs text-muted-foreground">%</span></div>
+                                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/55">下单总数</div>
+                                    <div className="mt-1 text-xl font-black text-foreground">
+                                        {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)}
+                                        <span className="ml-1 text-xs text-muted-foreground">份</span>
+                                    </div>
                                 </div>
                                 <div className="rounded-2xl border border-border/50 bg-background/70 px-3 py-3">
-                                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/55">已完成</div>
-                                    <div className="mt-1 text-xl font-black text-foreground">{doneItems}<span className="ml-1 text-xs text-muted-foreground">/ {totalItems}</span></div>
-                                </div>
-                                <div className="rounded-2xl border border-border/50 bg-background/70 px-3 py-3 col-span-2">
                                     <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/55">平台</div>
                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                 {platforms.map((platform: string) => {
@@ -336,17 +319,8 @@ export default function BrushPlansPage() {
                                     </div>
                                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
                                         <Package className="w-3.5 h-3.5 opacity-50" />
-                                        {doneItems}/{totalItems}
+                                        {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份
                                     </div>
-                                </div>
-                                <div className="w-full h-2 bg-zinc-100 dark:bg-white/5 rounded-full overflow-hidden">
-                                    <div 
-                                        className={cn(
-                                            "h-full transition-all duration-700 ease-out rounded-full shadow-lg",
-                                            isAllDone ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-primary shadow-primary/20'
-                                        )}
-                                        style={{ width: `${totalItems > 0 ? (doneItems / totalItems) * 100 : 0}%` }}
-                                    />
                                 </div>
                             </div>
                         </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, Search, CheckCircle2, Circle, Store, ChevronDown, ChevronRight, LayoutGrid, Wallet } from "lucide-react";
+import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
 import Image from "next/image";
 import { BrushOrderPlan, BrushOrderPlanItem, Product, AddressItem } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -233,14 +233,6 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                     return (
                                                                             <div key={`${platform}-${originalIndex}`} className="flex flex-col gap-2.5 p-3 sm:p-4 rounded-[20px] sm:rounded-[24px] border border-border bg-white dark:bg-white/5 hover:border-primary/30 transition-all shadow-sm">
                                                                                 <div className="flex items-center gap-3 min-w-0">
-                                                                                    <button 
-                                                                                        type="button"
-                                                                                        onClick={() => updateItem(originalIndex, 'done', !item.done)}
-                                                                                        className={`shrink-0 transition-colors ${item.done ? 'text-primary' : 'text-muted-foreground/30'}`}
-                                                                                    >
-                                                                                        {item.done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                                                                                    </button>
-
                                                                                     <div className="w-10 h-10 rounded-lg bg-muted border border-border/50 overflow-hidden shrink-0">
                                                                                         {item.product?.image ? (
                                                                                             <Image src={item.product.image} width={40} height={40} className="w-full h-full object-cover" alt={item.product.name} unoptimized />
@@ -248,7 +240,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                     </div>
                                                                                     
                                                                                     <div className="flex-1 min-w-0">
-                                                                                        <div className={`font-bold text-[13px] sm:text-sm truncate ${item.done ? 'text-muted-foreground line-through italic opacity-50' : ''}`} title={item.productName || item.product?.name}>
+                                                                                        <div className="font-bold text-[13px] sm:text-sm truncate" title={item.productName || item.product?.name}>
                                                                                             {item.productName || item.product?.name}
                                                                                         </div>
                                                                                         <div className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider">{item.product?.sku || "NO SKU"}</div>
@@ -272,17 +264,6 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                             value={item.quantity}
                                                                                             min="1"
                                                                                             onChange={e => updateItem(originalIndex, 'quantity', parseInt(e.target.value) || 1)}
-                                                                                        />
-                                                                                    </div>
-
-                                                                                    <div className="flex items-center gap-1.5 bg-amber-500/5 dark:bg-amber-500/10 rounded-lg px-2 h-9 border border-transparent focus-within:border-amber-500/20 focus-within:bg-background transition-all w-[85px] shrink-0">
-                                                                                        <span className="text-[9px] font-black text-amber-600 dark:text-amber-500/70 uppercase opacity-40 shrink-0">本金</span>
-                                                                                        <input
-                                                                                            type="number"
-                                                                                            className="w-full bg-transparent text-xs text-center outline-none font-black text-amber-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                                            value={item.principal || ""}
-                                                                                            placeholder="0"
-                                                                                            onChange={e => updateItem(originalIndex, 'principal', parseFloat(e.target.value) || 0)}
                                                                                         />
                                                                                     </div>
  
@@ -314,24 +295,16 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                             })}
 
                                             {formData.items && formData.items.length > 0 ? (
-                                                <div className="mt-4 p-4 rounded-3xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/10 flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-600">
-                                                            <Wallet size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-[10px] font-black text-amber-600/50 uppercase tracking-widest">任务总估算本金</div>
-                                                            <div className="flex items-baseline gap-1">
-                                                                <span className="text-xs font-black text-amber-600/70">¥</span>
-                                                                <span className="text-xl font-black text-amber-600 tracking-tight">
-                                                                    {(formData.items.reduce((sum, item) => sum + ((item.principal || 0) * (item.quantity || 1)), 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                                </span>
-                                                            </div>
+                                                <div className="mt-4 p-4 rounded-3xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-[10px] font-black text-primary/50 uppercase tracking-widest">商品数</div>
+                                                        <div className="text-xl font-black text-primary tracking-tight mt-1">
+                                                            {formData.items.length} <span className="text-xs">项</span>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right border-l border-amber-500/10 pl-6">
-                                                        <div className="text-[10px] font-black text-amber-600/50 uppercase tracking-widest">总件数</div>
-                                                        <div className="text-lg font-black text-amber-600 leading-none mt-1">
+                                                    <div className="text-right border-l border-primary/10 pl-6">
+                                                        <div className="text-[10px] font-black text-primary/50 uppercase tracking-widest">总件数</div>
+                                                        <div className="text-lg font-black text-primary leading-none mt-1">
                                                             {formData.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} <span className="text-xs">份</span>
                                                         </div>
                                                     </div>
