@@ -353,7 +353,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 40 }}
-                className="relative w-full max-w-7xl max-h-[92dvh] sm:max-h-[90dvh] min-h-0 bg-background border border-border rounded-[28px] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+                className="relative w-full max-w-7xl h-[92dvh] sm:h-[90dvh] max-h-[92dvh] sm:max-h-[90dvh] min-h-0 bg-background border border-border rounded-[28px] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
               >
                 <div className="px-5 sm:px-6 py-4 shrink-0 bg-background/95 backdrop-blur border-b border-border/60">
                   <div className="flex items-start justify-between gap-4">
@@ -535,9 +535,9 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                   </div>
                 </div>
 
-                <div className="hidden sm:block flex-1 min-h-0 overflow-y-auto xl:overflow-hidden">
-                  <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] xl:h-full xl:min-h-0">
-                    <div className="border-b xl:border-b-0 xl:border-r border-border/60 bg-black/[0.015] dark:bg-white/[0.02] xl:h-full xl:min-h-0 flex flex-col">
+                <div className="hidden sm:block flex-1 min-h-0 overflow-hidden">
+                  <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] h-full min-h-0">
+                    <div className="border-b xl:border-b-0 xl:border-r border-border/60 bg-black/[0.015] dark:bg-white/[0.02] h-full min-h-0 flex flex-col">
                       <div className="p-4 md:p-5 space-y-4 shrink-0 border-b border-border/40">
                         <div className="space-y-3">
                         <div className="space-y-1.5">
@@ -579,7 +579,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                       </div>
                       </div>
 
-                      <div ref={groupListRef} className="xl:flex-1 xl:min-h-0 overflow-x-auto xl:overflow-y-auto xl:overflow-x-hidden custom-scrollbar px-4 md:px-5 pb-4 xl:pb-16 pt-3">
+                      <div ref={groupListRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-5 pb-4 xl:pb-16 pt-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2 min-w-0">
                           {PERMISSION_TREE.map((group) => {
                             const selectedCount = group.children.filter((child) => !!editingRole.permissions?.[child.key]).length;
@@ -613,7 +613,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                       </div>
                     </div>
 
-                    <div ref={detailPaneRef} className="xl:h-full xl:min-h-0 xl:overflow-y-auto custom-scrollbar">
+                    <div ref={detailPaneRef} className="h-full min-h-0 overflow-y-auto custom-scrollbar">
                       <div className="xl:sticky xl:top-0 z-10 p-4 md:p-8 pb-4 bg-background/96 backdrop-blur border-b border-border/40 space-y-5">
                         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
                           <div className="space-y-1">
