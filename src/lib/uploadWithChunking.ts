@@ -55,6 +55,90 @@ async function computeFileSha256(file: File): Promise<string> {
     .join("");
 }
 
+async function sniffFileSignature(file: File): Promise<{ ext: string; mime: string } | null> {
+  try {
+    const buffer = await file.slice(0, 32).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const ascii = Array.from(bytes)
+      .map((b) => (b >= 32 && b <= 126 ? String.fromCharCode(b) : "."))
+      .join("");
+
+    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+      return { ext: "jpg", mime: "image/jpeg" };
+    }
+
+    if (
+      bytes.length >= 8 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a
+    ) {
+      return { ext: "png", mime: "image/png" };
+    }
+
+    if (ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a")) {
+      return { ext: "gif", mime: "image/gif" };
+    }
+
+    if (ascii.slice(8, 12) === "WEBP" && ascii.startsWith("RIFF")) {
+      return { ext: "webp", mime: "image/webp" };
+    }
+
+    if (bytes.length >= 12 && ascii.slice(4, 8) === "ftyp") {
+      const brand = ascii.slice(8, 12);
+      const brandFamily = ascii.slice(8, 16);
+
+      if (brand === "heic" || brand === "heix" || brand === "hevc" || brand === "hevx" || brandFamily.includes("heic")) {
+        return { ext: "heic", mime: "image/heic" };
+      }
+
+      if (brand === "mif1" || brand === "msf1" || brandFamily.includes("heif")) {
+        return { ext: "heif", mime: "image/heif" };
+      }
+
+      if (brand === "qt  ") {
+        return { ext: "mov", mime: "video/quicktime" };
+      }
+
+      if (["isom", "iso2", "mp41", "mp42", "avc1"].includes(brand)) {
+        return { ext: "mp4", mime: "video/mp4" };
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to sniff file signature:", error);
+  }
+
+  return null;
+}
+
+async function coerceCameraFileToRecognizableFile(file: File) {
+  const signature = await sniffFileSignature(file);
+  if (!signature) {
+    return file;
+  }
+
+  const currentExt = resolveUploadExtension(file.name, file.type);
+  const currentType = file.type?.trim().toLowerCase() || "";
+  const signatureMatches =
+    currentExt === signature.ext &&
+    (!!currentType ? currentType === signature.mime : false);
+
+  if (signatureMatches) {
+    return file;
+  }
+
+  const baseName = file.name.replace(/\.[^.]+$/, "").trim() || "camera_upload";
+  return new File([file], `${baseName}.${signature.ext}`, {
+    type: signature.mime,
+    lastModified: file.lastModified || Date.now(),
+  });
+}
+
 async function normalizeProblematicCapturedImage(file: File) {
   const resolvedExt = resolveUploadExtension(file.name, file.type);
   const hasStableImageType = file.type.startsWith("image/") && file.type !== "image/*";
@@ -158,6 +242,7 @@ export async function uploadFileWithChunking(
   folder?: string,
   onProgress?: (percent: number) => void
 ): Promise<{ url: string; path?: string; type: string; skipped?: boolean; name?: string }> {
+  file = await coerceCameraFileToRecognizableFile(file);
   file = await normalizeProblematicCapturedImage(file);
   file = normalizeUploadFileName(file);
   file = await maybeCompressImageBeforeUpload(file);
