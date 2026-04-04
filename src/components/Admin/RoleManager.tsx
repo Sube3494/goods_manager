@@ -379,8 +379,12 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                   </div>
                 </div>
 
-                <div ref={mobilePaneRef} className="sm:hidden flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
-                  <div className="p-4 space-y-4">
+                <div
+                  ref={mobilePaneRef}
+                  className="sm:hidden flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar touch-pan-y"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                  <div className="p-4 pb-24 space-y-4">
                     <div className="space-y-3 rounded-3xl border border-border/60 bg-background/70 p-4">
                       <div className="space-y-1.5">
                         <label className="text-sm font-black text-foreground ml-1 flex items-center gap-1">
@@ -429,7 +433,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                 key={group.key}
                                 onClick={() => setActiveTab(group.key)}
                                 className={cn(
-                                  "min-w-[140px] rounded-2xl border px-3 py-3 text-left transition-all",
+                                  "min-w-[140px] rounded-2xl border px-3 py-3 text-left transition-all touch-pan-y",
                                   isActive ? "border-primary/30 bg-primary/8 shadow-sm" : "border-border bg-background hover:bg-muted/50"
                                 )}
                               >
@@ -582,14 +586,14 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                             const isActive = activeTab === group.key;
                             const GroupIcon = getGroupIcon(group.key);
                             return (
-                              <button
-                                key={group.key}
-                                onClick={() => setActiveTab(group.key)}
-                                className={cn(
-                                  "w-full rounded-2xl border px-4 py-3 text-left transition-all",
-                                  isActive ? "border-primary/30 bg-primary/8 shadow-sm" : "border-border bg-background hover:bg-muted/50"
-                                )}
-                              >
+                            <button
+                              key={group.key}
+                              onClick={() => setActiveTab(group.key)}
+                              className={cn(
+                                "w-full rounded-2xl border px-4 py-3 text-left transition-all touch-pan-y",
+                                isActive ? "border-primary/30 bg-primary/8 shadow-sm" : "border-border bg-background hover:bg-muted/50"
+                              )}
+                            >
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-3 min-w-0">
                                     <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center shrink-0", isActive ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/70")}>

@@ -98,7 +98,7 @@ export function ConfirmModal({
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", damping: 25, stiffness: 350 }}
             className={cn(
-              "relative z-10 w-full max-h-safe-modal rounded-[28px] sm:rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col",
+              "relative z-10 w-full max-h-safe-modal rounded-[26px] sm:rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col",
               isAuth
                 ? "max-w-[min(calc(100vw-2rem),22rem)] sm:max-w-[420px]"
                 : "max-w-[min(calc(100vw-2rem),24rem)] sm:max-w-[420px]"
@@ -110,44 +110,44 @@ export function ConfirmModal({
             {/* Close Button */}
             <button 
               onClick={onClose} 
-              className="absolute top-4 right-4 sm:top-5 sm:right-5 z-20 rounded-full p-2.5 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-all active:scale-90"
+              className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 z-20 rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-all active:scale-90"
             >
               <X size={18} strokeWidth={2.5} />
             </button>
 
-            <div className="px-5 sm:px-8 pt-8 sm:pt-10 pb-6 sm:pb-8 flex flex-col items-center text-center overflow-y-auto min-w-0">
+            <div className="px-5 sm:px-8 pt-6 sm:pt-10 pb-5 sm:pb-8 flex flex-col items-center text-center overflow-y-auto min-w-0">
               {/* Icon Section */}
               <motion.div 
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1, type: "spring", stiffness: 400, damping: 20 }}
                 className={cn(
-                  "w-18 h-18 sm:w-20 sm:h-20 rounded-[24px] sm:rounded-[28px] flex items-center justify-center border-2 mb-6 sm:mb-8 relative group shrink-0",
+                  "w-16 h-16 sm:w-20 sm:h-20 rounded-[22px] sm:rounded-[28px] flex items-center justify-center border-2 mb-4 sm:mb-8 relative group shrink-0",
                   currentStyle.iconBg
                 )}
               >
                 <div className="absolute inset-0 rounded-[28px] bg-inherit opacity-50 blur-xl group-hover:blur-2xl transition-all duration-500" />
-                <div className="relative z-10 scale-110">
+                <div className="relative z-10 scale-100 sm:scale-110">
                   {icons[variant as keyof typeof icons] || icons.warning}
                 </div>
               </motion.div>
 
               {/* Text Section */}
-              <div className="space-y-3 relative z-10">
-                <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight leading-tight break-words">
+              <div className="space-y-2.5 sm:space-y-3 relative z-10">
+                <h2 className="text-[1.9rem] sm:text-2xl font-black text-foreground tracking-tight leading-none sm:leading-tight break-words">
                   {title}
                 </h2>
-                <div className="text-sm sm:text-[15px] font-medium text-muted-foreground leading-relaxed px-1 sm:px-2 break-words">
+                <div className="max-w-[17.5rem] sm:max-w-none text-[15px] sm:text-[15px] font-medium text-muted-foreground leading-7 sm:leading-relaxed px-1 sm:px-2 break-words">
                   {message}
                 </div>
               </div>
             </div>
 
             {/* Footer Buttons */}
-            <div className="p-5 sm:p-8 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-10 min-w-0">
+            <div className="px-5 sm:px-8 pb-5 sm:pb-8 pt-1 sm:pt-0 flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-4 relative z-10 min-w-0">
               <button
                 onClick={onClose}
-                className="min-w-0 h-12 sm:h-14 rounded-2xl px-4 text-sm sm:text-[15px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all active:scale-[0.97]"
+                className="order-1 sm:order-none min-w-0 h-11 sm:h-14 rounded-2xl px-4 text-[15px] sm:text-[15px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-black/5 dark:border-white/10 sm:border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all active:scale-[0.97]"
               >
                 {cancelLabel}
               </button>
@@ -157,7 +157,7 @@ export function ConfirmModal({
                   onClose();
                 }}
                 className={cn(
-                  "min-w-0 h-12 sm:h-14 rounded-2xl px-4 text-sm sm:text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight",
+                  "min-w-0 h-13 sm:h-14 rounded-[20px] sm:rounded-2xl px-4 text-[15px] sm:text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight",
                   currentStyle.confirm
                 )}
               >
