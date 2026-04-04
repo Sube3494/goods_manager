@@ -55,6 +55,68 @@ async function computeFileSha256(file: File): Promise<string> {
     .join("");
 }
 
+async function normalizeProblematicCapturedImage(file: File) {
+  const resolvedExt = resolveUploadExtension(file.name, file.type);
+  const hasStableImageType = file.type.startsWith("image/") && file.type !== "image/*";
+  const hasStableImageExt = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif", "heic", "heif"].includes(resolvedExt);
+
+  if (hasStableImageType && hasStableImageExt) {
+    return file;
+  }
+
+  const shouldAttemptImageRecovery =
+    file.type.startsWith("image/") ||
+    file.type === "" ||
+    file.type === "application/octet-stream" ||
+    file.type === "image/*";
+
+  if (!shouldAttemptImageRecovery) {
+    return file;
+  }
+
+  try {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    const loaded = await new Promise<boolean>((resolve) => {
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = objectUrl;
+    });
+    URL.revokeObjectURL(objectUrl);
+
+    if (!loaded) {
+      return file;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return file;
+    }
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const jpegBlob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
+    });
+
+    if (!jpegBlob) {
+      return file;
+    }
+
+    const baseName = file.name.replace(/\.[^.]+$/, "").trim() || "camera_upload";
+    return new File([jpegBlob], `${baseName}.jpg`, {
+      type: "image/jpeg",
+      lastModified: file.lastModified || Date.now(),
+    });
+  } catch (error) {
+    console.warn("Failed to normalize captured camera image, fallback to original file:", error);
+    return file;
+  }
+}
+
 function normalizeUploadFileName(file: File) {
   const ext = resolveUploadExtension(file.name, file.type);
   const hasAllowedExt = !!ext && file.name.toLowerCase().endsWith(`.${ext}`);
@@ -96,6 +158,7 @@ export async function uploadFileWithChunking(
   folder?: string,
   onProgress?: (percent: number) => void
 ): Promise<{ url: string; path?: string; type: string; skipped?: boolean; name?: string }> {
+  file = await normalizeProblematicCapturedImage(file);
   file = normalizeUploadFileName(file);
   file = await maybeCompressImageBeforeUpload(file);
 
