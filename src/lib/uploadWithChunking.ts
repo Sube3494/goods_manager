@@ -91,59 +91,9 @@ export async function uploadFileWithChunking(
         }
 
         // 文件不存在，用 hash 命名继续上传（避免重复内容存两份）
+        // 统一走同源 /api/upload，由服务端再写入 MinIO / 本地存储，避免浏览器直传对象存储时随机报网络错误。
         const hashFileName = `${hash}.${ext}`;
-
-        // 1. Presign（MinIO）
-        const presignRes = await fetch("/api/upload/presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: hashFileName,
-            fileType: file.type || "application/octet-stream",
-            folder,
-            useTimestamp: false, // hash 命名，不再加时间戳
-          }),
-        });
-
-        if (presignRes.ok) {
-          const presignData = await presignRes.json();
-
-          if (presignData.provider === "minio") {
-            return new Promise((resolve, reject) => {
-              const xhr = new XMLHttpRequest();
-              xhr.open("PUT", presignData.url, true);
-              xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-
-              if (onProgress) {
-                xhr.upload.onprogress = (e) => {
-                  if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-                };
-              }
-
-              xhr.onload = () => {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(hashFileName);
-                  const storedPath = presignData.fileName || presignData.path || presignData.name;
-                  if (onProgress) onProgress(100);
-                  resolve({
-                    url: presignData.publicUrl,
-                    path: storedPath,
-                    type: isVideo ? "video" : "image",
-                    name: storedPath,
-                  });
-                } else {
-                  reject(new Error(`MinIO upload failed with status ${xhr.status}`));
-                }
-              };
-
-              xhr.onerror = () => reject(new Error("Network error during MinIO upload"));
-              xhr.send(file);
-            });
-          }
-
-          // 本地存储：用 hash 文件名走 normalUpload
-          return normalUpload(file, folder, onProgress, hashFileName);
-        }
+        return normalUpload(file, folder, onProgress, hashFileName);
       }
     } catch (checkError) {
       // 预检失败不阻塞上传，降级到原有流程
