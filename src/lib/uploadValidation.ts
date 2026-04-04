@@ -32,7 +32,21 @@ export function getFileExtension(fileName: string) {
 }
 
 export function inferExtensionFromMimeType(fileType: string) {
-  return MIME_EXTENSION_MAP[fileType.trim().toLowerCase()] || "";
+  const normalized = fileType.trim().toLowerCase();
+  if (MIME_EXTENSION_MAP[normalized]) {
+    return MIME_EXTENSION_MAP[normalized];
+  }
+
+  // Some mobile browsers only return coarse MIME values like `image/*`.
+  if (normalized.startsWith("image/")) {
+    return "jpg";
+  }
+
+  if (normalized.startsWith("video/")) {
+    return "mp4";
+  }
+
+  return "";
 }
 
 export function resolveUploadExtension(fileName: string, fileType: string) {

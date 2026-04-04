@@ -85,7 +85,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const dragOverId = useRef<string | null>(null);
   const [dragOverImageId, setDragOverImageId] = useState<string|null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
-  const cameraUploadInputRef = useRef<HTMLInputElement>(null);
   
   // 批量管理状态 (Batch manage state)
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -1199,15 +1198,18 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             </div>
                             
                             <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-                                <button
-                                    type="button"
-                                    onClick={() => cameraUploadInputRef.current?.click()}
-                                    disabled={!!isUploading}
-                                    className={cn("ml-auto whitespace-nowrap", toolbarButtonClass)}
+                                <label
+                                    htmlFor="camera-upload-input"
+                                    aria-disabled={!!isUploading}
+                                    className={cn(
+                                      "ml-auto whitespace-nowrap",
+                                      toolbarButtonClass,
+                                      !!isUploading && "pointer-events-none"
+                                    )}
                                 >
                                     <Camera size={14} />
                                     拍摄上传
-                                </button>
+                                </label>
                                 {initialData?.id && (
                                     <>
                                         {isBatchMode ? (
@@ -1503,7 +1505,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             )}
                                         </label>
                                         <input
-                                            ref={cameraUploadInputRef}
+                                            id="camera-upload-input"
                                             type="file"
                                             className="hidden"
                                             accept="image/*"

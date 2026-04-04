@@ -60,7 +60,28 @@ function normalizeUploadFileName(file: File) {
   const hasAllowedExt = !!ext && file.name.toLowerCase().endsWith(`.${ext}`);
 
   if (!ext || hasAllowedExt) {
-    return file;
+    if (hasAllowedExt) {
+      return file;
+    }
+
+    if (ext) {
+      const baseName = file.name.replace(/\.[^.]+$/, "").trim() || "camera_upload";
+      return new File([file], `${baseName}.${ext}`, {
+        type: file.type,
+        lastModified: file.lastModified,
+      });
+    }
+
+    const coarseExt = file.type.startsWith("image/") ? "jpg" : file.type.startsWith("video/") ? "mp4" : "";
+    if (!coarseExt) {
+      return file;
+    }
+
+    const coarseBaseName = file.name.replace(/\.[^.]+$/, "").trim() || "camera_upload";
+    return new File([file], `${coarseBaseName}.${coarseExt}`, {
+      type: file.type,
+      lastModified: file.lastModified,
+    });
   }
 
   const baseName = file.name.replace(/\.[^.]+$/, "").trim() || "camera_upload";
