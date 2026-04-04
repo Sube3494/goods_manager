@@ -30,7 +30,15 @@ export function validateUploadFile(fileName: string, fileType: string) {
     return { ok: false as const, error: "仅支持上传图片或视频文件" };
   }
 
-  if (!isAllowedUploadMimeType(fileType)) {
+  const normalizedType = fileType.trim().toLowerCase();
+  const allowByMime =
+    isAllowedUploadMimeType(normalizedType) ||
+    normalizedType === "" ||
+    normalizedType === "application/octet-stream" ||
+    normalizedType === "image/*" ||
+    normalizedType === "video/*";
+
+  if (!allowByMime) {
     return { ok: false as const, error: "文件类型不受支持，仅允许图片或视频" };
   }
 
