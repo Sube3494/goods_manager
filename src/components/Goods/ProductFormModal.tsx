@@ -178,7 +178,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
 
     const fetchGallery = async (productId: string, coverImage: string) => {
       try {
-        const res = await fetch(`/api/gallery?productId=${productId}&pageSize=100`);
+        const res = await fetch(`/api/gallery/product/${productId}`);
         if (res.ok) {
           const data = await res.json();
           let items: GalleryItem[] = data.items || [];
@@ -1276,7 +1276,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
                     </div>
                         
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3">
                                 {displayList.map((img, index) => {
                                     const isMain = formData.image === img.url;
                                     const isVideo = img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url);
