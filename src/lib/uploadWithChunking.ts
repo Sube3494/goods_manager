@@ -123,12 +123,13 @@ export async function uploadFileWithChunking(
               xhr.onload = () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
                   const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(hashFileName);
+                  const storedPath = presignData.fileName || presignData.path || presignData.name;
                   if (onProgress) onProgress(100);
                   resolve({
                     url: presignData.publicUrl,
-                    path: presignData.name,
+                    path: storedPath,
                     type: isVideo ? "video" : "image",
-                    name: presignData.name,
+                    name: storedPath,
                   });
                 } else {
                   reject(new Error(`MinIO upload failed with status ${xhr.status}`));
