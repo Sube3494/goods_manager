@@ -1198,18 +1198,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             </div>
                             
                             <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-                                <label
-                                    htmlFor="camera-upload-input"
-                                    aria-disabled={!!isUploading}
-                                    className={cn(
-                                      "ml-auto whitespace-nowrap",
-                                      toolbarButtonClass,
-                                      !!isUploading && "pointer-events-none"
-                                    )}
-                                >
-                                    <Camera size={14} />
-                                    拍摄上传
-                                </label>
                                 {initialData?.id && (
                                     <>
                                         {isBatchMode ? (
@@ -1504,15 +1492,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 <div className="absolute inset-0 pointer-events-none border-2 border-primary rounded-2xl animate-pulse" />
                                             )}
                                         </label>
-                                        <input
-                                            id="camera-upload-input"
-                                            type="file"
-                                            className="hidden"
-                                            accept="image/*"
-                                            capture="environment"
-                                            onChange={(e) => handleFileUpload(e)}
-                                            disabled={!!isUploading}
-                                        />
                                     </div>
                                 )}
                         </div>
