@@ -26,6 +26,23 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   "video/x-m4v": "m4v",
 };
 
+const EXTENSION_MIME_MAP: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  ogg: "video/ogg",
+  mov: "video/quicktime",
+  m4v: "video/x-m4v",
+};
+
 export function getFileExtension(fileName: string) {
   const ext = fileName.split(".").pop()?.trim().toLowerCase() || "";
   return ext;
@@ -47,6 +64,10 @@ export function inferExtensionFromMimeType(fileType: string) {
   }
 
   return "";
+}
+
+export function inferMimeTypeFromExtension(ext: string) {
+  return EXTENSION_MIME_MAP[ext.trim().toLowerCase()] || "";
 }
 
 export function resolveUploadExtension(fileName: string, fileType: string) {
@@ -79,9 +100,18 @@ export function validateUploadFile(fileName: string, fileType: string) {
     return { ok: false as const, error: "仅支持上传图片或视频文件" };
   }
 
-  if (!isAllowedUploadMimeType(fileType)) {
+  const normalizedType = fileType.trim().toLowerCase();
+  const inferredMime = inferMimeTypeFromExtension(ext);
+  const allowByMime =
+    isAllowedUploadMimeType(normalizedType) ||
+    normalizedType === "" ||
+    normalizedType === "application/octet-stream" ||
+    normalizedType === "image/*" ||
+    normalizedType === "video/*";
+
+  if (!allowByMime) {
     return { ok: false as const, error: "文件类型不受支持，仅允许图片或视频" };
   }
 
-  return { ok: true as const, ext };
+  return { ok: true as const, ext, mime: isAllowedUploadMimeType(normalizedType) ? normalizedType : inferredMime };
 }
