@@ -1,4 +1,5 @@
 import imageCompression from "browser-image-compression";
+import { resolveUploadExtension } from "@/lib/uploadValidation";
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -54,11 +55,27 @@ async function computeFileSha256(file: File): Promise<string> {
     .join("");
 }
 
+function normalizeUploadFileName(file: File) {
+  const ext = resolveUploadExtension(file.name, file.type);
+  const hasAllowedExt = !!ext && file.name.toLowerCase().endsWith(`.${ext}`);
+
+  if (!ext || hasAllowedExt) {
+    return file;
+  }
+
+  const baseName = file.name.replace(/\.[^.]+$/, "").trim() || "camera_upload";
+  return new File([file], `${baseName}.${ext}`, {
+    type: file.type,
+    lastModified: file.lastModified,
+  });
+}
+
 export async function uploadFileWithChunking(
   file: File,
   folder?: string,
   onProgress?: (percent: number) => void
 ): Promise<{ url: string; path?: string; type: string; skipped?: boolean; name?: string }> {
+  file = normalizeUploadFileName(file);
   file = await maybeCompressImageBeforeUpload(file);
 
   // ── 去重预检：计算 SHA-256 后询问服务端是否已有相同文件 ──
@@ -66,7 +83,7 @@ export async function uploadFileWithChunking(
   if (file.size <= CHUNK_SIZE) {
     try {
       const hash = await computeFileSha256(file);
-      const ext = file.name.split(".").pop() || "";
+      const ext = resolveUploadExtension(file.name, file.type);
 
       const checkRes = await fetch("/api/upload/check", {
         method: "POST",
