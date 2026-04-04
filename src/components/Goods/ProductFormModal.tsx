@@ -1468,7 +1468,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             onDragLeave={handleDragLeave}
                                             onDrop={handleDrop}
                                             className={cn(
-                                                "aspect-square rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer h-full min-h-[132px] px-3",
+                                                "aspect-square h-full w-full rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer px-3",
                                                 isDraggingOver
                                                     ? "border-primary bg-primary/10 shadow-lg scale-[1.02]"
                                                     : "border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-inner"
@@ -1483,17 +1483,17 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 disabled={!!isUploading}
                                             />
                                             <div className={cn(
-                                                "p-3 rounded-full transition-colors",
+                                                "p-2.5 md:p-3 rounded-full transition-colors",
                                                 isDraggingOver ? "bg-primary/20" : "bg-muted group-hover:bg-primary/10"
                                             )}>
-                                                <Plus size={24} className={cn(
+                                            <Plus size={24} className={cn(
                                                     "transition-all duration-300",
                                                     isDraggingOver ? "text-primary scale-110" : "text-muted-foreground group-hover:text-primary group-hover:rotate-90",
                                                     isUploading && "animate-spin"
                                                 )} />
                                             </div>
                                             <span className={cn(
-                                                "text-[11px] leading-relaxed font-medium tracking-tight text-center px-2 transition-colors",
+                                                "text-[10px] leading-relaxed font-medium tracking-tight text-center px-2 transition-colors",
                                                 isDraggingOver ? "text-primary font-bold" : "text-muted-foreground group-hover:text-primary"
                                             )}>
                                                 {isUploading ? `${isUploading}` : (isDraggingOver ? "松开即可上传" : "添加或拖入实拍")}
