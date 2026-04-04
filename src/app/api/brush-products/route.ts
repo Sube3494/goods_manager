@@ -116,7 +116,14 @@ export async function POST(request: NextRequest) {
     const ownedProducts = await prisma.product.findMany({
       where: {
         id: { in: productIds },
-        userId: user.id,
+        ...(user.role === "SUPER_ADMIN"
+          ? {}
+          : {
+              OR: [
+                { userId: user.id },
+                { isPublic: true },
+              ],
+            }),
       },
       select: { id: true },
     });
