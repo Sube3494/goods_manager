@@ -18,22 +18,43 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export async function sendVerificationEmail(email: string, code: string) {
+type VerificationEmailScene = "login" | "reset-password";
+
+function getVerificationEmailContent(code: string, scene: VerificationEmailScene) {
+  if (scene === "reset-password") {
+    return {
+      subject: "重置密码验证码",
+      heading: "密码重置验证",
+      intro: "您好，您本次用于重置密码的验证码是：",
+      footer: "如果这不是您的操作，请尽快检查账号安全并忽略此邮件。",
+    };
+  }
+
+  return {
+    subject: "登录验证码",
+    heading: "系统登录验证",
+    intro: "您好，您的登录验证码是：",
+    footer: "如果这不是您的操作，请忽略此邮件。",
+  };
+}
+
+export async function sendVerificationEmail(email: string, code: string, scene: VerificationEmailScene = "login") {
   try {
+    const content = getVerificationEmailContent(code, scene);
     const info = await transporter.sendMail({
       from: SMTP_FROM,
       to: email,
-      subject: "登录验证码",
-      text: `您的验证码是: ${code}。有效期 5 分钟。`,
+      subject: content.subject,
+      text: `${content.intro} ${code}。有效期 5 分钟。`,
       html: `
         <div style="font-family: 'Microsoft YaHei', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <h2 style="color: #4F46E5;">系统登录验证</h2>
-          <p>您好，您的登录验证码是：</p>
+          <h2 style="color: #4F46E5;">${content.heading}</h2>
+          <p>${content.intro}</p>
           <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
             <h1 style="color: #4F46E5; font-size: 32px; letter-spacing: 5px; margin: 0; font-family: monospace;">${code}</h1>
           </div>
           <p>此验证码将在 5 分钟后过期。</p>
-          <p style="color: #666; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">如果这不是您的操作，请忽略此邮件。</p>
+          <p style="color: #666; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">${content.footer}</p>
         </div>
       `,
     });

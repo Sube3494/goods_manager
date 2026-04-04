@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft } from "lucide-react";
+import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,11 +15,78 @@ export default function LoginPage() {
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [setupToken, setSetupToken] = useState("");
+  const [step, setStep] = useState<"password" | "code" | "setPassword" | "forgotPasswordCode" | "resetPassword">("password");
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const triggeredRef = useRef(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+
+  const passwordStrength = useCallback((value: string) => {
+    if (!value) {
+      return { label: "未设置", tone: "text-muted-foreground", bar: "bg-muted", score: 0 };
+    }
+
+    let score = 0;
+    if (value.length >= 8) score += 1;
+    if (/[A-Za-z]/.test(value)) score += 1;
+    if (/\d/.test(value)) score += 1;
+    if (/[^A-Za-z0-9]/.test(value) || value.length >= 12) score += 1;
+
+    if (score <= 1) {
+      return { label: "较弱", tone: "text-red-500", bar: "bg-red-500", score };
+    }
+    if (score <= 3) {
+      return { label: "中等", tone: "text-amber-500", bar: "bg-amber-500", score };
+    }
+
+    return { label: "较强", tone: "text-emerald-500", bar: "bg-emerald-500", score };
+  }, []);
+
+  const currentPasswordStrength = passwordStrength(password);
+
+  const sendCode = useCallback(async (targetEmail = email, successMessage = "验证码已发送，请查收邮件") => {
+    const normalizedEmail = targetEmail.trim().toLowerCase();
+    if (!normalizedEmail) {
+        showToast("请输入邮箱地址", "error");
+        return false;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setEmail(normalizedEmail);
+        setStep("code");
+        setTimer(60);
+        showToast(successMessage, "success");
+        return true;
+      } else {
+        if (res.status === 401) {
+            setIsContactModalOpen(true);
+        } else {
+            showToast(data.error || "发送失败", "error");
+        }
+        return false;
+      }
+    } catch {
+      showToast("网络错误，请稍后重试", "error");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [email, showToast]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -28,30 +95,16 @@ export default function LoginPage() {
         const token = params.get("token");
         if (tokenEmail) setEmail(tokenEmail);
         
-        // 如果有 email 和 token，且尚未进入验证码步骤，且从未触发过
-        if (tokenEmail && token && step === "email" && !isLoading && !triggeredRef.current) {
+        // 如果有 email 和 token，自动进入验证码流程
+        if (tokenEmail && token && step === "password" && !isLoading && !triggeredRef.current) {
             triggeredRef.current = true;
             const autoTrigger = async () => {
-                setIsLoading(true);
-                try {
-                    const res = await fetch("/api/auth/send-code", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ email: tokenEmail }),
-                    });
-                    if (res.ok) {
-                        setStep("code");
-                        setTimer(60);
-                        showToast("欢迎加入！验证码已发送至您的邮箱", "success");
-                    }
-                } finally {
-                    setIsLoading(false);
-                }
+                await sendCode(tokenEmail, "欢迎加入！验证码已发送至您的邮箱");
             };
             autoTrigger();
         }
     }
-  }, [isLoading, showToast, step]);
+  }, [isLoading, sendCode, step]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -61,34 +114,40 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, [timer]);
 
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const handleSendCode = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    await sendCode();
+  };
 
-  const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-        showToast("请输入邮箱地址", "error");
-        return;
+  const handleSendForgotPasswordCode = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      showToast("请输入邮箱地址", "error");
+      return;
     }
+
     setIsLoading(true);
     try {
-      const res = await fetch("/api/auth/send-code", {
+      const res = await fetch("/api/auth/forgot-password/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
-      
+
       const data = await res.json();
-      
       if (res.ok) {
-        setStep("code");
+        setEmail(normalizedEmail);
+        setCode("");
+        setPassword("");
+        setConfirmPassword("");
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+        setStep("forgotPasswordCode");
         setTimer(60);
-        showToast("验证码已发送，请查收邮件", "success");
+        showToast("重置验证码已发送，请查收邮件", "success");
       } else {
-        if (res.status === 401) {
-            setIsContactModalOpen(true);
-        } else {
-            showToast(data.error || "发送失败", "error");
-        }
+        showToast(data.error || "发送失败", "error");
       }
     } catch {
       showToast("网络错误，请稍后重试", "error");
@@ -97,7 +156,72 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const resolveTargetUrl = async () => {
+    const params = new URLSearchParams(window.location.search);
+    let targetUrl = params.get("callbackUrl");
+
+    if (!targetUrl) {
+      try {
+        const meRes = await fetch("/api/auth/me");
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          const user = meData.user;
+          if (user) {
+            const hasProductRead = hasPermission(user as SessionUser, "product:read");
+            targetUrl = hasProductRead ? "/" : "/gallery";
+          } else {
+            targetUrl = "/gallery";
+          }
+        } else {
+          targetUrl = "/gallery";
+        }
+      } catch {
+        targetUrl = "/gallery";
+      }
+    }
+
+    window.location.href = targetUrl || "/";
+  };
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      showToast("请输入邮箱地址", "error");
+      return;
+    }
+    if (!password) {
+      showToast("请输入密码", "error");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/password-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast("登录成功", "success");
+        await resolveTargetUrl();
+        return;
+      }
+
+      if (data.requiresPasswordSetup) {
+        showToast("该账号尚未设置密码，请先使用邮箱验证码完成首次设密", "info");
+      } else {
+        showToast(data.error || "登录失败", "error");
+      }
+    } catch {
+      showToast("网络错误，请稍后重试", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCodeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code || code.length !== 6) {
         showToast("请输入6位验证码", "error");
@@ -114,38 +238,133 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        showToast("登录成功", "success");
-        // 获取 URL 里的 callbackUrl
-        const params = new URLSearchParams(window.location.search);
-        let targetUrl = params.get("callbackUrl");
-
-        if (!targetUrl) {
-            // 如果没有明确的目的地，查一下当前用户的权限决定默认去哪
-            try {
-                const meRes = await fetch("/api/auth/me");
-                if (meRes.ok) {
-                    const meData = await meRes.json();
-                    const user = meData.user;
-                    if (user) {
-                        const hasProductRead = hasPermission(user as SessionUser, "product:read");
-                        
-                        // 只有超管或具备查看商品权限的才能进后台首页，否则默认进相册
-                        targetUrl = hasProductRead ? "/" : "/gallery";
-                    } else {
-                        targetUrl = "/gallery";
-                    }
-                } else {
-                    targetUrl = "/gallery";
-                }
-            } catch {
-                targetUrl = "/gallery";
-            }
+        if (data.requiresPasswordSetup && data.setupToken) {
+          setSetupToken(data.setupToken);
+          setPassword("");
+          setConfirmPassword("");
+          setShowPassword(false);
+          setShowConfirmPassword(false);
+          setStep("setPassword");
+          showToast("首次登录请先设置密码", "success");
+          return;
         }
-        
-        // Use window.location for hard refresh to ensure all states (sidebar, middleware) are clean
-        window.location.href = targetUrl || "/"; 
+
+        showToast("登录成功", "success");
+        await resolveTargetUrl();
       } else {
         showToast(data.error || "登录失败", "error");
+      }
+    } catch {
+      showToast("网络错误，请稍后重试", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSetupPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!password || !confirmPassword) {
+      showToast("请完整填写密码", "error");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showToast("两次输入的密码不一致", "error");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/setup-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: setupToken,
+          password,
+          confirmPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast("密码设置成功", "success");
+        await resolveTargetUrl();
+      } else {
+        showToast(data.error || "设置密码失败", "error");
+      }
+    } catch {
+      showToast("网络错误，请稍后重试", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPasswordCodeVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code || code.length !== 6) {
+      showToast("请输入6位验证码", "error");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.resetToken) {
+        setSetupToken(data.resetToken);
+        setPassword("");
+        setConfirmPassword("");
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+        setStep("resetPassword");
+        showToast("邮箱验证成功，请设置新密码", "success");
+      } else {
+        showToast(data.error || "验证码校验失败", "error");
+      }
+    } catch {
+      showToast("网络错误，请稍后重试", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!password || !confirmPassword) {
+      showToast("请完整填写密码", "error");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showToast("两次输入的密码不一致", "error");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: setupToken,
+          password,
+          confirmPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast("密码重置成功", "success");
+        await resolveTargetUrl();
+      } else {
+        showToast(data.error || "重置密码失败", "error");
       }
     } catch {
       showToast("网络错误，请稍后重试", "error");
@@ -255,14 +474,14 @@ export default function LoginPage() {
 
           <div className="relative z-10">
             <AnimatePresence mode="wait">
-              {step === "email" ? (
+              {step === "password" ? (
                 <motion.form 
-                    key="email-form"
+                    key="password-form"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.3 }}
-                    onSubmit={handleSendCode} 
+                    onSubmit={handlePasswordLogin} 
                     className="space-y-6"
                 >
                   <div className="space-y-1.5 flex flex-col">
@@ -280,6 +499,28 @@ export default function LoginPage() {
                       />
                     </div>
                   </div>
+                  <div className="space-y-1.5 flex flex-col">
+                    <label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/60 ml-1">登录密码</label>
+                    <div className="relative group/input">
+                      <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-2xl bg-white/5 pl-12 pr-12 py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30"
+                        placeholder="请输入密码"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                        title={showPassword ? "隐藏密码" : "显示密码"}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -289,11 +530,11 @@ export default function LoginPage() {
                         {isLoading ? (
                             <>
                                 <Loader2 className="animate-spin" size={20} />
-                                <span>发送验证码...</span>
+                                <span>登录中...</span>
                             </>
                         ) : (
                             <>
-                                <span>获取验证码</span>
+                                <span>密码登录</span>
                                 <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
                             </>
                         )}
@@ -301,30 +542,47 @@ export default function LoginPage() {
                     <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-linear-to-r from-transparent via-white/20 to-transparent z-0" />
                   </button>
                     
-                  <div className="text-center text-xs text-muted-foreground/60 mt-4 flex flex-col items-center gap-3">
-                      <div className="flex items-center gap-1">
-                        <span>未注册邮箱将无法获取验证码，</span>
-                        <button 
-                            type="button"
-                            onClick={() => setIsContactModalOpen(true)}
-                            className="text-primary/70 hover:text-primary transition-colors border-b border-primary/30 hover:border-primary border-dashed pb-0.5 active:scale-95"
-                        >
-                            请联系管理员
-                        </button>
-                      </div>
-
-
+                  <div className="space-y-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSendForgotPasswordCode}
+                      disabled={isLoading}
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-foreground/85 transition-all hover:bg-white/10 hover:border-primary/30 active:scale-[0.98] disabled:opacity-60"
+                    >
+                      忘记密码
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendCode}
+                      disabled={isLoading}
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-foreground/85 transition-all hover:bg-white/10 hover:border-primary/30 active:scale-[0.98] disabled:opacity-60"
+                    >
+                      使用邮箱验证码登录
+                    </button>
+                    <div className="text-center text-xs text-muted-foreground/60 flex flex-col items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <span>未注册邮箱将无法获取验证码，</span>
+                          <button 
+                              type="button"
+                              onClick={() => setIsContactModalOpen(true)}
+                              className="text-primary/70 hover:text-primary transition-colors border-b border-primary/30 hover:border-primary border-dashed pb-0.5 active:scale-95"
+                          >
+                              请联系管理员
+                          </button>
+                        </div>
+                    </div>
                   </div>
 
                 </motion.form>
               ) : (
+              step === "code" ? (
                 <motion.form 
                     key="code-form"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                     transition={{ duration: 0.3 }}
-                    onSubmit={handleLogin} 
+                    onSubmit={handleCodeLogin} 
                     className="space-y-6"
                 >
                   <div className="space-y-4">
@@ -335,10 +593,10 @@ export default function LoginPage() {
                         </div>
                         <button 
                             type="button" 
-                            onClick={() => setStep("email")}
+                            onClick={() => setStep("password")}
                             className="text-xs font-medium text-primary hover:text-primary/80 transition-colors bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20"
                         >
-                            更换
+                            返回密码登录
                         </button>
                     </div>
                     
@@ -395,7 +653,194 @@ export default function LoginPage() {
                     </div>
                   </button>
                 </motion.form>
-              )}
+              ) : step === "forgotPasswordCode" ? (
+                <motion.form 
+                    key="forgot-password-code-form"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleForgotPasswordCodeVerify} 
+                    className="space-y-6"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-bold">重置密码</h3>
+                            <p className="text-xs text-muted-foreground">验证码已发送至 {email}</p>
+                        </div>
+                        <button 
+                            type="button" 
+                            onClick={() => {
+                              setStep("password");
+                            }}
+                            className="text-xs font-medium text-primary hover:text-primary/80 transition-colors bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20"
+                        >
+                            返回登录
+                        </button>
+                    </div>
+                    
+                    <div className="relative group/input">
+                      <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        className="w-full rounded-2xl bg-white/5 font-mono text-2xl tracking-[0.5em] text-center py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/20"
+                        placeholder="000000"
+                        autoFocus
+                      />
+                    </div>
+                    
+                    <div className="flex justify-center">
+                        {timer > 0 ? (
+                            <div className="text-xs text-muted-foreground bg-secondary/50 px-4 py-2 rounded-full flex items-center gap-2">
+                                <Loader2 size={12} className="animate-spin text-primary" />
+                                <span>{timer} 秒后可重新发送</span>
+                            </div>
+                        ) : (
+                            <button 
+                                type="button"
+                                onClick={handleSendForgotPasswordCode}
+                                className="flex items-center gap-2 text-xs text-primary hover:text-primary/80 font-medium transition-colors group/retry"
+                            >
+                                <RefreshCw size={12} className="group-hover/retry:rotate-180 transition-transform duration-500" />
+                                重新发送验证码
+                            </button>
+                        )}
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="group relative w-full overflow-hidden rounded-2xl bg-primary py-4 font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none"
+                  >
+                     <div className="relative z-10 flex items-center justify-center gap-2">
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="animate-spin" size={20} />
+                                <span>校验中...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>验证并继续</span>
+                                <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
+                            </>
+                        )}
+                    </div>
+                  </button>
+                </motion.form>
+              ) : (
+                <motion.form
+                  key={step === "resetPassword" ? "reset-password-form" : "setup-password-form"}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3 }}
+                  onSubmit={step === "resetPassword" ? handleResetPassword : handleSetupPassword}
+                  className="space-y-6"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-bold">{step === "resetPassword" ? "设置新密码" : "首次设置密码"}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {step === "resetPassword" ? `邮箱 ${email} 已验证，请设置新密码` : `邮箱 ${email} 已验证，设置后可直接用密码登录`}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5 flex flex-col">
+                      <label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/60 ml-1">设置密码</label>
+                    <div className="relative group/input">
+                      <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-2xl bg-white/5 pl-12 pr-12 py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30"
+                        placeholder="至少 8 位，包含字母和数字"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                        title={showPassword ? "隐藏密码" : "显示密码"}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                    <div className="space-y-2 px-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground/70">密码强度</span>
+                        <span className={currentPasswordStrength.tone}>{currentPasswordStrength.label}</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[1, 2, 3, 4].map((level) => (
+                          <div
+                            key={level}
+                            className={`h-1.5 rounded-full transition-all ${
+                              currentPasswordStrength.score >= level ? currentPasswordStrength.bar : "bg-white/10"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 flex flex-col">
+                      <label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/60 ml-1">确认密码</label>
+                      <div className="relative group/input">
+                        <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full rounded-2xl bg-white/5 pl-12 pr-12 py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30"
+                          placeholder="再次输入密码"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword((prev) => !prev)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                          title={showConfirmPassword ? "隐藏密码" : "显示密码"}
+                        >
+                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed px-1">
+                      密码至少 8 位，并且需要同时包含字母和数字。
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="group relative w-full overflow-hidden rounded-2xl bg-primary py-4 font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none"
+                  >
+                    <div className="relative z-10 flex items-center justify-center gap-2">
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="animate-spin" size={20} />
+                          <span>{step === "resetPassword" ? "正在重置密码..." : "正在保存密码..."}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{step === "resetPassword" ? "完成重置并进入系统" : "完成设置并进入系统"}</span>
+                          <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
+                        </>
+                      )}
+                    </div>
+                  </button>
+                </motion.form>
+              ))}
             </AnimatePresence>
           </div>
         </div>

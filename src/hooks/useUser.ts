@@ -19,6 +19,7 @@ interface User {
   email: string;
   name?: string;
   role: string;
+  hasPassword?: boolean;
   brushShops?: BrushShopItem[];
   shippingAddresses?: AddressItem[];
   roleProfile?: {

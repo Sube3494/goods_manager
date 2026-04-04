@@ -12,6 +12,35 @@ interface UserImportProfile {
   brushShops?: BrushShopItem[] | string[] | null;
 }
 
+function normalizeText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function stripShopSuffix(name: string) {
+  return name.replace(/(店|一店|二店|三店|分店|总店)$/, "");
+}
+
+function isBrushShopMatch(shopName: string, brushShopNames: string[]) {
+  if (!shopName || brushShopNames.length === 0) {
+    return false;
+  }
+
+  return brushShopNames.some((brushShop) => {
+    if (shopName === brushShop || shopName.includes(brushShop) || brushShop.includes(shopName)) {
+      return true;
+    }
+
+    const shopCoreName = stripShopSuffix(shopName);
+    const brushCoreName = stripShopSuffix(brushShop);
+
+    return (
+      shopCoreName.length >= 2 &&
+      brushCoreName.length >= 2 &&
+      (shopCoreName.includes(brushCoreName) || brushCoreName.includes(shopCoreName))
+    );
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession() as SessionUser | null;
@@ -48,6 +77,7 @@ export async function POST(req: NextRequest) {
 
     const userProfile = userDb as UserImportProfile | null;
     const internalShops = new Set<string>();
+    const brushShopNames = new Set<string>();
     if (Array.isArray(userProfile?.shippingAddresses)) {
       userProfile.shippingAddresses.forEach((a) => {
         if (a.label) internalShops.add(a.label);
@@ -55,11 +85,17 @@ export async function POST(req: NextRequest) {
     }
     if (Array.isArray(userProfile?.brushShops)) {
       userProfile.brushShops.forEach((s) => {
-        if (typeof s === 'string') internalShops.add(s);
-        else if (s.name) internalShops.add(s.name);
+        if (typeof s === 'string') {
+          internalShops.add(s);
+          brushShopNames.add(s);
+        } else if (s.name) {
+          internalShops.add(s.name);
+          brushShopNames.add(s.name);
+        }
       });
     }
     const internalShopNames = Array.from(internalShops);
+    const normalizedBrushShopNames = Array.from(brushShopNames).map((name) => normalizeText(name)).filter(Boolean);
 
     // 取出用户所有的商品用于智能名称匹配
     const allProducts = await prisma.product.findMany({
@@ -85,7 +121,7 @@ export async function POST(req: NextRequest) {
         
         // --- 智能平台名称清洗 (Smart Platform Normalization) ---
         // 将各平台长长的细分业务线名称（如“美团闪购”、“淘宝闪购零售”、“京东秒送”）降维成系统基础模块
-        platform = String(platform).trim();
+        platform = normalizeText(platform);
         if (platform.includes("美团")) {
           platform = "美团";
         } else if (platform.includes("淘宝") || platform.includes("天猫")) {
@@ -147,7 +183,7 @@ export async function POST(req: NextRequest) {
         }
 
         // --- 智能店铺名称清洗 (Smart Shop Name Normalization) ---
-        shopName = String(shopName).trim();
+        shopName = normalizeText(shopName);
         if (shopName && internalShopNames.length > 0) {
           // 1. 优先进行精确包含匹配（如 "私人订制白云店" 包含 "白云店"）
           let matchedInternalShop = internalShopNames.find(internal => shopName.includes(internal));
@@ -199,9 +235,12 @@ export async function POST(req: NextRequest) {
         // 2. 智能订单分流器
         // 根据您的业务逻辑修正：严格判定“自配送”才是刷单，或者人为备注了刷单才走刷单通道。
         // 空白的配送平台（或“其它”平台）都属于真实的取货/销售，必须走真实出库通道扣减库存！
-        const isBrushOrder = 
-          deliveryMethod === "自配送" || 
-          note.includes("刷单");
+        const normalizedDeliveryMethod = normalizeText(deliveryMethod);
+        const normalizedNote = normalizeText(note);
+        const isBrushOrder =
+          normalizedDeliveryMethod.includes("自配送") ||
+          normalizedNote.includes("刷单") ||
+          isBrushShopMatch(shopName, normalizedBrushShopNames);
 
         // 3. 多商品智能解析器 (处理类似 "xxx*1 + yyy*2")
         const parsedItems = OrderParser.parseProductString(rawProductName);

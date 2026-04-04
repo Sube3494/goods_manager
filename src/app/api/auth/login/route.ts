@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { login } from "@/lib/auth";
+import { createPasswordSetupToken } from "@/lib/passwordAuth";
 
 export async function POST(request: Request) {
   try {
@@ -95,15 +96,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "您的账号已被禁用" }, { status: 403 });
     }
 
-    // Login (create session)
-    await login({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        roleProfile: user.roleProfile,
-    });
-
     // Delete used code
     await prisma.verificationCode.delete({
       where: { id: verification.id },
@@ -112,6 +104,28 @@ export async function POST(request: Request) {
     // Also clean up old codes for this email
     await prisma.verificationCode.deleteMany({
         where: { email }
+    });
+
+    if (!user.passwordHash) {
+      const setupToken = await createPasswordSetupToken({
+        userId: user.id,
+        email: user.email,
+      });
+
+      return NextResponse.json({
+        success: true,
+        requiresPasswordSetup: true,
+        setupToken,
+      });
+    }
+
+    // Login (create session)
+    await login({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        roleProfile: user.roleProfile,
     });
 
     return NextResponse.json({ success: true });

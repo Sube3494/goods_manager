@@ -1548,13 +1548,8 @@ function GalleryContent() {
                             />
 
                             <motion.div 
-                                animate={{ 
-                                    opacity: isUIVisible ? 1 : 0, 
-                                    y: isUIVisible ? 0 : -20 
-                                }}
-                                style={{ 
-                                    pointerEvents: isUIVisible ? "auto" : "none"
-                                }}
+                                animate={{ opacity: 1, y: 0 }}
+                                style={{ pointerEvents: "auto" }}
                                 className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55"
                             >
                                 <div className="flex items-center gap-2 pointer-events-auto">

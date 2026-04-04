@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "audit:brush-cleanup": "node scripts/audit_brush_inventory_cleanup.js"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",

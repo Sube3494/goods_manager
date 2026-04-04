@@ -83,7 +83,18 @@ export function ConfirmModal({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className={cn("fixed inset-0 z-100000 flex items-center justify-center p-4 sm:p-6 safe-y safe-x lg:pl-(--sidebar-width) transition-[padding] duration-200", className)}>
+        <div
+          className={cn(
+            "fixed inset-0 z-100000 flex items-end justify-center p-3 sm:items-center sm:p-6 safe-y safe-x lg:pl-(--sidebar-width) transition-[padding] duration-200",
+            className
+          )}
+          style={{
+            paddingTop: "max(12px, calc(env(safe-area-inset-top, 0px) + 12px))",
+            paddingRight: "max(12px, calc(env(safe-area-inset-right, 0px) + 12px))",
+            paddingBottom: "max(12px, calc(env(safe-area-inset-bottom, 0px) + 12px))",
+            paddingLeft: "max(12px, calc(env(safe-area-inset-left, 0px) + 12px))",
+          }}
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -98,11 +109,17 @@ export function ConfirmModal({
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", damping: 25, stiffness: 350 }}
             className={cn(
-              "relative z-10 w-full max-h-safe-modal rounded-[26px] sm:rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col",
+              "relative z-10 w-full rounded-[26px] sm:rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col",
               isAuth
-                ? "max-w-[min(calc(100vw-2rem),22rem)] sm:max-w-[420px]"
-                : "max-w-[min(calc(100vw-2rem),24rem)] sm:max-w-[420px]"
+                ? "sm:max-w-[420px]"
+                : "sm:max-w-[420px]"
             )}
+            style={{
+              width: isAuth
+                ? "min(calc(100dvw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px), 22rem)"
+                : "min(calc(100dvw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px), 24rem)",
+              maxHeight: "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)",
+            }}
           >
             {/* Subtle Gradient Accent */}
             <div className={cn("absolute top-0 left-0 right-0 h-40 bg-linear-to-b opacity-20 pointer-events-none", currentStyle.accent)} />
