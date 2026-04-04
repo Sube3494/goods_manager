@@ -23,6 +23,12 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const toolbarButtonClass =
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-primary transition-all duration-300 hover:bg-primary hover:text-primary-foreground active:scale-95 shadow-sm disabled:cursor-not-allowed disabled:opacity-50";
+
+const toolbarButtonMutedClass =
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-border bg-white/5 px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-muted-foreground transition-all duration-300 hover:border-primary/20 hover:bg-primary/10 hover:text-primary active:scale-95";
+
 interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -79,6 +85,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
   const dragOverId = useRef<string | null>(null);
   const [dragOverImageId, setDragOverImageId] = useState<string|null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  const cameraUploadInputRef = useRef<HTMLInputElement>(null);
   
   // 批量管理状态 (Batch manage state)
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -1192,23 +1199,32 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             </div>
                             
                             <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                                <button
+                                    type="button"
+                                    onClick={() => cameraUploadInputRef.current?.click()}
+                                    disabled={!!isUploading}
+                                    className={cn("ml-auto whitespace-nowrap", toolbarButtonClass)}
+                                >
+                                    <Camera size={14} />
+                                    拍摄上传
+                                </button>
                                 {initialData?.id && (
                                     <>
                                         {isBatchMode ? (
-                                            <div className="flex items-center gap-3 whitespace-nowrap ml-auto">
+                                            <div className="flex items-center gap-3 whitespace-nowrap">
                                                 <button 
                                                     type="button"
                                                     onClick={toggleSelectAll}
-                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter"
+                                                    className={toolbarButtonClass}
                                                 >
                                                     {selectedIds.size === galleryImages.length + (formData.image && !galleryImages.find(i => i.url === formData.image) ? 1 : 0) ? "全不选" : "全选"}
                                                 </button>
-                                                <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-tight border-l border-white/10 pl-3">已选 {selectedIds.size}</span>
+                                                <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-tight">已选 {selectedIds.size}</span>
                                                 <button 
                                                     type="button"
                                                     onClick={handleBatchDelete}
                                                     disabled={selectedIds.size === 0}
-                                                    className="text-[10px] sm:text-[11px] font-semibold text-red-500 hover:text-red-600 disabled:opacity-30 uppercase tracking-tighter"
+                                                    className="inline-flex h-9 items-center justify-center rounded-full border border-red-500/20 bg-red-500/10 px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-red-500 transition-all duration-300 hover:bg-red-500 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                                                 >
                                                     删除
                                                 </button>
@@ -1218,28 +1234,28 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                         setIsBatchMode(false);
                                                         setSelectedIds(new Set());
                                                     }}
-                                                    className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground hover:text-foreground uppercase tracking-tighter"
+                                                    className={toolbarButtonMutedClass}
                                                 >
                                                     取消
                                                 </button>
                                             </div>
                                         ) : isReorderMode ? (
-                                            <div className="flex items-center gap-3 whitespace-nowrap ml-auto">
+                                            <div className="flex items-center gap-3 whitespace-nowrap">
                                                 <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-tight">拖动箭头调整顺序</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsReorderMode(false)}
-                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter border-l border-white/10 pl-3"
+                                                    className={toolbarButtonClass}
                                                 >
                                                     完成
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-3 sm:gap-4 whitespace-nowrap ml-auto">
+                                            <div className="flex items-center gap-3 sm:gap-4 whitespace-nowrap">
                                                 <button 
                                                     type="button"
                                                     onClick={enterBatchMode}
-                                                    className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter"
+                                                    className={toolbarButtonMutedClass}
                                                 >
                                                     批量管理
                                                 </button>
@@ -1247,7 +1263,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                     <button
                                                         type="button"
                                                         onClick={() => setIsReorderMode(true)}
-                                                        className="text-[10px] sm:text-[11px] font-semibold text-primary hover:text-primary/80 uppercase tracking-tighter sm:hidden border-l border-white/10 pl-3"
+                                                        className={cn("sm:hidden", toolbarButtonMutedClass)}
                                                     >
                                                         排序
                                                     </button>
@@ -1452,7 +1468,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                             onDragLeave={handleDragLeave}
                                             onDrop={handleDrop}
                                             className={cn(
-                                                "aspect-square rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer h-full",
+                                                "aspect-square rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 group relative overflow-hidden active:scale-95 cursor-pointer h-full min-h-[132px] px-3",
                                                 isDraggingOver
                                                     ? "border-primary bg-primary/10 shadow-lg scale-[1.02]"
                                                     : "border-border hover:border-primary/40 hover:bg-primary/5 hover:shadow-inner"
@@ -1477,7 +1493,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 )} />
                                             </div>
                                             <span className={cn(
-                                                "hidden sm:block text-[11px] font-medium tracking-tighter uppercase text-center px-2 transition-colors",
+                                                "text-[11px] leading-relaxed font-medium tracking-tight text-center px-2 transition-colors",
                                                 isDraggingOver ? "text-primary font-bold" : "text-muted-foreground group-hover:text-primary"
                                             )}>
                                                 {isUploading ? `${isUploading}` : (isDraggingOver ? "松开即可上传" : "添加或拖入实拍")}
@@ -1486,6 +1502,15 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                                 <div className="absolute inset-0 pointer-events-none border-2 border-primary rounded-2xl animate-pulse" />
                                             )}
                                         </label>
+                                        <input
+                                            ref={cameraUploadInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*"
+                                            capture="environment"
+                                            onChange={(e) => handleFileUpload(e)}
+                                            disabled={!!isUploading}
+                                        />
                                     </div>
                                 )}
                         </div>

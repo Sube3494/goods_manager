@@ -11,7 +11,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { copyToClipboard } from "@/lib/utils";
 import { useMemo } from "react";
-import { inferFileExtensionFromUrl, triggerBrowserDownload, triggerIOSMediaShare } from "@/lib/download";
+import { detectClientPlatform, inferFileExtensionFromUrl, triggerBrowserDownload, triggerFetchedBlobDownload, triggerIOSMediaShare } from "@/lib/download";
 
 // Moved handleDownload inside component to use hooks
 
@@ -215,10 +215,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
   });
 
   // iOS 兼容性支持
-  const isIOS = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
-  }, []);
+  const clientPlatform = useMemo(() => detectClientPlatform(), []);
 
   const [copyModalConfig, setCopyModalConfig] = useState<{
     isOpen: boolean;
@@ -236,7 +233,7 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
     // iOS Safari does not support the `download` attribute on anchor tags,
     // nor Blob URLs for saving to the photo library.
     // Prefer the native share sheet first because it can save videos directly to Photos.
-    if (isIOS) {
+    if (clientPlatform === "ios") {
       const shared = await triggerIOSMediaShare(url, fileName);
       if (shared) {
         showToast("已打开系统分享面板，可选择“存储到照片”", "success");
@@ -254,6 +251,12 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
     }
 
     try {
+      if (clientPlatform === "android") {
+        await triggerFetchedBlobDownload(url, fileName);
+        showToast("已开始下载", "success");
+        return;
+      }
+
       triggerBrowserDownload(url, fileName);
     } catch (error) {
       console.warn("Download failed, falling back:", error);

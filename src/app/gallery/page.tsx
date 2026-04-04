@@ -13,7 +13,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn, copyToClipboard } from "@/lib/utils";
-import { inferFileExtensionFromUrl, triggerBrowserDownload, triggerIOSMediaShare } from "@/lib/download";
+import { detectClientPlatform, inferFileExtensionFromUrl, triggerBrowserDownload, triggerFetchedBlobDownload, triggerIOSMediaShare } from "@/lib/download";
 import Image from "next/image";
 import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
@@ -246,10 +246,7 @@ function GalleryContent() {
     mode: 'copy'
   });
 
-  const isIOS = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
-  }, []);
+  const clientPlatform = useMemo(() => detectClientPlatform(), []);
 
   // Scroll listener for Back to Top button
   useEffect(() => {
@@ -856,7 +853,7 @@ function GalleryContent() {
   const handleDownload = async (url: string, filename: string) => {
     // iOS Safari does not support the `download` attribute or Blob URLs for saving to Photos.
     // Prefer the native share sheet first because it can save videos directly to Photos.
-    if (isIOS) {
+    if (clientPlatform === "ios") {
       const shared = await triggerIOSMediaShare(url, filename);
       if (shared) {
         showToast("已打开系统分享面板，可选择“存储到照片”", "success");
@@ -874,6 +871,12 @@ function GalleryContent() {
     }
 
     try {
+      if (clientPlatform === "android") {
+        await triggerFetchedBlobDownload(url, filename);
+        showToast("已开始下载", "success");
+        return;
+      }
+
       triggerBrowserDownload(url, filename);
     } catch (error) {
       console.warn("Direct download failed, falling back to new tab:", error);

@@ -1,5 +1,7 @@
 "use client";
 
+export type ClientPlatform = "ios" | "android" | "other";
+
 function isSameOrigin(url: string) {
   if (typeof window === "undefined") return false;
 
@@ -12,6 +14,22 @@ function isSameOrigin(url: string) {
 
 function stripUrlSuffix(url: string) {
   return url.split("#")[0].split("?")[0];
+}
+
+export function detectClientPlatform(): ClientPlatform {
+  if (typeof navigator === "undefined") return "other";
+
+  const userAgent = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+
+  const isIOS =
+    /iPad|iPhone|iPod/.test(userAgent) ||
+    (platform === "MacIntel" && maxTouchPoints > 1);
+
+  if (isIOS) return "ios";
+  if (/Android/i.test(userAgent)) return "android";
+  return "other";
 }
 
 export function inferFileExtensionFromUrl(url: string, fallback = "") {
@@ -67,6 +85,16 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
   document.body.removeChild(link);
 
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+}
+
+export async function triggerFetchedBlobDownload(url: string, filename: string) {
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) {
+    throw new Error(`Download request failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  triggerBlobDownload(blob, filename);
 }
 
 export async function triggerIOSMediaShare(url: string, filename: string) {

@@ -2,7 +2,7 @@
 
 import { Download, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { triggerBrowserDownload } from "@/lib/download";
+import { detectClientPlatform, triggerBrowserDownload, triggerFetchedBlobDownload } from "@/lib/download";
 
 interface DownloadButtonProps {
   url: string;
@@ -12,13 +12,10 @@ interface DownloadButtonProps {
 export function DownloadButton({ url, filename }: DownloadButtonProps) {
   const [showGuide, setShowGuide] = useState(false);
 
-  const isIOS = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
-  }, []);
+  const platform = useMemo(() => detectClientPlatform(), []);
 
   const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (isIOS) {
+    if (platform === "ios") {
       e.preventDefault();
       window.open(url, '_blank');
       setShowGuide(true);
@@ -26,7 +23,16 @@ export function DownloadButton({ url, filename }: DownloadButtonProps) {
     }
 
     e.preventDefault();
-    triggerBrowserDownload(url, filename);
+    try {
+      if (platform === "android") {
+        await triggerFetchedBlobDownload(url, filename);
+        return;
+      }
+
+      triggerBrowserDownload(url, filename);
+    } catch {
+      triggerBrowserDownload(url, filename);
+    }
   };
 
   return (
