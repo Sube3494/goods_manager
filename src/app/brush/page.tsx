@@ -27,14 +27,67 @@ import {
   Tags,
   TrendingUp,
 } from "lucide-react";
-import { BrushOrder, BrushOrderPlan, BrushProduct } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { formatLocalDate } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 
 const PLATFORM_COLORS = ["#41d18d", "#5ba7ff", "#f3b34c", "#fb7185"];
+
+type DashboardStats = {
+  brushProductCount: number;
+  todayPlanItemCount: number;
+  todayShopCount: number;
+  averageItemsPerShop: number;
+  todayOrderCount: number;
+  todayPayment: number;
+  todayReceived: number;
+  todayCommission: number;
+  todayExpense: number;
+  orderCount: number;
+  payment: number;
+  received: number;
+  commission: number;
+  expense: number;
+};
+
+type DailyAggregate = {
+  dateKey: string;
+  label: string;
+  payment: number;
+  received: number;
+  commission: number;
+  expense: number;
+  count: number;
+};
+
+type DailyShopAggregate = DailyAggregate & {
+  shopName: string;
+};
+
+type BrushDashboardPayload = {
+  stats: DashboardStats;
+  shops: string[];
+  orderDaily: DailyAggregate[];
+  orderDailyByShop: DailyShopAggregate[];
+};
+
+const EMPTY_DASHBOARD_STATS: DashboardStats = {
+  brushProductCount: 0,
+  todayPlanItemCount: 0,
+  todayShopCount: 0,
+  averageItemsPerShop: 0,
+  todayOrderCount: 0,
+  todayPayment: 0,
+  todayReceived: 0,
+  todayCommission: 0,
+  todayExpense: 0,
+  orderCount: 0,
+  payment: 0,
+  received: 0,
+  commission: 0,
+  expense: 0,
+};
 
 function DashboardCard({
   title,
@@ -211,9 +264,12 @@ export default function BrushCenterPage() {
   const canManageBrush = hasPermission(user as SessionUser | null, "brush:manage");
   const hasAnyAccess = canManageBrush;
 
-  const [brushProducts, setBrushProducts] = useState<BrushProduct[]>([]);
-  const [plans, setPlans] = useState<BrushOrderPlan[]>([]);
-  const [orders, setOrders] = useState<BrushOrder[]>([]);
+  const [dashboardData, setDashboardData] = useState<BrushDashboardPayload>({
+    stats: EMPTY_DASHBOARD_STATS,
+    shops: [],
+    orderDaily: [],
+    orderDailyByShop: [],
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [selectedShop, setSelectedShop] = useState("all");
   const [selectedRange, setSelectedRange] = useState("14");
@@ -245,28 +301,17 @@ export default function BrushCenterPage() {
     async function fetchAll() {
       setIsLoading(true);
       try {
-        const tasks: Promise<Response | null>[] = [
-          canManageBrush ? fetch("/api/brush-products?page=1&pageSize=120") : Promise.resolve(null),
-          canManageBrush ? fetch("/api/brush-plans?page=1&limit=90") : Promise.resolve(null),
-          canManageBrush ? fetch("/api/brush-orders?page=1&limit=90") : Promise.resolve(null),
-        ];
-
-        const [productsRes, plansRes, ordersRes] = await Promise.all(tasks);
+        const dashboardRes = canManageBrush ? await fetch("/api/brush/dashboard") : null;
         if (cancelled) return;
 
-        if (productsRes?.ok) {
-          const data = await productsRes.json();
-          setBrushProducts(Array.isArray(data.items) ? data.items : []);
-        }
-
-        if (plansRes?.ok) {
-          const data = await plansRes.json();
-          setPlans(Array.isArray(data.items) ? data.items : []);
-        }
-
-        if (ordersRes?.ok) {
-          const data = await ordersRes.json();
-          setOrders(Array.isArray(data.data) ? data.data : []);
+        if (dashboardRes?.ok) {
+          const data = await dashboardRes.json();
+          setDashboardData({
+            stats: data?.stats || EMPTY_DASHBOARD_STATS,
+            shops: Array.isArray(data?.shops) ? data.shops : [],
+            orderDaily: Array.isArray(data?.orderDaily) ? data.orderDaily : [],
+            orderDailyByShop: Array.isArray(data?.orderDailyByShop) ? data.orderDailyByShop : [],
+          });
         }
       } catch (error) {
         console.error("Failed to fetch brush center data:", error);
@@ -300,73 +345,21 @@ export default function BrushCenterPage() {
     };
   }, [isCompactView, isLoading, userLoading]);
 
-  const stats = useMemo(() => {
-    const today = formatLocalDate(new Date());
-    const totalPlanItems = plans.reduce(
-      (sum, plan) => sum + plan.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0),
-      0
-    );
-    const todayPlans = plans.filter((plan) => formatLocalDate(plan.date) === today);
-    const todayPlanItems = todayPlans.reduce(
-      (sum, plan) => sum + plan.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0),
-      0
-    );
-    const todayShopCount = new Set(
-      todayPlans.map((plan) => plan.shopName?.trim()).filter((shop): shop is string => Boolean(shop))
-    ).size;
-    const averageItemsPerShop = todayShopCount > 0 ? todayPlanItems / todayShopCount : 0;
-    const totalPayment = orders.reduce((sum, order) => sum + order.paymentAmount, 0);
-    const totalReceived = orders.reduce((sum, order) => sum + order.receivedAmount, 0);
-    const totalCommission = orders.reduce((sum, order) => sum + order.commission, 0);
-    const totalExpense = orders.reduce(
-      (sum, order) => sum + (order.paymentAmount - order.receivedAmount) + order.commission,
-      0
-    );
-    const todayOrders = orders.filter((order) => String(order.date).slice(0, 10) === today);
-    const todayOrderCount = todayOrders.length;
-    const todayPayment = todayOrders.reduce((sum, order) => sum + order.paymentAmount, 0);
-    const todayReceived = todayOrders.reduce((sum, order) => sum + order.receivedAmount, 0);
-    const todayCommission = todayOrders.reduce((sum, order) => sum + order.commission, 0);
-    const todayExpense = todayOrders.reduce(
-      (sum, order) => sum + (order.paymentAmount - order.receivedAmount) + order.commission,
-      0
-    );
-
-    return {
-      brushProductCount: brushProducts.length,
-      planCount: plans.length,
-      planItemCount: totalPlanItems,
-      todayPlanItemCount: todayPlanItems,
-      todayShopCount,
-      averageItemsPerShop,
-      orderCount: orders.length,
-      payment: totalPayment,
-      received: totalReceived,
-      commission: totalCommission,
-      expense: totalExpense,
-      todayOrderCount,
-      todayPayment,
-      todayReceived,
-      todayCommission,
-      todayExpense,
-    };
-  }, [brushProducts, orders, plans]);
+  const stats = dashboardData.stats;
 
   const shopOptions = useMemo(() => {
-    const shops = Array.from(
-      new Set(orders.map((order) => order.shopName?.trim()).filter((name): name is string => Boolean(name)))
-    ).sort((a, b) => a.localeCompare(b, "zh-CN"));
-
     return [
       { value: "all", label: "全部店铺" },
-      ...shops.map((shop) => ({ value: shop, label: shop })),
+      ...dashboardData.shops.map((shop) => ({ value: shop, label: shop })),
     ];
-  }, [orders]);
+  }, [dashboardData.shops]);
 
-  const filteredOrders = useMemo(() => {
-    const latestDate = orders.reduce<string | null>((max, order) => {
-      const current = String(order.date).slice(0, 10);
-      return !max || current > max ? current : max;
+  const filteredOrderDaily = useMemo(() => {
+    const source = selectedShop === "all"
+      ? dashboardData.orderDaily
+      : dashboardData.orderDailyByShop.filter((item) => item.shopName === selectedShop);
+    const latestDate = source.reduce<string | null>((max, item) => {
+      return !max || item.dateKey > max ? item.dateKey : max;
     }, null);
 
     let startBoundary = "";
@@ -378,52 +371,18 @@ export default function BrushCenterPage() {
       startBoundary = start.toISOString().slice(0, 10);
     }
 
-    return orders.filter((order) => {
-      const shopName = order.shopName?.trim() || "";
-      const orderDate = String(order.date).slice(0, 10);
+    return source.filter((item) => !startBoundary || item.dateKey >= startBoundary);
+  }, [dashboardData.orderDaily, dashboardData.orderDailyByShop, selectedRange, selectedShop]);
 
-      if (selectedShop !== "all" && shopName !== selectedShop) return false;
-      if (startBoundary && orderDate < startBoundary) return false;
-      return true;
-    });
-  }, [orders, selectedRange, selectedShop]);
-
-  const orderTrendData = useMemo(() => {
-    const byDay = new Map<
-      string,
-      { label: string; payment: number; received: number; commission: number; expense: number; count: number }
-    >();
-
-    filteredOrders.forEach((order) => {
-      const dateKey = String(order.date).slice(0, 10);
-      const current = byDay.get(dateKey) || {
-        label: formatLocalDate(order.date),
-        payment: 0,
-        received: 0,
-        commission: 0,
-        expense: 0,
-        count: 0,
-      };
-      current.payment += order.paymentAmount;
-      current.received += order.receivedAmount;
-      current.commission += order.commission;
-      current.expense += (order.paymentAmount - order.receivedAmount) + order.commission;
-      current.count += 1;
-      byDay.set(dateKey, current);
-    });
-
-    return Array.from(byDay.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-14)
-      .map(([, value]) => value);
-  }, [filteredOrders]);
+  const orderTrendData = useMemo(
+    () => filteredOrderDaily.slice(-14),
+    [filteredOrderDaily]
+  );
 
   const expenseTrendByShop = useMemo(() => {
     const topShops = Array.from(
-      orders.reduce((map, order) => {
-        const name = order.shopName?.trim() || "未分店铺";
-        const expense = (order.paymentAmount - order.receivedAmount) + order.commission;
-        map.set(name, (map.get(name) || 0) + expense);
+      dashboardData.orderDailyByShop.reduce((map, item) => {
+        map.set(item.shopName, (map.get(item.shopName) || 0) + item.expense);
         return map;
       }, new Map<string, number>())
     )
@@ -433,14 +392,11 @@ export default function BrushCenterPage() {
 
     const byDate = new Map<string, Record<string, string | number>>();
 
-    orders.forEach((order) => {
-      const shopName = order.shopName?.trim() || "未分店铺";
-      if (!topShops.includes(shopName)) return;
-
-      const key = String(order.date).slice(0, 10);
-      const current = byDate.get(key) || { label: formatLocalDate(order.date) };
-      current[shopName] = Number(current[shopName] || 0) + (order.paymentAmount - order.receivedAmount) + order.commission;
-      byDate.set(key, current);
+    dashboardData.orderDailyByShop.forEach((item) => {
+      if (!topShops.includes(item.shopName)) return;
+      const current = byDate.get(item.dateKey) || { label: item.label };
+      current[item.shopName] = Number(current[item.shopName] || 0) + item.expense;
+      byDate.set(item.dateKey, current);
     });
 
     return {
@@ -450,7 +406,7 @@ export default function BrushCenterPage() {
         .slice(-14)
         .map(([, value]) => value),
     };
-  }, [orders]);
+  }, [dashboardData.orderDailyByShop]);
 
   const orderChartHighlights = useMemo(() => {
     if (orderTrendData.length === 0) return [];
@@ -458,13 +414,17 @@ export default function BrushCenterPage() {
     const latest = orderTrendData[orderTrendData.length - 1];
     const peak = orderTrendData.reduce((max, current) => (current.expense > max.expense ? current : max), orderTrendData[0]);
     const total = orderTrendData.reduce((sum, current) => sum + current.expense, 0);
+    const rangeHint =
+      selectedRange === "all"
+        ? `全部时间，实际 ${orderTrendData.length} 天有数据`
+        : `近 ${selectedRange} 天内，实际 ${orderTrendData.length} 天有数据`;
 
     return [
       { label: "最新支出", value: formatExpenseCurrency(latest.expense), hint: latest.label },
       { label: "峰值日期", value: formatExpenseCurrency(peak.expense), hint: peak.label },
-      { label: "区间总支出", value: formatExpenseCurrency(total), hint: `${orderTrendData.length} 天累计` },
+      { label: "区间总支出", value: formatExpenseCurrency(total), hint: rangeHint },
     ];
-  }, [orderTrendData]);
+  }, [orderTrendData, selectedRange]);
 
   const latestShopExpense = useMemo(() => {
     if (expenseTrendByShop.data.length === 0) return [];
