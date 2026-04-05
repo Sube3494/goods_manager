@@ -871,17 +871,12 @@ function GalleryContent() {
     }
 
     try {
-      if (clientPlatform === "android") {
-        await triggerFetchedBlobDownload(url, filename);
-        showToast("已开始下载", "success");
-        return;
-      }
-
-      triggerBrowserDownload(url, filename);
+      await triggerFetchedBlobDownload(url, filename);
+      showToast("已开始下载", "success");
     } catch (error) {
       console.warn("Direct download failed, falling back to new tab:", error);
-      window.open(url, "_blank", "noopener,noreferrer");
-      showToast("开始尝试直接下载...", "info");
+      triggerBrowserDownload(url, filename);
+      showToast("正在尝试浏览器下载...", "info");
     }
   };
 

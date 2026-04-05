@@ -251,17 +251,12 @@ export function ProductShareClient({ items, productName, sku, description }: Pro
     }
 
     try {
-      if (clientPlatform === "android") {
-        await triggerFetchedBlobDownload(url, fileName);
-        showToast("已开始下载", "success");
-        return;
-      }
-
-      triggerBrowserDownload(url, fileName);
+      await triggerFetchedBlobDownload(url, fileName);
+      showToast("已开始下载", "success");
     } catch (error) {
       console.warn("Download failed, falling back:", error);
-      window.open(url, "_blank", "noopener,noreferrer");
-      showToast("正在尝试直接打开资源进行下载", "info");
+      triggerBrowserDownload(url, fileName);
+      showToast("正在尝试浏览器下载...", "info");
     }
   };
 

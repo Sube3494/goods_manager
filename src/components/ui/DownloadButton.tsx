@@ -24,12 +24,7 @@ export function DownloadButton({ url, filename }: DownloadButtonProps) {
 
     e.preventDefault();
     try {
-      if (platform === "android") {
-        await triggerFetchedBlobDownload(url, filename);
-        return;
-      }
-
-      triggerBrowserDownload(url, filename);
+      await triggerFetchedBlobDownload(url, filename);
     } catch {
       triggerBrowserDownload(url, filename);
     }
