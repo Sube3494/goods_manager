@@ -56,6 +56,7 @@ const GROUP_ICONS = {
   brush_center: Layers,
   gallery: ImageIcon,
   gallery_audit: ClipboardCheck,
+  logistics: Truck,
   system: Settings,
 } as const;
 
@@ -537,7 +538,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
 
                 <div className="hidden sm:block flex-1 min-h-0 overflow-hidden">
                   <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] h-full min-h-0">
-                    <div className="border-b xl:border-b-0 xl:border-r border-border/60 bg-black/[0.015] dark:bg-white/[0.02] h-full min-h-0 flex flex-col">
+                    <div className="border-b xl:border-b-0 xl:border-r border-border/60 bg-black/1.5 dark:bg-white/2 h-full min-h-0 flex flex-col">
                       <div className="p-4 md:p-5 space-y-4 shrink-0 border-b border-border/40">
                         <div className="space-y-3">
                         <div className="space-y-1.5">

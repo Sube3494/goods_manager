@@ -47,7 +47,7 @@ export async function GET() {
   const response = NextResponse.json({
     user: {
       ...safeUser,
-      hasPassword: !!passwordHash,
+      hasPassword: !!passwordHash || !!user.passwordSetAt,
       permissions: getEffectivePermissions(user as unknown as SessionUser),
     }
   });

@@ -106,7 +106,9 @@ export async function POST(request: Request) {
         where: { email }
     });
 
-    if (!user.passwordHash) {
+    const requiresPasswordSetup = !user.passwordHash && !user.passwordSetAt;
+
+    if (requiresPasswordSetup) {
       const setupToken = await createPasswordSetupToken({
         userId: user.id,
         email: user.email,

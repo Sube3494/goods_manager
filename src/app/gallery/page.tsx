@@ -276,8 +276,9 @@ function GalleryContent() {
       // 游客身份：引导登录
       setConfirmConfig({
         isOpen: true,
-        title: "登录后使用",
-        message: "您当前为游客身份。请先添加管理员微信 Sube3494 审核开通，审核通过后再登录使用下载、复制链接及上传等功能。",
+        title: "请登录后继续",
+        message: "当前操作需登录后方可使用。",
+        mode: "login",
         onConfirm: () => {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
         },
@@ -297,7 +298,7 @@ function GalleryContent() {
     if (hasPerm) {
       action();
     } else {
-      showToast("当前账号还没有这个权限；如需开通，请添加管理员微信 Sube3494 审核", "error");
+      showToast("当前账号还没有这个权限", "error");
     }
   }, [user, isUploadAllowed, showToast]);
   
@@ -372,6 +373,7 @@ function GalleryContent() {
     title: string;
     message: string;
     onConfirm: () => void;
+    mode?: "login" | "danger";
   }>({
     isOpen: false,
     title: "",
@@ -382,8 +384,9 @@ function GalleryContent() {
   const promptLoginForLightbox = useCallback(() => {
     setConfirmConfig({
       isOpen: true,
-      title: "请先登录",
-      message: "查看大图前，请先添加管理员微信 Sube3494 审核开通；审核通过后登录即可查看。",
+      title: "请登录后查看",
+      message: "当前内容需登录后方可查看。",
+      mode: "login",
       onConfirm: () => {
         window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
       },
@@ -740,6 +743,7 @@ function GalleryContent() {
       isOpen: true,
       title: "批量删除媒体",
       message: `确定要删除选中中的 ${count} 个实拍项吗？此操作不可恢复。`,
+      mode: "danger",
       onConfirm: async () => {
         try {
           const res = await fetch("/api/gallery/batch", {
@@ -813,6 +817,7 @@ function GalleryContent() {
       isOpen: true,
       title: "删除当前实拍",
       message: "确定删除当前图片/视频吗？此操作不可恢复。",
+      mode: "danger",
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/gallery/${image.id}`, {
@@ -1913,8 +1918,8 @@ function GalleryContent() {
         onConfirm={confirmConfig.onConfirm}
         message={confirmConfig.message}
         title={confirmConfig.title}
-        confirmLabel={confirmConfig.title === "登录后使用" || confirmConfig.title === "请先登录" ? "立即登录" : "确认删除"}
-        variant={confirmConfig.title === "登录后使用" || confirmConfig.title === "请先登录" ? "primary" : "danger"}
+        confirmLabel={confirmConfig.mode === "login" ? "立即登录" : "确认删除"}
+        variant={confirmConfig.mode === "login" ? "primary" : "danger"}
         className="z-31000"
     />
 

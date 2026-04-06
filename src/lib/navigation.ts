@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft, Navigation2 } from "lucide-react";
 import { AdminCapability, Permission, hasAdminAccess } from "./permissions";
 
 export interface NavItem {
@@ -21,6 +21,7 @@ export const navItems: NavItem[] = [
   { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true, permission: "supplier:manage", description: "供应商资料与联络信息", section: "workspace" },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true, permission: "purchase:manage", description: "日常采购与到货记录", section: "workspace" },
   { name: "开店进货", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "setup_purchase:manage", description: "开店批次与商品准备", section: "workspace" },
+  { name: "智能调货", href: "/distance-calc", icon: Navigation2, permission: "logistics:manage", description: "地图测距与最优配送方案", section: "workspace" },
   {
     name: "刷单中心",
     href: "/brush",

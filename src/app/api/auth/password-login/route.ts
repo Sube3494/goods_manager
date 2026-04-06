@@ -25,10 +25,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "您的账号已被禁用" }, { status: 403 });
     }
 
-    if (!user.passwordHash) {
+    const requiresPasswordSetup = !user.passwordHash && !user.passwordSetAt;
+
+    if (requiresPasswordSetup) {
       return NextResponse.json({
         error: "该账号尚未设置密码，请先使用邮箱验证码登录并完成首次设密",
         requiresPasswordSetup: true,
+      }, { status: 400 });
+    }
+
+    if (!user.passwordHash) {
+      return NextResponse.json({
+        error: "当前账号密码状态异常，请先使用邮箱验证码登录",
       }, { status: 400 });
     }
 

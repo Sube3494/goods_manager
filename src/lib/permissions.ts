@@ -11,6 +11,7 @@ export type Permission =
   | "brush:manage"
   | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy"
   | "settlement:manage"
+  | "logistics:manage"
   | "system:manage"
   | "all";
 
@@ -90,7 +91,7 @@ export const PERMISSION_TREE = [
     key: "brush_center",
     label: "刷单中心",
     children: [
-      { key: "brush:manage", label: "刷单中心" },
+      { key: "brush:manage", label: "刷单中心管理" },
     ]
   },
   {
@@ -104,17 +105,24 @@ export const PERMISSION_TREE = [
     ]
   },
   {
-    key: "system",
-    label: "系统设置",
-    children: [
-      { key: "system:manage", label: "系统管理" },
-    ]
-  },
-  {
     key: "settlement",
     label: "财务结算",
     children: [
       { key: "settlement:manage", label: "结算管理" },
+    ]
+  },
+  {
+    key: "logistics",
+    label: "物流配送",
+    children: [
+      { key: "logistics:manage", label: "调货与网点管理" },
+    ]
+  },
+  {
+    key: "system",
+    label: "系统设置",
+    children: [
+      { key: "system:manage", label: "系统管理" },
     ]
   }
 ];

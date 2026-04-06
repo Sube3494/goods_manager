@@ -10,6 +10,7 @@
     "audit:brush-cleanup": "node scripts/audit_brush_inventory_cleanup.js"
   },
   "dependencies": {
+    "@amap/amap-jsapi-loader": "^1.0.1",
     "@prisma/client": "5.22.0",
     "blueimp-md5": "^2.19.0",
     "browser-image-compression": "^2.0.2",
@@ -27,7 +28,7 @@
     "pinyin-pro": "^3.28.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "recharts": "^3.7.0",
+    "recharts": "^3.8.1",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0",
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/amap-js-api": "^1.4.16",
     "@types/blueimp-md5": "^2.18.2",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^20",

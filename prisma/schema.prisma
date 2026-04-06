@@ -185,6 +185,7 @@ model User {
   systemSettings     SystemSetting[]
   settlements        Settlement[]
   storeOpeningBatches StoreOpeningBatch[]
+  shops              Shop[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
 }
 
@@ -464,4 +465,22 @@ model StoreOpeningItem {
 
   @@index([batchId])
   @@index([productId])
+}
+
+model Shop {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  isSource    Boolean  @default(true) // 是否作为常备调货源
+  contactName String?
+  contactPhone String?
+  remark      String?
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
 }
