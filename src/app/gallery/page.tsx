@@ -793,6 +793,13 @@ function GalleryContent() {
     });
   };
 
+  const invalidateProductMedia = useCallback((productId: string) => {
+    setProductMediaMap(prev => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+  }, []);
 
   // Navigation logic: match the same order as ProductFormModal gallery
   // (main cover image first, then by createdAt ascending)
@@ -818,6 +825,109 @@ function GalleryContent() {
     });
   }, [selectedImage, productMediaMap, isAdmin]);
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
+
+  const handleDeleteMediaItem = useCallback((image: GalleryItem) => {
+    if (user?.role !== "SUPER_ADMIN") return;
+
+    const imageIndex = relatedImages.findIndex(item => item.id === image.id);
+    const currentProductId = image.productId;
+    const fallbackImage = selectedImage?.id === image.id
+      ? (relatedImages[imageIndex + 1] || relatedImages[imageIndex - 1] || null)
+      : selectedImage;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: "删除当前实拍",
+      message: "确定删除当前图片/视频吗？此操作不可恢复。",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/gallery/${image.id}`, {
+            method: "DELETE",
+          });
+
+          if (!res.ok) {
+            throw new Error("Delete failed");
+          }
+
+          setProductMediaMap(prev => {
+            const currentItems = prev[currentProductId] || [];
+            return {
+              ...prev,
+              [currentProductId]: currentItems.filter(item => item.id !== image.id),
+            };
+          });
+          setGroups(prev => prev
+            .map(group => {
+              if (group.productId !== currentProductId) return group;
+              const nextTotalCount = Math.max(0, group.totalCount - 1);
+              const isVideo = image.type === "video" || /\.(mp4|webm|ogg|mov)$/i.test(image.url);
+              return {
+                ...group,
+                totalCount: nextTotalCount,
+                imageCount: Math.max(0, group.imageCount - (isVideo ? 0 : 1)),
+                videoCount: Math.max(0, group.videoCount - (isVideo ? 1 : 0)),
+                coverItem: group.coverItem?.id === image.id ? (fallbackImage?.productId === currentProductId ? fallbackImage : null) : group.coverItem,
+              };
+            })
+            .filter(group => group.totalCount > 0)
+          );
+
+          setSelectedImage(fallbackImage?.productId === currentProductId ? fallbackImage : null);
+          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          invalidateProductMedia(currentProductId);
+          void fetchData(true);
+          showToast("已删除当前实拍", "success");
+        } catch (error) {
+          console.error("Failed to delete gallery item:", error);
+          showToast("删除失败", "error");
+        }
+      },
+    });
+  }, [fetchData, invalidateProductMedia, relatedImages, selectedImage, showToast, user?.role]);
+
+  const handleMoveCurrentMedia = useCallback(async (direction: -1 | 1) => {
+    if (!selectedImage || !selectedImage.productId) return;
+
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= relatedImages.length) return;
+
+    const reordered = [...relatedImages];
+    const [movedItem] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, movedItem);
+
+    const payload = reordered.map((item, index) => ({
+      id: item.id,
+      sortOrder: index,
+    }));
+
+    try {
+      const res = await fetch("/api/gallery/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: payload }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Reorder failed");
+      }
+
+      setProductMediaMap(prev => ({
+        ...prev,
+        [selectedImage.productId]: reordered.map((item, index) => ({
+          ...item,
+          sortOrder: index,
+        })),
+      }));
+      setSelectedImage({
+        ...reordered[targetIndex],
+        sortOrder: targetIndex,
+      });
+      showToast(direction === -1 ? "已上移当前图片" : "已下移当前图片", "success");
+    } catch (error) {
+      console.error("Failed to reorder gallery items:", error);
+      showToast("调整顺序失败", "error");
+    }
+  }, [currentIndex, relatedImages, selectedImage, showToast]);
 
   const navigate = useCallback((dir: number) => {
     if (!selectedImage) return;
@@ -1649,6 +1759,27 @@ function GalleryContent() {
                                         <Plus size={20} strokeWidth={2.5} />
                                     </button>
                                     )}
+
+                                    {user?.role === "SUPER_ADMIN" && (
+                                    <>
+                                    <button
+                                        onClick={() => { void handleMoveCurrentMedia(-1); }}
+                                        disabled={currentIndex <= 0}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl disabled:opacity-30 disabled:pointer-events-none"
+                                        title="向前移动"
+                                    >
+                                        <ChevronRight size={18} className="rotate-180" />
+                                    </button>
+                                    <button
+                                        onClick={() => { void handleMoveCurrentMedia(1); }}
+                                        disabled={currentIndex === -1 || currentIndex >= relatedImages.length - 1}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl disabled:opacity-30 disabled:pointer-events-none"
+                                        title="向后移动"
+                                    >
+                                        <ChevronRight size={18} />
+                                    </button>
+                                    </>
+                                    )}
                                     
                                     <button 
                                         onClick={() => {
@@ -1809,6 +1940,20 @@ function GalleryContent() {
                                                 : "border-white/5 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100"
                                             )}
                                         >
+                                             {user?.role === "SUPER_ADMIN" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteMediaItem(img);
+                                                    }}
+                                                    className="absolute right-0.5 top-0.5 z-20 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition hover:bg-destructive hover:text-white group-hover:opacity-100"
+                                                    title="删除当前实拍"
+                                                >
+                                                    <Trash2 size={10} />
+                                                </button>
+                                             )}
+
                                              {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
                                                 <div className="w-full h-full bg-black flex items-center justify-center relative">
                                                     <video 

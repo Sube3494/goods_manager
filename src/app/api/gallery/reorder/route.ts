@@ -23,11 +23,10 @@ export async function POST(request: Request) {
     // Wrap the updates in a transaction to ensure all or nothing
     await prisma.$transaction(
       items.map((item: { id: string; sortOrder: number }) =>
-        prisma.galleryItem.update({
-          where: { 
-            id: item.id,
-            userId: session.id 
-          },
+        prisma.galleryItem.updateMany({
+          where: session.role === "SUPER_ADMIN"
+            ? { id: item.id }
+            : { id: item.id, userId: session.id },
           data: { sortOrder: item.sortOrder },
         })
       )

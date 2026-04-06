@@ -5,7 +5,6 @@ import { Readable } from "stream";
 import { finished } from "stream/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
-import sharp from "sharp";
 import prisma from "./prisma";
 
 export interface UploadResult {
@@ -53,6 +52,16 @@ const HEIC_MIME_TYPES = new Set([
   "image/heic-sequence",
   "image/heif-sequence",
 ]);
+
+type SharpLike = {
+  (input?: Buffer, options?: { animated?: boolean }): {
+    rotate(): {
+      jpeg(options?: { quality?: number; mozjpeg?: boolean }): {
+        toBuffer(): Promise<Buffer>;
+      };
+    };
+  };
+};
 
 function getExtension(fileName: string) {
   return fileName.split(".").pop()?.trim().toLowerCase() || "";
@@ -107,6 +116,7 @@ async function normalizeUploadInput(
   const inputBuffer = await readUploadSourceToBuffer(file);
 
   try {
+    const sharp = await loadSharp();
     const jpegBuffer = await sharp(inputBuffer)
       .rotate()
       .jpeg({ quality: 90, mozjpeg: true })
@@ -123,6 +133,19 @@ async function normalizeUploadInput(
   } catch (error) {
     console.error("Failed to convert HEIC/HEIF upload to JPEG:", error);
     throw new Error("HEIC 图片转换失败，请稍后重试或改传 JPG/PNG");
+  }
+}
+
+async function loadSharp() {
+  try {
+    const { createRequire } = await import("node:module");
+    const runtimeRequire = createRequire(join(process.cwd(), "package.json"));
+    const moduleName = ["sh", "arp"].join("");
+    const sharpModule = runtimeRequire(moduleName);
+    return (sharpModule.default ?? sharpModule) as SharpLike;
+  } catch (error) {
+    console.error("Failed to load sharp for HEIC conversion:", error);
+    throw new Error("HEIC 转换依赖可选包 sharp，请先在运行环境安装 sharp。");
   }
 }
 
