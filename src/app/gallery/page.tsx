@@ -277,7 +277,7 @@ function GalleryContent() {
       setConfirmConfig({
         isOpen: true,
         title: "登录后使用",
-        message: "您当前为游客身份，登录后即可使用下载、复制链接及上传等完整功能。",
+        message: "您当前为游客身份。请先添加管理员微信 Sube3494 审核开通，审核通过后再登录使用下载、复制链接及上传等功能。",
         onConfirm: () => {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
         },
@@ -297,7 +297,7 @@ function GalleryContent() {
     if (hasPerm) {
       action();
     } else {
-      showToast("您的账号暂无此功能操作权限", "error");
+      showToast("当前账号还没有这个权限；如需开通，请添加管理员微信 Sube3494 审核", "error");
     }
   }, [user, isUploadAllowed, showToast]);
   
@@ -383,7 +383,7 @@ function GalleryContent() {
     setConfirmConfig({
       isOpen: true,
       title: "请先登录",
-      message: "登录后查看",
+      message: "查看大图前，请先添加管理员微信 Sube3494 审核开通；审核通过后登录即可查看。",
       onConfirm: () => {
         window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
       },

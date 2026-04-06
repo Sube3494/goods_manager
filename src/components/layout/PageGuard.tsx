@@ -92,10 +92,10 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
         <h1 className="text-2xl font-bold mb-2">{isLoginRequired ? "请先登录" : "访问受限"}</h1>
         <p className="text-muted-foreground max-w-md mb-8">
           {isLoginRequired
-            ? `当前页面${currentNavItem ? `“${currentNavItem.name}”` : ""}需要登录后才能访问。登录后会自动返回当前页面。`
+            ? `当前页面${currentNavItem ? `“${currentNavItem.name}”` : ""}需要先开通账号后才能访问。请先添加管理员微信 Sube3494 审核，审核通过后登录，系统会自动返回当前页面。`
             : currentNavItem
-            ? `当前账号尚未获得“${currentNavItem.name}”的访问许可。${currentNavItem.description || "如果您认为这是一个错误，请联系管理员进行配置。"}`
-            : "抱歉，您的账号尚未获得进入该区域的许可。如果您认为这是一个错误，请联系管理员进行配置。"}
+            ? `当前账号尚未获得“${currentNavItem.name}”的访问许可。${currentNavItem.description || "如需开通，请添加管理员微信 Sube3494 审核。"}`
+            : "抱歉，您的账号尚未获得进入该区域的许可。如需开通，请添加管理员微信 Sube3494 审核。"}
         </p>
         {user && (
           <p className="mb-6 rounded-full border border-border/70 bg-background/60 px-4 py-2 text-sm text-muted-foreground">

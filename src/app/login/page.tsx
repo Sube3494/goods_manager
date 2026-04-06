@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [setupToken, setSetupToken] = useState("");
-  const [step, setStep] = useState<"password" | "code" | "setPassword" | "forgotPasswordCode" | "resetPassword">("password");
+  const [step, setStep] = useState<"email" | "password" | "code" | "setPassword" | "forgotPasswordCode" | "resetPassword">("email");
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
@@ -96,7 +96,7 @@ export default function LoginPage() {
         if (tokenEmail) setEmail(tokenEmail);
         
         // 如果有 email 和 token，自动进入验证码流程
-        if (tokenEmail && token && step === "password" && !isLoading && !triggeredRef.current) {
+        if (tokenEmail && token && step === "email" && !isLoading && !triggeredRef.current) {
             triggeredRef.current = true;
             const autoTrigger = async () => {
                 await sendCode(tokenEmail, "欢迎加入！验证码已发送至您的邮箱");
@@ -474,7 +474,65 @@ export default function LoginPage() {
 
           <div className="relative z-10">
             <AnimatePresence mode="wait">
-              {step === "password" ? (
+              {step === "email" ? (
+                <motion.form
+                    key="email-form"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleSendCode}
+                    className="space-y-6"
+                >
+                  <div className="space-y-1.5 flex flex-col">
+                    <label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground/60 ml-1">登录邮箱</label>
+                    <div className="relative group/input">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full rounded-2xl bg-white/5 pl-12 pr-4 py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30"
+                        placeholder="admin@example.com"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="group relative w-full overflow-hidden rounded-2xl bg-primary py-4 font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-70 disabled:pointer-events-none"
+                  >
+                    <div className="relative z-10 flex items-center justify-center gap-2">
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="animate-spin" size={20} />
+                          <span>发送中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>发送验证码</span>
+                          <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
+                        </>
+                      )}
+                    </div>
+                    <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-linear-to-r from-transparent via-white/20 to-transparent z-0" />
+                  </button>
+
+                  <div className="space-y-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setStep("password")}
+                      disabled={isLoading}
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-foreground/85 transition-all hover:bg-white/10 hover:border-primary/30 active:scale-[0.98] disabled:opacity-60"
+                    >
+                      使用密码登录
+                    </button>
+                  </div>
+                </motion.form>
+              ) : step === "password" ? (
                 <motion.form 
                     key="password-form"
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -542,7 +600,15 @@ export default function LoginPage() {
                     <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-linear-to-r from-transparent via-white/20 to-transparent z-0" />
                   </button>
                     
-                  <div className="space-y-3 pt-1">
+                    <div className="space-y-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setStep("email")}
+                      disabled={isLoading}
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-foreground/85 transition-all hover:bg-white/10 hover:border-primary/30 active:scale-[0.98] disabled:opacity-60"
+                    >
+                      使用邮箱验证码登录
+                    </button>
                     <button
                       type="button"
                       onClick={handleSendForgotPasswordCode}
@@ -551,26 +617,6 @@ export default function LoginPage() {
                     >
                       忘记密码
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleSendCode}
-                      disabled={isLoading}
-                      className="w-full rounded-2xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-foreground/85 transition-all hover:bg-white/10 hover:border-primary/30 active:scale-[0.98] disabled:opacity-60"
-                    >
-                      使用邮箱验证码登录
-                    </button>
-                    <div className="text-center text-xs text-muted-foreground/60 flex flex-col items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <span>未注册邮箱将无法获取验证码，</span>
-                          <button 
-                              type="button"
-                              onClick={() => setIsContactModalOpen(true)}
-                              className="text-primary/70 hover:text-primary transition-colors border-b border-primary/30 hover:border-primary border-dashed pb-0.5 active:scale-95"
-                          >
-                              请联系管理员
-                          </button>
-                        </div>
-                    </div>
                   </div>
 
                 </motion.form>
@@ -672,7 +718,7 @@ export default function LoginPage() {
                         <button 
                             type="button" 
                             onClick={() => {
-                              setStep("password");
+                              setStep("email");
                             }}
                             className="text-xs font-medium text-primary hover:text-primary/80 transition-colors bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20"
                         >
@@ -891,19 +937,19 @@ export default function LoginPage() {
                           <div className="absolute -bottom-1 -right-1 bg-green-500 w-[18px] h-[18px] rounded-full border-[3px] border-white dark:border-zinc-900" />
                       </div>
 
-                      <div className="text-center space-y-1.5 relative z-10">
-                          <h2 className="text-2xl font-black tracking-tighter text-foreground">联系管理员</h2>
-                          <p className="text-sm text-muted-foreground px-4 leading-relaxed font-medium">
-                            您的<span className="font-black text-foreground">邮箱</span>尚未获得访问授权
+                      <div className="text-center space-y-2 relative z-10">
+                          <h2 className="text-2xl font-semibold tracking-tight text-foreground">联系管理员</h2>
+                          <p className="text-sm text-muted-foreground px-4 leading-relaxed">
+                            您的<span className="font-medium text-foreground">邮箱</span>尚未获得访问授权
                             <br />
-                            请添加<span className="font-black text-foreground">管理员微信</span>进行申请
+                            请添加<span className="font-medium text-foreground">管理员微信</span>进行申请
                           </p>
                       </div>
 
                       <div className="w-full space-y-3.5 relative z-10">
                           <div className="bg-zinc-50 dark:bg-white/5 rounded-2xl px-4 py-3.5 border border-zinc-100 dark:border-white/5 flex flex-col items-center gap-1.5 group/wechat">
-                              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground/60">管理员微信号</span>
-                              <span className="text-xl font-mono font-bold text-primary select-all tracking-wider">Sube3494</span>
+                              <span className="text-[10px] uppercase tracking-[0.2em] font-medium text-muted-foreground/60">管理员微信号</span>
+                              <span className="text-xl font-mono font-semibold text-primary select-all tracking-wider">Sube3494</span>
                           </div>
 
                           <div className="relative aspect-square w-full max-w-[156px] mx-auto bg-white rounded-2xl p-2.5 shadow-2xl group/qr ring-1 ring-zinc-100 dark:ring-white/10">
