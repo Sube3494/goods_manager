@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -197,6 +197,7 @@ function PointValueDot({
   color,
   labelOffset = 18,
   formatter = formatYAxisAmount,
+  showLabel = true,
 }: {
   cx?: number;
   cy?: number;
@@ -204,6 +205,7 @@ function PointValueDot({
   color: string;
   labelOffset?: number;
   formatter?: (value: number) => string;
+  showLabel?: boolean;
 }) {
   if (typeof cx !== "number" || typeof cy !== "number" || typeof value !== "number") return null;
 
@@ -213,19 +215,21 @@ function PointValueDot({
   return (
     <g>
       <circle cx={cx} cy={cy} r={3.5} fill={color} />
-      <text
-        x={cx}
-        y={y}
-        textAnchor="middle"
-        fill="#f8fafc"
-        fontSize="10"
-        fontWeight="700"
-        stroke="rgba(15,23,42,0.9)"
-        strokeWidth="3"
-        paintOrder="stroke"
-      >
-        {label}
-      </text>
+      {showLabel && (
+        <text
+          x={cx}
+          y={y}
+          textAnchor="middle"
+          fill="#f8fafc"
+          fontSize="10"
+          fontWeight="700"
+          stroke="rgba(15,23,42,0.9)"
+          strokeWidth="3"
+          paintOrder="stroke"
+        >
+          {label}
+        </text>
+      )}
     </g>
   );
 }
@@ -438,6 +442,26 @@ export default function BrushCenterPage() {
       }))
       .sort((a, b) => b.value - a.value);
   }, [expenseTrendByShop.data, expenseTrendByShop.shops]);
+
+  const shouldShowShopExpenseLabel = useCallback((shop: string, index: number) => {
+    const series = expenseTrendByShop.data.map((item) => Number(item[shop] || 0));
+
+    if (series.length <= 2) return true;
+    if (index === 0 || index === series.length - 1) return true;
+
+    const current = series[index];
+    const prev = series[index - 1];
+    const next = series[index + 1];
+    const min = Math.min(...series);
+    const max = Math.max(...series);
+
+    if (current === min || current === max) return true;
+
+    const isLocalPeak = current > prev && current > next;
+    const isLocalValley = current < prev && current < next;
+
+    return !isCompactView && (isLocalPeak || isLocalValley);
+  }, [expenseTrendByShop.data, isCompactView]);
 
   const metricCards = useMemo(
     () => [
@@ -865,6 +889,7 @@ export default function BrushCenterPage() {
                               color={PLATFORM_COLORS[index % PLATFORM_COLORS.length]}
                               labelOffset={isCompactView ? 10 : 14}
                               formatter={formatExpenseCurrency}
+                              showLabel={shouldShowShopExpenseLabel(shop, props.index ?? -1)}
                             />
                           )}
                           activeDot={{ r: 5, strokeWidth: 0, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length] }}
