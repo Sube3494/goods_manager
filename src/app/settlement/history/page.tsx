@@ -241,7 +241,7 @@ export default function SettlementHistoryPage() {
   return (
     <div className="space-y-8 pb-12">
       <div className="relative overflow-hidden rounded-[32px] border border-border/60 bg-white/85 p-6 shadow-sm dark:bg-white/5 sm:p-8">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-80 bg-gradient-to-l from-primary/8 via-primary/4 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-80 bg-linear-to-l from-primary/8 via-primary/4 to-transparent" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.28em] text-muted-foreground">
@@ -583,7 +583,7 @@ export default function SettlementHistoryPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col justify-center rounded-[26px] border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-6 text-center">
+                  <div className="flex flex-col justify-center rounded-[26px] border border-primary/20 bg-linear-to-br from-primary/5 to-primary/10 p-6 text-center">
                     <TrendingUp className="mx-auto text-primary" size={30} />
                     <p className="mt-4 text-[11px] font-black uppercase tracking-[0.22em] text-muted-foreground">
                       当前选中记录

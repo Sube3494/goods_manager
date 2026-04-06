@@ -235,7 +235,7 @@ export default function SettlementPage() {
   return (
     <div className="w-full space-y-6 pb-20 2xl:px-4">
       <div className="relative overflow-hidden rounded-[28px] border border-border/60 bg-white/85 p-5 shadow-sm dark:bg-white/5">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-gradient-to-l from-primary/8 via-primary/4 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-linear-to-l from-primary/8 via-primary/4 to-transparent" />
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
@@ -463,7 +463,7 @@ export default function SettlementPage() {
           ) : (
             <section className="rounded-[30px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
               <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] xl:p-8">
-                <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-border bg-muted/[0.08] px-6 text-center">
+                <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-border bg-muted/8 px-6 text-center">
                   <div className="flex h-18 w-18 items-center justify-center rounded-full bg-primary/8">
                     <Store size={34} className="text-primary" />
                   </div>

@@ -46,7 +46,7 @@ export function DownloadButton({ url, filename }: DownloadButtonProps) {
 
       {/* iOS 长按保存引导弹窗 */}
       {showGuide && (
-        <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowGuide(false)}>
+        <div className="fixed inset-0 z-99999 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowGuide(false)}>
           <div className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-base text-foreground">保存到相册</h3>

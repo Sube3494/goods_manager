@@ -201,7 +201,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="sticky top-[4.5rem] z-20 mx-3 mb-5 rounded-[24px] border border-border/60 bg-white/78 p-2 shadow-lg shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/82 sm:mx-0 lg:hidden">
+        <div className="sticky top-18 z-20 mx-3 mb-5 rounded-[24px] border border-border/60 bg-white/78 p-2 shadow-lg shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/82 sm:mx-0 lg:hidden">
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <a
             href="#profile-overview"

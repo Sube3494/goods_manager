@@ -78,12 +78,12 @@ export async function POST(req: NextRequest) {
     const userProfile = userDb as UserImportProfile | null;
     const internalShops = new Set<string>();
     const brushShopNames = new Set<string>();
-    if (Array.isArray(userProfile?.shippingAddresses)) {
+    if (userProfile && Array.isArray(userProfile.shippingAddresses)) {
       userProfile.shippingAddresses.forEach((a) => {
         if (a.label) internalShops.add(a.label);
       });
     }
-    if (Array.isArray(userProfile?.brushShops)) {
+    if (userProfile && Array.isArray(userProfile.brushShops)) {
       userProfile.brushShops.forEach((s) => {
         if (typeof s === 'string') {
           internalShops.add(s);
@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
 
           // 3. 如果还是没匹配上（比如“私人定制优选礼品”、“帮我取货”这种不包含地名的），
           // 我们通过 Excel 表里可能存在的“地址”列，结合系统配置的真实物理地址来进行逆向推导
-          if (!matchedInternalShop && shopAddress && Array.isArray(userProfile?.shippingAddresses)) {
+          if (!matchedInternalShop && shopAddress && userProfile && Array.isArray(userProfile.shippingAddresses)) {
             const shopAddrStr = String(shopAddress).trim();
             // 优先：用系统存储的物理地址与配送门店做互向子串匹配
             // 例: 配送门店="粤顺商务中心4楼423", 系统地址="...粤顺商务中心4楼423..." → 匹配白云店
