@@ -52,6 +52,29 @@ interface Settlement {
 const formatCurrency = (value: number) =>
   `¥${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const getSettlementShopNames = (settlement: Settlement, knownShopLabels: string[] = []) => {
+  const itemNames = settlement.items
+    .map((item) => item.shopName?.trim())
+    .filter((name): name is string => Boolean(name));
+
+  if (itemNames.length > 0) {
+    return Array.from(new Set(itemNames));
+  }
+
+  const rootNames = (settlement.shopName || "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+  if (rootNames.length > 0) {
+    return Array.from(new Set(rootNames));
+  }
+
+  const note = settlement.note || "";
+  const matchedFromNote = knownShopLabels.filter((shopLabel) => note.includes(shopLabel));
+  return Array.from(new Set(matchedFromNote));
+};
+
 export default function SettlementHistoryPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [filterShop, setFilterShop] = useState("");
@@ -64,6 +87,10 @@ export default function SettlementHistoryPage() {
   const { user, isLoading: userLoading } = useUser();
   const { showToast } = useToast();
   const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
+  const profileShopLabels = useMemo(
+    () => ((user?.shippingAddresses as AddressItem[] | undefined) || []).map((shop) => shop.label).filter(Boolean),
+    [user?.shippingAddresses]
+  );
 
   useEffect(() => {
     fetchSettlements();
@@ -87,8 +114,8 @@ export default function SettlementHistoryPage() {
   };
 
   const filteredSettlements = useMemo(() => {
-    return settlements.filter((settlement) => !filterShop || settlement.shopName === filterShop);
-  }, [settlements, filterShop]);
+    return settlements.filter((settlement) => !filterShop || getSettlementShopNames(settlement, profileShopLabels).includes(filterShop));
+  }, [settlements, filterShop, profileShopLabels]);
 
   useEffect(() => {
     if (filteredSettlements.length === 0) {
@@ -100,6 +127,11 @@ export default function SettlementHistoryPage() {
       setSelectedSettlement(filteredSettlements[0]);
     }
   }, [filteredSettlements, selectedSettlement]);
+
+  const availableShopOptions = useMemo(() => {
+    const knownFromHistory = settlements.flatMap((settlement) => getSettlementShopNames(settlement, profileShopLabels));
+    return Array.from(new Set([...profileShopLabels, ...knownFromHistory])).filter(Boolean);
+  }, [settlements, profileShopLabels]);
 
   const historyStats = useMemo(() => {
     return {
@@ -232,14 +264,14 @@ export default function SettlementHistoryPage() {
             </div>
           </div>
 
-          {user?.shippingAddresses && (user.shippingAddresses as AddressItem[]).length > 0 && (
+          {availableShopOptions.length > 0 && (
             <div className="min-w-[190px]">
               <CustomSelect
                 options={[
                   { value: "", label: "全部店铺" },
-                  ...(user.shippingAddresses as AddressItem[]).map((shop) => ({
-                    value: shop.label,
-                    label: shop.label,
+                  ...availableShopOptions.map((shopName) => ({
+                    value: shopName,
+                    label: shopName,
                   })),
                 ]}
                 value={filterShop}
@@ -305,6 +337,7 @@ export default function SettlementHistoryPage() {
           ) : (
             filteredSettlements.map((settlement) => {
               const active = selectedSettlement?.id === settlement.id;
+              const settlementShopNames = getSettlementShopNames(settlement, profileShopLabels);
               return (
                 <div
                   key={settlement.id}
@@ -330,9 +363,9 @@ export default function SettlementHistoryPage() {
                           <Calendar size={12} />
                           {format(new Date(settlement.date), "yyyy年MM月dd日", { locale: zhCN })}
                         </span>
-                        {settlement.shopName && (
+                        {settlementShopNames.length > 0 && (
                           <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold text-primary">
-                            {settlement.shopName}
+                            {settlementShopNames.join(" / ")}
                           </span>
                         )}
                       </div>

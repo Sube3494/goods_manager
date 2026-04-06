@@ -117,6 +117,7 @@ export default function SettlementPage() {
 
   const activeGroup = groups.find((group) => group.shopName === activeShop) ?? null;
   const confirmedGroups = groups.filter((group) => group.isConfirmed);
+  const hasSettlementInProgress = selectedShops.length > 0 || confirmedGroups.length > 0;
   const summary = {
     shopCount: confirmedGroups.length,
     totalReceived: confirmedGroups.reduce((sum, group) => sum + group.totalReceived, 0),
@@ -259,7 +260,7 @@ export default function SettlementPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 2xl:grid-cols-[240px_minmax(860px,1fr)_320px]">
+      <div className={`grid gap-6 ${hasSettlementInProgress ? "2xl:grid-cols-[280px_minmax(0,1fr)_320px]" : "xl:grid-cols-[320px_minmax(0,1fr)]"}`}>
         <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
           <section className="rounded-[24px] border border-border/60 bg-white p-4 shadow-sm dark:bg-white/5">
             <div className="mb-4 flex items-center gap-2">
@@ -409,7 +410,7 @@ export default function SettlementPage() {
                         </label>
                       </div>
 
-                      <div className="mt-3 grid gap-3 rounded-[18px] bg-muted/20 p-3 sm:grid-cols-3">
+                      <div className="mt-3 grid gap-3 rounded-[18px] bg-muted/20 p-3 sm:grid-cols-2">
                         <div>
                           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">真实业绩</div>
                           <div className="mt-1 font-mono text-lg font-black text-primary">{money(entry.net)}</div>
@@ -417,10 +418,6 @@ export default function SettlementPage() {
                         <div>
                           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">预计服务费</div>
                           <div className="mt-1 font-mono text-lg font-black text-orange-500">{money(entry.fee)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">已打款到卡</div>
-                          <div className="mt-1 font-mono text-lg font-black text-rose-500">{money(entry.alreadyReceivedAmount)}</div>
                         </div>
                       </div>
                     </div>
@@ -464,16 +461,41 @@ export default function SettlementPage() {
               </section>
             </>
           ) : (
-            <div className="flex min-h-[60dvh] flex-col items-center justify-center rounded-[30px] border-2 border-dashed border-border bg-muted/5 px-6 text-center">
-              <div className="flex h-18 w-18 items-center justify-center rounded-full bg-primary/8">
-                <Store size={34} className="text-primary" />
+            <section className="rounded-[30px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
+              <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] xl:p-8">
+                <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-border bg-muted/[0.08] px-6 text-center">
+                  <div className="flex h-18 w-18 items-center justify-center rounded-full bg-primary/8">
+                    <Store size={34} className="text-primary" />
+                  </div>
+                  <p className="mt-5 text-xl font-black tracking-tight">先在左侧选择要结算的店铺</p>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">选中后，中间区域只处理当前店铺，确认后再进入总单，避免多家店的数据混在一起。</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-[24px] border border-border/60 bg-background/80 p-5">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-muted-foreground">
+                      <Wallet size={14} className="text-primary" />
+                      本次总单预览
+                    </div>
+                    <div className="mt-4 text-3xl font-black tracking-tight text-primary">{money(summary.finalBalance)}</div>
+                    <p className="mt-2 text-sm text-muted-foreground">还没选店前，不生成总单；这里先给你看当前汇总状态。</p>
+                  </div>
+
+                  <div className="rounded-[24px] border border-border/60 bg-background/80 p-5">
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">推荐顺序</div>
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl bg-muted/20 px-4 py-3 text-sm text-muted-foreground">1. 左侧选择要结算的店铺</div>
+                      <div className="rounded-2xl bg-muted/20 px-4 py-3 text-sm text-muted-foreground">2. 在中间录入当前店铺的平台金额</div>
+                      <div className="rounded-2xl bg-muted/20 px-4 py-3 text-sm text-muted-foreground">3. 确认本店后，再汇总到总单保存</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="mt-5 text-xl font-black tracking-tight">先在左侧选择要结算的店铺</p>
-              <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">选中后，中间这里只处理当前店铺的结算，不再把多家店的录入区堆在一起。</p>
-            </div>
+            </section>
           )}
         </main>
 
+        {hasSettlementInProgress && (
         <aside className="space-y-6 2xl:sticky 2xl:top-6 2xl:self-start">
           <section className="overflow-hidden rounded-[24px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
             <div className="border-b border-border/60 bg-muted/10 px-5 py-4">
@@ -556,6 +578,7 @@ export default function SettlementPage() {
             </div>
           </section>
         </aside>
+        )}
       </div>
     </div>
   );
