@@ -72,7 +72,7 @@ export default function DistanceCalcPage() {
       <div className={cn(
         "flex-1 min-h-[600px] rounded-[32px] border border-border/60 bg-white/5 shadow-sm overflow-hidden backdrop-blur-xl relative",
       )}>
-        <StoreDispatchMap initialStores={[]} user={user} />
+        <StoreDispatchMap initialStores={[]} />
       </div>
     </div>
   );
