@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw } from "lucide-react";
+import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
@@ -160,7 +161,14 @@ export default function BrushPlansPage() {
         <div className="space-y-6 sm:space-y-8">
             <div className="mb-5 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <div className="min-w-0">
-                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground truncate">刷单安排表</h1>
+                    <Link
+                        href="/brush"
+                        className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
+                    >
+                        <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
+                        <span>返回刷单中心</span>
+                    </Link>
+                    <h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-foreground truncate">刷单安排表</h1>
                     <p className="text-muted-foreground mt-1 text-[10px] sm:text-sm font-medium truncate">规划及管理刷单任务</p>
                 </div>
                 {canManage && (

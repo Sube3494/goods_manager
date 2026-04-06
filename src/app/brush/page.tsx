@@ -221,10 +221,10 @@ function PointValueDot({
           y={y}
           textAnchor="middle"
           fill="#f8fafc"
-          fontSize="10"
-          fontWeight="700"
+          fontSize="8.5"
+          fontWeight="500"
           stroke="rgba(15,23,42,0.9)"
-          strokeWidth="3"
+          strokeWidth="2.2"
           paintOrder="stroke"
         >
           {label}
@@ -246,16 +246,16 @@ function ExpenseTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="min-w-[200px] rounded-[22px] border border-white/10 bg-slate-950/92 px-4 py-3 shadow-2xl backdrop-blur-xl">
-      <div className="text-lg font-black text-white">{label}</div>
-      <div className="mt-3 space-y-2 text-sm">
+    <div className="min-w-[156px] rounded-[16px] border border-white/10 bg-slate-950/92 px-3 py-2.5 shadow-xl backdrop-blur-xl">
+      <div className="text-sm font-semibold text-white">{label}</div>
+      <div className="mt-2 space-y-1.5 text-xs">
         {payload.map((item) => (
           <div key={item.name} className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
               <span className="text-slate-300">{item.name}</span>
             </div>
-            <span className="font-bold text-white">{formatExpenseCurrency(Number(item.value))}</span>
+            <span className="font-medium text-white">{formatExpenseCurrency(Number(item.value))}</span>
           </div>
         ))}
       </div>
@@ -536,9 +536,6 @@ export default function BrushCenterPage() {
               </div>
               <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
                 今日录单 {stats.todayOrderCount} 笔
-              </div>
-              <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                主支出店铺 {expenseTrendByShop.shops[0] || "--"}
               </div>
             </div>
           </div>

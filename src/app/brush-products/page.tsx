@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Plus, Search, Tags, Package, RotateCcw, Store, Download, Check } from "lucide-react";
+import { Plus, Search, Tags, Package, RotateCcw, Store, Download, Check, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { BrushProduct, Product } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
@@ -354,8 +355,15 @@ export default function BrushProductsPage() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
+          <Link
+            href="/brush"
+            className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
+          >
+            <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
+            <span>返回刷单中心</span>
+          </Link>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-4xl">刷单商品库</h1>
+            <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-4xl">刷单商品库</h1>
             <span className="inline-flex items-center rounded-2xl border border-border/70 bg-white/70 px-3 py-1 text-xs font-bold text-foreground dark:bg-white/5">
               {items.length}
             </span>
