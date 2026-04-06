@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
 
   // Define public paths that don't require authentication
   // STRICT MODE: Only Login, Gallery, and share pages are public.
-  const publicPaths = ["/login", "/gallery", "/share", "/brush-plans/share"];
+  const publicPaths = ["/login", "/gallery", "/media", "/brush-plans/share"];
 
   // 1. Always allow public static files (images, favicon, etc) - handled by matcher
 
@@ -43,11 +43,11 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public GET APIs
-  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/share/sign", "/api/brush-plans/public", "/api/uploads"];
+  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/brush-plans/public", "/api/uploads"];
   const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
 
-  // Check for public POST APIs (Guest uploads/submissions)
-  const publicPostApis = ["/api/upload", "/api/gallery/submissions"];
+  // Check for public POST APIs
+  const publicPostApis = ["/api/upload"];
   const isPublicPostApi = request.method === "POST" && publicPostApis.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public PATCH APIs (Guest toggle status)

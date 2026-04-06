@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, CheckCircle, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft } from "lucide-react";
 import { AdminCapability, Permission, hasAdminAccess } from "./permissions";
 
 export interface NavItem {
@@ -34,7 +34,6 @@ export const navItems: NavItem[] = [
   { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true, permission: "outbound:manage", description: "销售、领用与损耗出库", section: "workspace" },
   { name: "结算对账", href: "/settlement", icon: CreditCard, adminOnly: true, permission: "settlement:manage", description: "对账与结算记录", section: "workspace" },
   { name: "实物相册", href: "/gallery", icon: Camera, public: true, description: "商品实拍与公共素材", section: "workspace" },
-  { name: "实拍审核", href: "/gallery/submissions", icon: CheckCircle, adminOnly: true, permission: "gallery:audit", description: "审核外部提交的实拍素材", section: "workspace" },
   { name: "成员管理", href: "/admin/members", icon: Users, adminCapability: ["members:manage", "members:status", "whitelist:manage"], description: "成员、白名单与邀请控制", section: "management" },
   { name: "角色管理", href: "/admin/roles", icon: ShieldAlert, permission: "system:manage", description: "角色模板与权限矩阵", section: "management" },
   { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true, permission: "system:manage", description: "系统参数、存储与备份", section: "management" },

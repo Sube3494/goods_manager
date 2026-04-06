@@ -42,7 +42,6 @@ export async function POST(request: Request) {
           include: { items: true } 
       }),
       galleryItems: await prisma.galleryItem.findMany(),
-      gallerySubmissions: await prisma.gallerySubmission.findMany(),
       systemSettings: await prisma.systemSetting.findMany(),
       users: await prisma.user.findMany(),
       roleProfiles: await prisma.roleProfile.findMany(),

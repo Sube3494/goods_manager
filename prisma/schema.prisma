@@ -159,24 +159,6 @@ model GalleryItem {
   @@index([userId])
 }
 
-model GallerySubmission {
-  id              String   @id @default(cuid())
-  urls            Json
-  sku             String?
-  productName     String?
-  status          String   @default("pending")
-  notes           String?
-  productId       String?
-  selectedIndices Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  userId          String?
-  user            User?    @relation(fields: [userId], references: [id])
-
-  @@index([status])
-  @@index([userId])
-}
-
 model User {
   id                 String              @id @default(cuid())
   email              String              @unique
@@ -196,7 +178,6 @@ model User {
   brushProducts      BrushProduct[]
   categories         Category[]
   galleryItems       GalleryItem[]
-  gallerySubmissions GallerySubmission[]
   outboundOrders     OutboundOrder[]
   products           Product[]
   purchaseOrders     PurchaseOrder[]

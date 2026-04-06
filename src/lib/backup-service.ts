@@ -34,7 +34,6 @@ interface BackupPayload {
   outboundOrders?: BackupOrderWithItems[];
   brushOrders?: BackupOrderWithItems[];
   galleryItems?: Record<string, unknown>[];
-  gallerySubmissions?: Record<string, unknown>[];
 }
 
 function castMany<T>(value: unknown): T[] {
@@ -66,7 +65,6 @@ export class BackupService {
         outboundOrders: await prisma.outboundOrder.findMany({ include: { items: true } }),
         brushOrders: await prisma.brushOrder.findMany({ include: { items: true } }),
         galleryItems: await prisma.galleryItem.findMany(),
-        gallerySubmissions: await prisma.gallerySubmission.findMany(),
         systemSettings: await prisma.systemSetting.findMany(),
         users: await prisma.user.findMany(),
         roleProfiles: await prisma.roleProfile.findMany(),
@@ -171,7 +169,6 @@ export class BackupService {
       await tx.brushOrderItem.deleteMany();
       await tx.brushOrder.deleteMany();
       await tx.galleryItem.deleteMany();
-      await tx.gallerySubmission.deleteMany();
       await tx.outboundOrderItem.deleteMany();
       await tx.outboundOrder.deleteMany();
       await tx.purchaseOrderItem.deleteMany();
@@ -225,7 +222,6 @@ export class BackupService {
         }
       }
       if (data.galleryItems) await tx.galleryItem.createMany({ data: castMany<Prisma.GalleryItemCreateManyInput>(data.galleryItems) });
-      if (data.gallerySubmissions) await tx.gallerySubmission.createMany({ data: castMany<Prisma.GallerySubmissionCreateManyInput>(data.gallerySubmissions) });
     }, {
       timeout: 30000 // 恢复操作可能较重，增加超时时间
     });

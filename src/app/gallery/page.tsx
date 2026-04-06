@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
-import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, ExternalLink, Volume2, VolumeX, Maximize, Images, Clapperboard } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -271,13 +271,13 @@ function GalleryContent() {
   // 基础权限检查，不再用于隐藏按钮，仅用于业务逻辑拦截
 
   // 统一权限拦截与游客引导逻辑
-  const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy", action: () => void) => {
+  const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:copy", action: () => void) => {
     if (!user) {
       // 游客身份：引导登录
       setConfirmConfig({
         isOpen: true,
         title: "登录后使用",
-        message: "您当前为游客身份，登录后即可使用下载、分享、复制链接及上传等完整功能。",
+        message: "您当前为游客身份，登录后即可使用下载、复制链接及上传等完整功能。",
         onConfirm: () => {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
         },
@@ -674,64 +674,33 @@ function GalleryContent() {
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (uploadForm.urls.length === 0) return;
-
-    // Admin direct upload logic
-    if (isAdmin && uploadForm.productId) {
-      try {
-        const res = await fetch("/api/gallery", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...uploadForm,
-            tags: uploadForm.tags.split(",").map(t => t.trim()).filter(Boolean)
-          })
-        });
-
-        if (res.ok) {
-          setIsUploadModalOpen(false);
-          setUploadForm({ productId: "", urls: [], tags: "" });
-          if (uploadForm.productId) {
-            setProductMediaMap(prev => {
-              const next = { ...prev };
-              delete next[uploadForm.productId];
-              return next;
-            });
-          }
-          showToast("发布成功", "success");
-          fetchData(true);
-        }
-      } catch (error) {
-        console.error("Gallery submit failed:", error);
-        showToast("发布失败", "error");
-      }
-      return;
-    }
-
-    // Non-admin or missing product ID (Submission logic)
-    if (!uploadForm.productId && !uploadForm.tags && !isAdmin) { // Using tags field as a temporary storage or just relying on SKU/Name
-        // Validation check for SKU or Product Name is handled by the API and UI
-    }
+    if (uploadForm.urls.length === 0 || !uploadForm.productId) return;
 
     try {
-      const res = await fetch("/api/gallery/submissions", {
+      const res = await fetch("/api/gallery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          urls: uploadForm.urls,
-          sku: uploadForm.tags.split(",")[0]?.trim() || "", // Temporary use of tags field or new state
-          productName: uploadForm.tags.split(",")[1]?.trim() || "",
-          productId: uploadForm.productId // Send productId if available
+          ...uploadForm,
+          tags: uploadForm.tags.split(",").map(t => t.trim()).filter(Boolean)
         })
       });
 
       if (res.ok) {
         setIsUploadModalOpen(false);
         setUploadForm({ productId: "", urls: [], tags: "" });
-        showToast("已提交审核，请耐心等待管理员处理", "success");
+        if (uploadForm.productId) {
+          setProductMediaMap(prev => {
+            const next = { ...prev };
+            delete next[uploadForm.productId];
+            return next;
+          });
+        }
+        showToast("发布成功", "success");
+        fetchData(true);
       } else {
         const data = await res.json();
-        showToast(data.error || "提交失败", "error");
+        showToast(data.error || "发布失败", "error");
       }
     } catch (error) {
       console.error("Gallery submit failed:", error);
@@ -825,6 +794,11 @@ function GalleryContent() {
     });
   }, [selectedImage, productMediaMap, isAdmin]);
   const currentIndex = relatedImages.findIndex(img => img.id === selectedImage?.id);
+  const isSelectedCoverMedia = !!selectedImage?.product?.image && selectedImage.url === selectedImage.product.image;
+  const hasPinnedCoverMedia = !!selectedImage?.product?.image && relatedImages.some((item) => item.url === selectedImage.product?.image);
+  const minMovableIndex = hasPinnedCoverMedia ? 1 : 0;
+  const canMoveCurrentMediaBackward = !isSelectedCoverMedia && currentIndex > minMovableIndex;
+  const canMoveCurrentMediaForward = !isSelectedCoverMedia && currentIndex !== -1 && currentIndex < relatedImages.length - 1;
 
   const handleDeleteMediaItem = useCallback((image: GalleryItem) => {
     if (user?.role !== "SUPER_ADMIN") return;
@@ -887,6 +861,9 @@ function GalleryContent() {
 
   const handleMoveCurrentMedia = useCallback(async (direction: -1 | 1) => {
     if (!selectedImage || !selectedImage.productId) return;
+    if (selectedImage.product?.image && selectedImage.url === selectedImage.product.image) return;
+    if (direction === -1 && !canMoveCurrentMediaBackward) return;
+    if (direction === 1 && !canMoveCurrentMediaForward) return;
 
     const targetIndex = currentIndex + direction;
     if (targetIndex < 0 || targetIndex >= relatedImages.length) return;
@@ -927,7 +904,7 @@ function GalleryContent() {
       console.error("Failed to reorder gallery items:", error);
       showToast("调整顺序失败", "error");
     }
-  }, [currentIndex, relatedImages, selectedImage, showToast]);
+  }, [canMoveCurrentMediaBackward, canMoveCurrentMediaForward, currentIndex, relatedImages, selectedImage, showToast]);
 
   const navigate = useCallback((dir: number) => {
     if (!selectedImage) return;
@@ -1527,47 +1504,14 @@ function GalleryContent() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-4">
-                                            <div className="p-4 rounded-[20px] bg-zinc-50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/5 flex items-start gap-3 shadow-sm">
-                                                <Info size={18} className="text-primary shrink-0 mt-0.5" />
-                                                <div className="space-y-1">
-                                                    <p className="text-sm text-primary">实拍审核说明</p>
-                                                    <p className="text-xs text-muted-foreground leading-relaxed">请提供商品货号或名称，管理员将在审核后将照片关联至对应商品。实拍内容不会立即显示在相册中。</p>
+                                                <div className="p-4 rounded-[20px] bg-zinc-50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/5 flex items-start gap-3 shadow-sm">
+                                                    <Info size={18} className="text-primary shrink-0 mt-0.5" />
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm text-primary">请选择关联商品</p>
+                                                        <p className="text-xs text-muted-foreground leading-relaxed">发布到相册前，需要先把本次上传的素材关联到一个商品。</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">货号 (SKU)</label>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="例如: B03"
-                                                        value={uploadForm.tags.split(",")[0] || ""}
-                                                        onChange={(e) => {
-                                                            const parts = uploadForm.tags.split(",");
-                                                            parts[0] = e.target.value;
-                                                            setUploadForm(prev => ({ ...prev, tags: parts.join(",") }));
-                                                        }}
-                                                        className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-muted-foreground uppercase tracking-wider">商品名称</label>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="例如: 赛车游戏机"
-                                                        value={uploadForm.tags.split(",")[1] || ""}
-                                                        onChange={(e) => {
-                                                            const parts = uploadForm.tags.split(",");
-                                                            parts[1] = e.target.value;
-                                                            setUploadForm(prev => ({ ...prev, tags: parts.join(",") }));
-                                                        }}
-                                                        className="w-full px-4 py-2.5 rounded-xl bg-muted/50 border border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                            )}
 
                                     {/* Download button removed redundancy */}
                                 </div>
@@ -1578,11 +1522,11 @@ function GalleryContent() {
                                     <button type="button" onClick={() => setIsUploadModalOpen(false)} className="px-6 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground">取消</button>
                                     <button 
                                         type="submit" 
-                                        disabled={uploadForm.urls.length === 0 || (isAdmin && !uploadForm.productId) || (!isAdmin && !uploadForm.productId && !uploadForm.tags.split(",")[0] && !uploadForm.tags.split(",")[1]) || !!isUploading}
+                                        disabled={uploadForm.urls.length === 0 || !uploadForm.productId || !!isUploading}
                                         className="relative flex items-center gap-2 rounded-2xl bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-all group overflow-hidden"
                                     >
                                         <CheckCircle size={18} className="relative z-10" />
-                                        <span className="relative z-10">{isAdmin ? "确认发布" : "提交审核"} ({uploadForm.urls.length})</span>
+                                        <span className="relative z-10">确认发布 ({uploadForm.urls.length})</span>
                                     </button>
                                 </div>
                             </form>
@@ -1756,7 +1700,7 @@ function GalleryContent() {
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
                                         title="为此商品上传新实拍"
                                     >
-                                        <Plus size={20} strokeWidth={2.5} />
+                                        <Plus size={18} />
                                     </button>
                                     )}
 
@@ -1764,19 +1708,30 @@ function GalleryContent() {
                                     <>
                                     <button
                                         onClick={() => { void handleMoveCurrentMedia(-1); }}
-                                        disabled={currentIndex <= 0}
+                                        disabled={!canMoveCurrentMediaBackward}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl disabled:opacity-30 disabled:pointer-events-none"
-                                        title="向前移动"
+                                        title={isSelectedCoverMedia ? "封面图不可移动" : "向前移动"}
                                     >
                                         <ChevronRight size={18} className="rotate-180" />
                                     </button>
                                     <button
                                         onClick={() => { void handleMoveCurrentMedia(1); }}
-                                        disabled={currentIndex === -1 || currentIndex >= relatedImages.length - 1}
+                                        disabled={!canMoveCurrentMediaForward}
                                         className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl disabled:opacity-30 disabled:pointer-events-none"
-                                        title="向后移动"
+                                        title={isSelectedCoverMedia ? "封面图不可移动" : "向后移动"}
                                     >
                                         <ChevronRight size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (selectedImage) {
+                                                handleDeleteMediaItem(selectedImage);
+                                            }
+                                        }}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-destructive hover:text-white transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
+                                        title="删除当前实拍"
+                                    >
+                                        <Trash2 size={18} />
                                     </button>
                                     </>
                                     )}
@@ -1785,24 +1740,26 @@ function GalleryContent() {
                                         onClick={() => {
                                             checkAction("gallery:copy", async () => {
                                                 try {
-                                                    const res = await fetch(`/api/share/sign?id=${selectedImage!.id}`);
-                                                    if (!res.ok) throw new Error("Sign failed");
+                                                    const res = await fetch(`/api/media/sign?id=${selectedImage!.id}`);
+                                                    if (!res.ok) {
+                                                        throw new Error("Sign failed");
+                                                    }
                                                     const { expires, signature, expireText } = await res.json();
-                                                    const url = new URL(`/share/${selectedImage!.id}?e=${expires}&s=${signature}`, window.location.origin).href;
-                                                    const success = await copyToClipboard(url);
+                                                    const url = new URL(`/media/${selectedImage!.id}?e=${expires}&s=${signature}`, window.location.origin);
+                                                    const success = await copyToClipboard(url.href);
                                                     if (success) {
-                                                        showToast(`链接已复制，${expireText}内有效`, "success");
+                                                        showToast(`媒体链接已复制，${expireText}内有效`, "success");
                                                     } else {
                                                         // iOS 后备方案：弹出手动复制框
                                                         setCopyModalConfig({
                                                             isOpen: true,
-                                                            url: url,
-                                                            title: "链接已生成",
+                                                            url: url.href,
+                                                            title: "媒体链接已生成",
                                                             mode: 'copy',
                                                         });
                                                     }
                                                 } catch {
-                                                    showToast("生成链接失败", "error");
+                                                    showToast("复制媒体链接失败", "error");
                                                 }
                                             });
                                         }}
@@ -1810,38 +1767,6 @@ function GalleryContent() {
                                         title="复制媒体链接"
                                     >
                                         <Link2 size={18} />
-                                    </button>
-
-                                    <button 
-                                        onClick={() => {
-                                            checkAction("gallery:share", async () => {
-                                                try {
-                                                    const productId = selectedImage!.productId;
-                                                    const res = await fetch(`/api/share/sign?productId=${productId}`);
-                                                    if (!res.ok) throw new Error("Sign failed");
-                                                    const { expires, signature, expireText } = await res.json();
-                                                    const url = new URL(`/share/product/${productId}?e=${expires}&s=${signature}`, window.location.origin).href;
-                                                    const success = await copyToClipboard(url);
-                                                    if (success) {
-                                                        showToast(`相册链接已复制，${expireText}内有效`, "success");
-                                                    } else {
-                                                        // iOS 后备方案
-                                                        setCopyModalConfig({
-                                                            isOpen: true,
-                                                            url: url,
-                                                            title: "分享链接已生成",
-                                                            mode: 'copy',
-                                                        });
-                                                    }
-                                                } catch {
-                                                    showToast("生成链接失败", "error");
-                                                }
-                                            });
-                                        }}
-                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl"
-                                        title="转发（分享全套实拍）"
-                                    >
-                                        <ExternalLink size={18} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                                     </button>
 
                                     <button 
@@ -1940,20 +1865,6 @@ function GalleryContent() {
                                                 : "border-white/5 brightness-50 opacity-40 hover:opacity-100 hover:brightness-100"
                                             )}
                                         >
-                                             {user?.role === "SUPER_ADMIN" && (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteMediaItem(img);
-                                                    }}
-                                                    className="absolute right-0.5 top-0.5 z-20 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition hover:bg-destructive hover:text-white group-hover:opacity-100"
-                                                    title="删除当前实拍"
-                                                >
-                                                    <Trash2 size={10} />
-                                                </button>
-                                             )}
-
                                              {img.type === 'video' || /\.(mp4|webm|ogg|mov)$/i.test(img.url) ? (
                                                 <div className="w-full h-full bg-black flex items-center justify-center relative">
                                                     <video 

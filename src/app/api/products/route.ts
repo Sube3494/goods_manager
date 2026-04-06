@@ -211,12 +211,7 @@ export async function DELETE(request: Request) {
       where: { productId: id }
     });
 
-    // 2. Delete gallery submissions
-    await prisma.gallerySubmission.deleteMany({
-        where: { productId: id }
-    });
-
-    // 3. Finally delete the product
+    // 2. Finally delete the product
     await prisma.product.delete({
       where: { id },
     });

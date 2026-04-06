@@ -9,7 +9,7 @@ export type Permission =
   | "inbound:manage"
   | "outbound:manage"
   | "brush:manage"
-  | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy" | "gallery:audit"
+  | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy"
   | "settlement:manage"
   | "system:manage"
   | "all";
@@ -101,13 +101,6 @@ export const PERMISSION_TREE = [
       { key: "gallery:download", label: "下载媒体" },
       { key: "gallery:share", label: "分享相册" },
       { key: "gallery:copy", label: "复制链接" },
-    ]
-  },
-  {
-    key: "gallery_audit",
-    label: "实拍审核",
-    children: [
-      { key: "gallery:audit", label: "审核权限" },
     ]
   },
   {
