@@ -747,8 +747,8 @@ export default function BrushCenterPage() {
                               background: "rgba(15,23,42,0.92)",
                             }}
                             isAnimationActive={false}
-                            formatter={(value: number | string | undefined, name: string | undefined) => [
-                              formatCurrency(Number(value ?? 0)),
+                            formatter={(value, name) => [
+                              formatCurrency(Number(Array.isArray(value) ? value[0] ?? 0 : value ?? 0)),
                               name ?? "",
                             ]}
                           />
