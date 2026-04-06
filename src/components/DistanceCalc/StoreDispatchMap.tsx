@@ -648,7 +648,7 @@ export function StoreDispatchMap({
     targetMarkerRef.current = marker;
     map.add(marker);
 
-    const nextResults = shops
+    const nextResults: DistanceResult[] = shops
       .filter(
         (shop) =>
           shop.id === activeShopId &&
@@ -663,7 +663,10 @@ export function StoreDispatchMap({
         ),
         routeDist: null,
         duration: null,
-        path: [[shop.longitude as number, shop.latitude as number], targetPoint.location],
+        path: [
+          [shop.longitude as number, shop.latitude as number] as [number, number],
+          targetPoint.location as [number, number],
+        ],
       }))
       .sort((a, b) => a.straightDist - b.straightDist);
 

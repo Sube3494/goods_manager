@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion, useMotionValue, useSpring, animate } from "framer-motion";
+import { motion, useMotionValue, animate } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const SOFT_SPRING_CONFIG = { stiffness: 180, damping: 25, mass: 0.5 };
-const HARD_SPRING_CONFIG = { stiffness: 5000, damping: 200, mass: 0.05 };
 
 interface GestureImageProps {
   src: string;
@@ -26,10 +25,6 @@ export const GestureImage = ({ src, alt = "预览", className, onScaleChange }: 
   const lastPinchDistance = useRef<number | null>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   const lastTapTime = useRef(0);
-
-  const smoothScale = useSpring(scaleValue, SOFT_SPRING_CONFIG);
-  const smoothX = useSpring(xValue, isDragging ? HARD_SPRING_CONFIG : SOFT_SPRING_CONFIG);
-  const smoothY = useSpring(yValue, isDragging ? HARD_SPRING_CONFIG : SOFT_SPRING_CONFIG);
 
   useEffect(() => {
     return scaleValue.on("change", (v) => {
@@ -179,9 +174,9 @@ export const GestureImage = ({ src, alt = "预览", className, onScaleChange }: 
         className
       )}
       style={{
-        x: smoothX,
-        y: smoothY,
-        scale: smoothScale,
+        x: xValue,
+        y: yValue,
+        scale: scaleValue,
         willChange: "transform"
       }}
       onTouchStart={handleTouchStart}
