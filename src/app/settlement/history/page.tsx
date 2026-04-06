@@ -179,7 +179,7 @@ export default function SettlementHistoryPage() {
         { 项目: "---", 数值: "---" },
         { 项目: "合计真实总业绩", 数值: settlement.totalNet },
         { 项目: `平台服务费 (${(settlement.serviceFeeRate * 100).toFixed(1)}%)`, 数值: settlement.serviceFee },
-        { 项目: "已到账业绩部分 (扣除)", 数值: settlement.totalAlreadyReceived },
+        { 项目: "已打款到卡 (扣除)", 数值: settlement.totalAlreadyReceived },
         { 项目: "最终实补 / 应得", 数值: settlement.finalBalance },
         { 项目: "备注说明", 数值: settlement.note || "无" },
       ];
@@ -536,7 +536,7 @@ export default function SettlementHistoryPage() {
                         <span className="font-mono text-orange-500">-{formatCurrency(selectedSettlement.serviceFee)}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm font-bold">
-                        <span className="text-muted-foreground">已到账业绩部分</span>
+                        <span className="text-muted-foreground">已打款到卡</span>
                         <span className="font-mono text-rose-500">
                           -{formatCurrency(selectedSettlement.totalAlreadyReceived)}
                         </span>

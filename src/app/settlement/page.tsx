@@ -25,7 +25,7 @@ interface PlatformData {
 interface ShopGroup {
   shopName: string;
   serviceFeeRate: number;
-  entries: Array<PlatformData & { net: number; fee: number; alreadyReceivedNet: number }>;
+  entries: Array<PlatformData & { net: number; fee: number; alreadyReceivedAmount: number }>;
   totalReceived: number;
   totalToCard: number;
   totalNet: number;
@@ -91,14 +91,14 @@ export default function SettlementPage() {
       const shopEntries = entries.filter((entry) => entry.shopName === shopName).map((entry) => {
         const net = entry.received - entry.brushing;
         const fee = net * entry.serviceFeeRate;
-        const alreadyReceivedNet = entry.received > 0 ? (entry.receivedToCard / entry.received) * net : 0;
-        return { ...entry, net, fee, alreadyReceivedNet };
+        const alreadyReceivedAmount = entry.receivedToCard;
+        return { ...entry, net, fee, alreadyReceivedAmount };
       });
       const totalReceived = shopEntries.reduce((sum, entry) => sum + entry.received, 0);
       const totalToCard = shopEntries.reduce((sum, entry) => sum + entry.receivedToCard, 0);
       const totalNet = shopEntries.reduce((sum, entry) => sum + entry.net, 0);
       const totalServiceFee = shopEntries.reduce((sum, entry) => sum + entry.fee, 0);
-      const totalAlreadyReceived = shopEntries.reduce((sum, entry) => sum + entry.alreadyReceivedNet, 0);
+      const totalAlreadyReceived = shopEntries.reduce((sum, entry) => sum + entry.alreadyReceivedAmount, 0);
       return {
         shopName,
         serviceFeeRate: shopEntries[0]?.serviceFeeRate ?? 0,
@@ -419,8 +419,8 @@ export default function SettlementPage() {
                           <div className="mt-1 font-mono text-lg font-black text-orange-500">{money(entry.fee)}</div>
                         </div>
                         <div>
-                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">已到账占比折算</div>
-                          <div className="mt-1 font-mono text-lg font-black text-rose-500">{money(entry.alreadyReceivedNet)}</div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">已打款到卡</div>
+                          <div className="mt-1 font-mono text-lg font-black text-rose-500">{money(entry.alreadyReceivedAmount)}</div>
                         </div>
                       </div>
                     </div>
@@ -439,7 +439,7 @@ export default function SettlementPage() {
                     <div className="mt-1.5 font-mono text-xl font-black text-orange-500">{money(activeGroup.totalServiceFee)}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店已到账部分</div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店已打款到卡</div>
                     <div className="mt-1.5 font-mono text-xl font-black text-rose-500">{money(activeGroup.totalAlreadyReceived)}</div>
                   </div>
                   <div>
@@ -516,7 +516,7 @@ export default function SettlementPage() {
                   <span className="font-mono text-sm font-black text-orange-500">-{money(summary.totalServiceFee)}</span>
                 </div>
                 <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
-                  <span className="text-sm font-bold text-muted-foreground">汇总已到账部分</span>
+                  <span className="text-sm font-bold text-muted-foreground">汇总已打款到卡</span>
                   <span className="font-mono text-sm font-black text-rose-500">-{money(summary.totalAlreadyReceived)}</span>
                 </div>
               </div>
