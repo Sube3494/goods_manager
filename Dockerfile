@@ -58,10 +58,15 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/package.json ./package.json
 
 # Prisma Client（自定义输出路径：prisma/generated-client）
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+# standalone 模式下 sharp 作为 external package 不一定会被完整带入运行镜像
+# 在 runner 层显式安装一份 Linux 版 sharp，确保服务端 HEIC -> JPEG 转码可用
+RUN npm install --omit=dev --registry=https://registry.npmmirror.com sharp@0.34.5
 
 # 安装 Prisma CLI（使用淘宝源加速下载并用于启动时自动执行 migrate deploy）
 RUN npm install -g prisma@5.22.0 --registry=https://registry.npmmirror.com && \

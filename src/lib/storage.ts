@@ -5,6 +5,7 @@ import { Readable } from "stream";
 import { finished } from "stream/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
+import sharp from "sharp";
 import prisma from "./prisma";
 
 export interface UploadResult {
@@ -45,6 +46,85 @@ export interface MinioConfig {
 import { createHash } from "crypto";
 import { tmpdir } from "os";
 import { createReadStream } from "fs";
+
+const HEIC_MIME_TYPES = new Set([
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+]);
+
+function getExtension(fileName: string) {
+  return fileName.split(".").pop()?.trim().toLowerCase() || "";
+}
+
+function replaceExtension(fileName: string, nextExt: string) {
+  const sanitizedExt = nextExt.replace(/^\./, "");
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex === -1) {
+    return `${fileName}.${sanitizedExt}`;
+  }
+  return `${fileName.substring(0, dotIndex)}.${sanitizedExt}`;
+}
+
+function shouldConvertHeicToJpeg(fileName: string, fileType: string) {
+  const ext = getExtension(fileName);
+  const normalizedType = fileType.trim().toLowerCase();
+  return ext === "heic" || ext === "heif" || HEIC_MIME_TYPES.has(normalizedType);
+}
+
+async function readUploadSourceToBuffer(file: File | Buffer | ReadableStream | Readable) {
+  if (Buffer.isBuffer(file)) {
+    return file;
+  }
+
+  if (file instanceof Blob) {
+    return Buffer.from(await file.arrayBuffer());
+  }
+
+  const stream = file instanceof ReadableStream
+    ? Readable.fromWeb(file as import("stream/web").ReadableStream)
+    : (file as Readable);
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+async function normalizeUploadInput(
+  file: File | Buffer | ReadableStream | Readable,
+  options?: UploadOptions
+): Promise<{ file: File | Buffer | ReadableStream | Readable; options: UploadOptions | undefined }> {
+  const fileName = options?.name || (file instanceof Blob && "name" in file ? (file as File).name : "");
+  const fileType = options?.type || (file instanceof Blob ? file.type : "");
+
+  if (!fileName || !shouldConvertHeicToJpeg(fileName, fileType)) {
+    return { file, options };
+  }
+
+  const inputBuffer = await readUploadSourceToBuffer(file);
+
+  try {
+    const jpegBuffer = await sharp(inputBuffer)
+      .rotate()
+      .jpeg({ quality: 90, mozjpeg: true })
+      .toBuffer();
+
+    return {
+      file: jpegBuffer,
+      options: {
+        ...options,
+        name: replaceExtension(fileName, "jpg"),
+        type: "image/jpeg",
+      },
+    };
+  } catch (error) {
+    console.error("Failed to convert HEIC/HEIF upload to JPEG:", error);
+    throw new Error("HEIC 图片转换失败，请稍后重试或改传 JPG/PNG");
+  }
+}
 
 // 帮助函数：处理文件并计算哈希
 // 如果是流，会写入临时文件以便后续上传
@@ -203,6 +283,10 @@ export class LocalStorageStrategy implements StorageStrategy {
 
 
   async upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult> {
+    const normalizedUpload = await normalizeUploadInput(file, options);
+    file = normalizedUpload.file;
+    options = normalizedUpload.options;
+
     // 确保在 Docker standalone 环境下也能准备找到上传目录
     // standalone 模式下 process.cwd() 可能在 .next/standalone，需要向上回退
     let baseDir = join(process.cwd(), "public", "uploads");
@@ -365,6 +449,10 @@ export class MinioStorageStrategy implements StorageStrategy {
   }
 
   async upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult> {
+    const normalizedUpload = await normalizeUploadInput(file, options);
+    file = normalizedUpload.file;
+    options = normalizedUpload.options;
+
     const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
     const minioClient = new Minio.Client({
       endPoint: endPoint,

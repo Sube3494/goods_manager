@@ -1,8 +1,14 @@
-const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif"] as const;
+const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif", "heic", "heif"] as const;
 const ALLOWED_VIDEO_EXTENSIONS = ["mp4", "webm", "ogg", "mov", "m4v"] as const;
 
 const ALLOWED_IMAGE_MIME_PREFIX = "image/";
 const ALLOWED_VIDEO_MIME_PREFIX = "video/";
+const HEIC_MIME_TYPES = new Set([
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
+]);
 
 const ALLOWED_EXTENSIONS = new Set<string>([
   ...ALLOWED_IMAGE_EXTENSIONS,
@@ -12,6 +18,16 @@ const ALLOWED_EXTENSIONS = new Set<string>([
 export function getFileExtension(fileName: string) {
   const ext = fileName.split(".").pop()?.trim().toLowerCase() || "";
   return ext;
+}
+
+export function isHeicLikeUpload(fileName: string, fileType: string) {
+  const ext = getFileExtension(fileName);
+  const normalizedType = fileType.trim().toLowerCase();
+  return ext === "heic" || ext === "heif" || HEIC_MIME_TYPES.has(normalizedType);
+}
+
+export function getNormalizedUploadExtension(fileName: string, fileType: string) {
+  return isHeicLikeUpload(fileName, fileType) ? "jpg" : getFileExtension(fileName);
 }
 
 export function isAllowedUploadExtension(ext: string) {

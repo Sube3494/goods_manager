@@ -71,7 +71,13 @@ export async function uploadFileWithChunking(
       const checkRes = await fetch("/api/upload/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hash, ext, folder: folder || "gallery" }),
+        body: JSON.stringify({
+          hash,
+          ext,
+          fileName: file.name,
+          fileType: file.type || "application/octet-stream",
+          folder: folder || "gallery",
+        }),
       });
 
       if (checkRes.ok) {
