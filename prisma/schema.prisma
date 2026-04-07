@@ -471,16 +471,21 @@ model Shop {
   id          String   @id @default(cuid())
   name        String
   address     String?
+  province    String?
+  city        String?
   latitude    Float?
   longitude   Float?
   isSource    Boolean  @default(true) // 是否作为常备调货源
   contactName String?
   contactPhone String?
   remark      String?
+  externalId  String?  // 外部系统ID，如美团POI_ID，用于去重
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([userId])
+  @@index([province, city])
+  @@index([userId, externalId])
 }

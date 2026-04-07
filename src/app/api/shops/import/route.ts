@@ -18,6 +18,21 @@ function normalizeText(value: string) {
   return value.replace(/\s+/g, "").trim().toLowerCase();
 }
 
+function simplifyShopName(name: string) {
+  if (!name) return "";
+  const match = name.match(/[\(（](.*)[\)）]$/);
+  if (match && match[1]) return match[1];
+  const parts = name
+    .replace(/^私人订制轻奢礼品店/, "")
+    .split(/[^\u4e00-\u9fa5a-zA-Z0-9]+/)
+    .filter(Boolean);
+  const lastPart = parts.pop() || "";
+  if (lastPart === "店" && parts.length > 0) {
+    return parts.pop() + lastPart;
+  }
+  return lastPart.replace(/(生日礼物|儿童玩具|滋补燕窝|礼品店)/g, "").trim() || name;
+}
+
 export async function POST(request: Request) {
   try {
     const user = await getAuthorizedUser("logistics:manage");
@@ -32,9 +47,12 @@ export async function POST(request: Request) {
 
     const existingShops = await prisma.shop.findMany({
       where: user.role === "SUPER_ADMIN" ? {} : { userId: user.id },
-      select: { name: true, address: true },
+      select: { name: true, address: true, externalId: true },
     });
 
+    const existingExternalIds = new Set(
+      existingShops.map((s) => s.externalId).filter(Boolean)
+    );
     const existingKeys = new Set(
       existingShops.map((shop) => `${normalizeText(shop.name)}::${normalizeText(shop.address || "")}`)
     );
@@ -47,6 +65,8 @@ export async function POST(request: Request) {
     for (const row of shops as RawShopRow[]) {
       const name = getStringValue(row, ["门店名称", "店铺名称", "网点名称", "名称", "门店", "shopName"]);
       const address = getStringValue(row, ["详细地址", "门店地址", "地址", "address"]);
+      const province = getStringValue(row, ["省份", "省", "province"]);
+      const city = getStringValue(row, ["城市", "市", "city"]);
       const poiId = getStringValue(row, ["POI_ID", "POT_ID", "poi_id", "poiId"]);
 
       if (!name || !address) {
@@ -57,25 +77,39 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const dedupeKey = `${normalizeText(name)}::${normalizeText(address)}`;
-      if (existingKeys.has(dedupeKey)) {
+      const cleanedName = simplifyShopName(name);
+
+      // 优先用 POI_ID 做去重，更精准
+      if (poiId && existingExternalIds.has(poiId)) {
         skipped += 1;
         continue;
+      }
+      // 无 POI_ID 时，退回到名称+地址去重
+      if (!poiId) {
+        const dedupeKey = `${normalizeText(cleanedName)}::${normalizeText(address)}`;
+        if (existingKeys.has(dedupeKey)) {
+          skipped += 1;
+          continue;
+        }
+        existingKeys.add(dedupeKey);
       }
 
       const createdShop = await prisma.shop.create({
         data: {
-          name,
+          name: cleanedName,
           address,
+          province,
+          city,
           latitude: null,
           longitude: null,
           isSource: true,
-          remark: poiId ? `POI_ID:${poiId}` : null,
+          externalId: poiId || null,  // POI_ID 直接存入 externalId
+          remark: null,
           userId: user.id,
         },
       });
 
-      existingKeys.add(dedupeKey);
+      if (poiId) existingExternalIds.add(poiId);
       created += 1;
       createdShops.push({
         id: createdShop.id,

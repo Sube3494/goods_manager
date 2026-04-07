@@ -11,7 +11,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
 
     const { id } = await context.params;
     const body = await request.json();
-    const { name, address, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const { name, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
 
     const existingShop = await prisma.shop.findUnique({
       where: { id },
@@ -30,6 +30,8 @@ export async function PUT(request: Request, context: { params: { id: string } })
       data: {
         name,
         address,
+        province,
+        city,
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
         isSource,

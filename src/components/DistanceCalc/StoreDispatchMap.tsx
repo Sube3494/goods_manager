@@ -3,23 +3,28 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Loader2,
   MapPin,
+  Navigation,
   Navigation2,
   Pencil,
   Plus,
   Search,
   Store,
   Trash2,
+  Trophy,
+  Truck,
   Upload,
   X,
 } from "lucide-react";
 import { BareAmapTest } from "@/components/DistanceCalc/BareAmapTest";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ImportModal } from "@/components/Goods/ImportModal";
+import { StoreModal } from "@/components/DistanceCalc/StoreModal";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +32,8 @@ type Shop = {
   id: string;
   name: string;
   address: string | null;
+  province: string | null;
+  city: string | null;
   latitude: number | null;
   longitude: number | null;
   isSource: boolean;
@@ -46,13 +53,14 @@ type ImportedShopPayload = {
   address: string;
 };
 
-type DistanceResult = {
+interface DistanceResult {
   shopId: string;
-  straightDist: number;
-  routeDist: number | null;
-  duration: number | null;
-  path: Array<[number, number]>;
-};
+  airDist: number; // 直线距离单位为米
+  rank: number; // 排名
+  routeDist: number | null; // 骑行路径距离
+  duration: number | null; // 骑行预计时间
+  path: [number, number][]; // 路径点
+}
 
 const DEFAULT_CENTER: [number, number] = [106.5516, 29.563];
 const ALL_REGIONS = "全国";
@@ -110,33 +118,112 @@ function isTooBroadLocationName(name: string, keyword: string, areaHint: string)
   return false;
 }
 
-function extractRegionParts(shop: Pick<Shop, "address" | "name">) {
-  const text = `${shop.address || ""} ${shop.name || ""}`.replace(/\s+/g, "");
-  const municipalityMatch = text.match(/(北京市|上海市|天津市|重庆市)/);
-  if (municipalityMatch) {
-    const province = municipalityMatch[1];
+function extractRegionParts(shop: Pick<Shop, "address" | "name" | "province" | "city">) {
+  if (shop.province && shop.city) {
     return {
-      province,
-      city: province,
-      regionLabel: [province, province].join(" / "),
+      province: shop.province,
+      city: shop.city,
+      regionLabel: [shop.province, shop.city].filter(Boolean).join(" / "),
     };
   }
 
-  const provinceMatch = text.match(
-    /([\u4e00-\u9fa5]{2,}?(?:省|自治区|特别行政区))/
-  );
-  const province = provinceMatch?.[1] || UNKNOWN_PROVINCE;
-  const textAfterProvince = provinceMatch
-    ? text.slice((provinceMatch.index || 0) + provinceMatch[1].length)
-    : text;
-  const cityMatch = textAfterProvince.match(/([\u4e00-\u9fa5]{2,}?(?:市|州|地区|盟))/);
-  const city = cityMatch?.[1] || UNKNOWN_CITY;
+  const text = `${shop.address || ""} ${shop.name || ""}`.replace(/\s+/g, "");
+
+  const municipalityMatch = text.match(/(北京市|上海市|天津市|重庆市)/);
+  if (municipalityMatch) {
+    const province = municipalityMatch[1];
+    const city = province;
+    return {
+      province,
+      city,
+      regionLabel: [province, city].join(" / "),
+    };
+  }
+
+  const commonProvincesRegex = /(黑龙江省|内蒙古自治区|新疆维吾尔自治区|宁夏回族自治区|广西壮族自治区|香港特别行政区|澳门特别行政区|[\u4e00-\u9fa5]{2,3}?(?:省|自治区|特别行政区|省份))/;
+  const provinceMatch = text.match(commonProvincesRegex);
+
+  let province = provinceMatch?.[1] || UNKNOWN_PROVINCE;
+  let textAfterProvince = text;
+
+  if (!provinceMatch) {
+    const shortProvinces = [
+      "广东", "山东", "河南", "四川", "江苏", "河北", "湖南", "安徽", "湖北", "浙江", "广西", "云南", "江西", "辽宁", "福建", "陕西", "黑龙江", "山西", "贵州", "吉林", "甘肃", "海南", "青海", "台湾", "西藏", "宁夏", "新疆", "内蒙"
+    ];
+    for (const sp of shortProvinces) {
+      if (text.startsWith(sp)) {
+        province = sp.includes("内蒙") ? "内蒙古自治区" : (sp.length === 2 ? sp + (sp === "西藏" ? "" : "省") : sp);
+        if (sp === "广东") province = "广东省";
+        if (sp === "山东") province = "山东省";
+        if (sp === "河南") province = "河南省";
+        if (sp === "四川") province = "四川省";
+        if (sp === "江苏") province = "江苏省";
+        if (sp === "河北") province = "河北省";
+        if (sp === "湖南") province = "湖南省";
+        if (sp === "安徽") province = "安徽省";
+        if (sp === "湖北") province = "湖北省";
+        if (sp === "浙江") province = "浙江省";
+        if (sp === "云南") province = "云南省";
+        if (sp === "江西") province = "江西省";
+        if (sp === "辽宁") province = "辽宁省";
+        if (sp === "福建") province = "福建省";
+        if (sp === "陕西") province = "陕西省";
+        if (sp === "吉林") province = "吉林省";
+        if (sp === "山西") province = "山西省";
+        if (sp === "贵州") province = "贵州省";
+        if (sp === "黑龙江") province = "黑龙江省";
+        if (sp === "广西") province = "广西壮族自治区";
+        if (sp === "宁夏") province = "宁夏回族自治区";
+        if (sp === "新疆") province = "新疆维吾尔自治区";
+
+        textAfterProvince = text.slice(sp.length);
+        break;
+      }
+    }
+  } else {
+    textAfterProvince = text.slice((provinceMatch.index || 0) + provinceMatch[1].length);
+  }
+
+  const cityMatch = textAfterProvince.match(/([\u4e00-\u9fa5]{2,6}?(?:市|州|地区|盟|特别行政区))/);
+  let city = cityMatch?.[1] || UNKNOWN_CITY;
+
+  if (!cityMatch && province !== UNKNOWN_PROVINCE) {
+    const commonCities = ["广州", "深圳", "成都", "杭州", "武汉", "西安", "南京", "长沙", "郑州", "福州", "济南", "沈阳", "昆明", "南宁", "南昌", "合肥", "筑", "贵阳", "海口", "石家庄", "太原", "哈尔滨", "长春", "兰州", "西宁", "银川", "拉萨", "呼和浩特", "乌鲁木齐"];
+    for (const sc of commonCities) {
+      if (textAfterProvince.startsWith(sc)) {
+        city = sc + (sc.length === 2 ? "市" : "");
+        break;
+      }
+    }
+  }
 
   return {
     province,
     city,
-    regionLabel: [province, city].filter(Boolean).join(" / "),
+    regionLabel: [province, city].filter((v) => v && v !== UNKNOWN_PROVINCE && v !== UNKNOWN_CITY).join(" / ") || "未分类",
   };
+}
+
+function simplifyShopName(name: string) {
+  if (!name) return "";
+  // 1. 优先提取括号内的内容（如：哈尔滨店）
+  const match = name.match(/[\(（](.*)[\)）]$/);
+  if (match && match[1]) return match[1];
+
+  // 2. 极其激进的切割：只要不是中文、字母或数字，统统作为分隔符
+  const parts = name
+    .replace(/^私人订制轻奢礼品店/, "")
+    .split(/[^\u4e00-\u9fa5a-zA-Z0-9]+/)
+    .filter(Boolean);
+
+  const lastPart = parts.pop() || "";
+
+  // 3. 如果切割后最后一段只是“店”一个字，尝试合并前一段（例如：成华+店）
+  if (lastPart === "店" && parts.length > 0) {
+    return parts.pop() + lastPart;
+  }
+
+  return lastPart || name;
 }
 
 export function StoreDispatchMap({
@@ -150,15 +237,17 @@ export function StoreDispatchMap({
   const markersRef = useRef<any[]>([]);
   const targetMarkerRef = useRef<any>(null);
   const pathRef = useRef<any>(null);
+  const spiderLinesRef = useRef<any[]>([]);
+  const spiderLabelsRef = useRef<any[]>([]);
   const geocoderRef = useRef<any>(null);
+  const infoWindowRef = useRef<any>(null);
   const placeSearchRef = useRef<any>(null);
   const ridingRef = useRef<any>(null);
 
   const [shops, setShops] = useState<Shop[]>(initialStores);
-  const [isSavingShop, setIsSavingShop] = useState(false);
-  const [editingShop, setEditingShop] = useState<EditableShop | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isImportingShops, setIsImportingShops] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [shopSearch, setShopSearch] = useState("");
   const [targetQuery, setTargetQuery] = useState("");
   const [targetPoint, setTargetPoint] = useState<TargetPoint | null>(null);
@@ -168,6 +257,113 @@ export function StoreDispatchMap({
   const [searchFeedback, setSearchFeedback] = useState("可直接解析地址并预览最近店铺。");
   const [activeProvince, setActiveProvince] = useState<string>(ALL_REGIONS);
   const [activeCity, setActiveCity] = useState<string>(ALL_REGIONS);
+  const [activeShopId, setActiveShopId] = useState<string | null>(null);
+  const [expandedPanel, setExpandedPanel] = useState<"shops" | "results">("shops");
+  const [mapTheme, setMapTheme] = useState<string>("darkblue");
+  
+  const [isShopModalOpen, setIsShopModalOpen] = useState(false);
+  const [editingShop, setEditingShop] = useState<EditableShop | null>(null);
+
+  const MAP_THEMES = [
+    { id: "normal", label: "标准", color: "bg-[#2b85e4]" },
+    { id: "dark", label: "幻影黑", color: "bg-[#1f1f1f]" },
+    { id: "light", label: "月光银", color: "bg-[#e0e0e0]" },
+    { id: "darkblue", label: "极夜蓝", color: "bg-[#001630]" },
+    { id: "macaron", label: "马卡龙", color: "bg-[#f5c4ce]" },
+  ];
+
+  // 注入地图标记悬停样式的样式表
+  const markerStyles = `
+    .marker-wrapper .marker-label {
+      opacity: 0;
+      transform: translateY(5px);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+    .marker-wrapper:hover .marker-pin,
+    .marker-wrapper.active .marker-pin {
+      transform: scale(1.2) translateY(-2px);
+      filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.6));
+      z-index: 100;
+    }
+    .marker-wrapper:hover .marker-label,
+    .marker-wrapper.active .marker-label {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .marker-pin {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* 目的地 Marker 专用样式 */
+    .target-marker-wrapper {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 0;
+      height: 0;
+    }
+    .target-marker-label {
+      position: absolute;
+      bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+    }
+    .target-marker-label::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 4px solid rgba(15, 23, 42, 0.82);
+    }
+    .target-dot {
+      width: 12px;
+      height: 12px;
+      background: #3b82f6;
+      border: 2.5px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+      position: relative;
+      z-index: 5;
+    }
+    .target-dot::before {
+      content: '';
+      position: absolute;
+      top: -12px;
+      left: -12px;
+      right: -12px;
+      bottom: -12px;
+      border: 2px solid #3b82f6;
+      border-radius: 50%;
+      animation: target-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    }
+    @keyframes target-pulse {
+      0% { transform: scale(0.5); opacity: 0.8; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+    @keyframes target-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+  `;
 
   const locationTree = useMemo(() => {
     const provinceMap = new Map<string, Set<string>>();
@@ -236,9 +432,14 @@ export function StoreDispatchMap({
   const cityScopedStores = useMemo(() => {
     return shops.filter((shop) => {
       const parts = extractRegionParts(shop);
-      if (parts.province === UNKNOWN_PROVINCE || parts.city === UNKNOWN_CITY) return false;
-      if (activeProvince && activeProvince !== ALL_REGIONS && parts.province !== activeProvince) return false;
-      if (activeCity && activeCity !== ALL_REGIONS && parts.city !== activeCity) return false;
+      // 选了具体省份时，才排除省份未知的店铺
+      if (activeProvince && activeProvince !== ALL_REGIONS) {
+        if (parts.province === UNKNOWN_PROVINCE || parts.province !== activeProvince) return false;
+      }
+      // 选了具体城市时，才排除城市未知的店铺
+      if (activeCity && activeCity !== ALL_REGIONS) {
+        if (parts.city === UNKNOWN_CITY || parts.city !== activeCity) return false;
+      }
       return true;
     });
   }, [activeCity, activeProvince, shops]);
@@ -249,6 +450,9 @@ export function StoreDispatchMap({
       setResults([]);
       setTargetQuery("");
       setSearchFeedback("当前地区暂无门店，请先切换省市。");
+    } else {
+      // 如果有门店，清除掉之前的错误提示
+      setSearchFeedback("");
     }
   }, [activeCity, activeProvince, cityScopedStores]);
 
@@ -314,9 +518,183 @@ export function StoreDispatchMap({
     if (mapRef.current && pathRef.current) {
       mapRef.current.remove(pathRef.current);
     }
+    if (mapRef.current && spiderLinesRef.current.length) {
+      mapRef.current.remove(spiderLinesRef.current);
+    }
+    if (mapRef.current && spiderLabelsRef.current.length) {
+      mapRef.current.remove(spiderLabelsRef.current);
+    }
+    if (infoWindowRef.current) {
+      infoWindowRef.current.close();
+    }
     targetMarkerRef.current = null;
     pathRef.current = null;
+    spiderLinesRef.current = [];
+    spiderLabelsRef.current = [];
   }, []);
+
+  const ensureRidingService = useCallback(async () => {
+    if (ridingRef.current) return ridingRef.current;
+
+    const AMap = AMapRef.current;
+    if (!AMap) throw new Error("地图服务尚未就绪");
+
+    await new Promise<void>((resolve) => {
+      if (typeof AMap.plugin !== "function") {
+        resolve();
+        return;
+      }
+      AMap.plugin(["AMap.Riding"], () => resolve());
+    });
+
+    if (typeof AMap.Riding !== "function") {
+      return null;
+    }
+
+    ridingRef.current = new AMap.Riding({ map: null, hideMarkers: true });
+    return ridingRef.current;
+  }, []);
+
+  const handlePreviewResult = useCallback(async (result: DistanceResult) => {
+    const map = mapRef.current;
+    const AMap = AMapRef.current;
+    const matchedShop = shops.find((shop) => shop.id === result.shopId);
+    if (!map || !AMap || !matchedShop?.longitude || !matchedShop?.latitude || !targetPoint) return;
+
+    // 构造高级预览气泡 (InfoWindow)
+    const distStr = result.routeDist != null ? `${(result.routeDist / 1000).toFixed(2)}km` : `${(result.airDist / 1000).toFixed(2)}km (直线)`;
+    const timeStr = result.duration != null ? `${Math.ceil(result.duration / 60)}分钟` : "--";
+
+    const infoContent = `
+      <div style="
+        padding: 14px;
+        background: rgba(15, 23, 42, 0.96);
+        color: #fff;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+        backdrop-filter: blur(12px);
+        min-width: 200px;
+        pointer-events: none;
+      ">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+          <span style="background: ${result.rank === 1 ? "#f97316" : "#3b82f6"}; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 11px; font-weight: 900;">${result.rank}</span>
+          <span style="font-weight: 800; font-size: 14px; letter-spacing: -0.01em;">${matchedShop.name}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 600; text-transform: uppercase;">配送距离</span>
+            <span style="font-size: 14px; font-weight: 800; color: #60a5fa;">${distStr}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 600; text-transform: uppercase;">预估时长</span>
+            <span style="font-size: 14px; font-weight: 800; color: #fbbf24;">${timeStr}</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (!infoWindowRef.current) {
+      infoWindowRef.current = new AMap.InfoWindow({
+        isCustom: true,
+        autoMove: true,
+        offset: new AMap.Pixel(0, -45), // 确保悬浮在大头针上方
+      });
+    }
+
+    infoWindowRef.current.setContent(infoContent);
+    infoWindowRef.current.open(map, [matchedShop.longitude, matchedShop.latitude]);
+
+    // 不进行全局清理，保留背景辐射线和目的地 Marker
+    if (pathRef.current) {
+      map.remove(pathRef.current);
+    }
+
+    // 先用直线路径绘制虚线，让用户有即时反馈
+    const tempPolyline = new AMap.Polyline({
+      path: result.path,
+      strokeColor: "#2563eb",
+      strokeOpacity: 0.6,
+      strokeWeight: 5,
+      lineJoin: "round",
+      lineCap: "round",
+      zIndex: 70, // 提升层级，确保在全城信号网之上
+      strokeStyle: "dashed",
+    });
+    pathRef.current = tempPolyline;
+    map.add(tempPolyline);
+    map.setFitView([tempPolyline], false, [90, 90, 90, 90]);
+
+    // 如果还没有实际路线，调用 API 计算
+    if (result.routeDist == null) {
+      try {
+        const riding = await ensureRidingService();
+        if (!riding) return;
+        riding.search(
+          [matchedShop.longitude, matchedShop.latitude],
+          targetPoint.location,
+          (status: string, rideResult: any) => {
+            if (status !== "complete" || !rideResult?.routes?.length) return;
+            const route = rideResult.routes[0];
+            const routePath = route.rides?.flatMap((ride: any) =>
+              ride.path.map((point: any) => [point.lng, point.lat] as [number, number])
+            );
+            const resolvedPath =
+              routePath?.length
+                ? routePath
+                : [[matchedShop.longitude as number, matchedShop.latitude as number], targetPoint.location];
+
+            // 更新结果数据（显示实际距离/时间）
+            setResults((current) =>
+              current.map((item) =>
+                item.shopId === matchedShop.id
+                  ? { ...item, routeDist: route.distance ?? null, duration: route.time ?? null, path: resolvedPath }
+                  : item
+              )
+            );
+
+            // 更新地图路线为实线
+            if (mapRef.current && pathRef.current) {
+              mapRef.current.remove(pathRef.current);
+              const realPolyline = new AMap.Polyline({
+                path: resolvedPath,
+                strokeColor: "#2563eb",
+                strokeOpacity: 0.9,
+                strokeWeight: 6,
+                lineJoin: "round",
+                lineCap: "round",
+                zIndex: 70, // 确保实线盖在虚线辐射网之上
+                strokeStyle: "solid",
+              });
+              pathRef.current = realPolyline;
+              mapRef.current.add(realPolyline);
+              mapRef.current.setFitView([realPolyline], false, [90, 90, 90, 90]);
+            }
+          }
+        );
+      } catch (error) {
+        console.error("Resolve riding route failed:", error);
+      }
+    } else {
+      // 如果已经有路线数据了，直接绘制实线
+      if (pathRef.current && map) {
+        map.remove(pathRef.current);
+        const realPolyline = new AMap.Polyline({
+          path: result.path,
+          strokeColor: "#2563eb",
+          strokeOpacity: 0.9,
+          strokeWeight: 6,
+          lineJoin: "round",
+          lineCap: "round",
+          zIndex: 70, // 确保实线盖在虚线辐射网之上
+          strokeStyle: "solid",
+        });
+        pathRef.current = realPolyline;
+        map.add(realPolyline);
+        map.setFitView([realPolyline], false, [90, 90, 90, 90]);
+      }
+    }
+  }, [ensureRidingService, shops, targetPoint]);
 
   const drawShopMarkers = useCallback(() => {
     const map = mapRef.current;
@@ -326,18 +704,78 @@ export function StoreDispatchMap({
     clearMarkers();
 
     const markers = cityScopedStores
-      .filter((shop) => typeof shop.longitude === "number" && typeof shop.latitude === "number")
+      .filter((shop) => shop.longitude && shop.latitude)
       .map((shop) => {
+        const isActive = activeShopId === shop.id;
+        // 查找此门店在测距列表（Top 5）中的排名
+        const resultIndex = results && results.length > 0 ? results.findIndex(r => r.shopId === shop.id) : -1;
+        const rank = resultIndex !== -1 ? resultIndex + 1 : null;
+        const isTop5 = rank !== null && rank <= 5;
+
+        // 设置标注气泡的背景颜色（Top 1 橙色，Top 2-5 蓝色，普通黑色）
+        let bubbleBg = "rgba(17,24,39,0.95)";
+        if (isTop5) {
+          bubbleBg = rank === 1 ? "#f97316" : "#3b82f6";
+        } else if (isActive) {
+          bubbleBg = "#2563eb";
+        }
+
         const marker = new AMap.Marker({
           position: [shop.longitude, shop.latitude],
           title: shop.name,
+          zIndex: isTop5 ? 200 : (isActive ? 180 : 100),
+          content: `
+            <div class="marker-wrapper ${isTop5 ? "is-top" : ""} ${isActive ? "active" : ""}" style="position: relative;">
+              <!-- 名称标注气泡：仅在聚焦目的地（Top 5）或手动激活时常驻显示 -->
+              ${(targetPoint && isTop5) || isActive ? `
+              <div class="marker-label" style="
+                position: absolute;
+                bottom: 34px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 4px 10px;
+                background: ${bubbleBg};
+                color: #fff;
+                font-size: ${isTop5 ? "12px" : "11px"};
+                font-weight: ${isTop5 ? "800" : "600"};
+                border-radius: 8px;
+                border: 1px solid rgba(255,255,255,0.25);
+                box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                white-space: nowrap;
+                display: flex !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+                align-items: center;
+                gap: 5px;
+                z-index: 2;
+                pointer-events: none;
+                ${isTop5 ? "animation: bounce-subtle 2s infinite" : ""}
+              ">
+                ${rank ? `<span style="background: rgba(255,255,255,0.25); width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 10px;">${rank}</span>` : ""}
+                ${simplifyShopName(shop.name)}
+              </div>` : ""}
+              <!-- 大头针图标 -->
+              <svg class="marker-pin" width="22" height="28" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg" 
+                style="position: absolute; top: -28px; left: -11px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4)); z-index: 1; transition: transform 0.2s;">
+                <path d="M11 28C11 28 22 17.5 22 11C22 4.92487 17.0751 0 11 0C4.92487 0 0 4.92487 0 11C0 17.5 11 28 11 28Z" fill="${isActive || rank === 1 ? "#f97316" : (isTop5 ? "#3b82f6" : "#4b5563")}" fill-opacity="1"/>
+                <circle cx="11" cy="11" r="5" fill="white"/>
+              </svg>
+            </div>
+          `,
+          offset: new AMap.Pixel(0, 0), // 容器原点即为坐标点
         });
 
-        marker.setLabel({
-          direction: "top",
-          offset: new AMap.Pixel(0, -8),
-          content: `<div style="padding:4px 8px;border-radius:999px;background:rgba(17,24,39,.92);color:#fff;font-size:12px;line-height:1;border:1px solid rgba(255,255,255,.1);">${shop.name}</div>`,
+        marker.on("click", () => {
+          setActiveShopId(shop.id);
+          // 逻辑联动：在地图上点击门店时，如果已有测距结果，联动开启富媒体信息窗
+          const result = results && results.length > 0 ? results.find(r => r.shopId === shop.id) : null;
+          if (result) {
+            handlePreviewResult(result);
+          } else if (shop.longitude && shop.latitude) {
+            map.setZoomAndCenter(15, [shop.longitude, shop.latitude]);
+          }
         });
+
 
         return marker;
       });
@@ -345,14 +783,16 @@ export function StoreDispatchMap({
     markersRef.current = markers;
     if (markers.length && !targetPoint) {
       map.add(markers);
-      map.setFitView(markers, false, [80, 80, 80, 80]);
+      if (!activeShopId) {
+        map.setFitView(markers, false, [80, 80, 80, 80]);
+      }
     } else if (markers.length) {
       map.add(markers);
     } else {
       map.setCenter(DEFAULT_CENTER);
       map.setZoom(11);
     }
-  }, [cityScopedStores, clearMarkers, targetPoint]);
+  }, [activeShopId, cityScopedStores, clearMarkers, targetPoint, results, handlePreviewResult]);
 
   useEffect(() => {
     drawShopMarkers();
@@ -373,8 +813,9 @@ export function StoreDispatchMap({
     ridingRef.current = null;
   }, [clearMarkers, clearTargetArtifacts]);
 
+
   useEffect(() => {
-    if (targetPoint) return;
+    if (!targetPoint) return;
 
     const map = mapRef.current;
     if (!map) return;
@@ -424,13 +865,23 @@ export function StoreDispatchMap({
     async (keyword: string) => {
       const { geocoder, placeSearch } = await ensureSearchServices();
 
+      const cleanKeyword = keyword
+        .replace(/\(.*\)/g, "")
+        .replace(/（.*）/g, "")
+        .replace(/\d+房$/g, "")
+        .replace(/\d+号$/g, "")
+        .trim();
+
       const geocoderMatch = await withTimeout(
         () =>
-          new Promise<[number, number] | null>((resolve) => {
+          new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
             geocoder.getLocation(keyword, (status: string, result: any) => {
               if (status === "complete" && result?.geocodes?.length) {
                 const first = result.geocodes[0];
-                resolve([first.location.lng, first.location.lat]);
+                resolve({
+                  location: [first.location.lng, first.location.lat],
+                  components: first.addressComponent,
+                });
                 return;
               }
               resolve(null);
@@ -440,22 +891,49 @@ export function StoreDispatchMap({
         null
       );
 
-      if (geocoderMatch) {
-        return geocoderMatch;
-      }
+      if (geocoderMatch) return geocoderMatch;
 
-      if (!placeSearch) {
-        return null;
-      }
+      const cleanedMatch =
+        cleanKeyword !== keyword
+          ? await withTimeout(
+              () =>
+                new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
+                  geocoder.getLocation(cleanKeyword, (status: string, result: any) => {
+                    if (status === "complete" && result?.geocodes?.length) {
+                      const first = result.geocodes[0];
+                      resolve({
+                        location: [first.location.lng, first.location.lat],
+                        components: first.addressComponent,
+                      });
+                      return;
+                    }
+                    resolve(null);
+                  });
+                }),
+              4000,
+              null
+            )
+          : null;
+
+      if (cleanedMatch) return cleanedMatch;
+
+      if (!placeSearch) return null;
 
       return withTimeout(
         () =>
-          new Promise<[number, number] | null>((resolve) => {
+          new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
             placeSearch.search(keyword, (status: string, result: any) => {
               if (status === "complete" && result?.poiList?.pois?.length) {
                 const poi = result.poiList.pois[0];
                 if (poi?.location) {
-                  resolve([poi.location.lng, poi.location.lat]);
+                  resolve({
+                    location: [poi.location.lng, poi.location.lat],
+                    components: {
+                      province: poi.pname,
+                      city: poi.cityname,
+                      adcode: poi.adcode,
+                    },
+                  });
                   return;
                 }
               }
@@ -490,12 +968,14 @@ export function StoreDispatchMap({
 
     try {
       showToast("正在解析店铺位置...", "info");
-      const location = await resolveShopCoordinates(keyword);
+      const matched = await resolveShopCoordinates(keyword);
 
-      if (!location) {
+      if (!matched) {
         showToast("这个地址暂时解析不到坐标", "error");
         return;
       }
+
+      const { location, components } = matched;
 
       const res = await fetch(`/api/shops/${shop.id}`, {
         method: "PUT",
@@ -503,6 +983,8 @@ export function StoreDispatchMap({
         body: JSON.stringify({
           name: shop.name,
           address: shop.address,
+          province: components?.province || null,
+          city: (typeof components?.city === "string" ? components.city : components?.province) || null,
           latitude: location[1],
           longitude: location[0],
           isSource: shop.isSource,
@@ -523,28 +1005,6 @@ export function StoreDispatchMap({
       showToast("店铺定位失败", "error");
     }
   }, [fetchShops, resolveShopCoordinates, showToast]);
-
-  const ensureRidingService = useCallback(async () => {
-    if (ridingRef.current) return ridingRef.current;
-
-    const AMap = AMapRef.current;
-    if (!AMap) throw new Error("地图服务尚未就绪");
-
-    await new Promise<void>((resolve) => {
-      if (typeof AMap.plugin !== "function") {
-        resolve();
-        return;
-      }
-      AMap.plugin(["AMap.Riding"], () => resolve());
-    });
-
-    if (typeof AMap.Riding !== "function") {
-      return null;
-    }
-
-    ridingRef.current = new AMap.Riding({ map: null, hideMarkers: true });
-    return ridingRef.current;
-  }, []);
 
   const handleResolveTarget = useCallback(async () => {
     const keyword = targetQuery.trim();
@@ -695,7 +1155,9 @@ export function StoreDispatchMap({
 
       setTargetQuery(match.name);
       setTargetPoint(match);
-      setSearchFeedback(`已在 ${activeProvince}${activeCity} 范围内定位：${match.name}`);
+      const regionLabel = activeProvince === ALL_REGIONS ? ALL_REGIONS : `${activeProvince}${activeCity}`;
+      setSearchFeedback(`已在 ${regionLabel} 范围内定位：${match.name}`);
+      setExpandedPanel("results");
     } catch (error) {
       console.error("Resolve target failed:", error);
       setSearchFeedback("搜索失败，请确认地图已加载完成后再试。");
@@ -725,14 +1187,71 @@ export function StoreDispatchMap({
 
     const marker = new AMap.Marker({
       position: targetPoint.location,
-      title: targetPoint.name,
+      zIndex: 300,
+      offset: new AMap.Pixel(0, 0), // 中心对齐，样式内部已处理偏移
+      content: `
+        <div class="target-marker-wrapper">
+          <div class="target-marker-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: #60a5fa;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+            <span>${targetPoint.name}</span>
+          </div>
+          <div class="target-dot"></div>
+        </div>
+      `,
     });
 
-    marker.setLabel({
-      direction: "top",
-      offset: new AMap.Pixel(0, -8),
-      content: `<div style="padding:4px 8px;border-radius:999px;background:rgba(220,38,38,.92);color:#fff;font-size:12px;line-height:1;border:1px solid rgba(255,255,255,.18);">目标: ${targetPoint.name}</div>`,
+    // 绘制辐射虚线及其距离标注 (Spider Lines & Labels)
+    const spiderLines: any[] = [];
+    const spiderLabels: any[] = [];
+
+    cityScopedStores.forEach((shop) => {
+      if (typeof shop.longitude !== "number" || typeof shop.latitude !== "number") return;
+      
+      const shopPos = [shop.longitude, shop.latitude];
+      const targetPos = targetPoint.location;
+      
+      // 创建连线
+      const polyline = new AMap.Polyline({
+        path: [shopPos, targetPos],
+        strokeColor: "#60a5fa",
+        strokeOpacity: 0.65,
+        strokeWeight: 3,
+        strokeStyle: "dashed",
+        strokeDasharray: [12, 12],
+        zIndex: 50,
+        bubble: true,
+      });
+      spiderLines.push(polyline);
+      
+      // 计算直线距离
+      const dist = AMap.GeometryUtil.distance(shopPos, targetPos);
+      const labelText = dist > 1000 ? `${(dist / 1000).toFixed(1)}km` : `${Math.round(dist)}m`;
+      
+      // 在中点创建距离文本
+      const label = new AMap.Text({
+        text: labelText,
+        position: [(shopPos[0] + targetPos[0]) / 2, (shopPos[1] + targetPos[1]) / 2],
+        anchor: "center",
+        zIndex: 51,
+        style: {
+          "background-color": "rgba(2, 6, 23, 0.88)",
+          "border": "1px solid rgba(148, 163, 184, 0.3)",
+          "color": "#fff",
+          "font-size": "12px",
+          "font-weight": "800",
+          "padding": "3px 6px",
+          "border-radius": "4px",
+          "box-shadow": "0 4px 12px rgba(0,0,0,0.5)",
+          "pointer-events": "none",
+        },
+      });
+      spiderLabels.push(label);
     });
+
+    spiderLinesRef.current = spiderLines;
+    spiderLabelsRef.current = spiderLabels;
+    map.add(spiderLines);
+    map.add(spiderLabels);
 
     targetMarkerRef.current = marker;
     map.add(marker);
@@ -745,9 +1264,10 @@ export function StoreDispatchMap({
       )
       .map((shop) => ({
         shopId: shop.id,
-        straightDist: Math.round(
+        airDist: Math.round(
           AMap.GeometryUtil.distance([shop.longitude as number, shop.latitude as number], targetPoint.location)
         ),
+        rank: 0,
         routeDist: null,
         duration: null,
         path: [
@@ -755,7 +1275,8 @@ export function StoreDispatchMap({
           targetPoint.location as [number, number],
         ],
       }))
-      .sort((a, b) => a.straightDist - b.straightDist);
+      .sort((a, b) => a.airDist - b.airDist)
+      .map((item, idx) => ({ ...item, rank: idx + 1 }));
 
     setResults(nextResults);
 
@@ -841,91 +1362,6 @@ export function StoreDispatchMap({
     })();
   }, [cityScopedStores, clearTargetArtifacts, ensureRidingService, regionCenter, shops, targetPoint]);
 
-  const handlePreviewResult = useCallback((result: DistanceResult) => {
-    const map = mapRef.current;
-    const AMap = AMapRef.current;
-    const matchedShop = shops.find((shop) => shop.id === result.shopId);
-    if (!map || !AMap || !matchedShop?.longitude || !matchedShop?.latitude || !targetPoint) return;
-
-    clearTargetArtifacts();
-
-    const marker = new AMap.Marker({
-      position: targetPoint.location,
-      title: targetPoint.name,
-    });
-    targetMarkerRef.current = marker;
-    map.add(marker);
-
-    const polyline = new AMap.Polyline({
-      path: result.path,
-      strokeColor: "#2563eb",
-      strokeOpacity: 0.9,
-      strokeWeight: 6,
-      lineJoin: "round",
-      lineCap: "round",
-      zIndex: 30,
-      strokeStyle: result.routeDist ? "solid" : "dashed",
-    });
-
-    pathRef.current = polyline;
-    map.add(polyline);
-    map.setFitView([polyline, marker], false, [90, 90, 90, 90]);
-  }, [clearTargetArtifacts, shops, targetPoint]);
-
-  const handleSaveShop = useCallback(async () => {
-    if (!editingShop?.name?.trim()) {
-      showToast("请填写店铺名称", "error");
-      return;
-    }
-
-    setIsSavingShop(true);
-    try {
-      const method = editingShop.id ? "PUT" : "POST";
-      const url = editingShop.id ? `/api/shops/${editingShop.id}` : "/api/shops";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editingShop.name,
-          address: editingShop.address,
-          latitude: editingShop.latitude ?? null,
-          longitude: editingShop.longitude ?? null,
-          isSource: editingShop.isSource ?? true,
-          contactPhone: editingShop.contactPhone,
-        }),
-      });
-
-      if (!res.ok) throw new Error("save failed");
-
-      showToast(editingShop.id ? "店铺已更新" : "店铺已新增", "success");
-      setEditingShop(null);
-      await fetchShops();
-    } catch (error) {
-      console.error("Failed to save shop:", error);
-      showToast("保存店铺失败", "error");
-    } finally {
-      setIsSavingShop(false);
-    }
-  }, [editingShop, fetchShops, showToast]);
-
-  const handleDeleteShop = useCallback(
-    async (shopId: string) => {
-      if (!confirm("确定删除这个店铺吗？")) return;
-
-      try {
-        const res = await fetch(`/api/shops/${shopId}`, { method: "DELETE" });
-        if (!res.ok) throw new Error("delete failed");
-        showToast("店铺已删除", "success");
-        await fetchShops();
-      } catch (error) {
-        console.error("Failed to delete shop:", error);
-        showToast("删除店铺失败", "error");
-      }
-    },
-    [fetchShops, showToast]
-  );
-
   const handleImportShops = useCallback(
     async (rows: Record<string, unknown>[] | Record<string, unknown[]>) => {
       const importedRows = Array.isArray(rows) ? rows : [];
@@ -935,6 +1371,7 @@ export function StoreDispatchMap({
       }
 
       setIsImportingShops(true);
+      setImportProgress(null);
       try {
         const res = await fetch("/api/shops/import", {
           method: "POST",
@@ -950,12 +1387,22 @@ export function StoreDispatchMap({
         const createdShops = Array.isArray(result.shops) ? (result.shops as ImportedShopPayload[]) : [];
         let autoLocated = 0;
 
+        setImportProgress({ current: 0, total: createdShops.length });
+
         for (const shop of createdShops) {
           const keyword = String(shop.address || shop.name || "").trim();
-          if (!keyword) continue;
+          if (!keyword) {
+            setImportProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
+            continue;
+          }
 
-          const location = await resolveShopCoordinates(keyword);
-          if (!location) continue;
+          const matched = await resolveShopCoordinates(keyword);
+          if (!matched) {
+            setImportProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
+            continue;
+          }
+
+          const { location, components } = matched;
 
           const updateRes = await fetch(`/api/shops/${shop.id}`, {
             method: "PUT",
@@ -963,6 +1410,8 @@ export function StoreDispatchMap({
             body: JSON.stringify({
               name: shop.name,
               address: shop.address,
+              province: components?.province || null,
+              city: (typeof components?.city === "string" ? components.city : components?.province) || null,
               latitude: location[1],
               longitude: location[0],
               isSource: true,
@@ -972,6 +1421,7 @@ export function StoreDispatchMap({
           if (updateRes.ok) {
             autoLocated += 1;
           }
+          setImportProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
         }
 
         await fetchShops();
@@ -984,15 +1434,67 @@ export function StoreDispatchMap({
         showToast(error instanceof Error ? error.message : "店铺导入失败", "error");
       } finally {
         setIsImportingShops(false);
+        setImportProgress(null);
       }
     },
     [fetchShops, resolveShopCoordinates, showToast]
   );
 
+  const handleSaveShop = useCallback(async (data: EditableShop) => {
+    try {
+      const isEditing = !!data.id;
+      const url = isEditing ? `/api/shops/${data.id}` : "/api/shops";
+      const method = isEditing ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "保存失败");
+      }
+
+      showToast(isEditing ? "修改成功" : "新增成功", "success");
+      await fetchShops();
+      
+      // 如果是新增，尝试自动定位
+      if (!isEditing) {
+        const result = await res.json();
+        const newShop = result.shop;
+        if (newShop) {
+          handleLocateShop(newShop);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to save shop:", error);
+      showToast(error instanceof Error ? error.message : "保存失败", "error");
+    }
+  }, [fetchShops, handleLocateShop, showToast]);
+
+  const handleDeleteShop = useCallback(async (id: string) => {
+    if (!confirm("确定要删除这家店铺吗？此核销无法撤销。")) return;
+
+    try {
+      const res = await fetch(`/api/shops/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("删除失败");
+      
+      showToast("删除成功", "success");
+      await fetchShops();
+      if (activeShopId === id) setActiveShopId(null);
+    } catch (error) {
+      console.error("Failed to delete shop:", error);
+      showToast("删除失败", "error");
+    }
+  }, [activeShopId, fetchShops, showToast]);
+
   return (
     <>
-    <div className="relative h-full min-h-[720px] overflow-hidden rounded-[32px] bg-background">
-      <div className="absolute inset-0 z-0 p-4">
+    <div className="relative flex h-dvh w-full flex-col bg-background text-foreground md:flex-row">
+      <style>{markerStyles}</style>
+      <div className={cn("absolute inset-0 z-0 p-4")}>
         <BareAmapTest
           showDebug={false}
           center={DEFAULT_CENTER}
@@ -1000,8 +1502,25 @@ export function StoreDispatchMap({
           showDefaultMarker={false}
           onReady={handleMapReady}
           onDestroy={handleMapDestroy}
+          mapStyle={`amap://styles/${mapTheme}`}
           className="h-full min-h-[680px] overflow-hidden rounded-[28px] border border-border bg-white"
         />
+
+        {/* 悬浮主题切换器 */}
+        <div className="absolute right-8 top-8 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 p-1.5 backdrop-blur-md shadow-2xl">
+          {MAP_THEMES.map((theme) => (
+            <button
+              key={theme.id}
+              onClick={() => setMapTheme(theme.id)}
+              title={theme.label}
+              className={cn(
+                "h-6 w-6 rounded-full border border-white/20 transition-all hover:scale-110",
+                theme.color,
+                mapTheme === theme.id ? "ring-2 ring-primary ring-offset-2 ring-offset-black/20" : "opacity-60"
+              )}
+            />
+          ))}
+        </div>
       </div>
 
       {isPanelCollapsed && (
@@ -1047,7 +1566,10 @@ export function StoreDispatchMap({
                 <div className="text-xs font-bold text-muted-foreground">地区筛选</div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setEditingShop({ name: "", address: "", isSource: true })}
+                    onClick={() => {
+                      setEditingShop(null);
+                      setIsShopModalOpen(true);
+                    }}
                     className="inline-flex h-8 items-center gap-1.5 rounded-2xl border border-border bg-card px-3 text-[11px] font-bold transition-all hover:bg-muted"
                   >
                     <Plus size={13} />
@@ -1140,197 +1662,200 @@ export function StoreDispatchMap({
                   </button>
                 )}
               </div>
-              <div className="mt-3 flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-                <MapPin size={14} />
-                <span>
-                  {activeProvince && activeCity
-                    ? `${searchFeedback} 当前地区：${activeProvince === ALL_REGIONS ? ALL_REGIONS : [activeProvince, activeCity].filter((value) => value && value !== ALL_REGIONS).join(" / ")}`
-                    : "请先选择省市。"}
-                </span>
-              </div>
+                {searchFeedback && (
+                  <div className="mt-3 flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    <MapPin size={14} />
+                    <span className="truncate">{searchFeedback}</span>
+                  </div>
+                )}
               </div>
             </section>
 
-            <section className="rounded-3xl border border-border bg-background p-4">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-black text-foreground">本地区店铺</h3>
-                <div className="text-[11px] font-medium text-muted-foreground">
-                  当前省市下参与调货计算的门店
+            {/* 板块 1: 本地区店铺 (可折叠) */}
+            <div className={cn("flex flex-col transition-all duration-300", expandedPanel === "shops" ? "flex-1 min-h-0" : "flex-none")}>
+              <button
+                onClick={() => setExpandedPanel(expandedPanel === "shops" ? "results" : "shops")}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-background p-3.5 transition-colors hover:bg-muted/50"
+              >
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-foreground">本地区店铺</h3>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                    {currentCityStores.length}
+                  </span>
                 </div>
-              </div>
-
-              <div className="relative mb-3">
-                <Search
-                  size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  value={shopSearch}
-                  onChange={(event) => setShopSearch(event.target.value)}
-                  placeholder="搜索本地区店铺"
-                  className="h-10 w-full rounded-2xl border border-border bg-card px-9 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-                />
-              </div>
-
-              {editingShop && (
-                <div className="mb-3 space-y-3 rounded-2xl border border-primary/20 bg-primary/4 p-3">
-                  <input
-                    value={editingShop.name || ""}
-                    onChange={(event) => setEditingShop((prev) => ({ ...prev, name: event.target.value }))}
-                    placeholder="店铺名称"
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none"
-                  />
-                  <input
-                    value={editingShop.address || ""}
-                    onChange={(event) => setEditingShop((prev) => ({ ...prev, address: event.target.value }))}
-                    placeholder="详细地址"
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none"
-                  />
-                  <input
-                    value={editingShop.contactPhone || ""}
-                    onChange={(event) => setEditingShop((prev) => ({ ...prev, contactPhone: event.target.value }))}
-                    placeholder="联系电话"
-                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none"
-                  />
-                  <label className="flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={editingShop.isSource ?? true}
-                      onChange={(event) => setEditingShop((prev) => ({ ...prev, isSource: event.target.checked }))}
-                    />
-                    作为调货店铺
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveShop}
-                      disabled={isSavingShop}
-                      className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black text-primary-foreground disabled:opacity-60"
-                    >
-                      {isSavingShop ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                      保存
-                    </button>
-                    <button
-                      onClick={() => setEditingShop(null)}
-                      className="inline-flex h-10 items-center justify-center rounded-2xl border border-border px-4 text-sm font-bold transition-all hover:bg-muted"
-                    >
-                      取消
-                    </button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  {isImportingShops && importProgress && (
+                    <span className="text-[10px] text-muted-foreground animate-pulse">
+                      正在定位 {importProgress.current}/{importProgress.total}
+                    </span>
+                  )}
+                  <ChevronDown size={16} className={cn("text-muted-foreground transition-transform duration-300", expandedPanel === "shops" ? "rotate-180" : "rotate-0")} />
                 </div>
-              )}
+              </button>
 
-              <div className="max-h-[300px] space-y-2 overflow-y-auto custom-scrollbar pr-1">
-                {currentCityStores.map((shop) => (
-                  <div
-                    key={shop.id}
-                    className="rounded-2xl border border-border bg-card p-3 transition-all hover:border-primary/20"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Store size={14} className="text-primary" />
-                          <div className="truncate text-sm font-bold text-foreground">{shop.name}</div>
-                        </div>
-                        <div className="mt-1 truncate text-xs text-muted-foreground">
-                          {shop.address || "未设置地址"}
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5",
-                              shop.isSource
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                : "bg-muted"
-                            )}
-                          >
-                            门店
-                          </span>
-                          {shop.latitude && shop.longitude ? <span>已定位</span> : <span>待定位</span>}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          onClick={() => handleLocateShop(shop)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary"
-                        >
-                          <MapPin size={14} />
-                        </button>
-                        <button
-                          onClick={() => setEditingShop(shop)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => void handleDeleteShop(shop.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+              <div className={cn("grid transition-all duration-300", expandedPanel === "shops" ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 overflow-hidden")}>
+                <div className="min-h-0 flex flex-col gap-3 overflow-hidden">
+                  {isImportingShops && importProgress && (
+                    <div className="px-1 space-y-1">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all duration-300"
+                          style={{ width: `${importProgress.total > 0 ? Math.round(importProgress.current / importProgress.total * 100) : 0}%` }}
+                        />
                       </div>
                     </div>
-                  </div>
-                ))}
-                {!currentCityStores.length && (
-                  <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-                    当前地区暂无店铺
-                  </div>
-                )}
-              </div>
-            </section>
+                  )}
 
-            <section className="rounded-3xl border border-border bg-background p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-black text-foreground">店铺路线预览</h3>
-                <div className="text-[11px] font-medium text-muted-foreground">
-                  当前地区全部店铺的距离结果
-                </div>
-              </div>
-              <div className="max-h-[140px] space-y-2 overflow-y-auto custom-scrollbar pr-1">
-                {results.map((result, index) => {
-                  const shop = shops.find((item) => item.id === result.shopId);
-                  if (!shop) return null;
-                  return (
-                    <button
-                      key={result.shopId}
-                      onClick={() => handlePreviewResult(result)}
-                      className={cn(
-                        "w-full rounded-2xl border p-3 text-left transition-all",
-                        index === 0
-                          ? "border-primary/30 bg-primary/6"
-                          : "border-border bg-card hover:border-primary/20"
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-bold text-foreground">{shop.name}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {result.routeDist
-                              ? `路线距离 ${(result.routeDist / 1000).toFixed(2)} km · 直线 ${(result.straightDist / 1000).toFixed(2)} km`
-                              : `直线距离 ${(result.straightDist / 1000).toFixed(2)} km`}
-                          </div>
-                          {result.duration ? (
-                            <div className="mt-1 text-[11px] text-muted-foreground">
-                              预计耗时 {Math.max(1, Math.ceil(result.duration / 60))} 分钟
-                            </div>
-                          ) : null}
+                  <div className="relative">
+                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={shopSearch}
+                      onChange={(event) => setShopSearch(event.target.value)}
+                      placeholder="搜索本地区店铺"
+                      className="h-10 w-full rounded-xl border border-border bg-card px-9 text-sm outline-none transition-all focus:border-primary/20"
+                    />
+                  </div>
+
+                  <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-1 pb-4">
+                    {currentCityStores.map((shop) => (
+                      <div key={shop.id} className="rounded-2xl border border-border bg-card p-3 transition-all hover:border-primary/20">
+                        <div className="flex items-start gap-2">
+                          <Store size={14} className="mt-0.5 shrink-0 text-primary" />
+                          <div className="text-sm font-bold leading-snug text-foreground">{shop.name}</div>
                         </div>
-                        <div className="shrink-0 text-right text-[11px] font-bold text-primary">
-                          {result.routeDist ? "实际路线" : "直线预估"}
+                        <div className="mt-1 truncate text-xs text-muted-foreground">{shop.address || "未设置地址"}</div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                            <span className={cn("rounded-full px-2 py-0.5", shop.isSource ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted")}>门店</span>
+                            {shop.latitude && shop.longitude ? <span>已定位</span> : <span>待定位</span>}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button 
+                              onClick={() => handleLocateShop(shop)} 
+                              title="定位"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                            >
+                              <MapPin size={13} />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setEditingShop(shop);
+                                setIsShopModalOpen(true);
+                              }} 
+                              title="编辑"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-amber-500/10 hover:text-amber-500 transition-all"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteShop(shop.id)} 
+                              title="删除"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-all"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </button>
-                  );
-                })}
-                {!results.length && (
-                  <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-                    先选地区，再搜索收货地址。
-                    <br />
-                    这里会按距离列出当前地区全部店铺的结果。
+                    ))}
+                    {!currentCityStores.length && <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">当前地区暂无店铺</div>}
                   </div>
-                )}
+                </div>
               </div>
-            </section>
+            </div>
+
+            {/* 板块 2: 测距结果预览 (可折叠) */}
+            <div className={cn("flex flex-col transition-all duration-300 border-t border-white/5 pt-2", expandedPanel === "results" ? "flex-1 min-h-0" : "flex-none")}>
+              <button
+                onClick={() => setExpandedPanel(expandedPanel === "results" ? "shops" : "results")}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-2xl p-3.5 transition-colors",
+                  results.length > 0 ? "bg-primary/5 hover:bg-primary/10" : "bg-background hover:bg-muted/50"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-foreground">测距对比分析</h3>
+                  {results.length > 0 && (
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                      TOP {results.length}
+                    </span>
+                  )}
+                </div>
+                <ChevronDown size={16} className={cn("text-muted-foreground transition-transform duration-300", expandedPanel === "results" ? "rotate-0" : "rotate-180")} />
+              </button>
+
+              <div className={cn("grid transition-all duration-300", expandedPanel === "results" ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 overflow-hidden")}>
+                <div className="min-h-0 flex flex-col gap-2 overflow-hidden">
+                  <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-1 pb-4">
+                    {results.map((result, index) => {
+                      const shop = shops.find((item) => item.id === result.shopId);
+                      if (!shop) return null;
+                      const isTop3 = index < 3;
+                      return (
+                        <button
+                          key={result.shopId}
+                          onClick={() => handlePreviewResult(result)}
+                          className={cn(
+                            "w-full rounded-2xl border p-3 text-left transition-all group relative overflow-hidden",
+                            index === 0
+                              ? "border-primary/40 bg-primary/8"
+                              : "border-border bg-card hover:border-primary/20"
+                          )}
+                        >
+                          {isTop3 && (
+                            <div className={cn(
+                              "absolute right-0 top-0 h-8 w-8 text-white/10 flex items-center justify-center translate-x-1 -translate-y-1",
+                              index === 0 ? "text-amber-500/20" : index === 1 ? "text-slate-400/20" : "text-orange-600/20"
+                            )}>
+                              <Trophy size={32} />
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className={cn(
+                                  "flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-black",
+                                  index === 0 ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground"
+                                )}>
+                                  {index + 1}
+                                </span>
+                                <div className="truncate text-sm font-bold text-foreground">{shop.name}</div>
+                              </div>
+                              
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <div className="flex items-center gap-1 text-xs font-medium text-foreground">
+                                  <Truck size={12} className="text-primary" />
+                                  {(result.routeDist ? result.routeDist / 1000 : result.airDist / 1000).toFixed(2)}km
+                                </div>
+                                {result.duration && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Clock size={12} />
+                                    {Math.max(1, Math.ceil(result.duration / 60))}分钟
+                                  </div>
+                                )}
+                                {result.routeDist && (
+                                  <div className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                                    实际路线
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <ChevronRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {!results.length && (
+                      <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+                        <div className="mb-2 flex justify-center text-primary/40"><Navigation size={24} /></div>
+                        输入收货地址后<br />这里将自动展示最优配送方案
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
       </aside>
     </div>
@@ -1347,6 +1872,12 @@ export function StoreDispatchMap({
       dropzoneText="点击上传或拖拽店铺表格"
       templateData={SHOP_IMPORT_TEMPLATE}
       templateFileName="店铺导入模板.xlsx"
+    />
+    <StoreModal
+      isOpen={isShopModalOpen}
+      onClose={() => setIsShopModalOpen(false)}
+      onSave={handleSaveShop}
+      initialData={editingShop}
     />
     </>
   );

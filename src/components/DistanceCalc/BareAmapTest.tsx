@@ -47,6 +47,7 @@ export function BareAmapTest({
   showDefaultMarker = true,
   onReady,
   onDestroy,
+  mapStyle = "amap://styles/normal",
 }: {
   className?: string;
   showDebug?: boolean;
@@ -55,6 +56,7 @@ export function BareAmapTest({
   showDefaultMarker?: boolean;
   onReady?: (payload: { map: any; AMap: any }) => void;
   onDestroy?: () => void;
+  mapStyle?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -95,7 +97,7 @@ export function BareAmapTest({
           viewMode: "2D",
           zoom,
           center,
-          mapStyle: "amap://styles/normal",
+          mapStyle,
         });
 
         mapRef.current = map;
@@ -131,6 +133,12 @@ export function BareAmapTest({
       }
     };
   }, [center, key, securityCode, showDefaultMarker, zoom]);
+
+  useEffect(() => {
+    if (mapRef.current && mapStyle) {
+      mapRef.current.setMapStyle(mapStyle);
+    }
+  }, [mapStyle]);
 
   return (
     <div className="space-y-4">

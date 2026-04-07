@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, address, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const { name, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Missing shop name" }, { status: 400 });
@@ -41,6 +41,8 @@ export async function POST(request: Request) {
       data: {
         name,
         address,
+        province,
+        city,
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
         isSource: isSource ?? true,
