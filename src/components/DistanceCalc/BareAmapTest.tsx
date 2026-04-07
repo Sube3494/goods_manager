@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -62,6 +63,9 @@ export function BareAmapTest({
   const [status, setStatus] = useState("初始化中...");
   const [error, setError] = useState("");
 
+  const key = process.env.NEXT_PUBLIC_AMAP_KEY;
+  const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
+
   useEffect(() => {
     onReadyRef.current = onReady;
   }, [onReady]);
@@ -74,8 +78,6 @@ export function BareAmapTest({
     let disposed = false;
 
     async function boot() {
-      const key = process.env.NEXT_PUBLIC_AMAP_KEY;
-      const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
 
       if (!key) {
         setError("未读取到 NEXT_PUBLIC_AMAP_KEY");
@@ -128,22 +130,39 @@ export function BareAmapTest({
         mapRef.current = null;
       }
     };
-  }, [center, showDefaultMarker, zoom]);
+  }, [center, key, securityCode, showDefaultMarker, zoom]);
 
   return (
     <div className="space-y-4">
-      {showDebug && (
-        <div className="rounded-2xl border border-border bg-card p-4 text-sm">
-          <div>Status: {status}</div>
-          <div>Host: {typeof window !== "undefined" ? window.location.host : "--"}</div>
-          <div>Key: {process.env.NEXT_PUBLIC_AMAP_KEY ? "已读取" : "未读取"}</div>
-          <div>Security: {process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE ? "已读取" : "未读取"}</div>
-          {error && <div className="text-red-500">Error: {error}</div>}
+      {(showDebug || (!key && error)) && (
+        <div className="rounded-2xl border border-border bg-card/50 p-4 text-sm backdrop-blur-md">
+          {(!key && error) ? (
+            <div className="flex flex-col gap-2">
+              <div className="font-bold text-red-500">地图加载失败：缺少配置 (Environment Variable Missing)</div>
+              <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                检测到 `NEXT_PUBLIC_AMAP_KEY` 为空。
+                请检查 Docker 构建参数或是环境变量配置。
+                线上版本需要通过 `--build-arg` 在镜像构建时注入。
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>Status: {status}</div>
+              <div>Host: {typeof window !== "undefined" ? window.location.host : "--"}</div>
+              <div>Key: {key ? "已读取" : "未读取"}</div>
+              <div>Security: {process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE ? "已读取" : "未读取"}</div>
+              {error && <div className="text-red-500 font-bold mt-1">Error: {error}</div>}
+            </>
+          )}
         </div>
       )}
       <div
         ref={containerRef}
-        className={className || "h-[70vh] overflow-hidden rounded-3xl border border-border bg-white"}
+        className={cn(
+          "h-[70vh] overflow-hidden rounded-3xl border border-border bg-white transition-opacity",
+          className,
+          (!key && error) ? "opacity-30 grayscale pointer-events-none" : "opacity-100"
+        )}
       />
     </div>
   );
