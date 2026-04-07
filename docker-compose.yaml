@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_AMAP_KEY=${NEXT_PUBLIC_AMAP_KEY}
+        - NEXT_PUBLIC_AMAP_SECURITY_CODE=${NEXT_PUBLIC_AMAP_SECURITY_CODE}
     container_name: goods-app
     init: true
     restart: unless-stopped
