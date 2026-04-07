@@ -39,46 +39,13 @@ async function createThumbnailFile(file: File) {
   });
 }
 
-function isHeif(file: File) {
-  const type = file.type.toLowerCase();
-  const name = file.name.toLowerCase();
-  return type.includes("heic") || type.includes("heif") || name.endsWith(".heic") || name.endsWith(".heif");
-}
-
-async function convertHeifToJpeg(file: File): Promise<File> {
-  // 使用高质量参数将 HEIC 转换为 JPEG，尽可能保留原图细节
-  const converted = await imageCompression(file, {
-    maxSizeMB: 10, // 足够大以不压缩尺寸 (Large enough to keep original size)
-    maxWidthOrHeight: 4096, // 常见手机照片的最大尺寸 (Max size for phone photos)
-    useWebWorker: true,
-    fileType: "image/jpeg",
-    initialQuality: 0.95,
-  });
-
-  const baseName = file.name.replace(/\.[^.]+$/, "");
-  return new File([converted], `${baseName}.jpg`, {
-    type: "image/jpeg",
-    lastModified: file.lastModified,
-  });
-}
 
 export async function uploadGalleryMedia(
   file: File,
   folder = "gallery",
   onProgress?: (percent: number) => void
 ): Promise<UploadedGalleryMedia> {
-  let finalFile = file;
-  
-  // 如果是 HEIF/HEIC，先执行客户端转码 (Client-side transcode)
-  if (isHeif(file)) {
-    try {
-      finalFile = await convertHeifToJpeg(file);
-    } catch (error) {
-      console.warn("Client-side HEIF conversion failed, falling back to original:", error);
-    }
-  }
-
-  const original = await uploadFileWithChunking(finalFile, folder, onProgress);
+  const original = await uploadFileWithChunking(file, folder, onProgress);
   const type = original.type === "video" ? "video" : "image";
 
   const result: UploadedGalleryMedia = {
@@ -88,12 +55,12 @@ export async function uploadGalleryMedia(
     skipped: original.skipped,
   };
 
-  if (!canGenerateThumbnail(finalFile) || type !== "image") {
+  if (!canGenerateThumbnail(file) || type !== "image") {
     return result;
   }
 
   try {
-    const thumbnailFile = await createThumbnailFile(finalFile);
+    const thumbnailFile = await createThumbnailFile(file);
     const thumbnail = await uploadFileWithChunking(thumbnailFile, `${folder}/thumbs`);
     result.thumbnailUrl = thumbnail.url;
     result.thumbnailPath = thumbnail.path || thumbnail.name || thumbnail.url;
