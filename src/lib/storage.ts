@@ -220,7 +220,7 @@ export class LocalStorageStrategy implements StorageStrategy {
     
     await mkdir(uploadDir, { recursive: true });
 
-    let fileNameInput = options?.name || (file instanceof Blob ? (file as Blob).name : `upload-${Date.now()}`);
+    let fileNameInput = options?.name || (file instanceof File ? file.name : `upload-${Date.now()}`);
     
     // Naming logic
     if (options?.useTimestamp) {
@@ -294,7 +294,7 @@ export class LocalStorageStrategy implements StorageStrategy {
         } else if (Buffer.isBuffer(file)) {
         await writeFile(fullPath, file);
         } else {
-        const bytes = await (file instanceof Blob ? (file as Blob).arrayBuffer() : (file as File).arrayBuffer());
+        const bytes = await (file as Blob).arrayBuffer();
         const buffer = Buffer.from(bytes);
         await writeFile(fullPath, buffer);
         }
@@ -398,7 +398,7 @@ export class MinioStorageStrategy implements StorageStrategy {
       await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy));
     }
 
-    let fileNameInput = options?.name || (file instanceof Blob ? (file as Blob).name : `upload-${Date.now()}`);
+    let fileNameInput = options?.name || (file instanceof File ? file.name : `upload-${Date.now()}`);
     
     if (options?.useTimestamp) {
         const ext = fileNameInput.split(".").pop() || "";
@@ -411,7 +411,7 @@ export class MinioStorageStrategy implements StorageStrategy {
     const subFolder = options?.folder || "";
     const objectName = subFolder ? `${subFolder}/${fileNameInput}` : fileNameInput;
 
-    const fileType = options?.type || (file instanceof Blob ? (file as File).type : "application/octet-stream");
+    const fileType = options?.type || (file instanceof Blob ? (file as Blob).type : "application/octet-stream");
 
     let usedStrategy = this.config.uploadConflictStrategy || "uuid";
     let uploadSource: File | Buffer | ReadableStream | Readable | string = file;
@@ -482,7 +482,7 @@ export class MinioStorageStrategy implements StorageStrategy {
                 'Content-Type': fileType,
             });
         } else {
-            const bytes = await (file instanceof Blob ? (file as Blob).arrayBuffer() : (file as File).arrayBuffer());
+            const bytes = await (file as Blob).arrayBuffer();
             const buffer = Buffer.from(bytes);
             await minioClient.putObject(bucketName, fileName, buffer, buffer.length, {
                 'Content-Type': fileType,

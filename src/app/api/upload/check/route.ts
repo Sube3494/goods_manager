@@ -3,7 +3,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { getNormalizedUploadExtension, isAllowedUploadExtension } from "@/lib/uploadValidation";
+import { getFileExtension, isAllowedUploadExtension } from "@/lib/uploadValidation";
 
 /**
  * POST /api/upload/check
@@ -25,16 +25,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "实物上传功能已关闭" }, { status: 401 });
     }
 
-    const { hash, ext, folder, fileName, fileType } = await request.json();
+    const { hash, ext, folder, fileName } = await request.json();
 
     if (!hash || (!ext && !fileName)) {
       return NextResponse.json({ error: "Missing hash or file extension" }, { status: 400 });
     }
 
-    const normalizedExt = getNormalizedUploadExtension(
-      String(fileName || `upload.${ext}`),
-      String(fileType || "")
-    );
+    const normalizedExt = getFileExtension(String(fileName || `upload.${ext}`));
 
     if (!isAllowedUploadExtension(String(ext || normalizedExt))) {
       return NextResponse.json({ error: "仅支持上传图片或视频文件" }, { status: 400 });
