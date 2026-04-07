@@ -46,130 +46,6 @@ import { createHash } from "crypto";
 import { tmpdir } from "os";
 import { createReadStream } from "fs";
 
-const HEIC_MIME_TYPES = new Set([
-  "image/heic",
-  "image/heif",
-  "image/heic-sequence",
-  "image/heif-sequence",
-  "image/x-heic",
-  "image/x-heif",
-]);
-
-type SharpLike = {
-  (input?: Buffer | Uint8Array, options?: { animated?: boolean }): {
-    rotate(): {
-      jpeg(options?: { quality?: number; mozjpeg?: boolean }): {
-        toBuffer(): Promise<Buffer>;
-      };
-    };
-  };
-  format: Record<string, { 
-    input?: { buffer?: boolean; file?: boolean; stream?: boolean }; 
-    output?: { buffer?: boolean; file?: boolean; stream?: boolean } 
-  }>;
-};
-
-function getExtension(fileName: string) {
-  return fileName.split(".").pop()?.trim().toLowerCase() || "";
-}
-
-function replaceExtension(fileName: string, nextExt: string) {
-  const sanitizedExt = nextExt.replace(/^\./, "");
-  const dotIndex = fileName.lastIndexOf(".");
-  if (dotIndex === -1) {
-    return `${fileName}.${sanitizedExt}`;
-  }
-  return `${fileName.substring(0, dotIndex)}.${sanitizedExt}`;
-}
-
-function shouldConvertHeicToJpeg(fileName: string, fileType: string) {
-  const ext = getExtension(fileName);
-  const normalizedType = fileType.trim().toLowerCase();
-  return ext === "heic" || ext === "heif" || HEIC_MIME_TYPES.has(normalizedType);
-}
-
-async function readUploadSourceToBuffer(file: File | Buffer | ReadableStream | Readable) {
-  if (Buffer.isBuffer(file)) {
-    return file;
-  }
-
-  if (file instanceof Blob) {
-    return Buffer.from(await file.arrayBuffer());
-  }
-
-  const stream = file instanceof ReadableStream
-    ? Readable.fromWeb(file as import("stream/web").ReadableStream)
-    : (file as Readable);
-
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
-}
-
-async function normalizeUploadInput(
-  file: File | Buffer | ReadableStream | Readable,
-  options?: UploadOptions
-): Promise<{ file: File | Buffer | ReadableStream | Readable; options: UploadOptions | undefined }> {
-  const fileName = options?.name || (file instanceof Blob && "name" in file ? (file as File).name : "");
-  const fileType = options?.type || (file instanceof Blob ? file.type : "");
-
-  if (!fileName || !shouldConvertHeicToJpeg(fileName, fileType)) {
-    return { file, options };
-  }
-
-  const inputBuffer = await readUploadSourceToBuffer(file);
-
-  try {
-    const sharp = await loadSharp();
-    
-    // 检查当前 sharp 实例是否支持 HEIF/HEIC 输入
-    const hasHeifInput = !!(sharp.format?.heif?.input?.buffer || sharp.format?.heic?.input?.buffer);
-    if (!hasHeifInput) {
-      throw new Error("当前环境下的 sharp 暂不支持 HEIF/HEIC 解码。");
-    }
-
-    const jpegBuffer = await sharp(inputBuffer)
-      .rotate()
-      .jpeg({ quality: 90, mozjpeg: true })
-      .toBuffer();
-
-    return {
-      file: jpegBuffer,
-      options: {
-        ...options,
-        name: replaceExtension(fileName, "jpg"),
-        type: "image/jpeg",
-      },
-    };
-  } catch (error) {
-    console.error("Failed to convert HEIC/HEIF upload to JPEG:", error);
-    const msg = error instanceof Error ? error.message : String(error);
-    throw new Error(`HEIC 图片转换失败: ${msg}. 请尝试改传 JPG/PNG。`);
-  }
-}
-
-async function loadSharp() {
-  try {
-    // 优先尝试动态导入，符合现代 ESM 规范且能绕过某些 lint 限制
-    const sharpModule = await import("sharp");
-    const sharp = sharpModule.default ?? sharpModule;
-    return sharp as unknown as SharpLike;
-  } catch {
-    try {
-      // 回退到基于 CWD 的动态 require，适用于 standalone 模式下的外部安装包
-      const { createRequire } = await import("node:module");
-      const runtimeRequire = createRequire(join(process.cwd(), "package.json"));
-      const sharpModule = runtimeRequire("sharp");
-      return (sharpModule.default ?? sharpModule) as unknown as SharpLike;
-    } catch (innerError) {
-      console.error("Fatal: failed to load sharp:", innerError);
-      throw new Error("HEIC 转换依赖可选包 sharp，且目前在服务器上未能正确加载。请联系管理员确保环境包含 sharp。");
-    }
-  }
-}
-
 // 帮助函数：处理文件并计算哈希
 // 如果是流，会写入临时文件以便后续上传
 // 返回：hash, extension, cleanup回调, 以及用于上传的 source (Buffer 或 path)
@@ -327,10 +203,6 @@ export class LocalStorageStrategy implements StorageStrategy {
 
 
   async upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult> {
-    const normalizedUpload = await normalizeUploadInput(file, options);
-    file = normalizedUpload.file;
-    options = normalizedUpload.options;
-
     // 确保在 Docker standalone 环境下也能准备找到上传目录
     // standalone 模式下 process.cwd() 可能在 .next/standalone，需要向上回退
     let baseDir = join(process.cwd(), "public", "uploads");
@@ -348,7 +220,7 @@ export class LocalStorageStrategy implements StorageStrategy {
     
     await mkdir(uploadDir, { recursive: true });
 
-    let fileNameInput = options?.name || (file as File).name || `upload-${Date.now()}`;
+    let fileNameInput = options?.name || (file instanceof Blob ? (file as Blob).name : `upload-${Date.now()}`);
     
     // Naming logic
     if (options?.useTimestamp) {
@@ -358,8 +230,6 @@ export class LocalStorageStrategy implements StorageStrategy {
         const prefix = options.folder ? `${options.folder}_` : "file_";
         fileNameInput = `${prefix}${timestamp}_${random}.${ext}`;
     }
-    // Remove unused fileType variable or use it if needed
-    // const fileType = options?.type || (file as File).type || "application/octet-stream";
 
     let usedStrategy = this.strategy;
     let uploadSource: File | Buffer | ReadableStream | Readable | string = file;
@@ -424,7 +294,7 @@ export class LocalStorageStrategy implements StorageStrategy {
         } else if (Buffer.isBuffer(file)) {
         await writeFile(fullPath, file);
         } else {
-        const bytes = await (file as File).arrayBuffer();
+        const bytes = await (file instanceof Blob ? (file as Blob).arrayBuffer() : (file as File).arrayBuffer());
         const buffer = Buffer.from(bytes);
         await writeFile(fullPath, buffer);
         }
@@ -493,10 +363,6 @@ export class MinioStorageStrategy implements StorageStrategy {
   }
 
   async upload(file: File | Buffer | ReadableStream | Readable, options?: UploadOptions): Promise<UploadResult> {
-    const normalizedUpload = await normalizeUploadInput(file, options);
-    file = normalizedUpload.file;
-    options = normalizedUpload.options;
-
     const endPoint = this.config.minioEndpoint.replace(/^\[|\]$/g, '');
     const minioClient = new Minio.Client({
       endPoint: endPoint,
@@ -532,7 +398,7 @@ export class MinioStorageStrategy implements StorageStrategy {
       await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy));
     }
 
-    let fileNameInput = options?.name || (file as File).name || `upload-${Date.now()}`;
+    let fileNameInput = options?.name || (file instanceof Blob ? (file as Blob).name : `upload-${Date.now()}`);
     
     if (options?.useTimestamp) {
         const ext = fileNameInput.split(".").pop() || "";
@@ -545,7 +411,7 @@ export class MinioStorageStrategy implements StorageStrategy {
     const subFolder = options?.folder || "";
     const objectName = subFolder ? `${subFolder}/${fileNameInput}` : fileNameInput;
 
-    const fileType = options?.type || (file as File).type || "application/octet-stream";
+    const fileType = options?.type || (file instanceof Blob ? (file as File).type : "application/octet-stream");
 
     let usedStrategy = this.config.uploadConflictStrategy || "uuid";
     let uploadSource: File | Buffer | ReadableStream | Readable | string = file;
@@ -616,7 +482,7 @@ export class MinioStorageStrategy implements StorageStrategy {
                 'Content-Type': fileType,
             });
         } else {
-            const bytes = await (file as File).arrayBuffer();
+            const bytes = await (file instanceof Blob ? (file as Blob).arrayBuffer() : (file as File).arrayBuffer());
             const buffer = Buffer.from(bytes);
             await minioClient.putObject(bucketName, fileName, buffer, buffer.length, {
                 'Content-Type': fileType,

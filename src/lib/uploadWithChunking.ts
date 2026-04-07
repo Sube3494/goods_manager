@@ -10,61 +10,37 @@ const IMAGE_COMPRESSION_TARGETS = {
 } as const;
 
 async function maybeCompressImageBeforeUpload(file: File) {
-  const name = file.name.toLowerCase();
-  const type = file.type.toLowerCase();
-  const isHeif = name.endsWith(".heic") || name.endsWith(".heif") || type.includes("heic") || type.includes("heif");
-
-  // 如果不是图片类型且文件名后缀不是 HEIC，且不是常用的图片类型，则跳过处理
-  if (!isHeif && !type.startsWith("image/") || type.includes("gif")) {
+  if (!file.type.startsWith("image/") || file.type.includes("gif")) {
     return file;
   }
 
-  // 小于 5MB 且不是 HEIC 的普通图片通常没必要在客户端重压 (HEIC 必须转码哪怕它很小)
-  if (!isHeif && file.size <= 900 * 1024) {
+  // Smaller assets don't benefit much from client-side recompression.
+  if (file.size <= 900 * 1024) {
     return file;
   }
 
   try {
-    const options = isHeif ? {
-      maxSizeMB: 10,
-      maxWidthOrHeight: 4096,
-      useWebWorker: true,
-      fileType: "image/jpeg" as const,
-      initialQuality: 0.95,
-    } : {
+    const compressedFile = await imageCompression(file, {
       ...IMAGE_COMPRESSION_TARGETS,
       useWebWorker: true,
       preserveExif: true,
-    };
+    });
 
-    if (isHeif) {
-      console.log(`[HEIC Conversion] Transcoding ${file.name} to JPEG client-side...`);
-    }
-
-    const compressedFile = await imageCompression(file, options);
-
-    // 如果转换后的文件依然很大，且不是 HEIC，保留原样 (HEIC 即使变大也必须用转换后的，防止服务端崩溃)
-    if (!isHeif && compressedFile.size >= file.size) {
+    if (compressedFile.size >= file.size) {
       return file;
     }
 
     const savedRatio = ((file.size - compressedFile.size) / file.size) * 100;
     console.log(
-      `[Image Processing] ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (saved ${savedRatio.toFixed(1)}%)`
+      `[Image Compression] ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (saved ${savedRatio.toFixed(1)}%)`
     );
 
-    const nextName = isHeif ? file.name.replace(/\.[^.]+$/, ".jpg") : file.name;
-
-    return new File([compressedFile], nextName, {
-      type: "image/jpeg",
+    return new File([compressedFile], file.name, {
+      type: compressedFile.type || file.type,
       lastModified: file.lastModified,
     });
   } catch (error) {
-    console.warn("图片处理失败，降级使用原文件:", error);
-    // 如果是 HEIC 且转码失败，由于服务端也转不了，这里我们应当让上传失败报出错误
-    if (isHeif) {
-      throw new Error(`HEIC 转码失败: ${error instanceof Error ? error.message : String(error)}。请尝试直接改为上传 JPG/PNG。`);
-    }
+    console.warn("图片压缩失败，降级使用原文件:", error);
     return file;
   }
 }
