@@ -95,6 +95,6 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error("Merge Error:", error);
-    return NextResponse.json({ error: "Merge failed" }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Merge failed" }, { status: 500 });
   }
 }

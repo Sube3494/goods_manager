@@ -1173,7 +1173,7 @@ export function StoreDispatchMap({
               </div>
 
               {editingShop && (
-                <div className="mb-3 space-y-3 rounded-2xl border border-primary/20 bg-primary/[0.04] p-3">
+                <div className="mb-3 space-y-3 rounded-2xl border border-primary/20 bg-primary/4 p-3">
                   <input
                     value={editingShop.name || ""}
                     onChange={(event) => setEditingShop((prev) => ({ ...prev, name: event.target.value }))}
@@ -1297,7 +1297,7 @@ export function StoreDispatchMap({
                       className={cn(
                         "w-full rounded-2xl border p-3 text-left transition-all",
                         index === 0
-                          ? "border-primary/30 bg-primary/[0.06]"
+                          ? "border-primary/30 bg-primary/6"
                           : "border-border bg-card hover:border-primary/20"
                       )}
                     >

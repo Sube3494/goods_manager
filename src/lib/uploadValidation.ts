@@ -8,6 +8,8 @@ const HEIC_MIME_TYPES = new Set([
   "image/heif",
   "image/heic-sequence",
   "image/heif-sequence",
+  "image/x-heic",
+  "image/x-heif",
 ]);
 
 const ALLOWED_EXTENSIONS = new Set<string>([

@@ -51,16 +51,22 @@ const HEIC_MIME_TYPES = new Set([
   "image/heif",
   "image/heic-sequence",
   "image/heif-sequence",
+  "image/x-heic",
+  "image/x-heif",
 ]);
 
 type SharpLike = {
-  (input?: Buffer, options?: { animated?: boolean }): {
+  (input?: Buffer | Uint8Array, options?: { animated?: boolean }): {
     rotate(): {
       jpeg(options?: { quality?: number; mozjpeg?: boolean }): {
         toBuffer(): Promise<Buffer>;
       };
     };
   };
+  format: Record<string, { 
+    input?: { buffer?: boolean; file?: boolean; stream?: boolean }; 
+    output?: { buffer?: boolean; file?: boolean; stream?: boolean } 
+  }>;
 };
 
 function getExtension(fileName: string) {
@@ -117,6 +123,13 @@ async function normalizeUploadInput(
 
   try {
     const sharp = await loadSharp();
+    
+    // 检查当前 sharp 实例是否支持 HEIF/HEIC 输入
+    const hasHeifInput = !!(sharp.format?.heif?.input?.buffer || sharp.format?.heic?.input?.buffer);
+    if (!hasHeifInput) {
+      throw new Error("当前环境下的 sharp 暂不支持 HEIF/HEIC 解码。");
+    }
+
     const jpegBuffer = await sharp(inputBuffer)
       .rotate()
       .jpeg({ quality: 90, mozjpeg: true })
@@ -132,20 +145,28 @@ async function normalizeUploadInput(
     };
   } catch (error) {
     console.error("Failed to convert HEIC/HEIF upload to JPEG:", error);
-    throw new Error("HEIC 图片转换失败，请稍后重试或改传 JPG/PNG");
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new Error(`HEIC 图片转换失败: ${msg}. 请尝试改传 JPG/PNG。`);
   }
 }
 
 async function loadSharp() {
   try {
-    const { createRequire } = await import("node:module");
-    const runtimeRequire = createRequire(join(process.cwd(), "package.json"));
-    const moduleName = ["sh", "arp"].join("");
-    const sharpModule = runtimeRequire(moduleName);
-    return (sharpModule.default ?? sharpModule) as SharpLike;
-  } catch (error) {
-    console.error("Failed to load sharp for HEIC conversion:", error);
-    throw new Error("HEIC 转换依赖可选包 sharp，请先在运行环境安装 sharp。");
+    // 优先尝试动态导入，符合现代 ESM 规范且能绕过某些 lint 限制
+    const sharpModule = await import("sharp");
+    const sharp = sharpModule.default ?? sharpModule;
+    return sharp as unknown as SharpLike;
+  } catch {
+    try {
+      // 回退到基于 CWD 的动态 require，适用于 standalone 模式下的外部安装包
+      const { createRequire } = await import("node:module");
+      const runtimeRequire = createRequire(join(process.cwd(), "package.json"));
+      const sharpModule = runtimeRequire("sharp");
+      return (sharpModule.default ?? sharpModule) as unknown as SharpLike;
+    } catch (innerError) {
+      console.error("Fatal: failed to load sharp:", innerError);
+      throw new Error("HEIC 转换依赖可选包 sharp，且目前在服务器上未能正确加载。请联系管理员确保环境包含 sharp。");
+    }
   }
 }
 

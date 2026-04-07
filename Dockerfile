@@ -45,7 +45,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Prisma 在 Alpine 上需要 openssl；postgresql-client 提供 psql 用于自动建库；su-exec 用于降权
-RUN apk add --no-cache openssl libc6-compat postgresql-client su-exec
+RUN apk add --no-cache openssl libc6-compat postgresql-client su-exec libheif
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
