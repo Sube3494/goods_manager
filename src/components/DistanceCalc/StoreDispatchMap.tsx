@@ -1344,7 +1344,7 @@ export function StoreDispatchMap({
             new Promise<TargetPoint | null>((resolve) => {
               placeSearch.searchNearBy(
                 keyword,
-                regionCenter ?? map.getCenter?.() ?? DEFAULT_CENTER,
+                regionCenter ?? mapRef.current?.getCenter?.() ?? DEFAULT_CENTER,
                 50000,
                 (status: string, result: any) => {
                   if (status === "complete" && result?.poiList?.pois?.length) {
