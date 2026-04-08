@@ -3,19 +3,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Clock,
   Loader2,
   MapPin,
   Navigation,
-  Navigation2,
-  Pencil,
   Plus,
   Search,
-  Store,
-  Trash2,
   Trophy,
   Truck,
   Upload,
@@ -31,12 +25,14 @@ import { cn } from "@/lib/utils";
 type Shop = {
   id: string;
   name: string;
+  externalId?: string | null;
   address: string | null;
   province: string | null;
   city: string | null;
   latitude: number | null;
   longitude: number | null;
   isSource: boolean;
+  contactName?: string | null;
   contactPhone: string | null;
   remark?: string | null;
 };
@@ -66,6 +62,11 @@ const DEFAULT_CENTER: [number, number] = [106.5516, 29.563];
 const ALL_REGIONS = "全国";
 const UNKNOWN_PROVINCE = "未分省";
 const UNKNOWN_CITY = "未分市";
+const ROUTE_CANDIDATE_LIMIT = 12;
+const ROUTE_DISPLAY_LIMIT = 5;
+const ROUTE_COLORS = ["#2563eb", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981"];
+const CROSS_CITY_RADIUS_METERS = 80000;
+const MAX_ROUTE_DISTANCE_METERS = 50000;
 const SHOP_IMPORT_TEMPLATE = [
   {
     门店名称: "私人订制轻奢礼品店（白云店）",
@@ -214,8 +215,8 @@ const MARKER_STYLES = `
   }
   .marker-wrapper:hover .marker-pin,
   .marker-wrapper.active .marker-pin {
-    transform: scale(1.2) translateY(-2px);
-    filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.6));
+    transform: scale(1.14) translateY(-2px);
+    filter: drop-shadow(0 10px 18px rgba(8, 47, 73, 0.35));
     z-index: 100;
   }
   .marker-wrapper:hover .marker-label,
@@ -240,60 +241,32 @@ const MARKER_STYLES = `
   }
   .target-marker-label {
     position: absolute;
-    bottom: 20px;
+    bottom: 16px;
     display: flex;
     align-items: center;
-    gap: 5px;
-    background: rgba(15, 23, 42, 0.82);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    gap: 4px;
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid rgba(148, 163, 184, 0.24);
     color: white;
-    padding: 5px 10px;
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
     white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 10px rgba(2, 6, 23, 0.22);
     z-index: 10;
   }
   .target-marker-label::after {
-    content: '';
-    position: absolute;
-    bottom: -4px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 4px solid rgba(15, 23, 42, 0.82);
+    display: none;
   }
   .target-dot {
-    width: 12px;
-    height: 12px;
-    background: #3b82f6;
-    border: 2.5px solid white;
-    border-radius: 50%;
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
-    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     z-index: 5;
   }
   .target-dot::before {
-    content: '';
-    position: absolute;
-    top: -12px;
-    left: -12px;
-    right: -12px;
-    bottom: -12px;
-    border: 2px solid #3b82f6;
-    border-radius: 50%;
-    animation: target-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
-  }
-  @keyframes target-pulse {
-    0% { transform: scale(0.5); opacity: 0.8; }
-    100% { transform: scale(2.8); opacity: 0; }
-  }
-  @keyframes target-float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
+    display: none;
   }
 `;
 
@@ -319,6 +292,91 @@ function simplifyShopName(name: string) {
   return lastPart || name;
 }
 
+function getResultDistance(result: DistanceResult) {
+  return result.routeDist ?? result.airDist;
+}
+
+function getResultDistanceMeta(result: DistanceResult) {
+  if (result.routeDist != null) {
+    return {
+      distanceText: `${(result.routeDist / 1000).toFixed(2)}km`,
+      badgeText: "实际路线",
+      badgeClassName: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    };
+  }
+
+  return {
+    distanceText: "计算中",
+    badgeText: "等待路线",
+    badgeClassName: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  };
+}
+
+function getRouteColor(index: number) {
+  return ROUTE_COLORS[index % ROUTE_COLORS.length];
+}
+
+function getShopCoordinates(shop: Pick<Shop, "longitude" | "latitude">): [number, number] | null {
+  if (typeof shop.longitude !== "number" || typeof shop.latitude !== "number") {
+    return null;
+  }
+
+  return [shop.longitude, shop.latitude];
+}
+
+function getDistanceMeters(from: [number, number], to: [number, number]) {
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const [lng1, lat1] = from;
+  const [lng2, lat2] = to;
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function sortDistanceResults(results: DistanceResult[]) {
+  return [...results]
+    .sort((a, b) => {
+      const aHasRoute = a.routeDist != null;
+      const bHasRoute = b.routeDist != null;
+
+      if (aHasRoute !== bHasRoute) {
+        return aHasRoute ? -1 : 1;
+      }
+
+      const distanceDiff = getResultDistance(a) - getResultDistance(b);
+      if (distanceDiff !== 0) return distanceDiff;
+      return a.airDist - b.airDist;
+    })
+    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+}
+
+function extractRoutePath(route: any, fallbackPath: [number, number][]) {
+  const routePath = route?.rides?.flatMap((ride: any) =>
+    ride.path.map((point: any) => [point.lng, point.lat] as [number, number])
+  );
+
+  return routePath?.length ? routePath : fallbackPath;
+}
+
+function extractRidingResult(result: any) {
+  const route = result?.routes?.[0] ?? result?.rides?.[0] ?? null;
+  if (!route) return null;
+
+  return {
+    routeDist: route.distance ?? result?.distance ?? null,
+    duration: route.time ?? result?.time ?? null,
+    path: extractRoutePath(route, []),
+  };
+}
+
 export function StoreDispatchMap({
   initialStores = [],
 }: {
@@ -330,41 +388,36 @@ export function StoreDispatchMap({
   const markersRef = useRef<any[]>([]);
   const targetMarkerRef = useRef<any>(null);
   const pathRef = useRef<any>(null);
+  const routePathsRef = useRef<any[]>([]);
   const spiderLinesRef = useRef<any[]>([]);
   const spiderLabelsRef = useRef<any[]>([]);
   const geocoderRef = useRef<any>(null);
   const infoWindowRef = useRef<any>(null);
   const placeSearchRef = useRef<any>(null);
-  const ridingRef = useRef<any>(null);
-  const labelsLayerRef = useRef<any>(null);
+  const mapInteractionHandlerRef = useRef<(() => void) | null>(null);
+  const routeBatchIdRef = useRef(0);
+  const lastMarkerFocusRef = useRef<{ shopId: string | null; at: number }>({ shopId: null, at: 0 });
+  const resultsRef = useRef<DistanceResult[]>([]);
 
   const [shops, setShops] = useState<Shop[]>(initialStores);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isImportingShops, setIsImportingShops] = useState(false);
-  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
-  const [shopSearch, setShopSearch] = useState("");
+  const [, setImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isShopListOpen, setIsShopListOpen] = useState(false);
+  const [shopSearchQuery, setShopSearchQuery] = useState("");
   const [targetQuery, setTargetQuery] = useState("");
   const [targetPoint, setTargetPoint] = useState<TargetPoint | null>(null);
   const [results, setResults] = useState<DistanceResult[]>([]);
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
+  const [isResolvingRoutes, setIsResolvingRoutes] = useState(false);
   const [isSearchingTarget, setIsSearchingTarget] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState("可直接解析地址并预览最近店铺。");
   const [activeProvince, setActiveProvince] = useState<string>(ALL_REGIONS);
   const [activeCity, setActiveCity] = useState<string>(ALL_REGIONS);
   const [activeShopId, setActiveShopId] = useState<string | null>(null);
-  const [expandedPanel, setExpandedPanel] = useState<"shops" | "results">("shops");
-  const [mapTheme, setMapTheme] = useState<string>("darkblue");
+  const [mapTheme] = useState<string>("grey");
   
   const [isShopModalOpen, setIsShopModalOpen] = useState(false);
   const [editingShop, setEditingShop] = useState<EditableShop | null>(null);
-
-  const MAP_THEMES = [
-    { id: "normal", label: "标准", color: "bg-[#2b85e4]" },
-    { id: "dark", label: "幻影黑", color: "bg-[#1f1f1f]" },
-    { id: "light", label: "月光银", color: "bg-[#e0e0e0]" },
-    { id: "darkblue", label: "极夜蓝", color: "bg-[#001630]" },
-    { id: "macaron", label: "马卡龙", color: "bg-[#f5c4ce]" },
-  ];
 
   // 注入地图标记悬停样式的样式表
   const markerStyles = MARKER_STYLES;
@@ -381,6 +434,10 @@ export function StoreDispatchMap({
 
     return provinceMap;
   }, [shops]);
+
+  useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
 
   useEffect(() => {
     if (!activeProvince) {
@@ -400,6 +457,24 @@ export function StoreDispatchMap({
     () => provinceOptions.map((province) => ({ value: province, label: province })),
     [provinceOptions]
   );
+
+  const searchedShops = useMemo(() => {
+    const keyword = shopSearchQuery.trim().toLowerCase();
+    if (!keyword) return shops;
+
+    return shops.filter((shop) => {
+      const region = extractRegionParts(shop);
+      return [
+        shop.name,
+        shop.externalId,
+        shop.address,
+        region.province,
+        region.city,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(keyword));
+    });
+  }, [shopSearchQuery, shops]);
 
   const cityOptions = useMemo(() => {
     if (!activeProvince || activeProvince === ALL_REGIONS) return [ALL_REGIONS];
@@ -448,34 +523,47 @@ export function StoreDispatchMap({
     });
   }, [activeCity, activeProvince, shops]);
 
+  const provinceScopedStores = useMemo(() => {
+    if (!activeProvince || activeProvince === ALL_REGIONS) return shops;
+
+    return shops.filter((shop) => {
+      const parts = extractRegionParts(shop);
+      return parts.province !== UNKNOWN_PROVINCE && parts.province === activeProvince;
+    });
+  }, [activeProvince, shops]);
+
+  const deliveryScopedStores = useMemo(() => {
+    if (!targetPoint || !activeCity || activeCity === ALL_REGIONS) {
+      return cityScopedStores;
+    }
+
+    return provinceScopedStores.filter((shop) => {
+      const parts = extractRegionParts(shop);
+      if (parts.city === activeCity) return true;
+
+      const shopCoordinates = getShopCoordinates(shop);
+      if (!shopCoordinates) return false;
+
+      return getDistanceMeters(shopCoordinates, targetPoint.location) <= CROSS_CITY_RADIUS_METERS;
+    });
+  }, [activeCity, cityScopedStores, provinceScopedStores, targetPoint]);
+
   useEffect(() => {
     if (!cityScopedStores.length) {
       setTargetPoint(null);
       setResults([]);
       setTargetQuery("");
       setSearchFeedback("当前地区暂无门店，请先切换省市。");
-    } else {
-      // 如果有门店，清除掉之前的错误提示
-      setSearchFeedback("");
+    } else if (!targetPoint) {
+      setSearchFeedback("可直接解析地址并预览最近店铺。");
     }
-  }, [activeCity, activeProvince, cityScopedStores]);
+  }, [activeCity, activeProvince, cityScopedStores, targetPoint]);
 
   const activeRegionKeyword = useMemo(
     () => [activeProvince, activeCity].filter(Boolean).join(""),
     [activeCity, activeProvince]
   );
 
-  const filteredShops = useMemo(() => {
-    const keyword = shopSearch.trim().toLowerCase();
-    if (!keyword) return cityScopedStores;
-    return cityScopedStores.filter((shop) =>
-      [shop.name, shop.address, shop.contactPhone].some((value) =>
-        String(value || "").toLowerCase().includes(keyword)
-      )
-    );
-  }, [cityScopedStores, shopSearch]);
-
-  const currentCityStores = useMemo(() => filteredShops, [filteredShops]);
   const regionCenter = useMemo<[number, number] | null>(() => {
     const located = cityScopedStores.filter(
       (shop) => typeof shop.longitude === "number" && typeof shop.latitude === "number"
@@ -491,6 +579,11 @@ export function StoreDispatchMap({
     );
     return [totals.lng / located.length, totals.lat / located.length];
   }, [cityScopedStores]);
+
+  const mapScopedStores = useMemo(
+    () => (targetPoint ? deliveryScopedStores : cityScopedStores),
+    [cityScopedStores, deliveryScopedStores, targetPoint]
+  );
 
   const fetchShops = useCallback(async () => {
     try {
@@ -509,9 +602,6 @@ export function StoreDispatchMap({
   }, [fetchShops]);
 
   const clearMarkers = useCallback(() => {
-    if (labelsLayerRef.current) {
-      labelsLayerRef.current.clear();
-    }
     if (mapRef.current && markersRef.current.length) {
       mapRef.current.remove(markersRef.current);
     }
@@ -525,6 +615,9 @@ export function StoreDispatchMap({
     if (mapRef.current && pathRef.current) {
       mapRef.current.remove(pathRef.current);
     }
+    if (mapRef.current && routePathsRef.current.length) {
+      mapRef.current.remove(routePathsRef.current);
+    }
     if (mapRef.current && spiderLinesRef.current.length) {
       mapRef.current.remove(spiderLinesRef.current);
     }
@@ -536,13 +629,12 @@ export function StoreDispatchMap({
     }
     targetMarkerRef.current = null;
     pathRef.current = null;
+    routePathsRef.current = [];
     spiderLinesRef.current = [];
     spiderLabelsRef.current = [];
   }, []);
 
-  const ensureRidingService = useCallback(async () => {
-    if (ridingRef.current) return ridingRef.current;
-
+  const ensureRidingPlugin = useCallback(async () => {
     const AMap = AMapRef.current;
     if (!AMap) throw new Error("地图服务尚未就绪");
 
@@ -558,44 +650,192 @@ export function StoreDispatchMap({
       return null;
     }
 
-    ridingRef.current = new AMap.Riding({ map: null, hideMarkers: true });
-    return ridingRef.current;
+    return true;
+  }, []);
+
+  const requestRidingRoute = useCallback(
+    async (start: [number, number], end: [number, number]) => {
+      const AMap = AMapRef.current;
+      const pluginReady = await ensureRidingPlugin();
+      if (!AMap || !pluginReady || typeof AMap.Riding !== "function") {
+        return null;
+      }
+
+      const runSearch = () =>
+        new Promise<Pick<DistanceResult, "routeDist" | "duration" | "path"> | null>((resolve) => {
+          const riding = new AMap.Riding({ map: null, hideMarkers: true });
+          riding.search(start, end, (status: string, result: any) => {
+            if (status !== "complete") {
+              resolve(null);
+              return;
+            }
+
+            const resolved = extractRidingResult(result);
+            if (!resolved) {
+              resolve(null);
+              return;
+            }
+
+            resolve({
+              routeDist: resolved.routeDist,
+              duration: resolved.duration,
+              path: resolved.path.length ? resolved.path : [start, end],
+            });
+          });
+        });
+
+      const primaryResult = await runSearch();
+      if (primaryResult) return primaryResult;
+
+      return runSearch();
+    },
+    [ensureRidingPlugin]
+  );
+
+  const drawPrimaryPath = useCallback((path: [number, number][], color = "#2563eb", strokeStyle: "solid" | "dashed" = "solid") => {
+    const map = mapRef.current;
+    const AMap = AMapRef.current;
+    if (!map || !AMap) return;
+
+    if (pathRef.current) {
+      map.remove(pathRef.current);
+    }
+
+    const polyline = new AMap.Polyline({
+      path,
+      strokeColor: color,
+      strokeOpacity: strokeStyle === "solid" ? 0.9 : 0.6,
+      strokeWeight: strokeStyle === "solid" ? 6 : 5,
+      lineJoin: "round",
+      lineCap: "round",
+      zIndex: 70,
+      strokeStyle,
+    });
+
+    pathRef.current = polyline;
+    map.add(polyline);
+
+    const overlays = targetMarkerRef.current ? [polyline, targetMarkerRef.current] : [polyline];
+    map.setFitView(overlays, false, [90, 90, 90, 90]);
+  }, []);
+
+  const drawRoutePaths = useCallback((resolvedResults: DistanceResult[], activeShopId?: string) => {
+    const map = mapRef.current;
+    const AMap = AMapRef.current;
+    if (!map || !AMap) return;
+
+    if (routePathsRef.current.length) {
+      map.remove(routePathsRef.current);
+      routePathsRef.current = [];
+    }
+
+    const secondaryPolylines = resolvedResults
+      .filter((item) => item.routeDist != null && item.path.length > 1 && item.shopId !== activeShopId)
+      .map((item) => {
+        const routeIndex = resolvedResults.findIndex((result) => result.shopId === item.shopId);
+        return (
+        new AMap.Polyline({
+          path: item.path,
+          strokeColor: getRouteColor(routeIndex),
+          strokeOpacity: 0.38,
+          strokeWeight: 4,
+          lineJoin: "round",
+          lineCap: "round",
+          zIndex: 60,
+        })
+      );
+      });
+
+    routePathsRef.current = secondaryPolylines;
+    if (secondaryPolylines.length) {
+      map.add(secondaryPolylines);
+    }
+  }, []);
+
+  const resetToGlobalView = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (infoWindowRef.current) {
+      infoWindowRef.current.close();
+    }
+
+    const resolvedResults = results.filter((item) => item.routeDist != null);
+    const bestResolved = resolvedResults[0];
+
+    if (bestResolved) {
+      drawRoutePaths(resolvedResults, bestResolved.shopId);
+      drawPrimaryPath(bestResolved.path, getRouteColor(0), "solid");
+    } else if (pathRef.current) {
+      map.remove(pathRef.current);
+      pathRef.current = null;
+    }
+
+    const overlays = targetMarkerRef.current
+      ? [...markersRef.current, targetMarkerRef.current, ...routePathsRef.current, ...(pathRef.current ? [pathRef.current] : [])]
+      : [...markersRef.current, ...routePathsRef.current, ...(pathRef.current ? [pathRef.current] : [])];
+
+    if (overlays.length) {
+      map.setFitView(overlays, false, [80, 80, 80, 80]);
+    } else if (regionCenter) {
+      map.setZoomAndCenter(12, regionCenter);
+    } else {
+      map.setCenter(DEFAULT_CENTER);
+      map.setZoom(11);
+    }
+  }, [drawPrimaryPath, drawRoutePaths, regionCenter, results]);
+
+  const closePreviewInfoWindow = useCallback(() => {
+    if (infoWindowRef.current) {
+      infoWindowRef.current.close();
+    }
   }, []);
 
   const handlePreviewResult = useCallback(async (result: DistanceResult) => {
     const map = mapRef.current;
     const AMap = AMapRef.current;
     const matchedShop = shops.find((shop) => shop.id === result.shopId);
-    if (!map || !AMap || !matchedShop?.longitude || !matchedShop?.latitude || !targetPoint) return;
+    if (
+      !map ||
+      !AMap ||
+      !getShopCoordinates(matchedShop) ||
+      !targetPoint
+    ) {
+      return;
+    }
+    setActiveShopId(result.shopId);
+    const shopCoordinates = getShopCoordinates(matchedShop);
+    if (!shopCoordinates) return;
 
     // 构造高级预览气泡 (InfoWindow)
-    const distStr = result.routeDist != null ? `${(result.routeDist / 1000).toFixed(2)}km` : `${(result.airDist / 1000).toFixed(2)}km (直线)`;
-    const timeStr = result.duration != null ? `${Math.ceil(result.duration / 60)}分钟` : "--";
+    const distStr = result.routeDist != null ? `${(result.routeDist / 1000).toFixed(2)}km` : "计算中";
+    const timeStr = result.duration != null ? `${Math.ceil(result.duration / 60)}分钟` : "计算中";
 
     const infoContent = `
       <div style="
-        padding: 14px;
-        background: rgba(15, 23, 42, 0.96);
+        padding: 10px 12px;
+        background: rgba(15, 23, 42, 0.94);
         color: #fff;
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 12px 32px rgba(0,0,0,0.6);
-        backdrop-filter: blur(12px);
-        min-width: 200px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 10px 24px rgba(0,0,0,0.42);
+        backdrop-filter: blur(10px);
+        min-width: 168px;
+        max-width: 196px;
         pointer-events: none;
       ">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
-          <span style="background: ${result.rank === 1 ? "#f97316" : "#3b82f6"}; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 11px; font-weight: 900;">${result.rank}</span>
-          <span style="font-weight: 800; font-size: 14px; letter-spacing: -0.01em;">${matchedShop.name}</span>
+        <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 7px;">
+          <span style="background: ${result.rank === 1 ? "#f97316" : "#3b82f6"}; min-width: 18px; height: 18px; padding: 0 4px; display: flex; align-items: center; justify-content: center; border-radius: 999px; font-size: 10px; font-weight: 900;">${result.rank}</span>
+          <span style="font-weight: 800; font-size: 12px; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${simplifyShopName(matchedShop.name)}</span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div style="display: flex; flex-direction: column; gap: 2px;">
-            <span style="font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 600; text-transform: uppercase;">配送距离</span>
-            <span style="font-size: 14px; font-weight: 800; color: #60a5fa;">${distStr}</span>
+            <span style="font-size: 10px; color: rgba(255,255,255,0.46); font-weight: 600;">距离</span>
+            <span style="font-size: 12px; font-weight: 800; color: #60a5fa;">${distStr}</span>
           </div>
           <div style="display: flex; flex-direction: column; gap: 2px;">
-            <span style="font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 600; text-transform: uppercase;">预估时长</span>
-            <span style="font-size: 14px; font-weight: 800; color: #fbbf24;">${timeStr}</span>
+            <span style="font-size: 10px; color: rgba(255,255,255,0.46); font-weight: 600;">时长</span>
+            <span style="font-size: 12px; font-weight: 800; color: #fbbf24;">${timeStr}</span>
           </div>
         </div>
       </div>
@@ -610,98 +850,46 @@ export function StoreDispatchMap({
     }
 
     infoWindowRef.current.setContent(infoContent);
-    infoWindowRef.current.open(map, [matchedShop.longitude, matchedShop.latitude]);
-
-    // 不进行全局清理，保留背景辐射线和目的地 Marker
-    if (pathRef.current) {
-      map.remove(pathRef.current);
+    infoWindowRef.current.open(map, shopCoordinates);
+    if (result.routeDist != null) {
+      const resolvedResults = resultsRef.current.filter((item) => item.routeDist != null);
+      const routeIndex = Math.max(0, resolvedResults.findIndex((item) => item.shopId === result.shopId));
+      drawRoutePaths(resolvedResults, result.shopId);
+      drawPrimaryPath(result.path, getRouteColor(routeIndex), "solid");
     }
-
-    // 先用直线路径绘制虚线，让用户有即时反馈
-    const tempPolyline = new AMap.Polyline({
-      path: result.path,
-      strokeColor: "#2563eb",
-      strokeOpacity: 0.6,
-      strokeWeight: 5,
-      lineJoin: "round",
-      lineCap: "round",
-      zIndex: 70, // 提升层级，确保在全城信号网之上
-      strokeStyle: "dashed",
-    });
-    pathRef.current = tempPolyline;
-    map.add(tempPolyline);
-    map.setFitView([tempPolyline], false, [90, 90, 90, 90]);
 
     // 如果还没有实际路线，调用 API 计算
     if (result.routeDist == null) {
+      const activeBatchId = routeBatchIdRef.current;
       try {
-        const riding = await ensureRidingService();
-        if (!riding) return;
-        riding.search(
-          [matchedShop.longitude, matchedShop.latitude],
-          targetPoint.location,
-          (status: string, rideResult: any) => {
-            if (status !== "complete" || !rideResult?.routes?.length) return;
-            const route = rideResult.routes[0];
-            const routePath = route.rides?.flatMap((ride: any) =>
-              ride.path.map((point: any) => [point.lng, point.lat] as [number, number])
-            );
-            const resolvedPath =
-              routePath?.length
-                ? routePath
-                : [[matchedShop.longitude as number, matchedShop.latitude as number], targetPoint.location];
+        const resolvedRoute = await requestRidingRoute(shopCoordinates, targetPoint.location);
+        if (activeBatchId !== routeBatchIdRef.current || !targetMarkerRef.current) return;
+        if (!resolvedRoute) return;
 
-            // 更新结果数据（显示实际距离/时间）
-            setResults((current) =>
-              current.map((item) =>
-                item.shopId === matchedShop.id
-                  ? { ...item, routeDist: route.distance ?? null, duration: route.time ?? null, path: resolvedPath }
-                  : item
-              )
-            );
-
-            // 更新地图路线为实线
-            if (mapRef.current && pathRef.current) {
-              mapRef.current.remove(pathRef.current);
-              const realPolyline = new AMap.Polyline({
-                path: resolvedPath,
-                strokeColor: "#2563eb",
-                strokeOpacity: 0.9,
-                strokeWeight: 6,
-                lineJoin: "round",
-                lineCap: "round",
-                zIndex: 70, // 确保实线盖在虚线辐射网之上
-                strokeStyle: "solid",
-              });
-              pathRef.current = realPolyline;
-              mapRef.current.add(realPolyline);
-              mapRef.current.setFitView([realPolyline], false, [90, 90, 90, 90]);
-            }
+        setResults((current) => {
+          const merged = sortDistanceResults(
+            current.map((item) =>
+              item.shopId === matchedShop.id
+                ? { ...item, ...resolvedRoute }
+                : item
+            )
+          );
+          const eligibleMerged = merged.filter(
+            (item) => item.routeDist == null || item.routeDist <= MAX_ROUTE_DISTANCE_METERS
+          );
+          const resolvedMerged = eligibleMerged.filter((item) => item.routeDist != null);
+          const routeIndex = Math.max(0, resolvedMerged.findIndex((item) => item.shopId === matchedShop.id));
+          drawRoutePaths(resolvedMerged, matchedShop.id);
+          if (resolvedRoute.routeDist != null && resolvedRoute.routeDist <= MAX_ROUTE_DISTANCE_METERS) {
+            drawPrimaryPath(resolvedRoute.path, getRouteColor(routeIndex), "solid");
           }
-        );
+          return eligibleMerged.slice(0, ROUTE_DISPLAY_LIMIT);
+        });
       } catch (error) {
         console.error("Resolve riding route failed:", error);
       }
-    } else {
-      // 如果已经有路线数据了，直接绘制实线
-      if (pathRef.current && map) {
-        map.remove(pathRef.current);
-        const realPolyline = new AMap.Polyline({
-          path: result.path,
-          strokeColor: "#2563eb",
-          strokeOpacity: 0.9,
-          strokeWeight: 6,
-          lineJoin: "round",
-          lineCap: "round",
-          zIndex: 70, // 确保实线盖在虚线辐射网之上
-          strokeStyle: "solid",
-        });
-        pathRef.current = realPolyline;
-        map.add(realPolyline);
-        map.setFitView([realPolyline], false, [90, 90, 90, 90]);
-      }
     }
-  }, [ensureRidingService, shops, targetPoint]);
+  }, [drawPrimaryPath, drawRoutePaths, requestRidingRoute, shops, targetPoint]);
 
   const drawShopMarkers = useCallback(() => {
     const map = mapRef.current;
@@ -710,55 +898,43 @@ export function StoreDispatchMap({
 
     clearMarkers();
 
-    // 如果还没有 LabelsLayer，初始化一个
-    if (!labelsLayerRef.current) {
-      labelsLayerRef.current = new AMap.LabelsLayer({
-        zooms: [3, 20],
-        zIndex: 1000,
-        collision: false, // 门店名称较短，关闭碰撞检测以便全部显示
-        animation: true,
-      });
-      map.add(labelsLayerRef.current);
-    }
-
-    const labelMarkers = cityScopedStores
-      .filter((shop) => shop.longitude && shop.latitude)
+    const markers = mapScopedStores
+      .filter((shop) => typeof shop.longitude === "number" && typeof shop.latitude === "number")
       .map((shop) => {
         const isActive = activeShopId === shop.id;
         const resultIndex = results && results.length > 0 ? results.findIndex(r => r.shopId === shop.id) : -1;
         const rank = resultIndex !== -1 ? resultIndex + 1 : null;
         const isTop5 = rank !== null && rank <= 5;
+        const shouldShowMarkerLabel = Boolean((targetPoint && isTop5) || isActive);
 
-        let bubbleBg = "rgba(17,24,39,0.95)";
+        let pinFill = "#5b8def";
         if (isTop5) {
-          bubbleBg = rank === 1 ? "#f97316" : "#3b82f6";
+          pinFill = rank === 1 ? "#0ea5e9" : "#3b82f6";
         } else if (isActive) {
-          bubbleBg = "#2563eb";
+          pinFill = "#2563eb";
         }
 
-        // 使用 LabelMarker 以获得更高性能
-        const labelMarker = new AMap.LabelMarker({
-          name: shop.name,
+        // AMap.Marker 支持完整 HTML content（LabelMarker 在 v2.0 中不支持 content 属性）
+        const marker = new AMap.Marker({
           position: [shop.longitude, shop.latitude],
           zIndex: isTop5 ? 200 : (isActive ? 180 : 100),
-          rank: isTop5 ? 10 : 1, // LabelsLayer 的权值
-          // 仍然使用 HTML Content 以保持细腻的视觉效果，但在 LabelsLayer 中它的性能表现优于独立 Marker
+          offset: new AMap.Pixel(-10, -24),
           content: `
             <div class="marker-wrapper ${isTop5 ? "is-top" : ""} ${isActive ? "active" : ""}" style="position: relative;">
-              ${(targetPoint && isTop5) || isActive ? `
+              ${shouldShowMarkerLabel ? `
               <div class="marker-label" style="
                 position: absolute;
-                bottom: 34px;
+                bottom: 30px;
                 left: 50%;
                 transform: translateX(-50%);
-                padding: 4px 10px;
-                background: ${bubbleBg};
+                padding: 4px 8px;
+                background: rgba(37, 99, 235, 0.92);
                 color: #fff;
                 font-size: ${isTop5 ? "12px" : "11px"};
                 font-weight: ${isTop5 ? "800" : "600"};
-                border-radius: 8px;
-                border: 1px solid rgba(255,255,255,0.25);
-                box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                border-radius: 999px;
+                border: 1px solid rgba(255,255,255,0.18);
+                box-shadow: 0 8px 18px rgba(2,6,23,0.22);
                 white-space: nowrap;
                 display: flex !important;
                 opacity: 1 !important;
@@ -767,43 +943,60 @@ export function StoreDispatchMap({
                 gap: 5px;
                 z-index: 2;
                 pointer-events: none;
-                ${isTop5 ? "animation: bounce-subtle 2s infinite" : ""}
               ">
-                ${rank ? `<span style="background: rgba(255,255,255,0.25); width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 10px;">${rank}</span>` : ""}
+                ${rank ? `<span style="background: rgba(37,99,235,0.95); min-width: 16px; height: 16px; padding: 0 4px; display: flex; align-items: center; justify-content: center; border-radius: 999px; font-size: 10px; box-shadow: 0 6px 16px rgba(2,6,23,0.24);">${rank}</span>` : ""}
                 ${simplifyShopName(shop.name)}
               </div>` : ""}
-              <svg class="marker-pin" width="22" height="28" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg" 
-                style="position: absolute; top: -28px; left: -11px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4)); z-index: 1; transition: transform 0.2s;">
-                <path d="M11 28C11 28 22 17.5 22 11C22 4.92487 17.0751 0 11 0C4.92487 0 0 4.92487 0 11C0 17.5 11 28 11 28Z" fill="${isActive || rank === 1 ? "#f97316" : (isTop5 ? "#3b82f6" : "#4b5563")}" fill-opacity="1"/>
+              <svg class="marker-pin" width="20" height="24" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg"
+                style="filter: drop-shadow(0 6px 14px rgba(15,23,42,0.24)); transition: transform 0.2s;">
+                <path d="M11 28C11 28 22 17.5 22 11C22 4.92487 17.0751 0 11 0C4.92487 0 0 4.92487 0 11C0 17.5 11 28 11 28Z" fill="${pinFill}" />
                 <circle cx="11" cy="11" r="5" fill="white"/>
+                <circle cx="11" cy="11" r="2.6" fill="rgba(15,23,42,0.16)"/>
               </svg>
             </div>
           `,
         });
 
-        labelMarker.on("click", () => {
+        marker.on("click", () => {
+          const now = Date.now();
+          const isRepeatToggle =
+            activeShopId === shop.id &&
+            lastMarkerFocusRef.current.shopId === shop.id &&
+            now - lastMarkerFocusRef.current.at > 250;
+
+          if (isRepeatToggle) {
+            setActiveShopId(null);
+            lastMarkerFocusRef.current = { shopId: null, at: 0 };
+            resetToGlobalView();
+            return;
+          }
+
+          lastMarkerFocusRef.current = { shopId: shop.id, at: now };
           setActiveShopId(shop.id);
           const result = results && results.length > 0 ? results.find(r => r.shopId === shop.id) : null;
           if (result) {
             handlePreviewResult(result);
-          } else if (shop.longitude && shop.latitude) {
+          } else if (typeof shop.longitude === "number" && typeof shop.latitude === "number") {
             map.setZoomAndCenter(15, [shop.longitude, shop.latitude]);
           }
         });
 
-        return labelMarker;
+        return marker;
       });
 
-    labelsLayerRef.current.add(labelMarkers);
-    
-    // 如果是由于搜索结果导致的重绘，不改变视角，因为 handleResolveTarget 会处理视角
-    if (!targetPoint && labelMarkers.length) {
-      map.setFitView(labelMarkers, false, [80, 80, 80, 80]);
-    } else if (!labelMarkers.length && !targetPoint) {
+    markersRef.current = markers;
+    if (markers.length) {
+      map.add(markers);
+    }
+
+    // 仅在无选中态时自动回全图，避免点击聚焦后又被重绘拉回去
+    if (!targetPoint && !activeShopId && markers.length) {
+      map.setFitView(markers, false, [80, 80, 80, 80]);
+    } else if (!markers.length && !targetPoint && !activeShopId) {
       map.setCenter(DEFAULT_CENTER);
       map.setZoom(11);
     }
-  }, [activeShopId, cityScopedStores, clearMarkers, targetPoint, results, handlePreviewResult]);
+  }, [activeShopId, clearMarkers, mapScopedStores, targetPoint, results, handlePreviewResult, resetToGlobalView]);
 
   useEffect(() => {
     // 使用 requestAnimationFrame 略微延迟渲染，避免交互卡顿
@@ -816,17 +1009,27 @@ export function StoreDispatchMap({
   const handleMapReady = useCallback(({ map, AMap }: { map: any; AMap: any }) => {
     mapRef.current = map;
     AMapRef.current = AMap;
+    const dismissPreview = () => {
+      closePreviewInfoWindow();
+    };
+    mapInteractionHandlerRef.current = dismissPreview;
+    map.on("zoomstart", dismissPreview);
+    map.on("dragstart", dismissPreview);
     drawShopMarkers();
-  }, [drawShopMarkers]);
+  }, [closePreviewInfoWindow, drawShopMarkers]);
 
   const handleMapDestroy = useCallback(() => {
+    if (mapRef.current && mapInteractionHandlerRef.current) {
+      mapRef.current.off("zoomstart", mapInteractionHandlerRef.current);
+      mapRef.current.off("dragstart", mapInteractionHandlerRef.current);
+    }
     clearMarkers();
     clearTargetArtifacts();
     mapRef.current = null;
     AMapRef.current = null;
     geocoderRef.current = null;
-    ridingRef.current = null;
-    labelsLayerRef.current = null;
+    mapInteractionHandlerRef.current = null;
+    routeBatchIdRef.current += 1;
   }, [clearMarkers, clearTargetArtifacts]);
 
 
@@ -1141,7 +1344,7 @@ export function StoreDispatchMap({
             new Promise<TargetPoint | null>((resolve) => {
               placeSearch.searchNearBy(
                 keyword,
-                DEFAULT_CENTER,
+                regionCenter ?? map.getCenter?.() ?? DEFAULT_CENTER,
                 50000,
                 (status: string, result: any) => {
                   if (status === "complete" && result?.poiList?.pois?.length) {
@@ -1172,8 +1375,21 @@ export function StoreDispatchMap({
       setTargetQuery(match.name);
       setTargetPoint(match);
       const regionLabel = activeProvince === ALL_REGIONS ? ALL_REGIONS : `${activeProvince}${activeCity}`;
-      setSearchFeedback(`已在 ${regionLabel} 范围内定位：${match.name}`);
-      setExpandedPanel("results");
+      const nearbyStoreCount =
+        !activeCity || activeCity === ALL_REGIONS
+          ? 0
+          : provinceScopedStores.filter((shop) => {
+              const parts = extractRegionParts(shop);
+              if (parts.city === UNKNOWN_CITY || parts.city === activeCity) return false;
+              const coordinates = getShopCoordinates(shop);
+              if (!coordinates) return false;
+              return getDistanceMeters(coordinates, match.location) <= CROSS_CITY_RADIUS_METERS;
+            }).length;
+      setSearchFeedback(
+        nearbyStoreCount > 0
+          ? `已在 ${regionLabel} 范围内定位：${match.name}，并自动纳入邻近城市门店参与调货。`
+          : `已在 ${regionLabel} 范围内定位：${match.name}`
+      );
     } catch (error) {
       console.error("Resolve target failed:", error);
       setSearchFeedback("搜索失败，请确认地图已加载完成后再试。");
@@ -1181,7 +1397,7 @@ export function StoreDispatchMap({
     } finally {
       setIsSearchingTarget(false);
     }
-  }, [activeCity, activeProvince, activeRegionKeyword, cityScopedStores.length, clearTargetArtifacts, drawShopMarkers, ensureSearchServices, regionCenter, showToast, targetQuery]);
+  }, [activeCity, activeProvince, activeRegionKeyword, cityScopedStores.length, clearTargetArtifacts, drawShopMarkers, ensureSearchServices, provinceScopedStores, regionCenter, showToast, targetQuery]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1189,10 +1405,13 @@ export function StoreDispatchMap({
 
     if (!map || !AMap) return;
 
+    const batchId = ++routeBatchIdRef.current;
+
     clearTargetArtifacts();
 
     if (!targetPoint) {
       setResults([]);
+      setIsResolvingRoutes(false);
       if (markersRef.current.length) {
         map.setFitView(markersRef.current, false, [80, 80, 80, 80]);
       } else if (regionCenter) {
@@ -1211,77 +1430,22 @@ export function StoreDispatchMap({
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: #60a5fa;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
             <span>${targetPoint.name}</span>
           </div>
-          <div class="target-dot"></div>
+          <div class="target-dot">
+            <svg width="18" height="22" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 10px rgba(37,99,235,0.22));">
+              <path d="M11 28C11 28 22 17.5 22 11C22 4.92487 17.0751 0 11 0C4.92487 0 0 4.92487 0 11C0 17.5 11 28 11 28Z" fill="#2563eb" />
+              <circle cx="11" cy="11" r="5" fill="white"/>
+              <circle cx="11" cy="11" r="2.4" fill="rgba(15,23,42,0.16)"/>
+            </svg>
+          </div>
         </div>
       `,
     });
 
-    // 绘制辐射虚线及其距离标注 (Spider Lines & Labels)
-    // 性能优化：仅显示距离最近的前 20 个店铺的辐射线，避免海量线段导致卡顿
-    const spiderLines: any[] = [];
-    const spiderLabels: any[] = [];
-
-    // 先根据直线距离排序，取 Top 20
-    const top20Shops = [...cityScopedStores]
-      .filter(shop => typeof shop.longitude === "number" && typeof shop.latitude === "number")
-      .sort((a, b) => {
-        const distA = AMap.GeometryUtil.distance([a.longitude as number, a.latitude as number], targetPoint.location);
-        const distB = AMap.GeometryUtil.distance([b.longitude as number, b.latitude as number], targetPoint.location);
-        return distA - distB;
-      })
-      .slice(0, 20);
-
-    top20Shops.forEach((shop) => {
-      const shopPos = [shop.longitude as number, shop.latitude as number];
-      const targetPos = targetPoint.location;
-      
-      // 创建连线
-      const polyline = new AMap.Polyline({
-        path: [shopPos, targetPos],
-        strokeColor: "#60a5fa",
-        strokeOpacity: 0.5,
-        strokeWeight: 2,
-        strokeStyle: "dashed",
-        strokeDasharray: [10, 10],
-        zIndex: 50,
-        bubble: true,
-      });
-      spiderLines.push(polyline);
-      
-      // 计算直线距离
-      const dist = AMap.GeometryUtil.distance(shopPos, targetPos);
-      const labelText = dist > 1000 ? `${(dist / 1000).toFixed(1)}km` : `${Math.round(dist)}m`;
-      
-      // 在中点创建距离文本
-      const label = new AMap.Text({
-        text: labelText,
-        position: [(shopPos[0] + targetPos[0]) / 2, (shopPos[1] + targetPos[1]) / 2],
-        anchor: "center",
-        zIndex: 51,
-        style: {
-          "background-color": "rgba(2, 6, 23, 0.82)",
-          "border": "1px solid rgba(148, 163, 184, 0.2)",
-          "color": "#fff",
-          "font-size": "11px",
-          "font-weight": "800",
-          "padding": "2px 5px",
-          "border-radius": "4px",
-          "box-shadow": "0 4px 10px rgba(0,0,0,0.4)",
-          "pointer-events": "none",
-        },
-      });
-      spiderLabels.push(label);
-    });
-
-    spiderLinesRef.current = spiderLines;
-    spiderLabelsRef.current = spiderLabels;
-    map.add(spiderLines);
-    map.add(spiderLabels);
-
     targetMarkerRef.current = marker;
     map.add(marker);
 
-    const nextResults: DistanceResult[] = cityScopedStores
+    const nextResults = sortDistanceResults(
+      deliveryScopedStores
       .filter(
         (shop) =>
           typeof shop.longitude === "number" &&
@@ -1300,92 +1464,92 @@ export function StoreDispatchMap({
           targetPoint.location as [number, number],
         ],
       }))
-      .sort((a, b) => a.airDist - b.airDist)
-      .map((item, idx) => ({ ...item, rank: idx + 1 }));
+    );
 
-    setResults(nextResults);
+    const routeCandidates = nextResults.slice(0, ROUTE_CANDIDATE_LIMIT);
+    setResults([]);
+    setIsResolvingRoutes(true);
 
-    const nearest = nextResults[0];
+    const nearest = routeCandidates[0];
     if (!nearest) {
+      setIsResolvingRoutes(false);
       map.setCenter(targetPoint.location);
       map.setZoom(13);
       return;
     }
 
     const matchedShop = shops.find((shop) => shop.id === nearest.shopId);
-    if (!matchedShop?.longitude || !matchedShop?.latitude) return;
+    const nearestCoordinates = matchedShop ? getShopCoordinates(matchedShop) : null;
+    if (!nearestCoordinates) {
+      setIsResolvingRoutes(false);
+      return;
+    }
 
-    const polyline = new AMap.Polyline({
-      path: nearest.path,
-      strokeColor: "#2563eb",
-      strokeOpacity: 0.9,
-      strokeWeight: 6,
-      lineJoin: "round",
-      lineCap: "round",
-      zIndex: 30,
-      strokeStyle: nearest.routeDist ? "solid" : "dashed",
-    });
-
-    pathRef.current = polyline;
-    map.add(polyline);
-    map.setFitView([polyline, marker], false, [90, 90, 90, 90]);
     void (async () => {
       try {
-        const riding = await ensureRidingService();
-        if (!riding || !matchedShop?.longitude || !matchedShop?.latitude) return;
-
-        riding.search(
-          [matchedShop.longitude, matchedShop.latitude],
-          targetPoint.location,
-          (status: string, result: any) => {
-            if (status !== "complete" || !result?.routes?.length) return;
-
-            const route = result.routes[0];
-            const routePath = route.rides?.flatMap((ride: any) =>
-              ride.path.map((point: any) => [point.lng, point.lat] as [number, number])
-            );
-
-            const resolvedPath =
-              routePath && routePath.length
-                ? routePath
-                : [[matchedShop.longitude as number, matchedShop.latitude as number], targetPoint.location];
-
-            setResults((current) =>
-              current.map((item) =>
-                item.shopId === matchedShop.id
-                  ? {
-                      ...item,
-                      routeDist: route.distance ?? null,
-                      duration: route.time ?? null,
-                      path: resolvedPath,
-                    }
-                  : item
-              )
-            );
-
-            if (pathRef.current && mapRef.current) {
-              mapRef.current.remove(pathRef.current);
-              const refreshed = new AMap.Polyline({
-                path: resolvedPath,
-                strokeColor: "#2563eb",
-                strokeOpacity: 0.9,
-                strokeWeight: 6,
-                lineJoin: "round",
-                lineCap: "round",
-                zIndex: 30,
-                strokeStyle: "solid",
-              });
-              pathRef.current = refreshed;
-              mapRef.current.add(refreshed);
-              mapRef.current.setFitView([refreshed, marker], false, [90, 90, 90, 90]);
+        const resolvedEntries = await Promise.all(
+          routeCandidates.map(async (candidate) => {
+            const candidateShop = shops.find((shop) => shop.id === candidate.shopId);
+            const candidateCoordinates = candidateShop ? getShopCoordinates(candidateShop) : null;
+            if (!candidateCoordinates) {
+              return null;
             }
-          }
+
+            const resolvedRoute = await requestRidingRoute(candidateCoordinates, targetPoint.location);
+            if (!resolvedRoute) {
+              return null;
+            }
+
+            return {
+              shopId: candidate.shopId,
+              ...resolvedRoute,
+            };
+          })
         );
+
+        if (batchId !== routeBatchIdRef.current) return;
+
+        const resolvedMap = new Map(
+          resolvedEntries
+            .filter((entry): entry is { shopId: string; routeDist: number | null; duration: number | null; path: [number, number][] } => entry !== null)
+            .map((entry) => [entry.shopId, entry])
+        );
+
+        if (!resolvedMap.size) {
+          setResults([]);
+          setIsResolvingRoutes(false);
+          return;
+        }
+
+        const mergedResults = sortDistanceResults(
+          routeCandidates.map((item) =>
+            resolvedMap.has(item.shopId)
+              ? { ...item, ...resolvedMap.get(item.shopId)! }
+              : item
+          )
+        );
+
+        const eligibleResults = mergedResults.filter(
+          (item) => item.routeDist == null || item.routeDist <= MAX_ROUTE_DISTANCE_METERS
+        );
+        const resolvedResults = eligibleResults.filter((item) => item.routeDist != null);
+        const displayResults = eligibleResults.slice(0, ROUTE_DISPLAY_LIMIT);
+
+        setResults(displayResults);
+        setIsResolvingRoutes(false);
+
+        const bestResult = resolvedResults[0];
+        if (bestResult) {
+          drawRoutePaths(resolvedResults, bestResult.shopId);
+          drawPrimaryPath(bestResult.path, getRouteColor(0), "solid");
+        }
       } catch (error) {
         console.error("Resolve riding route failed:", error);
+        setResults([]);
+        setIsResolvingRoutes(false);
       }
     })();
-  }, [cityScopedStores, clearTargetArtifacts, ensureRidingService, regionCenter, shops, targetPoint]);
+  }, [clearTargetArtifacts, deliveryScopedStores, drawPrimaryPath, drawRoutePaths, regionCenter, requestRidingRoute, shops, targetPoint]);
 
   const handleImportShops = useCallback(
     async (rows: Record<string, unknown>[] | Record<string, unknown[]>) => {
@@ -1499,390 +1663,369 @@ export function StoreDispatchMap({
     }
   }, [fetchShops, handleLocateShop, showToast]);
 
-  const handleDeleteShop = useCallback(async (id: string) => {
-    if (!confirm("确定要删除这家店铺吗？此核销无法撤销。")) return;
+  const renderRouteResults = (mobile = false) => (
+    <section
+      className={cn(
+        mobile
+          ? "sm:hidden"
+          : "pointer-events-none absolute right-3 top-3 z-20 hidden w-[188px] sm:block"
+      )}
+    >
+      <div className={cn(mobile ? "" : "pointer-events-auto relative")}>
+        <div className={cn("min-h-0 overflow-hidden", mobile && "rounded-[20px] border border-border/70 bg-card/95 shadow-sm")}>
+          <div
+            className={cn(
+              mobile
+                ? "grid grid-cols-2 gap-2 px-2 py-2 min-[420px]:grid-cols-3"
+                : "flex max-h-[30dvh] flex-col gap-1 overflow-y-auto p-1"
+            )}
+          >
+            {results.map((result, index) => {
+              const shop = shops.find((item) => item.id === result.shopId);
+              if (!shop) return null;
 
-    try {
-      const res = await fetch(`/api/shops/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("删除失败");
-      
-      showToast("删除成功", "success");
-      await fetchShops();
-      if (activeShopId === id) setActiveShopId(null);
-    } catch (error) {
-      console.error("Failed to delete shop:", error);
-      showToast("删除失败", "error");
-    }
-  }, [activeShopId, fetchShops, showToast]);
+              const isTop3 = index < 3;
+              const isSelected = activeShopId === result.shopId;
+              const distanceMeta = getResultDistanceMeta(result);
+
+              return (
+                <button
+                  key={result.shopId}
+                  onClick={() => handlePreviewResult(result)}
+                  className={cn(
+                    "group relative overflow-hidden border text-left transition-all backdrop-blur-sm",
+                    mobile
+                      ? "w-full min-w-0 rounded-[16px] px-2.5 py-2"
+                      : "w-full rounded-[18px] px-2 py-1.5",
+                    isSelected
+                      ? "border-primary/80 bg-slate-950/92 shadow-[0_0_0_1px_rgba(37,99,235,0.28)]"
+                      : index === 0
+                        ? "border-white/25 bg-slate-950/88"
+                        : "border-white/12 bg-slate-950/82 hover:border-white/20"
+                  )}
+                >
+                  {isTop3 && (
+                    <div
+                      className={cn(
+                        "absolute right-0 top-0 flex h-8 w-8 translate-x-1 -translate-y-1 items-center justify-center text-white/10",
+                        index === 0
+                          ? "text-amber-500/20"
+                          : index === 1
+                            ? "text-slate-400/20"
+                            : "text-orange-600/20"
+                      )}
+                    >
+                      <Trophy size={32} />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={cn(
+                            "flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-black",
+                            isSelected
+                              ? "bg-primary text-primary-foreground"
+                              : index === 0
+                                ? "bg-amber-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {index + 1}
+                        </span>
+                        <div
+                          className="truncate text-[11px] font-bold tracking-tight text-white"
+                          title={shop.name}
+                        >
+                          {simplifyShopName(shop.name)}
+                        </div>
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-2 overflow-hidden">
+                        <div
+                          className={cn(
+                            "flex items-center gap-1 text-[10px] font-medium whitespace-nowrap",
+                            isSelected ? "text-white" : "text-white/92"
+                          )}
+                        >
+                          <Truck size={11} className="text-primary" />
+                          {distanceMeta.distanceText}
+                        </div>
+                        {result.duration && (
+                          <div className="flex items-center gap-1 text-[10px] text-white/72 whitespace-nowrap">
+                            <Clock size={11} />
+                            {Math.max(1, Math.ceil(result.duration / 60))}分
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight
+                      size={11}
+                      className={cn(
+                        "transition-opacity",
+                        isSelected ? "text-primary opacity-100" : "text-white/40 opacity-0 group-hover:opacity-100"
+                      )}
+                    />
+                  </div>
+                </button>
+              );
+            })}
+            {!results.length && (
+              <div
+                className={cn(
+                  "rounded-[18px] border border-dashed border-white/10 bg-slate-950/88 text-center text-[11px] text-white/72",
+                  mobile ? "col-span-full px-3 py-4" : "w-full px-3 py-4"
+                )}
+              >
+                <div className="mb-2 flex justify-center text-primary/40">
+                  {isResolvingRoutes ? <Loader2 size={24} className="animate-spin" /> : <Navigation size={24} />}
+                </div>
+                {isResolvingRoutes ? (
+                  <>
+                    正在计算实际路线
+                    <br />
+                    稍后展示真实配送距离
+                  </>
+                ) : (
+                  <>
+                    暂未获取到可用路线
+                    <br />
+                    请尝试更换目标地址或缩小区域
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <>
-    <div className="relative flex h-dvh w-full flex-col bg-background text-foreground md:flex-row">
+    <div className="flex h-full min-h-0 w-full flex-col bg-background text-foreground">
       <style>{markerStyles}</style>
-      <div className={cn("absolute inset-0 z-0 p-4")}>
-        <BareAmapTest
-          showDebug={false}
-          center={DEFAULT_CENTER}
-          zoom={11}
-          showDefaultMarker={false}
-          onReady={handleMapReady}
-          onDestroy={handleMapDestroy}
-          mapStyle={`amap://styles/${mapTheme}`}
-          className="h-full min-h-[680px] overflow-hidden rounded-[28px] border border-border bg-white"
-        />
-
-        {/* 悬浮主题切换器 */}
-        <div className="absolute right-8 top-8 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 p-1.5 backdrop-blur-md shadow-2xl">
-          {MAP_THEMES.map((theme) => (
-            <button
-              key={theme.id}
-              onClick={() => setMapTheme(theme.id)}
-              title={theme.label}
-              className={cn(
-                "h-6 w-6 rounded-full border border-white/20 transition-all hover:scale-110",
-                theme.color,
-                mapTheme === theme.id ? "ring-2 ring-primary ring-offset-2 ring-offset-black/20" : "opacity-60"
-              )}
+      <div className="shrink-0 border-b border-border/60 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-0 flex-1 sm:min-w-[128px] sm:flex-none">
+            <CustomSelect
+              value={activeProvince}
+              options={provinceSelectOptions}
+              onChange={(nextProvince) => {
+                const nextCity =
+                  nextProvince === ALL_REGIONS
+                    ? ALL_REGIONS
+                    : Array.from(locationTree.get(nextProvince) || []).sort((a, b) =>
+                        a.localeCompare(b, "zh-CN")
+                      )[0] || ALL_REGIONS;
+                setActiveProvince(nextProvince);
+                setActiveCity(nextCity);
+              }}
+              placeholder="省份"
+              triggerClassName="h-10 rounded-2xl border-border bg-card px-3 text-sm font-medium text-foreground"
             />
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {isPanelCollapsed && (
-        <button
-          onClick={() => setIsPanelCollapsed(false)}
-          className="absolute left-6 top-6 z-30 inline-flex h-11 items-center gap-2 rounded-2xl border border-white/15 bg-black/60 px-4 text-sm font-bold text-white backdrop-blur-xl transition-all hover:bg-black/75"
-          title="展开侧栏"
-        >
-          <ChevronRight size={16} />
-          展开面板
-        </button>
-      )}
+          <div className="min-w-0 flex-1 sm:min-w-[128px] sm:flex-none">
+            <CustomSelect
+              value={activeCity}
+              options={citySelectOptions}
+              onChange={setActiveCity}
+              placeholder="城市"
+              triggerClassName="h-10 rounded-2xl border-border bg-card px-3 text-sm font-medium text-foreground"
+            />
+          </div>
 
-      <aside
-        className={cn(
-          "absolute inset-y-4 left-4 z-20 flex flex-col rounded-[28px] border border-white/10 bg-slate-950/88 shadow-2xl backdrop-blur-2xl transition-all",
-          isPanelCollapsed ? "w-0 overflow-hidden opacity-0" : "w-[420px] opacity-100"
-        )}
-      >
-        <div className="border-b border-white/10 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Navigation2 size={22} />
+          <div className="order-3 w-full min-w-0 sm:order-none sm:min-w-[280px] sm:flex-1">
+            <div className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                value={targetQuery}
+                onChange={(event) => setTargetQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleResolveTarget();
+                  }
+                }}
+                placeholder="搜索目标送达地址"
+                className="h-10 w-full rounded-2xl border border-border bg-card px-10 pr-24 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+              />
+              <button
+                onClick={() => void handleResolveTarget()}
+                disabled={isSearchingTarget}
+                className="absolute right-10 top-1/2 -translate-y-1/2 text-xs font-bold text-primary transition-colors hover:text-primary/80 disabled:opacity-60"
+              >
+                {isSearchingTarget ? "搜索中" : "搜索"}
+              </button>
+              {targetQuery && (
+                <button
+                  onClick={() => {
+                    setTargetQuery("");
+                    setTargetPoint(null);
+                    setResults([]);
+                    clearTargetArtifacts();
+                    drawShopMarkers();
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-lg font-black text-foreground">智能调货测距</h2>
-              <p className="text-xs text-muted-foreground">先稳定显示地图，再逐项接回业务功能</p>
-            </div>
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
             <button
-              onClick={() => setIsPanelCollapsed(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-4 text-sm font-bold text-white transition-all hover:bg-black/40"
-              title="收起侧栏"
+              onClick={() => setIsShopListOpen((prev) => !prev)}
+              className={cn(
+                "inline-flex h-10 items-center justify-center gap-1.5 rounded-2xl border px-3.5 text-sm font-medium transition-all max-sm:flex-1",
+                isShopListOpen
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card hover:bg-muted"
+              )}
             >
-              <ChevronLeft size={16} />
-              收起面板
+              店铺列表
+            </button>
+            <button
+              onClick={() => {
+                setEditingShop(null);
+                setIsShopModalOpen(true);
+              }}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-border bg-card px-3.5 text-sm font-medium transition-all hover:bg-muted max-sm:flex-1"
+            >
+              <Plus size={14} />
+              新增店铺
+            </button>
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              disabled={isImportingShops}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-border bg-card px-3.5 text-sm font-medium transition-all hover:bg-muted disabled:opacity-60 max-sm:flex-1"
+            >
+              {isImportingShops ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              导入店铺
             </button>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <section className="rounded-3xl border border-border bg-background p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-xs font-bold text-muted-foreground">地区筛选</div>
-                <div className="flex items-center gap-2">
+        {searchFeedback && (
+          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+            <MapPin size={14} />
+            <span className="truncate">{searchFeedback}</span>
+          </div>
+        )}
+
+        {(targetPoint || results.length > 0 || isResolvingRoutes) && renderRouteResults(true)}
+
+      </div>
+
+      <div className="min-h-0 flex-1 p-3 pt-3 sm:p-5 sm:pt-4">
+        <div className="relative h-full min-h-[520px] overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:min-h-[620px] sm:rounded-[28px]">
+          <BareAmapTest
+            showDebug={false}
+            center={DEFAULT_CENTER}
+            zoom={11}
+            showDefaultMarker={false}
+            onReady={handleMapReady}
+            onDestroy={handleMapDestroy}
+            mapStyle={`amap://styles/${mapTheme}`}
+            className="h-full min-h-[520px] overflow-hidden rounded-[24px] border-0 bg-white sm:min-h-[620px] sm:rounded-[28px]"
+          />
+          {isShopListOpen && (
+            <aside className="absolute inset-x-3 bottom-3 top-auto z-20 flex max-h-[55dvh] flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background/96 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:left-3 sm:top-3 sm:h-[calc(100%-1.5rem)] sm:max-h-none sm:w-[320px] sm:max-w-[calc(100%-1.5rem)]">
+              <div className="border-b border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-black text-foreground">店铺列表</div>
+                    <div className="mt-1 text-xs text-muted-foreground">搜索、定位并修改店铺信息</div>
+                  </div>
                   <button
-                    onClick={() => {
-                      setEditingShop(null);
-                      setIsShopModalOpen(true);
-                    }}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-2xl border border-border bg-card px-3 text-[11px] font-bold transition-all hover:bg-muted"
-                  >
-                    <Plus size={13} />
-                    新增店铺
-                  </button>
-                  <button
-                    onClick={() => setIsImportModalOpen(true)}
-                    disabled={isImportingShops}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-2xl border border-border bg-card px-3 text-[11px] font-bold transition-all hover:bg-muted disabled:opacity-60"
-                  >
-                    {isImportingShops ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                    导入店铺
-                  </button>
-                </div>
-              </div>
-              <div className="mb-3 text-[11px] text-muted-foreground">先选省份，再选城市</div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
-                    省份
-                  </span>
-                  <CustomSelect
-                    value={activeProvince}
-                    options={provinceSelectOptions}
-                    onChange={(nextProvince) => {
-                      const nextCity =
-                        nextProvince === ALL_REGIONS
-                          ? ALL_REGIONS
-                          : Array.from(locationTree.get(nextProvince) || []).sort((a, b) =>
-                              a.localeCompare(b, "zh-CN")
-                            )[0] || ALL_REGIONS;
-                      setActiveProvince(nextProvince);
-                      setActiveCity(nextCity);
-                    }}
-                    placeholder="选择省份"
-                    triggerClassName="h-11 rounded-2xl border-border bg-card px-4 text-sm font-medium text-foreground"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
-                    城市
-                  </span>
-                  <CustomSelect
-                    value={activeCity}
-                    options={citySelectOptions}
-                    onChange={setActiveCity}
-                    placeholder="选择城市"
-                    triggerClassName="h-11 rounded-2xl border-border bg-card px-4 text-sm font-medium text-foreground"
-                  />
-                </label>
-              </div>
-              <div className="mt-4">
-                <label className="mb-2 block text-xs font-bold text-muted-foreground">目标送达地址</label>
-              <div className="relative">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  value={targetQuery}
-                  onChange={(event) => setTargetQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void handleResolveTarget();
-                    }
-                  }}
-                  placeholder="搜索目标送达地址"
-                  className="h-11 w-full rounded-2xl border border-border bg-card px-10 pr-24 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-                />
-                <button
-                  onClick={() => void handleResolveTarget()}
-                  disabled={isSearchingTarget}
-                  className="absolute right-10 top-1/2 -translate-y-1/2 text-xs font-bold text-primary transition-colors hover:text-primary/80 disabled:opacity-60"
-                >
-                  {isSearchingTarget ? "搜索中" : "搜索"}
-                </button>
-                {targetQuery && (
-                  <button
-                    onClick={() => {
-                      setTargetQuery("");
-                      setTargetPoint(null);
-                      setResults([]);
-                      clearTargetArtifacts();
-                      drawShopMarkers();
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => setIsShopListOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
                   >
                     <X size={16} />
                   </button>
-                )}
-              </div>
-                {searchFeedback && (
-                  <div className="mt-3 flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-                    <MapPin size={14} />
-                    <span className="truncate">{searchFeedback}</span>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* 板块 1: 本地区店铺 (可折叠) */}
-            <div className={cn("flex flex-col transition-all duration-300", expandedPanel === "shops" ? "flex-1 min-h-0" : "flex-none")}>
-              <button
-                onClick={() => setExpandedPanel(expandedPanel === "shops" ? "results" : "shops")}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-background p-3.5 transition-colors hover:bg-muted/50"
-              >
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black text-foreground">本地区店铺</h3>
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                    {currentCityStores.length}
-                  </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {isImportingShops && importProgress && (
-                    <span className="text-[10px] text-muted-foreground animate-pulse">
-                      正在定位 {importProgress.current}/{importProgress.total}
-                    </span>
-                  )}
-                  <ChevronDown size={16} className={cn("text-muted-foreground transition-transform duration-300", expandedPanel === "shops" ? "rotate-180" : "rotate-0")} />
+
+                <div className="relative mt-3">
+                  <Search
+                    size={14}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <input
+                    value={shopSearchQuery}
+                    onChange={(event) => setShopSearchQuery(event.target.value)}
+                    placeholder="搜索店名 / POI_ID / 地址"
+                    className="h-10 w-full rounded-2xl border border-border bg-card px-9 pr-3 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+                  />
                 </div>
-              </button>
+              </div>
 
-              <div className={cn("grid transition-all duration-300", expandedPanel === "shops" ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 overflow-hidden")}>
-                <div className="min-h-0 flex flex-col gap-3 overflow-hidden">
-                  {isImportingShops && importProgress && (
-                    <div className="px-1 space-y-1">
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all duration-300"
-                          style={{ width: `${importProgress.total > 0 ? Math.round(importProgress.current / importProgress.total * 100) : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      value={shopSearch}
-                      onChange={(event) => setShopSearch(event.target.value)}
-                      placeholder="搜索本地区店铺"
-                      className="h-10 w-full rounded-xl border border-border bg-card px-9 text-sm outline-none transition-all focus:border-primary/20"
-                    />
-                  </div>
-
-                  <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-1 pb-4">
-                    {currentCityStores.map((shop) => (
-                      <div key={shop.id} className="rounded-2xl border border-border bg-card p-3 transition-all hover:border-primary/20">
-                        <div className="flex items-start gap-2">
-                          <Store size={14} className="mt-0.5 shrink-0 text-primary" />
-                          <div className="text-sm font-bold leading-snug text-foreground">{shop.name}</div>
-                        </div>
-                        <div className="mt-1 truncate text-xs text-muted-foreground">{shop.address || "未设置地址"}</div>
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-                            <span className={cn("rounded-full px-2 py-0.5", shop.isSource ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted")}>门店</span>
-                            {shop.latitude && shop.longitude ? <span>已定位</span> : <span>待定位</span>}
+              <div className="flex-1 overflow-y-auto p-3">
+                <div className="space-y-2">
+                  {searchedShops.map((shop) => {
+                    const region = extractRegionParts(shop);
+                    return (
+                      <div
+                        key={shop.id}
+                        className="rounded-2xl border border-border bg-card px-3 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-bold text-foreground" title={shop.name}>
+                              {shop.name}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {region.regionLabel || "未分类"}
+                            </div>
+                            {shop.externalId && (
+                              <div className="mt-1 text-xs font-medium text-primary">POI_ID: {shop.externalId}</div>
+                            )}
+                            {shop.address && (
+                              <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                {shop.address}
+                              </div>
+                            )}
                           </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button 
-                              onClick={() => handleLocateShop(shop)} 
-                              title="定位"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              onClick={() => {
+                                void handleLocateShop(shop);
+                              }}
+                              className="rounded-xl border border-border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground transition-all hover:bg-muted"
                             >
-                              <MapPin size={13} />
+                              定位
                             </button>
-                            <button 
+                            <button
                               onClick={() => {
                                 setEditingShop(shop);
                                 setIsShopModalOpen(true);
-                              }} 
-                              title="编辑"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-amber-500/10 hover:text-amber-500 transition-all"
+                              }}
+                              className="rounded-xl bg-primary px-2.5 py-1.5 text-xs font-bold text-primary-foreground transition-all hover:bg-primary/90"
                             >
-                              <Pencil size={13} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteShop(shop.id)} 
-                              title="删除"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 transition-all"
-                            >
-                              <Trash2 size={13} />
+                              编辑
                             </button>
                           </div>
                         </div>
                       </div>
-                    ))}
-                    {!currentCityStores.length && <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">当前地区暂无店铺</div>}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 板块 2: 测距结果预览 (可折叠) */}
-            <div className={cn("flex flex-col transition-all duration-300 border-t border-white/5 pt-2", expandedPanel === "results" ? "flex-1 min-h-0" : "flex-none")}>
-              <button
-                onClick={() => setExpandedPanel(expandedPanel === "results" ? "shops" : "results")}
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-2xl p-3.5 transition-colors",
-                  results.length > 0 ? "bg-primary/5 hover:bg-primary/10" : "bg-background hover:bg-muted/50"
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black text-foreground">测距对比分析</h3>
-                  {results.length > 0 && (
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
-                      TOP {results.length}
-                    </span>
+                    );
+                  })}
+                  {!searchedShops.length && (
+                    <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+                      没有找到匹配的店铺
+                    </div>
                   )}
                 </div>
-                <ChevronDown size={16} className={cn("text-muted-foreground transition-transform duration-300", expandedPanel === "results" ? "rotate-0" : "rotate-180")} />
-              </button>
-
-              <div className={cn("grid transition-all duration-300", expandedPanel === "results" ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0 overflow-hidden")}>
-                <div className="min-h-0 flex flex-col gap-2 overflow-hidden">
-                  <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-1 pb-4">
-                    {results.map((result, index) => {
-                      const shop = shops.find((item) => item.id === result.shopId);
-                      if (!shop) return null;
-                      const isTop3 = index < 3;
-                      return (
-                        <button
-                          key={result.shopId}
-                          onClick={() => handlePreviewResult(result)}
-                          className={cn(
-                            "w-full rounded-2xl border p-3 text-left transition-all group relative overflow-hidden",
-                            index === 0
-                              ? "border-primary/40 bg-primary/8"
-                              : "border-border bg-card hover:border-primary/20"
-                          )}
-                        >
-                          {isTop3 && (
-                            <div className={cn(
-                              "absolute right-0 top-0 h-8 w-8 text-white/10 flex items-center justify-center translate-x-1 -translate-y-1",
-                              index === 0 ? "text-amber-500/20" : index === 1 ? "text-slate-400/20" : "text-orange-600/20"
-                            )}>
-                              <Trophy size={32} />
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className={cn(
-                                  "flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-black",
-                                  index === 0 ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground"
-                                )}>
-                                  {index + 1}
-                                </span>
-                                <div className="truncate text-sm font-bold text-foreground">{shop.name}</div>
-                              </div>
-                              
-                              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                <div className="flex items-center gap-1 text-xs font-medium text-foreground">
-                                  <Truck size={12} className="text-primary" />
-                                  {(result.routeDist ? result.routeDist / 1000 : result.airDist / 1000).toFixed(2)}km
-                                </div>
-                                {result.duration && (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Clock size={12} />
-                                    {Math.max(1, Math.ceil(result.duration / 60))}分钟
-                                  </div>
-                                )}
-                                {result.routeDist && (
-                                  <div className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
-                                    实际路线
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <ChevronRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {!results.length && (
-                      <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-                        <div className="mb-2 flex justify-center text-primary/40"><Navigation size={24} /></div>
-                        输入收货地址后<br />这里将自动展示最优配送方案
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
-            </div>
-          </div>
-      </aside>
+            </aside>
+          )}
+          {(targetPoint || results.length > 0 || isResolvingRoutes) && renderRouteResults()}
+        </div>
+      </div>
     </div>
     <ImportModal
       isOpen={isImportModalOpen}

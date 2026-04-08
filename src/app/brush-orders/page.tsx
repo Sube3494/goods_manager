@@ -232,7 +232,7 @@ export default function BrushOrdersPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/brush-orders?limit=1000");
+      const res = await fetch("/api/brush-orders?limit=100000");
       if (res.ok) {
         const data = await res.json();
         setOrders(data.data || []); 

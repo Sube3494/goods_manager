@@ -11,7 +11,11 @@ export async function PUT(request: Request, context: { params: { id: string } })
 
     const { id } = await context.params;
     const body = await request.json();
-    const { name, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+
+    if (!name || !externalId || !address) {
+      return NextResponse.json({ error: "Missing required shop fields" }, { status: 400 });
+    }
 
     const existingShop = await prisma.shop.findUnique({
       where: { id },
@@ -29,6 +33,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
       where: { id },
       data: {
         name,
+        externalId,
         address,
         province,
         city,

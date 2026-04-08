@@ -31,15 +31,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
 
-    if (!name) {
-      return NextResponse.json({ error: "Missing shop name" }, { status: 400 });
+    if (!name || !externalId || !address) {
+      return NextResponse.json({ error: "Missing required shop fields" }, { status: 400 });
     }
 
     const newShop = await prisma.shop.create({
       data: {
         name,
+        externalId,
         address,
         province,
         city,

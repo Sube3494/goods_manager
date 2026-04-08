@@ -57,20 +57,20 @@ export default function DistanceCalcPage() {
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col animate-in fade-in duration-700">
-      <div className="flex flex-col sm:flex-row items-baseline justify-between gap-4 shrink-0 px-1">
+    <div className="h-full flex min-h-0 flex-col animate-in fade-in duration-700">
+      <div className="flex flex-col sm:flex-row items-baseline justify-between gap-1.5 shrink-0 px-4 sm:px-6 lg:px-8 pt-2 pb-1.5">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground truncate">
+          <h1 className="text-[1.75rem] sm:text-[2.1rem] leading-none font-black tracking-tight text-foreground truncate">
             智能调货中心
           </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-2xl">
+          <p className="text-muted-foreground mt-1 max-w-3xl text-xs sm:text-sm">
             基于高德地图 LBS 能力，实时测算目标点与各仓库、门店之间的路线方案、骑行距离及预估运费。
           </p>
         </div>
       </div>
 
       <div className={cn(
-        "flex-1 min-h-[600px] rounded-[32px] border border-border/60 bg-white/5 shadow-sm overflow-hidden backdrop-blur-xl relative",
+        "flex-1 min-h-0 rounded-none border-y border-border/60 bg-white/5 shadow-sm overflow-hidden backdrop-blur-xl relative lg:rounded-[32px] lg:border lg:mx-4 lg:mb-4",
       )}>
         <StoreDispatchMap initialStores={[]} />
       </div>

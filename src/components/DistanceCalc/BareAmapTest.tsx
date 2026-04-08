@@ -141,7 +141,7 @@ export function BareAmapTest({
   }, [mapStyle]);
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {(showDebug || (!key && error)) && (
         <div className="rounded-2xl border border-border bg-card/50 p-4 text-sm backdrop-blur-md">
           {(!key && error) ? (
@@ -167,7 +167,7 @@ export function BareAmapTest({
       <div
         ref={containerRef}
         className={cn(
-          "h-[70vh] overflow-hidden rounded-3xl border border-border bg-white transition-opacity",
+          "min-h-0 flex-1 overflow-hidden rounded-3xl border border-border bg-white transition-opacity",
           className,
           (!key && error) ? "opacity-30 grayscale pointer-events-none" : "opacity-100"
         )}

@@ -32,6 +32,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
   const isLoginPage = pathname === "/login";
   const isSharePage = pathname?.startsWith("/media") || pathname?.startsWith("/brush-plans/share");
+  const isWideCanvasPage = pathname?.startsWith("/distance-calc");
   const isFullScreenPage = isLoginPage || isSharePage;
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
@@ -159,11 +160,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             />
             <main className={cn(
                 "flex-1 w-full",
-                !isFullScreenPage && "pt-4 px-4 sm:px-6 lg:px-10 pb-10 safe-bottom",
+                !isFullScreenPage && (isWideCanvasPage ? "pt-2 px-0 pb-0 safe-bottom" : "pt-4 px-4 sm:px-6 lg:px-10 pb-10 safe-bottom"),
             )}>
                 <div className={cn(
                     "h-full animate-fade-in",
-                    !isFullScreenPage && "mx-auto max-w-7xl"
+                    !isFullScreenPage && !isWideCanvasPage && "mx-auto max-w-7xl"
                 )}>
                     {isLoading && !isFullScreenPage ? (
                         <div className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-4 bg-background">
