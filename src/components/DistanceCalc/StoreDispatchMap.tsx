@@ -795,17 +795,17 @@ export function StoreDispatchMap({
     const map = mapRef.current;
     const AMap = AMapRef.current;
     const matchedShop = shops.find((shop) => shop.id === result.shopId);
+    const shopCoordinates = matchedShop ? getShopCoordinates(matchedShop) : null;
     if (
       !map ||
       !AMap ||
-      !getShopCoordinates(matchedShop) ||
+      !matchedShop ||
+      !shopCoordinates ||
       !targetPoint
     ) {
       return;
     }
     setActiveShopId(result.shopId);
-    const shopCoordinates = getShopCoordinates(matchedShop);
-    if (!shopCoordinates) return;
 
     // 构造高级预览气泡 (InfoWindow)
     const distStr = result.routeDist != null ? `${(result.routeDist / 1000).toFixed(2)}km` : "计算中";
