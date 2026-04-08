@@ -204,6 +204,99 @@ function extractRegionParts(shop: Pick<Shop, "address" | "name" | "province" | "
   };
 }
 
+// 注入地图标记悬停样式的样式表 - 移出组件外部以避免重复注入
+const MARKER_STYLES = `
+  .marker-wrapper .marker-label {
+    opacity: 0;
+    transform: translateY(5px);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+  .marker-wrapper:hover .marker-pin,
+  .marker-wrapper.active .marker-pin {
+    transform: scale(1.2) translateY(-2px);
+    filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.6));
+    z-index: 100;
+  }
+  .marker-wrapper:hover .marker-label,
+  .marker-wrapper.active .marker-label {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .marker-pin {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* 目的地 Marker 专用样式 */
+  .target-marker-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 0;
+    height: 0;
+  }
+  .target-marker-label {
+    position: absolute;
+    bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(15, 23, 42, 0.82);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+  }
+  .target-marker-label::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid rgba(15, 23, 42, 0.82);
+  }
+  .target-dot {
+    width: 12px;
+    height: 12px;
+    background: #3b82f6;
+    border: 2.5px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+    position: relative;
+    z-index: 5;
+  }
+  .target-dot::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: -12px;
+    right: -12px;
+    bottom: -12px;
+    border: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: target-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  }
+  @keyframes target-pulse {
+    0% { transform: scale(0.5); opacity: 0.8; }
+    100% { transform: scale(2.8); opacity: 0; }
+  }
+  @keyframes target-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+`;
+
 function simplifyShopName(name: string) {
   if (!name) return "";
   // 1. 优先提取括号内的内容（如：哈尔滨店）
@@ -243,6 +336,7 @@ export function StoreDispatchMap({
   const infoWindowRef = useRef<any>(null);
   const placeSearchRef = useRef<any>(null);
   const ridingRef = useRef<any>(null);
+  const labelsLayerRef = useRef<any>(null);
 
   const [shops, setShops] = useState<Shop[]>(initialStores);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -273,97 +367,7 @@ export function StoreDispatchMap({
   ];
 
   // 注入地图标记悬停样式的样式表
-  const markerStyles = `
-    .marker-wrapper .marker-label {
-      opacity: 0;
-      transform: translateY(5px);
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      pointer-events: none;
-    }
-    .marker-wrapper:hover .marker-pin,
-    .marker-wrapper.active .marker-pin {
-      transform: scale(1.2) translateY(-2px);
-      filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.6));
-      z-index: 100;
-    }
-    .marker-wrapper:hover .marker-label,
-    .marker-wrapper.active .marker-label {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-    .marker-pin {
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    /* 目的地 Marker 专用样式 */
-    .target-marker-wrapper {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 0;
-      height: 0;
-    }
-    .target-marker-label {
-      position: absolute;
-      bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(15, 23, 42, 0.82);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: white;
-      padding: 5px 10px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 800;
-      white-space: nowrap;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-      z-index: 10;
-    }
-    .target-marker-label::after {
-      content: '';
-      position: absolute;
-      bottom: -4px;
-      left: 50%;
-      transform: translateX(-50%);
-      border-left: 4px solid transparent;
-      border-right: 4px solid transparent;
-      border-top: 4px solid rgba(15, 23, 42, 0.82);
-    }
-    .target-dot {
-      width: 12px;
-      height: 12px;
-      background: #3b82f6;
-      border: 2.5px solid white;
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
-      position: relative;
-      z-index: 5;
-    }
-    .target-dot::before {
-      content: '';
-      position: absolute;
-      top: -12px;
-      left: -12px;
-      right: -12px;
-      bottom: -12px;
-      border: 2px solid #3b82f6;
-      border-radius: 50%;
-      animation: target-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
-    }
-    @keyframes target-pulse {
-      0% { transform: scale(0.5); opacity: 0.8; }
-      100% { transform: scale(2.8); opacity: 0; }
-    }
-    @keyframes target-float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
-    }
-  `;
+  const markerStyles = MARKER_STYLES;
 
   const locationTree = useMemo(() => {
     const provinceMap = new Map<string, Set<string>>();
@@ -505,6 +509,9 @@ export function StoreDispatchMap({
   }, [fetchShops]);
 
   const clearMarkers = useCallback(() => {
+    if (labelsLayerRef.current) {
+      labelsLayerRef.current.clear();
+    }
     if (mapRef.current && markersRef.current.length) {
       mapRef.current.remove(markersRef.current);
     }
@@ -703,16 +710,25 @@ export function StoreDispatchMap({
 
     clearMarkers();
 
-    const markers = cityScopedStores
+    // 如果还没有 LabelsLayer，初始化一个
+    if (!labelsLayerRef.current) {
+      labelsLayerRef.current = new AMap.LabelsLayer({
+        zooms: [3, 20],
+        zIndex: 1000,
+        collision: false, // 门店名称较短，关闭碰撞检测以便全部显示
+        animation: true,
+      });
+      map.add(labelsLayerRef.current);
+    }
+
+    const labelMarkers = cityScopedStores
       .filter((shop) => shop.longitude && shop.latitude)
       .map((shop) => {
         const isActive = activeShopId === shop.id;
-        // 查找此门店在测距列表（Top 5）中的排名
         const resultIndex = results && results.length > 0 ? results.findIndex(r => r.shopId === shop.id) : -1;
         const rank = resultIndex !== -1 ? resultIndex + 1 : null;
         const isTop5 = rank !== null && rank <= 5;
 
-        // 设置标注气泡的背景颜色（Top 1 橙色，Top 2-5 蓝色，普通黑色）
         let bubbleBg = "rgba(17,24,39,0.95)";
         if (isTop5) {
           bubbleBg = rank === 1 ? "#f97316" : "#3b82f6";
@@ -720,13 +736,15 @@ export function StoreDispatchMap({
           bubbleBg = "#2563eb";
         }
 
-        const marker = new AMap.Marker({
+        // 使用 LabelMarker 以获得更高性能
+        const labelMarker = new AMap.LabelMarker({
+          name: shop.name,
           position: [shop.longitude, shop.latitude],
-          title: shop.name,
           zIndex: isTop5 ? 200 : (isActive ? 180 : 100),
+          rank: isTop5 ? 10 : 1, // LabelsLayer 的权值
+          // 仍然使用 HTML Content 以保持细腻的视觉效果，但在 LabelsLayer 中它的性能表现优于独立 Marker
           content: `
             <div class="marker-wrapper ${isTop5 ? "is-top" : ""} ${isActive ? "active" : ""}" style="position: relative;">
-              <!-- 名称标注气泡：仅在聚焦目的地（Top 5）或手动激活时常驻显示 -->
               ${(targetPoint && isTop5) || isActive ? `
               <div class="marker-label" style="
                 position: absolute;
@@ -754,7 +772,6 @@ export function StoreDispatchMap({
                 ${rank ? `<span style="background: rgba(255,255,255,0.25); width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 10px;">${rank}</span>` : ""}
                 ${simplifyShopName(shop.name)}
               </div>` : ""}
-              <!-- 大头针图标 -->
               <svg class="marker-pin" width="22" height="28" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg" 
                 style="position: absolute; top: -28px; left: -11px; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4)); z-index: 1; transition: transform 0.2s;">
                 <path d="M11 28C11 28 22 17.5 22 11C22 4.92487 17.0751 0 11 0C4.92487 0 0 4.92487 0 11C0 17.5 11 28 11 28Z" fill="${isActive || rank === 1 ? "#f97316" : (isTop5 ? "#3b82f6" : "#4b5563")}" fill-opacity="1"/>
@@ -762,12 +779,10 @@ export function StoreDispatchMap({
               </svg>
             </div>
           `,
-          offset: new AMap.Pixel(0, 0), // 容器原点即为坐标点
         });
 
-        marker.on("click", () => {
+        labelMarker.on("click", () => {
           setActiveShopId(shop.id);
-          // 逻辑联动：在地图上点击门店时，如果已有测距结果，联动开启富媒体信息窗
           const result = results && results.length > 0 ? results.find(r => r.shopId === shop.id) : null;
           if (result) {
             handlePreviewResult(result);
@@ -776,26 +791,26 @@ export function StoreDispatchMap({
           }
         });
 
-
-        return marker;
+        return labelMarker;
       });
 
-    markersRef.current = markers;
-    if (markers.length && !targetPoint) {
-      map.add(markers);
-      if (!activeShopId) {
-        map.setFitView(markers, false, [80, 80, 80, 80]);
-      }
-    } else if (markers.length) {
-      map.add(markers);
-    } else {
+    labelsLayerRef.current.add(labelMarkers);
+    
+    // 如果是由于搜索结果导致的重绘，不改变视角，因为 handleResolveTarget 会处理视角
+    if (!targetPoint && labelMarkers.length) {
+      map.setFitView(labelMarkers, false, [80, 80, 80, 80]);
+    } else if (!labelMarkers.length && !targetPoint) {
       map.setCenter(DEFAULT_CENTER);
       map.setZoom(11);
     }
   }, [activeShopId, cityScopedStores, clearMarkers, targetPoint, results, handlePreviewResult]);
 
   useEffect(() => {
-    drawShopMarkers();
+    // 使用 requestAnimationFrame 略微延迟渲染，避免交互卡顿
+    const timer = requestAnimationFrame(() => {
+      drawShopMarkers();
+    });
+    return () => cancelAnimationFrame(timer);
   }, [drawShopMarkers]);
 
   const handleMapReady = useCallback(({ map, AMap }: { map: any; AMap: any }) => {
@@ -811,6 +826,7 @@ export function StoreDispatchMap({
     AMapRef.current = null;
     geocoderRef.current = null;
     ridingRef.current = null;
+    labelsLayerRef.current = null;
   }, [clearMarkers, clearTargetArtifacts]);
 
 
@@ -1201,23 +1217,32 @@ export function StoreDispatchMap({
     });
 
     // 绘制辐射虚线及其距离标注 (Spider Lines & Labels)
+    // 性能优化：仅显示距离最近的前 20 个店铺的辐射线，避免海量线段导致卡顿
     const spiderLines: any[] = [];
     const spiderLabels: any[] = [];
 
-    cityScopedStores.forEach((shop) => {
-      if (typeof shop.longitude !== "number" || typeof shop.latitude !== "number") return;
-      
-      const shopPos = [shop.longitude, shop.latitude];
+    // 先根据直线距离排序，取 Top 20
+    const top20Shops = [...cityScopedStores]
+      .filter(shop => typeof shop.longitude === "number" && typeof shop.latitude === "number")
+      .sort((a, b) => {
+        const distA = AMap.GeometryUtil.distance([a.longitude as number, a.latitude as number], targetPoint.location);
+        const distB = AMap.GeometryUtil.distance([b.longitude as number, b.latitude as number], targetPoint.location);
+        return distA - distB;
+      })
+      .slice(0, 20);
+
+    top20Shops.forEach((shop) => {
+      const shopPos = [shop.longitude as number, shop.latitude as number];
       const targetPos = targetPoint.location;
       
       // 创建连线
       const polyline = new AMap.Polyline({
         path: [shopPos, targetPos],
         strokeColor: "#60a5fa",
-        strokeOpacity: 0.65,
-        strokeWeight: 3,
+        strokeOpacity: 0.5,
+        strokeWeight: 2,
         strokeStyle: "dashed",
-        strokeDasharray: [12, 12],
+        strokeDasharray: [10, 10],
         zIndex: 50,
         bubble: true,
       });
@@ -1234,14 +1259,14 @@ export function StoreDispatchMap({
         anchor: "center",
         zIndex: 51,
         style: {
-          "background-color": "rgba(2, 6, 23, 0.88)",
-          "border": "1px solid rgba(148, 163, 184, 0.3)",
+          "background-color": "rgba(2, 6, 23, 0.82)",
+          "border": "1px solid rgba(148, 163, 184, 0.2)",
           "color": "#fff",
-          "font-size": "12px",
+          "font-size": "11px",
           "font-weight": "800",
-          "padding": "3px 6px",
+          "padding": "2px 5px",
           "border-radius": "4px",
-          "box-shadow": "0 4px 12px rgba(0,0,0,0.5)",
+          "box-shadow": "0 4px 10px rgba(0,0,0,0.4)",
           "pointer-events": "none",
         },
       });

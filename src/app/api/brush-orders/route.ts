@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   }
   const searchParams = req.nextUrl.searchParams;
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 1000);
+  const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 100000);
   const skip = (page - 1) * limit;
 
   try {
