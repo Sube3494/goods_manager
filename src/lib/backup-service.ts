@@ -11,6 +11,8 @@ export interface BackupFile {
   name: string;
   size: number;
   createdAt: Date;
+  source: "local" | "webdav";
+  fullPath?: string;
 }
 
 interface BackupOrderWithItems {
@@ -51,6 +53,15 @@ function castMany<T>(value: unknown): T[] {
 export class BackupService {
   private static readonly BACKUP_DIR = join(process.cwd(), "public", "backups");
   private static readonly BACKUP_PASSWORD = process.env.BACKUP_PASSWORD || "PickNote_Auto_Backup_Safe_Key"; // 建议从环境变量获取
+
+  static resolveBackupPassword(password?: string | null) {
+    const trimmedPassword = typeof password === "string" ? password.trim() : "";
+    if (!trimmedPassword) return this.BACKUP_PASSWORD;
+    if (trimmedPassword.length < 6) {
+      throw new Error("自定义密码长度至少为 6 位");
+    }
+    return trimmedPassword;
+  }
 
   static decryptBackupBuffer(encryptedBuffer: Buffer, password?: string) {
     const candidates = [password, this.BACKUP_PASSWORD].filter((value, index, arr): value is string => {
@@ -142,7 +153,7 @@ export class BackupService {
   /**
    * 获取备份列表
    */
-  static async listBackups(): Promise<BackupFile[]> {
+  private static async listLocalBackups(): Promise<BackupFile[]> {
     if (!existsSync(this.BACKUP_DIR)) return [];
 
     const files = await readdir(this.BACKUP_DIR);
@@ -154,13 +165,68 @@ export class BackupService {
           return {
             name: f,
             size: s.size,
-            createdAt: s.birthtime
+            createdAt: s.birthtime,
+            source: "local" as const,
           };
         })
     );
 
-    // 按时间倒序
-    return backupFiles.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return backupFiles;
+  }
+
+  static async createExportBuffer(userId?: string, password?: string | null) {
+    const database = await this.collectBackupData(userId);
+    const jsonString = JSON.stringify(database);
+    const exportPassword = this.resolveBackupPassword(password);
+    return BackupCrypto.encrypt(jsonString, exportPassword);
+  }
+
+  private static async listWebDAVBackups(): Promise<BackupFile[]> {
+    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+    if (!settings?.webdavEnabled || !settings.webdavUrl) return [];
+
+    try {
+      const client = createClient(settings.webdavUrl, {
+        username: settings.webdavUser || "",
+        password: settings.webdavPassword || ""
+      });
+
+      let targetPath = settings.webdavPath || "/";
+      if (!targetPath.startsWith("/")) targetPath = "/" + targetPath;
+      if (!(await client.exists(targetPath))) return [];
+
+      const items = await client.getDirectoryContents(targetPath) as { type: string; basename: string; lastmod: string; size?: number | string; filename?: string }[];
+      return items
+        .filter((item) => item.type === "file" && item.basename.endsWith(".pnk"))
+        .map((item) => ({
+          name: item.basename,
+          size: Number(item.size || 0),
+          createdAt: new Date(item.lastmod),
+          source: "webdav" as const,
+          fullPath: item.filename || `${targetPath}/${item.basename}`.replace(/\/+/g, "/"),
+        }));
+    } catch (error) {
+      console.error("Failed to list WebDAV backups:", error);
+      return [];
+    }
+  }
+
+  static async listBackups(): Promise<BackupFile[]> {
+    const [localBackups, remoteBackups] = await Promise.all([
+      this.listLocalBackups(),
+      this.listWebDAVBackups(),
+    ]);
+
+    const merged = new Map<string, BackupFile>();
+
+    for (const backup of [...remoteBackups, ...localBackups]) {
+      const existing = merged.get(backup.name);
+      if (!existing || backup.source === "local") {
+        merged.set(backup.name, existing ? { ...backup, fullPath: existing.fullPath || backup.fullPath } : backup);
+      }
+    }
+
+    return Array.from(merged.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   /**
@@ -171,18 +237,69 @@ export class BackupService {
     if (existsSync(filePath)) {
       await unlink(filePath);
     }
+
+    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+    if (!settings?.webdavEnabled || !settings.webdavUrl) return;
+
+    try {
+      const client = createClient(settings.webdavUrl, {
+        username: settings.webdavUser || "",
+        password: settings.webdavPassword || ""
+      });
+
+      let targetPath = settings.webdavPath || "/";
+      if (!targetPath.startsWith("/")) targetPath = "/" + targetPath;
+      const fullFilePath = `${targetPath}/${fileName}`.replace(/\/+/g, "/");
+      if (await client.exists(fullFilePath)) {
+        await client.deleteFile(fullFilePath);
+      }
+    } catch (error) {
+      console.error("Failed to delete WebDAV backup:", error);
+    }
+  }
+
+  private static async getWebDAVBackupBuffer(fileName: string): Promise<Buffer | null> {
+    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+    if (!settings?.webdavEnabled || !settings.webdavUrl) return null;
+
+    try {
+      const client = createClient(settings.webdavUrl, {
+        username: settings.webdavUser || "",
+        password: settings.webdavPassword || ""
+      });
+
+      let targetPath = settings.webdavPath || "/";
+      if (!targetPath.startsWith("/")) targetPath = "/" + targetPath;
+      const fullFilePath = `${targetPath}/${fileName}`.replace(/\/+/g, "/");
+      if (!(await client.exists(fullFilePath))) return null;
+
+      const content = await client.getFileContents(fullFilePath, { format: "binary" });
+      return Buffer.isBuffer(content) ? content : Buffer.from(content as ArrayBuffer);
+    } catch (error) {
+      console.error("Failed to fetch WebDAV backup:", error);
+      return null;
+    }
+  }
+
+  static async getBackupBuffer(fileName: string): Promise<Buffer> {
+    const filePath = join(this.BACKUP_DIR, fileName);
+    if (existsSync(filePath)) {
+      return readFile(filePath);
+    }
+
+    const remoteBuffer = await this.getWebDAVBackupBuffer(fileName);
+    if (remoteBuffer) {
+      return remoteBuffer;
+    }
+
+    throw new Error("备份文件不存在");
   }
 
   /**
    * 从服务器备份文件恢复
    */
   static async restoreFromFile(fileName: string, password?: string) {
-      const filePath = join(this.BACKUP_DIR, fileName);
-      if (!existsSync(filePath)) {
-        throw new Error("备份文件不存在");
-      }
-
-      const encryptedBuffer = await readFile(filePath);
+      const encryptedBuffer = await this.getBackupBuffer(fileName);
       const decryptedData = this.decryptBackupBuffer(encryptedBuffer, password);
 
     const data = JSON.parse(decryptedData);
@@ -341,6 +458,7 @@ export class BackupService {
       if (now.getTime() - lastBackup.getTime() >= intervalMs) {
         console.log("Starting scheduled auto backup...");
         await this.createBackup();
+        return;
       }
     } catch (error) {
       console.error("Scheduled backup check failed:", error);

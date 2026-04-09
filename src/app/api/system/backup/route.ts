@@ -15,6 +15,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await BackupService.checkAndRunScheduledBackup();
     const backups = await BackupService.listBackups();
     return NextResponse.json(backups);
   } catch (error) {

@@ -8,7 +8,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { BackupCrypto } from "@/lib/crypto";
 import { BackupService } from "@/lib/backup-service";
 
 export const dynamic = 'force-dynamic';
@@ -21,16 +20,7 @@ export async function POST(request: Request) {
     }
 
     const { password } = await request.json();
-    if (!password || password.length < 6) {
-      return NextResponse.json({ error: "密码长度至少为 6 位" }, { status: 400 });
-    }
-
-    // 1. 聚合当前工作区数据库表数据
-    const database = await BackupService.collectBackupData(session.id);
-
-    // 2. 加密序列化后的 JSON
-    const jsonString = JSON.stringify(database);
-    const encryptedBuffer = BackupCrypto.encrypt(jsonString, password);
+    const encryptedBuffer = await BackupService.createExportBuffer(session.id, password);
 
     // 3. 先返回备份文件，异步更新最后备份时间（不阻塞响应）
     const response = new Response(Buffer.from(encryptedBuffer), {
