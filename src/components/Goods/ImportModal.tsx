@@ -101,18 +101,22 @@ export function ImportModal({
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: "binary" });
             
-            if (multiSheet) {
+              if (multiSheet) {
                 const result: Record<string, unknown[]> = {};
                 workbook.SheetNames.forEach(name => {
                     const sheet = workbook.Sheets[name];
                     result[name] = XLSX.utils.sheet_to_json(sheet);
                 });
                 onImport(result);
-            } else {
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+              } else {
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet).map((row) => ({
+                  ...row,
+                  __sheetName: sheetName,
+                }));
                 onImport(json);
-            }
+              }
             onClose();
         };
         reader.readAsBinaryString(file);

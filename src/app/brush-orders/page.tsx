@@ -437,14 +437,20 @@ export default function BrushOrdersPage() {
   }, [filteredOrders, showToast]);
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
-    if (!Array.isArray(data)) return;
-    setIsLoading(true);
-    try {
-      const res = await fetch("/api/brush-orders/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+      const rows = Array.isArray(data) ? data : [];
+      const sheetName = rows.length > 0 && typeof rows[0]?.__sheetName === "string" ? String(rows[0].__sheetName) : "";
+
+      if (rows.length === 0) {
+        showToast("导入文件里没有可用数据", "info");
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const res = await fetch("/api/brush-orders/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows, sheetName })
+        });
       const result = await res.json();
       if (res.ok) {
         if (result.failed > 0 && result.errors?.length > 0) {
