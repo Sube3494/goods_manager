@@ -52,8 +52,8 @@ function isBrushShopMatch(shopName: string, brushShopNames: string[]) {
   });
 }
 
-function isBrushDeliveryMethod(deliveryMethod: unknown) {
-  const normalized = normalizeText(deliveryMethod);
+function isSelfDeliveryCourier(courierName: unknown) {
+  const normalized = normalizeText(courierName);
   if (!normalized) {
     return false;
   }
@@ -234,7 +234,7 @@ export async function POST(req: NextRequest) {
         let platform = inferPlatform(
           pickRowValue(row, ['平台', '来源平台', '类型', '*类型'])
         );
-        const deliveryMethod = normalizeText(pickRowValue(row, ['配送平台', '配送方式']));
+        const courierName = normalizeText(pickRowValue(row, ['配送人员', '骑手', '配送骑手']));
         const orderStatus = normalizeText(pickRowValue(row, ['状态', '订单状态']));
 
         // 过滤无效订单：跳过"已删除"、"已取消"、"已退款"的订单
@@ -336,10 +336,9 @@ export async function POST(req: NextRequest) {
         // 2. 智能订单分流器
         // 根据您的业务逻辑修正：严格判定“自配送”才是刷单，或者人为备注了刷单才走刷单通道。
         // 空白的配送平台（或“其它”平台）都属于真实的取货/销售，必须走真实出库通道扣减库存！
-        const normalizedDeliveryMethod = normalizeText(deliveryMethod);
         const normalizedNote = normalizeText(note);
         const isBrushOrder =
-          isBrushDeliveryMethod(normalizedDeliveryMethod) ||
+          isSelfDeliveryCourier(courierName) ||
           normalizedNote.includes("刷单") ||
           isBrushShopMatch(shopName, normalizedBrushShopNames);
 
