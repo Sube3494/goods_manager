@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { BackupCrypto } from "@/lib/crypto";
+import { BackupService } from "@/lib/backup-service";
 
 export const dynamic = 'force-dynamic';
 
@@ -25,32 +26,7 @@ export async function POST(request: Request) {
     }
 
     // 1. 聚合当前工作区数据库表数据
-    const database = {
-      version: "1.0",
-      timestamp: new Date().toISOString(),
-      userId: session.id,
-      categories: await prisma.category.findMany(),
-      products: await prisma.product.findMany(),
-      suppliers: await prisma.supplier.findMany(),
-      purchaseOrders: await prisma.purchaseOrder.findMany({ 
-          include: { items: true } 
-      }),
-      outboundOrders: await prisma.outboundOrder.findMany({ 
-          include: { items: true } 
-      }),
-      brushOrders: await prisma.brushOrder.findMany({ 
-          include: { items: true } 
-      }),
-      galleryItems: await prisma.galleryItem.findMany(),
-      systemSettings: await prisma.systemSetting.findMany(),
-      users: await prisma.user.findMany(),
-      roleProfiles: await prisma.roleProfile.findMany(),
-      whitelists: await prisma.emailWhitelist.findMany(),
-      invitations: await prisma.invitation.findMany(),
-      registrationRequests: await prisma.registrationRequest.findMany(),
-      pageViews: await prisma.pageView.findMany(),
-      verificationCodes: await prisma.verificationCode.findMany(),
-    };
+    const database = await BackupService.collectBackupData(session.id);
 
     // 2. 加密序列化后的 JSON
     const jsonString = JSON.stringify(database);
