@@ -88,7 +88,7 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                   <div className="p-4 rounded-2xl bg-muted/30 border border-border/50">
                     <div className="flex items-center gap-2 mb-3 text-sm font-medium text-foreground">
                       <KeyRound size={16} className="text-primary" />
-                      {type === "export" ? "设置备份加密密码" : requirePassword ? "输入备份解密密码" : "确认执行服务器备份恢复"}
+                      {type === "export" ? "设置备份加密密码" : requirePassword ? "输入备份解密密码" : "确认执行备份恢复"}
                     </div>
                     {requirePassword ? (
                       <>
@@ -109,7 +109,7 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                       </>
                     ) : (
                       <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-                        当前恢复的是服务器自动备份文件，系统会使用内置备份密钥自动解密并恢复，无需手动输入密码。
+                        密码可留空。系统会优先尝试你输入的备份密码；如果这是服务器自动备份文件，也会自动使用内置备份密钥完成解密恢复。
                       </div>
                     )}
                     {error && (
@@ -122,7 +122,7 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                         ? "请务必牢记此密码。如果丢失，该备份文件将永久无法被解密恢复。" 
                         : requirePassword
                           ? `正在准备恢复文件: ${file?.name || "未知"}`
-                          : `即将恢复服务器备份文件: ${file?.name || "未知"}`}
+                          : `即将恢复备份文件: ${file?.name || "未知"}`}
                     </p>
                   </div>
                   

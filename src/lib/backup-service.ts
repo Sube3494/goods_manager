@@ -44,6 +44,23 @@ export class BackupService {
   private static readonly BACKUP_DIR = join(process.cwd(), "public", "backups");
   private static readonly BACKUP_PASSWORD = process.env.BACKUP_PASSWORD || "PickNote_Auto_Backup_Safe_Key"; // 建议从环境变量获取
 
+  static decryptBackupBuffer(encryptedBuffer: Buffer, password?: string) {
+    const candidates = [password, this.BACKUP_PASSWORD].filter((value, index, arr): value is string => {
+      if (!value) return false;
+      return arr.indexOf(value) === index;
+    });
+
+    for (const candidate of candidates) {
+      try {
+        return BackupCrypto.decrypt(encryptedBuffer, candidate);
+      } catch {
+        continue;
+      }
+    }
+
+    throw new Error("解密失败，密码错误或文件损坏");
+  }
+
   /**
    * 执行一次完整备份
    */
@@ -148,12 +165,7 @@ export class BackupService {
       }
 
       const encryptedBuffer = await readFile(filePath);
-      let decryptedData: string;
-      try {
-        decryptedData = BackupCrypto.decrypt(encryptedBuffer, password || this.BACKUP_PASSWORD);
-      } catch {
-        throw new Error("解密失败，密码错误或文件损坏");
-      }
+      const decryptedData = this.decryptBackupBuffer(encryptedBuffer, password);
 
     const data = JSON.parse(decryptedData);
     await this.restoreFromData(data);

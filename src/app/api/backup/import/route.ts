@@ -7,7 +7,6 @@
  */
 import { NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { BackupCrypto } from "@/lib/crypto";
 import { BackupService } from "@/lib/backup-service";
 
 export async function POST(request: Request) {
@@ -21,8 +20,8 @@ export async function POST(request: Request) {
     const file = formData.get("file") as File;
     const password = formData.get("password") as string;
 
-    if (!file || !password) {
-      return NextResponse.json({ error: "文件和密码必填" }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: "文件必填" }, { status: 400 });
     }
 
     // 1. 解密数据
@@ -31,9 +30,9 @@ export async function POST(request: Request) {
     
     let decryptedData: string;
     try {
-      decryptedData = BackupCrypto.decrypt(encryptedBuffer, password);
-    } catch {
-      return NextResponse.json({ error: "解密失败，密码错误或文件损坏" }, { status: 400 });
+      decryptedData = BackupService.decryptBackupBuffer(encryptedBuffer, password);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "解密失败，密码错误或文件损坏" }, { status: 400 });
     }
 
     const data = JSON.parse(decryptedData);
