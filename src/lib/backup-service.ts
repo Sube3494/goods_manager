@@ -141,19 +141,19 @@ export class BackupService {
   /**
    * 从服务器备份文件恢复
    */
-  static async restoreFromFile(fileName: string, password: string) {
-    const filePath = join(this.BACKUP_DIR, fileName);
-    if (!existsSync(filePath)) {
-      throw new Error("备份文件不存在");
-    }
+  static async restoreFromFile(fileName: string, password?: string) {
+      const filePath = join(this.BACKUP_DIR, fileName);
+      if (!existsSync(filePath)) {
+        throw new Error("备份文件不存在");
+      }
 
-    const encryptedBuffer = await readFile(filePath);
-    let decryptedData: string;
-    try {
-      decryptedData = BackupCrypto.decrypt(encryptedBuffer, password);
-    } catch {
-      throw new Error("解密失败，密码错误或文件损坏");
-    }
+      const encryptedBuffer = await readFile(filePath);
+      let decryptedData: string;
+      try {
+        decryptedData = BackupCrypto.decrypt(encryptedBuffer, password || this.BACKUP_PASSWORD);
+      } catch {
+        throw new Error("解密失败，密码错误或文件损坏");
+      }
 
     const data = JSON.parse(decryptedData);
     await this.restoreFromData(data);

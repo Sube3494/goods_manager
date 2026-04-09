@@ -10,19 +10,20 @@ interface BackupModalProps {
   onClose: () => void;
   type: "export" | "import";
   file?: File;
+  requirePassword?: boolean;
   onAction: (password: string, onProgress: (p: number) => void) => Promise<void>;
 }
 
 type ModalState = "password" | "processing" | "success" | "error";
 
-export function BackupModal({ isOpen, onClose, type, file, onAction }: BackupModalProps) {
+export function BackupModal({ isOpen, onClose, type, file, requirePassword = true, onAction }: BackupModalProps) {
   const [state, setState] = useState<ModalState>("password");
   const [password, setPassword] = useState("");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
   const handleConfirm = async () => {
-    if (password.length < 6) {
+    if (requirePassword && password.length < 6) {
       setError("密码至少需要 6 位字符");
       return;
     }
@@ -87,22 +88,30 @@ export function BackupModal({ isOpen, onClose, type, file, onAction }: BackupMod
                   <div className="p-4 rounded-2xl bg-muted/30 border border-border/50">
                     <div className="flex items-center gap-2 mb-3 text-sm font-medium text-foreground">
                       <KeyRound size={16} className="text-primary" />
-                      {type === "export" ? "设置备份加密密码" : "输入备份解密密码"}
+                      {type === "export" ? "设置备份加密密码" : requirePassword ? "输入备份解密密码" : "确认执行服务器备份恢复"}
                     </div>
-                    <input
-                      type="password"
-                      autoFocus
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder={type === "export" ? "设置 6 位以上安全密码" : "输入备份时的加密密码"}
-                      className="w-full h-12 bg-background border border-border rounded-xl px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
-                      onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
-                    />
-                    <div className="mt-2 flex items-center justify-between">
-                        <p className="text-[10px] text-muted-foreground italic">
-                            {type === "export" ? "要求：至少 6 位，支持字母、数字及符号" : "请输入备份导出时设置的对应密码"}
-                        </p>
-                    </div>
+                    {requirePassword ? (
+                      <>
+                        <input
+                          type="password"
+                          autoFocus
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder={type === "export" ? "设置 6 位以上安全密码" : "输入备份时的加密密码"}
+                          className="w-full h-12 bg-background border border-border rounded-xl px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
+                          onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
+                        />
+                        <div className="mt-2 flex items-center justify-between">
+                            <p className="text-[10px] text-muted-foreground italic">
+                                {type === "export" ? "要求：至少 6 位，支持字母、数字及符号" : "请输入备份导出时设置的对应密码"}
+                            </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+                        当前恢复的是服务器自动备份文件，系统会使用内置备份密钥自动解密并恢复，无需手动输入密码。
+                      </div>
+                    )}
                     {error && (
                       <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
                         <AlertCircle size={12} /> {error}
@@ -111,7 +120,9 @@ export function BackupModal({ isOpen, onClose, type, file, onAction }: BackupMod
                     <p className="mt-4 text-[11px] text-muted-foreground leading-relaxed">
                       {type === "export" 
                         ? "请务必牢记此密码。如果丢失，该备份文件将永久无法被解密恢复。" 
-                        : `正在准备恢复文件: ${file?.name || "未知"}`}
+                        : requirePassword
+                          ? `正在准备恢复文件: ${file?.name || "未知"}`
+                          : `即将恢复服务器备份文件: ${file?.name || "未知"}`}
                     </p>
                   </div>
                   

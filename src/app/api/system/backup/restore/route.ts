@@ -11,8 +11,8 @@ export async function POST(request: Request) {
     }
 
     const { fileName, password } = await request.json();
-    if (!fileName || !password) {
-      return NextResponse.json({ error: "文件名和密码必填" }, { status: 400 });
+    if (!fileName) {
+      return NextResponse.json({ error: "文件名必填" }, { status: 400 });
     }
 
     const result = await BackupService.restoreFromFile(fileName, password);

@@ -452,7 +452,7 @@ export function DataTab({
         </div>
       </section>
 
-      <BackupModal isOpen={backupConfig.isOpen} type={backupConfig.type} file={backupConfig.file} onClose={() => setBackupConfig((prev) => ({ ...prev, isOpen: false }))} onAction={async (password: string, onProgress: (p: number) => void) => {
+      <BackupModal isOpen={backupConfig.isOpen} type={backupConfig.type} file={backupConfig.file} requirePassword={backupConfig.type === "export" || !!(backupConfig.file && "size" in backupConfig.file)} onClose={() => setBackupConfig((prev) => ({ ...prev, isOpen: false }))} onAction={async (password: string, onProgress: (p: number) => void) => {
         onProgress(10);
         await new Promise((resolve) => setTimeout(resolve, 600));
         onProgress(35);
