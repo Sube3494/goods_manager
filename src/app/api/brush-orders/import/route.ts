@@ -6,6 +6,7 @@ import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { OrderParser } from "@/lib/orderParser";
 import { InventoryService } from "@/services/inventoryService";
 import { AddressItem, BrushShopItem } from "@/lib/types";
+import { Prisma } from "../../../../../prisma/generated-client";
 
 interface UserImportProfile {
   shippingAddresses?: AddressItem[] | null;
@@ -41,6 +42,83 @@ function isBrushShopMatch(shopName: string, brushShopNames: string[]) {
   });
 }
 
+function isBrushDeliveryMethod(deliveryMethod: unknown) {
+  const normalized = normalizeText(deliveryMethod);
+  if (!normalized) {
+    return false;
+  }
+
+  return ["自配送", "商家自配", "商家自配送", "门店自配", "自配"].some((keyword) =>
+    normalized.includes(keyword)
+  );
+}
+
+async function restoreOutboundInventory(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  items: { productId: string; quantity: number }[]
+) {
+  for (const item of items) {
+    let remainingToRestore = item.quantity;
+
+    const batches = await tx.purchaseOrderItem.findMany({
+      where: {
+        productId: item.productId,
+        purchaseOrder: {
+          userId,
+          status: "Received",
+        },
+      },
+      select: {
+        id: true,
+        quantity: true,
+        remainingQuantity: true,
+      },
+      orderBy: {
+        purchaseOrder: {
+          date: "asc",
+        },
+      },
+    });
+
+    for (const batch of batches) {
+      if (remainingToRestore <= 0) {
+        break;
+      }
+
+      const remainingQuantity = batch.remainingQuantity || 0;
+      const restoreCapacity = Math.max(batch.quantity - remainingQuantity, 0);
+      if (restoreCapacity <= 0) {
+        continue;
+      }
+
+      const restoreQuantity = Math.min(restoreCapacity, remainingToRestore);
+      await tx.purchaseOrderItem.update({
+        where: { id: batch.id },
+        data: {
+          remainingQuantity: {
+            increment: restoreQuantity,
+          },
+        },
+      });
+      remainingToRestore -= restoreQuantity;
+    }
+
+    if (remainingToRestore > 0) {
+      throw new Error(`订单覆盖失败：商品 ${item.productId} 无法完整回补库存，请先检查历史库存数据`);
+    }
+
+    await tx.product.update({
+      where: { id: item.productId },
+      data: {
+        stock: {
+          increment: item.quantity,
+        },
+      },
+    });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession() as SessionUser | null;
@@ -66,7 +144,8 @@ export async function POST(req: NextRequest) {
       failed: 0,
       errors: [] as string[],
       brushOrdersCount: 0,
-      realOrdersCount: 0
+      realOrdersCount: 0,
+      overwrittenCount: 0,
     };
 
     // 获取用户的预设店铺列表（用于智能洗清过长的平台店名）
@@ -157,30 +236,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // --- 幂等性校验 (防重防漏机制) ---
-        // 如果表格中存在订单号，检查数据库中是否已经导入过该订单，防止多次点击导致库存和财务数据翻倍
-        if (platformOrderId) {
-          const strOrderId = String(platformOrderId);
-          
-          // 检查是否已存在于刷单表
-          const existingBrush = await prisma.brushOrder.findFirst({
-            where: { userId, platformOrderId: strOrderId }
-          });
-          
-          // 检查是否已存在于出库表 (通过我们在 note 中打的特征 tag 进行精确匹配)
-          const existingOutbound = await prisma.outboundOrder.findFirst({
-            where: { 
-              userId, 
-              note: { contains: `平台单号: ${strOrderId}` } 
-            }
-          });
-
-          if (existingBrush || existingOutbound) {
-            results.failed++;
-            results.errors.push(`第 ${rowNumber} 行: 订单号 [${strOrderId}] 已存在，系统已自动跳过防重`);
-            continue;
-          }
-        }
+        const strOrderId = platformOrderId ? String(platformOrderId).trim() : "";
 
         // --- 智能店铺名称清洗 (Smart Shop Name Normalization) ---
         shopName = normalizeText(shopName);
@@ -238,7 +294,7 @@ export async function POST(req: NextRequest) {
         const normalizedDeliveryMethod = normalizeText(deliveryMethod);
         const normalizedNote = normalizeText(note);
         const isBrushOrder =
-          normalizedDeliveryMethod.includes("自配送") ||
+          isBrushDeliveryMethod(normalizedDeliveryMethod) ||
           normalizedNote.includes("刷单") ||
           isBrushShopMatch(shopName, normalizedBrushShopNames);
 
@@ -269,6 +325,40 @@ export async function POST(req: NextRequest) {
 
         if (matchFailed) continue;
 
+        let existingBrush: { id: string; items: { productId: string; quantity: number }[] } | null = null;
+        let existingOutbound: { id: string; items: { productId: string; quantity: number }[] } | null = null;
+
+        if (strOrderId) {
+          existingBrush = await prisma.brushOrder.findFirst({
+            where: { userId, platformOrderId: strOrderId },
+            select: {
+              id: true,
+              items: {
+                select: {
+                  productId: true,
+                  quantity: true,
+                },
+              },
+            },
+          });
+
+          existingOutbound = await prisma.outboundOrder.findFirst({
+            where: {
+              userId,
+              note: { contains: `平台单号: ${strOrderId}` },
+            },
+            select: {
+              id: true,
+              items: {
+                select: {
+                  productId: true,
+                  quantity: true,
+                },
+              },
+            },
+          });
+        }
+
         // 4. 执行业务逻辑分支
         if (isBrushOrder) {
           // ==============================
@@ -277,26 +367,45 @@ export async function POST(req: NextRequest) {
           const typeTag = "[刷单]";
           const finalNote = note ? `${typeTag} ${note}` : typeTag;
 
-          await prisma.brushOrder.create({
-            data: {
-              date: parseAsShanghaiTime(dateStr),
-              type: String(platform),
-              status: "Completed",
-              userId,
-              paymentAmount: parseFloat(String(payment)),
-              receivedAmount: parseFloat(String(received)),
-              commission: parseFloat(String(commission)),
-              note: finalNote,
-              shopName: shopName ? String(shopName) : null,
-              platformOrderId: platformOrderId ? String(platformOrderId) : null,
-              items: {
-                create: matchedItems.map(item => ({
-                  productId: item.productId,
-                  quantity: item.quantity
-                }))
-              }
+          await prisma.$transaction(async (tx) => {
+            if (existingOutbound) {
+              await restoreOutboundInventory(tx, userId, existingOutbound.items);
+              await tx.outboundOrder.delete({
+                where: { id: existingOutbound.id },
+              });
             }
+
+            if (existingBrush) {
+              await tx.brushOrder.delete({
+                where: { id: existingBrush.id },
+              });
+            }
+
+            await tx.brushOrder.create({
+              data: {
+                date: parseAsShanghaiTime(dateStr),
+                type: String(platform),
+                status: "Completed",
+                userId,
+                paymentAmount: parseFloat(String(payment)),
+                receivedAmount: parseFloat(String(received)),
+                commission: parseFloat(String(commission)),
+                note: finalNote,
+                shopName: shopName ? String(shopName) : null,
+                platformOrderId: strOrderId || null,
+                items: {
+                  create: matchedItems.map(item => ({
+                    productId: item.productId,
+                    quantity: item.quantity
+                  }))
+                }
+              }
+            });
           });
+
+          if (existingBrush || existingOutbound) {
+            results.overwrittenCount++;
+          }
           results.brushOrdersCount++;
           results.success++;
 
@@ -306,6 +415,19 @@ export async function POST(req: NextRequest) {
           // ==============================
           
           await prisma.$transaction(async (tx) => {
+            if (existingBrush) {
+              await tx.brushOrder.delete({
+                where: { id: existingBrush.id },
+              });
+            }
+
+            if (existingOutbound) {
+              await restoreOutboundInventory(tx, userId, existingOutbound.items);
+              await tx.outboundOrder.delete({
+                where: { id: existingOutbound.id },
+              });
+            }
+
             // 4.1 自动库存补偿逻辑 (Auto-Inbound Compensator)
             // 在扣减之前，检查每个商品的当前库存是否足够。如果不足，立刻打单入库。
             for (const item of matchedItems) {
@@ -378,6 +500,9 @@ export async function POST(req: NextRequest) {
             })));
           });
 
+          if (existingBrush || existingOutbound) {
+            results.overwrittenCount++;
+          }
           results.realOrdersCount++;
           results.success++;
         }

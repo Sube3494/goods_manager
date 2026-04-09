@@ -451,7 +451,8 @@ export default function BrushOrdersPage() {
           setImportErrors(result.errors);
           setIsErrorModalOpen(true);
         }
-        showToast(`导入完成: 成功 ${result.success} 条, 失败 ${result.failed} 条`);
+        const overwriteText = result.overwrittenCount > 0 ? `, 覆盖 ${result.overwrittenCount} 条` : "";
+        showToast(`导入完成: 成功 ${result.success} 条, 失败 ${result.failed} 条${overwriteText}`);
         fetchData();
       } else {
         showToast(result.error || "导入失败", "error");
