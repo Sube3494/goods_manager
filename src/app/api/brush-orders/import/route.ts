@@ -17,6 +17,16 @@ function normalizeText(value: unknown) {
   return String(value || "").trim();
 }
 
+function pickRowValue(row: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && normalizeText(value) !== "") {
+      return value;
+    }
+  }
+  return "";
+}
+
 function stripShopSuffix(name: string) {
   return name.replace(/(店|一店|二店|三店|分店|总店)$/, "");
 }
@@ -51,6 +61,35 @@ function isBrushDeliveryMethod(deliveryMethod: unknown) {
   return ["自配送", "商家自配", "商家自配送", "门店自配", "自配"].some((keyword) =>
     normalized.includes(keyword)
   );
+}
+
+function inferPlatform(platform: unknown) {
+  const rawPlatform = normalizeText(platform);
+  const source = rawPlatform;
+
+  if (source.includes("美团")) {
+    return "美团";
+  }
+  if (source.includes("淘宝") || source.includes("天猫")) {
+    return "淘宝";
+  }
+  if (source.includes("京东")) {
+    return "京东";
+  }
+  if (source.includes("饿了么")) {
+    return "饿了么";
+  }
+  if (source.includes("抖音")) {
+    return "抖音";
+  }
+  if (source.includes("快手")) {
+    return "快手";
+  }
+  if (source.includes("拼多多") || source.includes("多多")) {
+    return "拼多多";
+  }
+
+  return rawPlatform || "帮我取货";
 }
 
 async function restoreOutboundInventory(
@@ -134,7 +173,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const data = await req.json();
+    const body = await req.json();
+    const data = Array.isArray(body)
+      ? body
+      : (body && Array.isArray(body.rows) ? body.rows : null);
+
     if (!Array.isArray(data)) {
       return NextResponse.json({ error: "数据格式不正确" }, { status: 400 });
     }
@@ -187,10 +230,12 @@ export async function POST(req: NextRequest) {
       const rowNumber = i + 1;
       try {
         // 1. 标准化提取您的表格字段
-        const dateStr = row['下单日期'] || row['日期'] || row['下单时间'] || row['*日期'];
-        let platform = row['来源平台'] || row['类型'] || row['*类型'] || "未知平台";
-        const deliveryMethod = row['配送平台'] || row['配送方式'];
-        const orderStatus = String(row['状态'] || row['订单状态'] || "").trim();
+        const dateStr = normalizeText(pickRowValue(row, ['下单日期', '日期', '下单时间', '*日期']));
+        let platform = inferPlatform(
+          pickRowValue(row, ['平台', '来源平台', '类型', '*类型'])
+        );
+        const deliveryMethod = normalizeText(pickRowValue(row, ['配送平台', '配送方式']));
+        const orderStatus = normalizeText(pickRowValue(row, ['状态', '订单状态']));
 
         // 过滤无效订单：跳过"已删除"、"已取消"、"已退款"的订单
         if (orderStatus.includes('删除') || orderStatus.includes('取消') || orderStatus.includes('退款')) {
@@ -220,15 +265,15 @@ export async function POST(req: NextRequest) {
         }
         
         // 财务字段
-        const payment = row['用户实付金额'] || row['实付'] || row['*实付'] || row['实际支付'] || 0;
-        const received = row['商家实收金额'] || row['到手金额'] || row['*到手金额'] || row['预计收入'] || 0;
-        const commission = row['佣金'] || row['*佣金'] || 0;
-        const note = row['备注'] || row['*备注'] || "";
-        const rawProductName = row['商品'] || row['商品名称'] || row['*商品名称'];
-        let shopName = row['平台店铺'] || row['店铺'] || row['*店铺'] || row['所属门店'] || "";
-        const shopAddress = row['配送门店'] || row['门店地址'] || row['店铺地址'] || row['发货地址'] || row['收件地址'] || row['取货地址'] || "";
-        const platformOrderId = row['订单编号'] || row['平台单号'] || row['*平台单号'] || row['订单号'];
-        const dailySerial = row['原流水号'] || row['流水号'] || row['日流水号'] || "";
+        const payment = pickRowValue(row, ['用户实付金额', '实付', '*实付', '实际支付']) || 0;
+        const received = pickRowValue(row, ['商家实收金额', '到手金额', '*到手金额', '预计收入']) || 0;
+        const commission = pickRowValue(row, ['佣金', '*佣金']) || 0;
+        const note = normalizeText(pickRowValue(row, ['备注', '*备注']));
+        const rawProductName = normalizeText(pickRowValue(row, ['商品', '商品名称', '*商品名称']));
+        let shopName = normalizeText(pickRowValue(row, ['平台店铺', '店铺', '*店铺', '所属门店']));
+        const shopAddress = normalizeText(pickRowValue(row, ['配送门店', '门店地址', '店铺地址', '发货地址', '收件地址', '取货地址']));
+        const platformOrderId = normalizeText(pickRowValue(row, ['订单编号', '平台单号', '*平台单号', '订单号']));
+        const dailySerial = normalizeText(pickRowValue(row, ['原流水号', '流水号', '日流水号', '序号']));
 
         if (!dateStr || !rawProductName) {
           results.failed++;
