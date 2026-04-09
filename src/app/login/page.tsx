@@ -645,21 +645,29 @@ export default function LoginPage() {
                             返回密码登录
                         </button>
                     </div>
-                    
-                    <div className="relative group/input">
-                      <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        className="w-full rounded-2xl bg-white/5 font-mono text-2xl tracking-[0.5em] text-center py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/20"
-                        placeholder="000000"
-                        autoFocus
-                      />
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <label className="text-[11px] uppercase tracking-[0.24em] font-bold text-primary/80">验证码</label>
+                        <span className="text-[11px] text-muted-foreground">请输入 6 位数字</span>
+                      </div>
+                      <div className="relative group/input">
+                        <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/55 group-focus-within/input:text-primary transition-colors" size={18} />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          required
+                          maxLength={6}
+                          value={code}
+                          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          className="w-full rounded-2xl border-2 border-primary/25 bg-primary/[0.08] py-4 pl-12 pr-4 text-center font-mono text-[28px] tracking-[0.35em] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition-all placeholder:text-primary/25 hover:border-primary/35 focus:border-primary/70 focus:bg-primary/[0.12] focus:ring-4 focus:ring-primary/15"
+                          placeholder="000000"
+                          autoFocus
+                        />
+                      </div>
                     </div>
-                    
+
                     <div className="flex justify-center">
                         {timer > 0 ? (
                             <div className="text-xs text-muted-foreground bg-secondary/50 px-4 py-2 rounded-full flex items-center gap-2">
@@ -725,21 +733,29 @@ export default function LoginPage() {
                             返回登录
                         </button>
                     </div>
-                    
-                    <div className="relative group/input">
-                      <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within/input:text-primary transition-colors" size={18} />
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        className="w-full rounded-2xl bg-white/5 font-mono text-2xl tracking-[0.5em] text-center py-4 text-foreground outline-none border border-white/10 transition-all focus:bg-white/10 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/20"
-                        placeholder="000000"
-                        autoFocus
-                      />
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <label className="text-[11px] uppercase tracking-[0.24em] font-bold text-primary/80">验证码</label>
+                        <span className="text-[11px] text-muted-foreground">请输入 6 位数字</span>
+                      </div>
+                      <div className="relative group/input">
+                        <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/55 group-focus-within/input:text-primary transition-colors" size={18} />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          required
+                          maxLength={6}
+                          value={code}
+                          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          className="w-full rounded-2xl border-2 border-primary/25 bg-primary/[0.08] py-4 pl-12 pr-4 text-center font-mono text-[28px] tracking-[0.35em] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] outline-none transition-all placeholder:text-primary/25 hover:border-primary/35 focus:border-primary/70 focus:bg-primary/[0.12] focus:ring-4 focus:ring-primary/15"
+                          placeholder="000000"
+                          autoFocus
+                        />
+                      </div>
                     </div>
-                    
+
                     <div className="flex justify-center">
                         {timer > 0 ? (
                             <div className="text-xs text-muted-foreground bg-secondary/50 px-4 py-2 rounded-full flex items-center gap-2">
