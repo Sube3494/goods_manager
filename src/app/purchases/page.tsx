@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
-import { Plus, Search, ShoppingBag, Calendar, Trash2, Truck, Eye, Copy, ExternalLink, RotateCcw, X, Store } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
-import { PurchaseOrder, PurchaseStatus, User as UserType } from "@/lib/types";
+import { PurchaseOrder, User as UserType } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ImageGallery } from "@/components/ui/ImageGallery";
@@ -14,35 +14,16 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import { PurchaseFilters } from "@/components/Purchases/PurchaseFilters";
+import { PurchaseStatusBadge } from "@/components/Purchases/PurchaseStatusBadge";
+import { PurchaseTrackingList } from "@/components/Purchases/PurchaseTrackingList";
 
 
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
-import { pinyinMatch, sortPurchaseItems } from "@/lib/pinyin";
-
-const COURIER_CODES: Record<string, string> = {
-  "顺丰速运": "shunfeng",
-  "圆通速递": "yuantong",
-  "中通快递": "zhongtong",
-  "中通快运": "zhongtongkuaiyun",
-  "申通快递": "shentong",
-  "韵达快递": "yunda",
-  "极兔速递": "jtexpress",
-  "EMS": "ems",
-  "邮政快递": "youzhengguonei",
-  "京东快递": "jd",
-  "德邦快递": "debangwuliu",
-  "安能物流": "annengwuliu",
-  "跨越速运": "kuayue",
-  "优速快递": "yousu"
-};
-
-const getTrackingUrl = (num: string, courierName?: string) => {
-  const code = courierName ? COURIER_CODES[courierName] : "";
-  if (!num || !code) return null;
-  return `https://www.kuaidi100.com/chaxun?com=${code}&nu=${num.trim()}`;
-};
+import { sortPurchaseItems } from "@/lib/pinyin";
+import { filterPurchases, isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
 
 function PurchasesContent() {
   const [isPending, startTransition] = useTransition();
@@ -62,7 +43,7 @@ function PurchasesContent() {
 
   const [detailReadOnly, setDetailReadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [statusFilter, setStatusFilter] = useState<PurchaseStatusFilter>("All");
   const [shopFilter, setShopFilter] = useState<string>("All");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -137,7 +118,10 @@ function PurchasesContent() {
         // Sync filter from URL on mount
         const statusParam = searchParams.get('status');
         if (statusParam) {
-            setStatusFilter(statusParam === 'Ordered' ? 'Confirmed' : statusParam);
+            const normalizedStatus = statusParam === "Ordered" ? "Confirmed" : statusParam;
+            if (isPurchaseStatusFilter(normalizedStatus)) {
+              setStatusFilter(normalizedStatus);
+            }
         }
     });
     return () => cancelAnimationFrame(handle);
@@ -163,7 +147,7 @@ function PurchasesContent() {
   }, [searchParams, purchases, router, pathname]);
 
 
-  const handleStatusFilterChange = (status: string) => {
+  const handleStatusFilterChange = (status: PurchaseStatusFilter) => {
     startTransition(() => {
       setStatusFilter(status);
     });
@@ -175,26 +159,6 @@ function PurchasesContent() {
         params.set('status', status);
     }
     router.replace(`${pathname}?${params.toString()}`);
-  };
-
-  const getStatusColor = (status: PurchaseStatus) => {
-    switch (status) {
-      case "Received": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
-      case "Shipped": return "bg-orange-500/10 text-orange-500 border-orange-500/20";
-      case "Confirmed":
-      case "Ordered": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      default: return "bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
-    }
-  };
-
-  const getStatusLabel = (status: PurchaseStatus) => {
-    switch (status) {
-      case "Received": return "已入库";
-      case "Shipped": return "运输中";
-      case "Confirmed":
-      case "Ordered": return "已下单";
-      default: return "草稿";
-    }
   };
 
   const handleCreate = () => {
@@ -291,49 +255,7 @@ function PurchasesContent() {
   };
 
   const filteredPurchases = useMemo(() => {
-    return purchases.filter(p => {
-      const query = searchQuery.trim();
-      if (!query) {
-        let matchesStatus = statusFilter === 'All';
-        if (!matchesStatus) {
-          if (statusFilter === 'Confirmed') {
-            matchesStatus = p.status === 'Confirmed' || (p.status as string) === 'Ordered';
-          } else {
-            matchesStatus = p.status === statusFilter;
-          }
-        }
-        
-        let matchesShop = shopFilter === 'All';
-        if (!matchesShop) {
-            matchesShop = p.shopName === shopFilter;
-        }
-        return matchesStatus && matchesShop;
-      }
-
-      const matchesId = pinyinMatch(p.id, query);
-      const matchesSupplier = p.items.some(item => 
-        item.supplier?.name && pinyinMatch(item.supplier.name, query)
-      );
-      const matchesProduct = p.items.some(item =>
-        item.product?.name && pinyinMatch(item.product.name, query)
-      );
-      let matchesStatus = statusFilter === 'All';
-      if (!matchesStatus) {
-        if (statusFilter === 'Confirmed') {
-          matchesStatus = p.status === 'Confirmed' || (p.status as string) === 'Ordered';
-        } else {
-          matchesStatus = p.status === statusFilter;
-        }
-      }
-      
-      let matchesShop = shopFilter === 'All';
-      if (!matchesShop) {
-          matchesShop = p.shopName === shopFilter;
-      }
-      
-      const queryMatch = matchesId || matchesSupplier || matchesProduct || (p.shopName && pinyinMatch(p.shopName, query));
-      return queryMatch && matchesStatus && matchesShop;
-    });
+    return filterPurchases(purchases, { searchQuery, statusFilter, shopFilter });
   }, [purchases, searchQuery, statusFilter, shopFilter]);
 
   const totalItems = filteredPurchases.length;
@@ -600,6 +522,11 @@ function PurchasesContent() {
     }
   }, [filteredPurchases, showToast, typedUser?.shippingAddresses]);
 
+  const handleCopyTrackingNumber = useCallback((trackingNumber: string, compact = false) => {
+    navigator.clipboard.writeText(trackingNumber);
+    showToast(compact ? "单号已复制" : "单号已复制到剪贴板", "success");
+  }, [showToast]);
+
 
 
 
@@ -627,7 +554,7 @@ function PurchasesContent() {
               onClick={handleCreate}
               className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all active:scale-95"
             >
-              <Plus size={16} className="md:w-[18px] md:h-[18px]" />
+              <Plus size={16} className="md:w-4.5 md:h-4.5" />
               新建采购单
             </button>
           </div>
@@ -638,98 +565,17 @@ function PurchasesContent() {
 
       </div>
 
-      {/* Search Box & Reset */}
-      <div className="flex flex-row items-center gap-3 mb-6 md:mb-8">
-        <div className="h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
-            <Search size={18} className="text-muted-foreground shrink-0" />
-            <input
-            type="text"
-            placeholder="搜索采购记录..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
-            />
-            {searchQuery && (
-                <button 
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"
-                >
-                    <X size={14} />
-                </button>
-            )}
-        </div>
-
-        {hasActiveFilters && (
-            <button
-                onClick={resetFilters}
-                className="h-11 px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-            >
-                <RotateCcw size={14} />
-                <span>重置</span>
-            </button>
-        )}
-      </div>
-
-      {/* Optimized Filter Zone */}
-      <div className="flex flex-col gap-4 mb-6 md:mb-8 bg-white/40 dark:bg-white/5 p-4 rounded-2xl border border-border/50 shadow-sm backdrop-blur-sm">
-          {/* Row 1: Shop Filter */}
-          {(() => {
-              const uniqueShops = Array.from(new Set(purchases.map(p => p.shopName).filter(Boolean))) as string[];
-              if (uniqueShops.length === 0) return null;
-              return (
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2 shrink-0 opacity-50">归属店铺</span>
-                      <button
-                        onClick={() => setShopFilter("All")}
-                        className={cn(
-                            "px-3 h-7 rounded-full text-[11px] font-bold transition-all whitespace-nowrap border",
-                            shopFilter === "All"
-                                ? "bg-secondary text-secondary-foreground border-secondary shadow-sm"
-                                : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80"
-                        )}
-                      >
-                        全部
-                      </button>
-                      {uniqueShops.map(shop => (
-                          <button
-                            key={shop}
-                            onClick={() => setShopFilter(shop)}
-                            className={cn(
-                                "px-3 h-7 rounded-full text-[11px] font-bold transition-all whitespace-nowrap border",
-                                shopFilter === shop
-                                    ? "bg-secondary text-secondary-foreground border-secondary shadow-sm"
-                                    : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80"
-                            )}
-                          >
-                            {shop}
-                          </button>
-                      ))}
-                  </div>
-              );
-          })()}
-
-          {/* Row 2: Status Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-3 border-t border-border/30">
-              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mr-2 shrink-0 opacity-50">单据状态</span>
-              {['All', 'Confirmed', 'Shipped', 'Received', 'Draft'].map(status => (
-                  <button
-                    key={status}
-                    onClick={() => handleStatusFilterChange(status)}
-                    className={cn(
-                        "px-3.5 h-8 rounded-full text-xs font-bold transition-all whitespace-nowrap border",
-                        statusFilter === status 
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm" 
-                            : "bg-white dark:bg-white/10 border-border dark:border-white/10 text-muted-foreground hover:bg-muted/80"
-                    )}
-                  >
-                    {status === 'All' ? '全部' : 
-                     status === 'Confirmed' ? '已下单' :
-                     status === 'Shipped' ? '运输中' :
-                     status === 'Received' ? '已入库' : '草稿'}
-                  </button>
-              ))}
-          </div>
-      </div>
+      <PurchaseFilters
+        purchases={purchases}
+        searchQuery={searchQuery}
+        statusFilter={statusFilter}
+        shopFilter={shopFilter}
+        hasActiveFilters={hasActiveFilters}
+        onSearchChange={setSearchQuery}
+        onStatusChange={handleStatusFilterChange}
+        onShopChange={setShopFilter}
+        onReset={resetFilters}
+      />
 
       {/* Table/List View */}
       {/* Desktop Table View */}
@@ -741,7 +587,7 @@ function PurchasesContent() {
                <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
             </div>
           ) : paginatedPurchases.length > 0 ? (
-          <table className="w-full text-left border-collapse min-w-[800px] table-auto">
+          <table className="w-full text-left border-collapse min-w-200 table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">单据编号</th>
@@ -785,9 +631,7 @@ function PurchasesContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(po.status)}`}>
-                        {getStatusLabel(po.status)}
-                      </span>
+                      <PurchaseStatusBadge status={po.status} />
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -798,49 +642,11 @@ function PurchasesContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                        <div className="flex flex-col gap-1.5 min-w-[140px] max-w-[200px] mx-auto">
-                          {(po.trackingData && po.trackingData.length > 0) ? (
-                            po.trackingData.map((td, idx) => (
-                              <div 
-                                key={idx} 
-                                className="flex items-center gap-2 text-[10px] text-orange-500 font-mono bg-orange-500/5 px-2 py-0.5 rounded-md border border-orange-500/10 group/item relative overflow-hidden"
-                              >
-                                <Truck size={10} className="shrink-0" />
-                                <span className="opacity-70 shrink-0 whitespace-nowrap">{td.courier}:</span>
-                                <span className="font-bold truncate min-w-0">{td.number}</span>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigator.clipboard.writeText(td.number);
-                                    showToast("单号已复制到剪贴板", "success");
-                                  }}
-                                  className="p-0.5 hover:bg-orange-500/20 rounded"
-                                  title="复制单号"
-                                >
-                                  <Copy size={10} />
-                                </button>
-                                {(() => {
-                                  const url = getTrackingUrl(td.number, td.courier);
-                                  if (!url) return null;
-                                  return (
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.open(url, '_blank');
-                                      }}
-                                      className="p-0.5 hover:bg-orange-500/20 rounded"
-                                      title="追踪查询"
-                                    >
-                                      <ExternalLink size={10} />
-                                    </button>
-                                  );
-                                })()}
-                              </div>
-                            ))
-                          ) : (
-                            po.status !== "Draft" && <span className="text-[10px] text-muted-foreground opacity-30 italic">暂由仓库处理中</span>
-                          )}
-                        </div>
+                        <PurchaseTrackingList
+                          trackingData={po.trackingData}
+                          status={po.status}
+                          onCopy={handleCopyTrackingNumber}
+                        />
                     </td>
                     <td className="px-6 py-4 text-center whitespace-nowrap">
                       <div className="flex justify-center items-center gap-3">
@@ -876,7 +682,7 @@ function PurchasesContent() {
                  <ShoppingBag size={40} strokeWidth={1.5} />
                </div>
                <h3 className="text-xl font-bold text-foreground">暂无采购记录</h3>
-               <p className="text-muted-foreground text-sm mt-2 max-w-[280px] leading-relaxed">
+               <p className="text-muted-foreground text-sm mt-2 max-w-70 leading-relaxed">
                  {searchQuery || statusFilter !== 'All' ? '当前筛选条件下没有找到记录，尝试调整筛选或搜索关键词。' : '还没有采购记录，点击右上角“新建采购单”开始。'}
                </p>
             </div>
@@ -912,9 +718,7 @@ function PurchasesContent() {
                             {po.id}
                           </span>
                        </div>
-                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(po.status)}`}>
-                      {getStatusLabel(po.status)}
-                   </span>
+                   <PurchaseStatusBadge status={po.status} />
                 </div>
                 
                 {/* Card Body */}
@@ -938,52 +742,12 @@ function PurchasesContent() {
                     {po.trackingData && po.trackingData.length > 0 && (
                       <div className="pt-2 border-t border-border/10 space-y-1.5">
                           <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">物流包裹 ({po.trackingData.length})</span>
-                          <div className="grid grid-cols-1 gap-1.5">
-                            {po.trackingData.map((td, idx) => (
-                              <div 
-                                  key={idx} 
-                                  className="flex justify-between items-center bg-orange-500/5 px-3 py-2 rounded-lg border border-orange-500/10 group/mob-item"
-                                  onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(td.number);
-                                      showToast("单号已复制", "success");
-                                  }}
-                              >
-                                  <div className="flex items-center gap-2 text-orange-500 font-mono text-[10px] min-w-0 flex-1">
-                                      <Truck size={12} className="shrink-0" />
-                                      <span className="shrink-0 whitespace-nowrap">{td.courier}:</span>
-                                      <span className="truncate font-bold">{td.number}</span>
-                                  </div>
-                                      <div className="flex items-center gap-2 opacity-40 group-hover/mob-item:opacity-100 transition-opacity">
-                                          {(() => {
-                                              const url = getTrackingUrl(td.number, td.courier);
-                                              if (!url) return null;
-                                              return (
-                                                  <button
-                                                      onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          window.open(url, '_blank');
-                                                      }}
-                                                      className="p-1"
-                                                  >
-                                                      <ExternalLink size={12} className="text-orange-500" />
-                                                  </button>
-                                              );
-                                          })()}
-                                          <button
-                                              onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  navigator.clipboard.writeText(td.number);
-                                                  showToast("单号已复制到剪贴板", "success");
-                                              }}
-                                              className="p-1"
-                                          >
-                                              <Copy size={12} className="text-orange-500" />
-                                          </button>
-                                      </div>
-                              </div>
-                            ))}
-                          </div>
+                          <PurchaseTrackingList
+                            trackingData={po.trackingData}
+                            status={po.status}
+                            compact
+                            onCopy={handleCopyTrackingNumber}
+                          />
                       </div>
                     )}
                 </div>
@@ -1016,7 +780,7 @@ function PurchasesContent() {
                  <ShoppingBag size={32} />
                </div>
                <h3 className="text-lg font-bold text-foreground">暂无采购记录</h3>
-               <p className="text-muted-foreground text-xs mt-1 max-w-[240px]">
+               <p className="text-muted-foreground text-xs mt-1 max-w-60">
                  {searchQuery || statusFilter !== 'All' ? '未找到匹配结果，尝试更改筛选条件或搜索关键词。' : '您目前还没有任何采购订单，立即创建一个吧。'}
                </p>
               </div>

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "npx tsc --module commonjs --target es2020 --outDir tmp/purchase-tests --esModuleInterop --skipLibCheck src/lib/pinyin.ts src/lib/types.ts src/lib/purchases.ts scripts/purchases.test.ts && node tmp/purchase-tests/scripts/purchases.test.js",
     "audit:brush-cleanup": "node scripts/audit_brush_inventory_cleanup.js"
   },
   "dependencies": {
