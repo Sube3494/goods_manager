@@ -378,9 +378,15 @@ export default function BrushCenterPage() {
     return source.filter((item) => !startBoundary || item.dateKey >= startBoundary);
   }, [dashboardData.orderDaily, dashboardData.orderDailyByShop, selectedRange, selectedShop]);
 
+  const selectedRangeLimit = useMemo(() => {
+    if (selectedRange === "all") return undefined;
+    const days = Number(selectedRange);
+    return Number.isFinite(days) ? days : undefined;
+  }, [selectedRange]);
+
   const orderTrendData = useMemo(
-    () => filteredOrderDaily.slice(-14),
-    [filteredOrderDaily]
+    () => (selectedRangeLimit ? filteredOrderDaily.slice(-selectedRangeLimit) : filteredOrderDaily),
+    [filteredOrderDaily, selectedRangeLimit]
   );
 
   const expenseTrendByShop = useMemo(() => {
@@ -407,10 +413,10 @@ export default function BrushCenterPage() {
       shops: topShops,
       data: Array.from(byDate.entries())
         .sort(([a], [b]) => a.localeCompare(b))
-        .slice(-14)
+        .slice(selectedRangeLimit ? -selectedRangeLimit : undefined)
         .map(([, value]) => value),
     };
-  }, [dashboardData.orderDailyByShop]);
+  }, [dashboardData.orderDailyByShop, selectedRangeLimit]);
 
   const orderChartHighlights = useMemo(() => {
     if (orderTrendData.length === 0) return [];
