@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
@@ -49,6 +50,12 @@ type ImportedShopPayload = {
   name: string;
   address: string;
   externalId?: string | null;
+};
+
+type ImportLocateFailure = {
+  name: string;
+  address: string;
+  reason: string;
 };
 
 type PendingDeleteAction =
@@ -409,8 +416,10 @@ export function StoreDispatchMap({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isImportingShops, setIsImportingShops] = useState(false);
   const [, setImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [importLocateFailures, setImportLocateFailures] = useState<ImportLocateFailure[]>([]);
   const [isShopListOpen, setIsShopListOpen] = useState(false);
   const [shopSearchQuery, setShopSearchQuery] = useState("");
+  const [shopLocationFilter, setShopLocationFilter] = useState<"all" | "resolved" | "pending">("all");
   const [isBulkManageMode, setIsBulkManageMode] = useState(false);
   const [selectedShopIds, setSelectedShopIds] = useState<string[]>([]);
   const [isDeletingShops, setIsDeletingShops] = useState(false);
@@ -470,9 +479,16 @@ export function StoreDispatchMap({
 
   const searchedShops = useMemo(() => {
     const keyword = shopSearchQuery.trim().toLowerCase();
-    if (!keyword) return shops;
-
     return shops.filter((shop) => {
+      const hasResolvedLocation = typeof shop.longitude === "number" && typeof shop.latitude === "number";
+      const matchesLocationFilter =
+        shopLocationFilter === "all" ||
+        (shopLocationFilter === "resolved" && hasResolvedLocation) ||
+        (shopLocationFilter === "pending" && !hasResolvedLocation);
+
+      if (!matchesLocationFilter) return false;
+      if (!keyword) return true;
+
       const region = extractRegionParts(shop);
       return [
         shop.name,
@@ -484,7 +500,7 @@ export function StoreDispatchMap({
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword));
     });
-  }, [shopSearchQuery, shops]);
+  }, [shopLocationFilter, shopSearchQuery, shops]);
 
   const cityOptions = useMemo(() => {
     if (!activeProvince || activeProvince === ALL_REGIONS) return [ALL_REGIONS];
@@ -1597,6 +1613,7 @@ export function StoreDispatchMap({
         }
 
         const createdShops = Array.isArray(result.shops) ? (result.shops as ImportedShopPayload[]) : [];
+        const locateFailures: ImportLocateFailure[] = [];
         let autoLocated = 0;
 
         setImportProgress({ current: 0, total: createdShops.length });
@@ -1604,12 +1621,22 @@ export function StoreDispatchMap({
         for (const shop of createdShops) {
           const keyword = String(shop.address || shop.name || "").trim();
           if (!keyword) {
+            locateFailures.push({
+              name: shop.name,
+              address: shop.address || "",
+              reason: "缺少可解析地址",
+            });
             setImportProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
             continue;
           }
 
           const matched = await resolveShopCoordinates(keyword);
           if (!matched) {
+            locateFailures.push({
+              name: shop.name,
+              address: shop.address || "",
+              reason: "地址未匹配到坐标",
+            });
             setImportProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
             continue;
           }
@@ -1633,14 +1660,21 @@ export function StoreDispatchMap({
 
           if (updateRes.ok) {
             autoLocated += 1;
+          } else {
+            locateFailures.push({
+              name: shop.name,
+              address: shop.address || "",
+              reason: "坐标保存失败",
+            });
           }
           setImportProgress((prev) => prev ? { ...prev, current: prev.current + 1 } : null);
         }
 
         await fetchShops();
+        setImportLocateFailures(locateFailures);
         showToast(
-          `导入完成：新增 ${result.created ?? 0} 条，自动定位 ${autoLocated} 条，跳过 ${result.skipped ?? 0} 条`,
-          "success"
+          `导入完成：新增 ${result.created ?? 0} 条，自动定位 ${autoLocated} 条，跳过 ${result.skipped ?? 0} 条${locateFailures.length > 0 ? `，另有 ${locateFailures.length} 条待处理` : ""}`,
+          locateFailures.length > 0 ? "info" : "success"
         );
       } catch (error) {
         console.error("Failed to import shops:", error);
@@ -1997,20 +2031,36 @@ export function StoreDispatchMap({
             mapStyle={`amap://styles/${mapTheme}`}
             className="h-full min-h-[520px] overflow-hidden rounded-[24px] border-0 bg-white sm:min-h-[620px] sm:rounded-[28px]"
           />
-          {isShopListOpen && (
-            <aside className="absolute inset-x-3 bottom-3 top-auto z-20 flex max-h-[55dvh] flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background/96 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:left-3 sm:top-3 sm:h-[calc(100%-1.5rem)] sm:max-h-none sm:w-[320px] sm:max-w-[calc(100%-1.5rem)]">
+          {isShopListOpen &&
+            createPortal(
+              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                <div
+                  className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                  onClick={() => setIsShopListOpen(false)}
+                />
+                <aside className="relative z-10 flex h-[min(78dvh,760px)] w-full max-w-[420px] flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background shadow-2xl backdrop-blur-xl sm:rounded-[28px]">
               <div className="border-b border-border/60 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-black text-foreground">店铺列表</div>
                     <div className="mt-1 text-xs text-muted-foreground">搜索、定位并修改店铺信息</div>
                   </div>
-                  <button
-                    onClick={() => setIsShopListOpen(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <X size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {!isBulkManageMode && (
+                      <button
+                        onClick={() => setIsBulkManageMode(true)}
+                        className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-3 text-[11px] font-bold text-foreground transition-all hover:bg-muted"
+                      >
+                        批量删除
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsShopListOpen(false)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="relative mt-3">
@@ -2026,15 +2076,30 @@ export function StoreDispatchMap({
                   />
                 </div>
 
-                <div className="mt-3">
-                  {!isBulkManageMode ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {[
+                    { value: "all", label: "全部" },
+                    { value: "resolved", label: "已定位" },
+                    { value: "pending", label: "待处理" },
+                  ].map((filter) => (
                     <button
-                      onClick={() => setIsBulkManageMode(true)}
-                      className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-bold text-foreground transition-all hover:bg-muted"
+                      key={filter.value}
+                      type="button"
+                      onClick={() => setShopLocationFilter(filter.value as "all" | "resolved" | "pending")}
+                      className={cn(
+                        "inline-flex h-8 items-center justify-center rounded-full px-3 text-xs font-bold transition-all",
+                        shopLocationFilter === filter.value
+                          ? "bg-primary/12 text-primary ring-1 ring-primary/20"
+                          : "border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
                     >
-                      批量删除
+                      {filter.label}
                     </button>
-                  ) : (
+                  ))}
+                </div>
+
+                <div className="mt-3">
+                  {isBulkManageMode && (
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => {
@@ -2074,6 +2139,23 @@ export function StoreDispatchMap({
                     </div>
                   )}
                 </div>
+
+                <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/70 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    </span>
+                    已定位
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500/70 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                    </span>
+                    待处理
+                  </div>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-3">
@@ -2081,6 +2163,7 @@ export function StoreDispatchMap({
                   {searchedShops.map((shop) => {
                     const region = extractRegionParts(shop);
                     const isSelected = selectedShopIds.includes(shop.id);
+                    const hasResolvedLocation = typeof shop.longitude === "number" && typeof shop.latitude === "number";
                     return (
                       <div
                         key={shop.id}
@@ -2110,11 +2193,35 @@ export function StoreDispatchMap({
                               </button>
                             )}
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-base font-bold text-foreground" title={shop.name}>
-                                {shop.name}
+                              <div className="flex items-center gap-2">
+                                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                                  <span
+                                    className={cn(
+                                      "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                                      hasResolvedLocation ? "bg-emerald-500/70" : "bg-red-500/70"
+                                    )}
+                                  />
+                                  <span
+                                    className={cn(
+                                      "relative inline-flex h-2.5 w-2.5 rounded-full",
+                                      hasResolvedLocation ? "bg-emerald-500" : "bg-red-500"
+                                    )}
+                                  />
+                                </span>
+                                <div className="truncate text-base font-bold text-foreground" title={shop.name}>
+                                  {shop.name}
+                                </div>
                               </div>
-                              <div className="mt-1 text-xs text-muted-foreground">
+                              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                                 {region.regionLabel || "未分类"}
+                                <span className={cn(
+                                  "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                                  hasResolvedLocation
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-red-500/10 text-red-500"
+                                )}>
+                                  {hasResolvedLocation ? "定位正常" : "待定位"}
+                                </span>
                               </div>
                               {shop.externalId && (
                                 <div className="mt-2 inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
@@ -2168,8 +2275,10 @@ export function StoreDispatchMap({
                   )}
                 </div>
               </div>
-            </aside>
-          )}
+                </aside>
+              </div>,
+              document.body
+            )}
           {(targetPoint || results.length > 0 || isResolvingRoutes) && renderRouteResults()}
         </div>
       </div>
@@ -2214,6 +2323,31 @@ export function StoreDispatchMap({
       confirmLabel="确认删除"
       cancelLabel="取消"
       variant="danger"
+    />
+    <ConfirmModal
+      isOpen={importLocateFailures.length > 0}
+      onClose={() => setImportLocateFailures([])}
+      onConfirm={() => setImportLocateFailures([])}
+      title="部分店铺未定位"
+      message={
+        <div className="space-y-3 text-left">
+          <p>以下店铺本次导入后没有自动定位成功，你可以按名称逐个点“定位”继续处理。</p>
+          <div className="max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-border/60 bg-muted/20 p-3 text-sm">
+            {importLocateFailures.map((item, index) => (
+              <div key={`${item.name}-${index}`} className="rounded-xl border border-border/50 bg-background/80 p-3">
+                <div className="font-bold text-foreground">{item.name}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{item.reason}</div>
+                {item.address && (
+                  <div className="mt-2 text-xs leading-5 text-muted-foreground">{item.address}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      }
+      confirmLabel="知道了"
+      cancelLabel="关闭"
+      variant="info"
     />
   </>
   );
