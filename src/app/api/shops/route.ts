@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 
+function normalizeExternalId(value: unknown) {
+  return String(value || "").replace(/\s+/g, "").trim();
+}
+
 // GET: 获取所有店铺
 export async function GET() {
   try {
@@ -32,15 +36,28 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const normalizedExternalId = normalizeExternalId(externalId);
 
-    if (!name || !externalId || !address) {
+    if (!name || !normalizedExternalId || !address) {
       return NextResponse.json({ error: "Missing required shop fields" }, { status: 400 });
+    }
+
+    const duplicateShop = await prisma.shop.findFirst({
+      where: {
+        userId: user.id,
+        externalId: normalizedExternalId,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (duplicateShop) {
+      return NextResponse.json({ error: `POI_ID 已存在：${duplicateShop.name}` }, { status: 409 });
     }
 
     const newShop = await prisma.shop.create({
       data: {
         name,
-        externalId,
+        externalId: normalizedExternalId,
         address,
         province,
         city,

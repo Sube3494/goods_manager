@@ -487,5 +487,5 @@ model Shop {
 
   @@index([userId])
   @@index([province, city])
-  @@index([userId, externalId])
+  @@unique([userId, externalId])
 }

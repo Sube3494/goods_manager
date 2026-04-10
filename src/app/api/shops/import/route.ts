@@ -4,6 +4,10 @@ import { getAuthorizedUser } from "@/lib/auth";
 
 type RawShopRow = Record<string, unknown>;
 
+function normalizeExternalId(value: unknown) {
+  return String(value || "").replace(/\s+/g, "").trim();
+}
+
 function normalizeColumnKey(value: string) {
   return value
     .replace(/^\uFEFF/, "")
@@ -71,12 +75,12 @@ export async function POST(request: Request) {
     }
 
     const existingShops = await prisma.shop.findMany({
-      where: user.role === "SUPER_ADMIN" ? {} : { userId: user.id },
+      where: { userId: user.id },
       select: { name: true, address: true, externalId: true },
     });
 
     const existingExternalIds = new Set(
-      existingShops.map((s) => s.externalId).filter(Boolean)
+      existingShops.map((s) => normalizeExternalId(s.externalId)).filter(Boolean)
     );
     const existingKeys = new Set(
       existingShops.map((shop) => `${normalizeText(shop.name)}::${normalizeText(shop.address || "")}`)
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
       const address = getStringValue(row, ["详细地址", "门店地址", "地址", "address", "shop_address"]);
       const province = getStringValue(row, ["省份", "省", "province"]);
       const city = getStringValue(row, ["城市", "市", "city"]);
-      const poiId = getStringValue(row, [
+      const poiId = normalizeExternalId(getStringValue(row, [
         "POI_ID",
         "POI ID",
         "POIID",
@@ -104,7 +108,7 @@ export async function POST(request: Request) {
         "poi",
         "poi编号",
         "poi号",
-      ]);
+      ]));
 
       if (!name || !address || !poiId) {
         skipped += 1;
@@ -117,7 +121,7 @@ export async function POST(request: Request) {
       const cleanedName = simplifyShopName(name);
 
       // 优先用 POI_ID 做去重，更精准
-      if (poiId && existingExternalIds.has(poiId)) {
+      if (existingExternalIds.has(poiId)) {
         skipped += 1;
         continue;
       }

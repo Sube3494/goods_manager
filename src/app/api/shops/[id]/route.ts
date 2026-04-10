@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 
+function normalizeExternalId(value: unknown) {
+  return String(value || "").replace(/\s+/g, "").trim();
+}
+
 export async function PUT(request: Request, context: { params: { id: string } }) {
   try {
     const user = await getAuthorizedUser("logistics:manage");
@@ -12,8 +16,9 @@ export async function PUT(request: Request, context: { params: { id: string } })
     const { id } = await context.params;
     const body = await request.json();
     const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const normalizedExternalId = normalizeExternalId(externalId);
 
-    if (!name || !externalId || !address) {
+    if (!name || !normalizedExternalId || !address) {
       return NextResponse.json({ error: "Missing required shop fields" }, { status: 400 });
     }
 
@@ -29,11 +34,24 @@ export async function PUT(request: Request, context: { params: { id: string } })
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const duplicateShop = await prisma.shop.findFirst({
+      where: {
+        id: { not: id },
+        userId: existingShop.userId,
+        externalId: normalizedExternalId,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (duplicateShop) {
+      return NextResponse.json({ error: `POI_ID 已存在：${duplicateShop.name}` }, { status: 409 });
+    }
+
     const updatedShop = await prisma.shop.update({
       where: { id },
       data: {
         name,
-        externalId,
+        externalId: normalizedExternalId,
         address,
         province,
         city,
