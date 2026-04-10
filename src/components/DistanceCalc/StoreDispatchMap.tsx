@@ -48,6 +48,7 @@ type ImportedShopPayload = {
   id: string;
   name: string;
   address: string;
+  externalId?: string | null;
 };
 
 type PendingDeleteAction =
