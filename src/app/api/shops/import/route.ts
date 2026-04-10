@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     let created = 0;
     let skipped = 0;
     const errors: string[] = [];
-    const createdShops: Array<{ id: string; name: string; address: string }> = [];
+    const createdShops: Array<{ id: string; name: string; address: string; externalId: string }> = [];
 
     for (const row of shops as RawShopRow[]) {
       const name = getStringValue(row, ["门店名称", "店铺名称", "网点名称", "名称", "门店", "shopName", "shop_name"]);
@@ -149,6 +149,7 @@ export async function POST(request: Request) {
         id: createdShop.id,
         name: createdShop.name,
         address: createdShop.address || address,
+        externalId: createdShop.externalId || poiId,
       });
     }
 
