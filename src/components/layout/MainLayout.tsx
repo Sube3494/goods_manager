@@ -160,10 +160,15 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             />
             <main className={cn(
                 "flex-1 w-full",
-                !isFullScreenPage && (isWideCanvasPage ? "pt-2 px-0 pb-0 safe-bottom" : "pt-4 px-4 sm:px-6 lg:px-10 pb-10 safe-bottom"),
+                !isFullScreenPage && (
+                  isWideCanvasPage
+                    ? "flex min-h-0 flex-col pt-2 px-0 pb-0 safe-bottom"
+                    : "pt-4 px-4 sm:px-6 lg:px-10 pb-10 safe-bottom"
+                ),
             )}>
                 <div className={cn(
-                    "h-full animate-fade-in",
+                    "animate-fade-in",
+                    isWideCanvasPage ? "flex min-h-0 flex-1 flex-col" : "h-full",
                     !isFullScreenPage && !isWideCanvasPage && "mx-auto max-w-7xl"
                 )}>
                     {isLoading && !isFullScreenPage ? (

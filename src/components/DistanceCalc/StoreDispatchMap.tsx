@@ -1906,7 +1906,7 @@ export function StoreDispatchMap({
 
   return (
     <>
-    <div className="flex h-full min-h-0 w-full flex-col bg-background text-foreground">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-background text-foreground">
       <style>{markerStyles}</style>
       <div className="shrink-0 border-b border-border/60 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -2026,7 +2026,7 @@ export function StoreDispatchMap({
       </div>
 
       <div className="min-h-0 flex-1 p-3 pt-3 sm:p-5 sm:pt-4">
-        <div className="relative h-full min-h-[520px] overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:min-h-[620px] sm:rounded-[28px]">
+        <div className="relative h-full min-h-[520px] overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:min-h-[calc(100dvh-16rem)] sm:rounded-[28px]">
           <BareAmapTest
             showDebug={false}
             center={DEFAULT_CENTER}
@@ -2035,7 +2035,7 @@ export function StoreDispatchMap({
             onReady={handleMapReady}
             onDestroy={handleMapDestroy}
             mapStyle={`amap://styles/${mapTheme}`}
-            className="h-full min-h-[520px] overflow-hidden rounded-[24px] border-0 bg-white sm:min-h-[620px] sm:rounded-[28px]"
+            className="h-full min-h-[520px] overflow-hidden rounded-[24px] border-0 bg-white sm:min-h-[calc(100dvh-16rem)] sm:rounded-[28px]"
           />
           {isShopListOpen &&
             createPortal(

@@ -57,7 +57,7 @@ export default function DistanceCalcPage() {
   }
 
   return (
-    <div className="h-full flex min-h-0 flex-col animate-in fade-in duration-700">
+    <div className="flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] min-h-[calc(100vh-3.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] flex-1 flex-col animate-in fade-in duration-700">
       <div className="flex flex-col sm:flex-row items-baseline justify-between gap-1.5 shrink-0 px-4 sm:px-6 lg:px-8 pt-2 pb-1.5">
         <div className="min-w-0 flex-1">
           <h1 className="text-[1.75rem] sm:text-[2.1rem] leading-none font-black tracking-tight text-foreground truncate">
@@ -70,7 +70,7 @@ export default function DistanceCalcPage() {
       </div>
 
       <div className={cn(
-        "flex-1 min-h-0 rounded-none border-y border-border/60 bg-white/5 shadow-sm overflow-hidden backdrop-blur-xl relative lg:rounded-[32px] lg:border lg:mx-4 lg:mb-4",
+        "flex min-h-0 flex-1 flex-col rounded-none border-y border-border/60 bg-white/5 shadow-sm overflow-hidden backdrop-blur-xl relative lg:rounded-[32px] lg:border lg:mx-4 lg:mb-4",
       )}>
         <StoreDispatchMap initialStores={[]} />
       </div>
