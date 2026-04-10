@@ -2039,7 +2039,7 @@ export function StoreDispatchMap({
           />
           {isShopListOpen &&
             createPortal(
-              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                 <div
                   className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                   onClick={() => setIsShopListOpen(false)}
