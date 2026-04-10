@@ -27,6 +27,7 @@ export function StoreModal({
   title = "店铺信息",
 }: StoreModalProps) {
   const [formData, setFormData] = useState<Partial<Shop>>({
+    id: undefined,
     name: "",
     externalId: "",
     address: "",
@@ -38,6 +39,7 @@ export function StoreModal({
     if (isOpen) {
       if (initialData) {
         setFormData({
+          id: initialData.id,
           name: initialData.name || "",
           externalId: initialData.externalId || "",
           address: initialData.address || "",
@@ -45,6 +47,7 @@ export function StoreModal({
         });
       } else {
         setFormData({
+          id: undefined,
           name: "",
           externalId: "",
           address: "",

@@ -415,7 +415,7 @@ export function StoreDispatchMap({
   const [shops, setShops] = useState<Shop[]>(initialStores);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isImportingShops, setIsImportingShops] = useState(false);
-  const [, setImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [importLocateFailures, setImportLocateFailures] = useState<ImportLocateFailure[]>([]);
   const [isShopListOpen, setIsShopListOpen] = useState(false);
   const [shopSearchQuery, setShopSearchQuery] = useState("");
@@ -476,6 +476,12 @@ export function StoreDispatchMap({
     () => provinceOptions.map((province) => ({ value: province, label: province })),
     [provinceOptions]
   );
+
+  const importButtonLabel = useMemo(() => {
+    if (!isImportingShops) return "导入店铺";
+    if (!importProgress || importProgress.total <= 0) return "导入店铺中...";
+    return `导入中 ${Math.min(importProgress.current, importProgress.total)}/${importProgress.total}`;
+  }, [importProgress, isImportingShops]);
 
   const searchedShops = useMemo(() => {
     const keyword = shopSearchQuery.trim().toLowerCase();
@@ -2003,7 +2009,7 @@ export function StoreDispatchMap({
               className="inline-flex h-10 items-center justify-center gap-1.5 rounded-2xl border border-border bg-card px-3.5 text-sm font-medium transition-all hover:bg-muted disabled:opacity-60 max-sm:flex-1"
             >
               {isImportingShops ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-              导入店铺
+              {importButtonLabel}
             </button>
           </div>
         </div>
