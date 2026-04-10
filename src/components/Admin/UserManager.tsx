@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -9,6 +9,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { createPortal } from "react-dom";
 import { useUser } from "@/hooks/useUser";
 import { hasAdminAccess, SessionUser } from "@/lib/permissions";
+import { pinyinMatch } from "@/lib/pinyin";
 
 
 
@@ -203,6 +204,21 @@ export function UserManager() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingRemarkEntry, setEditingRemarkEntry] = useState<WhitelistEntry | null>(null);
   const [isSavingRemark, setIsSavingRemark] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredEntries = useMemo(() => {
+    const keyword = searchQuery.trim();
+    if (!keyword) return entries;
+
+    return entries.filter((entry) => {
+      const normalizedKeyword = keyword.toLowerCase();
+
+      return (
+        entry.email.toLowerCase().includes(normalizedKeyword) ||
+        pinyinMatch(entry.remark || "", keyword)
+      );
+    });
+  }, [entries, searchQuery]);
 
   const fetchData = useCallback(async () => {
     if (!canViewEntries) {
@@ -436,6 +452,17 @@ export function UserManager() {
         </div>
       )}
 
+      <div className="relative">
+        <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="搜索邮箱或备注"
+          className="h-11 w-full rounded-2xl border border-border bg-white dark:bg-white/5 pl-11 pr-4 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
+
       {/* Members Table - Desktop */}
       <div className="rounded-3xl border border-border bg-white dark:bg-gray-900/40 overflow-hidden shadow-sm flex-1">
         <div className="hidden md:block overflow-x-auto w-full">
@@ -456,10 +483,10 @@ export function UserManager() {
                     正在整理成员目录...
                   </td>
                 </tr>
-              ) : entries.length === 0 ? (
+              ) : filteredEntries.length === 0 ? (
                 <tr><td colSpan={4} className="py-20 text-center text-muted-foreground">暂无成员数据</td></tr>
               ) : (
-                entries.map((entry) => {
+                filteredEntries.map((entry) => {
                   const isRegistered = !!entry.user;
                   const roleName = isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name;
                   
@@ -551,10 +578,10 @@ export function UserManager() {
               <Loader2 className="animate-spin mx-auto mb-4 text-primary" size={32} />
               <p>正在整理成员目录...</p>
             </div>
-          ) : entries.length === 0 ? (
+          ) : filteredEntries.length === 0 ? (
             <div className="py-20 text-center text-muted-foreground">暂无成员数据</div>
           ) : (
-            entries.map((entry) => {
+            filteredEntries.map((entry) => {
               const isRegistered = !!entry.user;
               const roleName = isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name;
               
