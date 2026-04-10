@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { Loader2, X } from "lucide-react";
 
@@ -26,6 +27,7 @@ export function StoreModal({
   initialData,
   title = "店铺信息",
 }: StoreModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [formData, setFormData] = useState<Partial<Shop>>({
     id: undefined,
     name: "",
@@ -34,6 +36,11 @@ export function StoreModal({
     isSource: true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -57,7 +64,7 @@ export function StoreModal({
     }
   }, [isOpen, initialData]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +81,7 @@ export function StoreModal({
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
@@ -94,7 +101,7 @@ export function StoreModal({
             </div>
             <button
               onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
             >
               <X size={20} />
             </button>
@@ -169,6 +176,7 @@ export function StoreModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
