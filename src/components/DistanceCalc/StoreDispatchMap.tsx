@@ -3,12 +3,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
   Clock,
   Loader2,
   MapPin,
   Navigation,
   Plus,
   Search,
+  Trash2,
   Truck,
   Upload,
   X,
@@ -17,6 +19,7 @@ import { BareAmapTest } from "@/components/DistanceCalc/BareAmapTest";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { StoreModal } from "@/components/DistanceCalc/StoreModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +49,10 @@ type ImportedShopPayload = {
   name: string;
   address: string;
 };
+
+type PendingDeleteAction =
+  | { type: "single"; shop: Shop }
+  | { type: "bulk"; ids: string[] };
 
 interface DistanceResult {
   shopId: string;
@@ -403,6 +410,10 @@ export function StoreDispatchMap({
   const [, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [isShopListOpen, setIsShopListOpen] = useState(false);
   const [shopSearchQuery, setShopSearchQuery] = useState("");
+  const [isBulkManageMode, setIsBulkManageMode] = useState(false);
+  const [selectedShopIds, setSelectedShopIds] = useState<string[]>([]);
+  const [isDeletingShops, setIsDeletingShops] = useState(false);
+  const [pendingDeleteAction, setPendingDeleteAction] = useState<PendingDeleteAction | null>(null);
   const [targetQuery, setTargetQuery] = useState("");
   const [targetPoint, setTargetPoint] = useState<TargetPoint | null>(null);
   const [results, setResults] = useState<DistanceResult[]>([]);
@@ -520,6 +531,17 @@ export function StoreDispatchMap({
       return true;
     });
   }, [activeCity, activeProvince, shops]);
+
+  useEffect(() => {
+    setSelectedShopIds((prev) => prev.filter((id) => shops.some((shop) => shop.id === id)));
+  }, [shops]);
+
+  useEffect(() => {
+    if (!isShopListOpen) {
+      setIsBulkManageMode(false);
+      setSelectedShopIds([]);
+    }
+  }, [isShopListOpen]);
 
   const provinceScopedStores = useMemo(() => {
     if (!activeProvince || activeProvince === ALL_REGIONS) return shops;
@@ -1199,12 +1221,14 @@ export function StoreDispatchMap({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: shop.name,
+          externalId: shop.externalId,
           address: shop.address,
           province: components?.province || null,
           city: (typeof components?.city === "string" ? components.city : components?.province) || null,
           latitude: location[1],
           longitude: location[0],
           isSource: shop.isSource,
+          contactName: shop.contactName,
           contactPhone: shop.contactPhone,
           remark: shop.remark,
         }),
@@ -1596,6 +1620,7 @@ export function StoreDispatchMap({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: shop.name,
+              externalId: shop.externalId,
               address: shop.address,
               province: components?.province || null,
               city: (typeof components?.city === "string" ? components.city : components?.province) || null,
@@ -1660,6 +1685,58 @@ export function StoreDispatchMap({
       showToast(error instanceof Error ? error.message : "保存失败", "error");
     }
   }, [fetchShops, handleLocateShop, showToast]);
+
+  const executeDeleteShops = useCallback(async (ids: string[]) => {
+    if (!ids.length || isDeletingShops) return;
+    setIsDeletingShops(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          fetch(`/api/shops/${id}`, {
+            method: "DELETE",
+          })
+        )
+      );
+
+      const successCount = results.filter(
+        (result) => result.status === "fulfilled" && result.value.ok
+      ).length;
+      const failedCount = results.length - successCount;
+
+      await fetchShops();
+      setSelectedShopIds((prev) => prev.filter((id) => !ids.includes(id)));
+
+      if (successCount > 0) {
+        showToast(
+          failedCount > 0
+            ? `已删除 ${successCount} 家店铺，${failedCount} 家删除失败`
+            : `已删除 ${successCount} 家店铺`,
+          failedCount > 0 ? "info" : "success"
+        );
+      } else {
+        showToast("批量删除失败", "error");
+      }
+
+      if (successCount > 0 && failedCount === 0 && ids.length > 1) {
+        setIsBulkManageMode(false);
+      }
+    } catch (error) {
+      console.error("Failed to bulk delete shops:", error);
+      showToast("批量删除失败", "error");
+    } finally {
+      setIsDeletingShops(false);
+    }
+  }, [fetchShops, isDeletingShops, showToast]);
+
+  const handleBulkDeleteShops = useCallback(() => {
+    if (!selectedShopIds.length || isDeletingShops) return;
+    setPendingDeleteAction({ type: "bulk", ids: [...selectedShopIds] });
+  }, [isDeletingShops, selectedShopIds]);
+
+  const handleDeleteSingleShop = useCallback(async (shop: Shop) => {
+    if (isDeletingShops) return;
+    setPendingDeleteAction({ type: "single", shop });
+  }, [isDeletingShops]);
 
   const renderRouteResults = (mobile = false) => (
     <section
@@ -1947,40 +2024,116 @@ export function StoreDispatchMap({
                     className="h-10 w-full rounded-2xl border border-border bg-card px-9 pr-3 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
                   />
                 </div>
+
+                <div className="mt-3">
+                  {!isBulkManageMode ? (
+                    <button
+                      onClick={() => setIsBulkManageMode(true)}
+                      className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 text-xs font-bold text-foreground transition-all hover:bg-muted"
+                    >
+                      批量删除
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const visibleIds = searchedShops.map((shop) => shop.id);
+                          const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedShopIds.includes(id));
+                          setSelectedShopIds(allVisibleSelected ? [] : visibleIds);
+                        }}
+                        className={cn(
+                          "inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-bold transition-all",
+                          searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id))
+                            ? "bg-primary/12 text-primary ring-1 ring-primary/20"
+                            : "border border-border bg-card text-foreground hover:bg-muted"
+                        )}
+                      >
+                        {searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id)) ? "取消全选" : "全选当前列表"}
+                      </button>
+                      <div className="inline-flex h-9 items-center justify-center rounded-full bg-white/[0.04] px-4 text-xs font-medium text-muted-foreground">
+                        已选 <span className="mx-1 font-bold text-foreground">{selectedShopIds.length}</span> / 当前 {searchedShops.length}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsBulkManageMode(false);
+                          setSelectedShopIds([]);
+                        }}
+                        className="inline-flex h-9 items-center justify-center rounded-full px-3 text-xs font-medium text-muted-foreground transition-all hover:text-foreground"
+                      >
+                        退出
+                      </button>
+                      <button
+                        onClick={() => void handleBulkDeleteShops()}
+                        disabled={selectedShopIds.length === 0 || isDeletingShops}
+                        className="ml-auto inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-destructive/85 px-4 text-xs font-bold text-white transition-all hover:bg-destructive disabled:cursor-not-allowed disabled:bg-destructive/35 disabled:text-white/60"
+                      >
+                        {isDeletingShops ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        删除 ({selectedShopIds.length})
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-3">
                 <div className="space-y-2">
                   {searchedShops.map((shop) => {
                     const region = extractRegionParts(shop);
+                    const isSelected = selectedShopIds.includes(shop.id);
                     return (
                       <div
                         key={shop.id}
-                        className="rounded-2xl border border-border bg-card px-3 py-3"
+                        className={cn(
+                          "rounded-3xl border bg-card p-4 transition-all",
+                          isSelected ? "border-primary ring-2 ring-primary/15" : "border-border"
+                        )}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-bold text-foreground" title={shop.name}>
-                              {shop.name}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {region.regionLabel || "未分类"}
-                            </div>
-                            {shop.externalId && (
-                              <div className="mt-1 text-xs font-medium text-primary">POI_ID: {shop.externalId}</div>
+                        <div className="flex min-w-0 items-start gap-3">
+                            {isBulkManageMode && (
+                              <button
+                                onClick={() => {
+                                  setSelectedShopIds((prev) =>
+                                    prev.includes(shop.id)
+                                      ? prev.filter((id) => id !== shop.id)
+                                      : [...prev, shop.id]
+                                  );
+                                }}
+                                className={cn(
+                                  "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                                  isSelected
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-muted-foreground/30 bg-background text-transparent"
+                                )}
+                              >
+                                <Check size={12} />
+                              </button>
                             )}
-                            {shop.address && (
-                              <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                {shop.address}
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-base font-bold text-foreground" title={shop.name}>
+                                {shop.name}
                               </div>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 gap-2">
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {region.regionLabel || "未分类"}
+                              </div>
+                              {shop.externalId && (
+                                <div className="mt-2 inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                                  POI_ID: {shop.externalId}
+                                </div>
+                              )}
+                              {shop.address && (
+                                <div className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                                  {shop.address}
+                                </div>
+                              )}
+                            </div>
+                        </div>
+                        {!isBulkManageMode && (
+                          <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
                             <button
                               onClick={() => {
                                 void handleLocateShop(shop);
                               }}
-                              className="rounded-xl border border-border bg-background px-2.5 py-1.5 text-xs font-bold text-foreground transition-all hover:bg-muted"
+                              className="rounded-full border border-border bg-background px-4 py-2 text-xs font-bold text-foreground transition-all hover:bg-muted"
                             >
                               定位
                             </button>
@@ -1989,12 +2142,21 @@ export function StoreDispatchMap({
                                 setEditingShop(shop);
                                 setIsShopModalOpen(true);
                               }}
-                              className="rounded-xl bg-primary px-2.5 py-1.5 text-xs font-bold text-primary-foreground transition-all hover:bg-primary/90"
+                              className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black transition-all hover:bg-white/90"
                             >
                               编辑
                             </button>
+                            <button
+                              onClick={() => {
+                                void handleDeleteSingleShop(shop);
+                              }}
+                              disabled={isDeletingShops}
+                              className="rounded-full px-3 py-2 text-xs font-medium text-destructive transition-all hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              删除
+                            </button>
                           </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
@@ -2020,7 +2182,7 @@ export function StoreDispatchMap({
       }}
       onImport={handleImportShops}
       title="导入店铺"
-      description="支持 Excel 或 CSV 导入。当前优先识别“门店名称 / POI_ID / 详细地址”这类表头，名称和地址会自动入库。"
+      description="支持 Excel 或 CSV 导入。请至少包含“门店名称 / POI_ID / 详细地址”三列，也兼容 `POI ID`、`poi_id` 这类写法。"
       dropzoneText="点击上传或拖拽店铺表格"
       templateData={SHOP_IMPORT_TEMPLATE}
       templateFileName="店铺导入模板.xlsx"
@@ -2031,6 +2193,27 @@ export function StoreDispatchMap({
       onSave={handleSaveShop}
       initialData={editingShop}
     />
-    </>
+    <ConfirmModal
+      isOpen={!!pendingDeleteAction}
+      onClose={() => setPendingDeleteAction(null)}
+      onConfirm={() => {
+        if (!pendingDeleteAction) return;
+        if (pendingDeleteAction.type === "single") {
+          void executeDeleteShops([pendingDeleteAction.shop.id]);
+          return;
+        }
+        void executeDeleteShops(pendingDeleteAction.ids);
+      }}
+      title={pendingDeleteAction?.type === "single" ? "确认删除店铺" : "确认批量删除"}
+      message={
+        pendingDeleteAction?.type === "single"
+          ? <>确认删除店铺“{pendingDeleteAction.shop.name}”吗？此操作不可撤销。</>
+          : <>确认删除已选中的 {pendingDeleteAction?.type === "bulk" ? pendingDeleteAction.ids.length : 0} 家店铺吗？此操作不可撤销。</>
+      }
+      confirmLabel="确认删除"
+      cancelLabel="取消"
+      variant="danger"
+    />
+  </>
   );
 }

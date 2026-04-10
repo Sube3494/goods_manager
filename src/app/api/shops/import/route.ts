@@ -4,13 +4,38 @@ import { getAuthorizedUser } from "@/lib/auth";
 
 type RawShopRow = Record<string, unknown>;
 
+function normalizeColumnKey(value: string) {
+  return value
+    .replace(/^\uFEFF/, "")
+    .replace(/[：:]/g, "")
+    .replace(/[\s_-]+/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function getStringValue(row: RawShopRow, keys: string[]) {
+  const normalizedRowEntries = Object.entries(row).map(([key, value]) => [
+    normalizeColumnKey(key),
+    value,
+  ] as const);
+
   for (const key of keys) {
-    const value = row[key];
-    if (value !== undefined && value !== null && String(value).trim()) {
-      return String(value).trim();
+    const directValue = row[key];
+    if (directValue !== undefined && directValue !== null && String(directValue).trim()) {
+      return String(directValue).trim();
     }
   }
+
+  for (const key of keys) {
+    const normalizedKey = normalizeColumnKey(key);
+    const matchedEntry = normalizedRowEntries.find(([entryKey, value]) => {
+      return entryKey === normalizedKey && value !== undefined && value !== null && String(value).trim();
+    });
+    if (matchedEntry) {
+      return String(matchedEntry[1]).trim();
+    }
+  }
+
   return "";
 }
 
@@ -63,16 +88,28 @@ export async function POST(request: Request) {
     const createdShops: Array<{ id: string; name: string; address: string }> = [];
 
     for (const row of shops as RawShopRow[]) {
-      const name = getStringValue(row, ["门店名称", "店铺名称", "网点名称", "名称", "门店", "shopName"]);
-      const address = getStringValue(row, ["详细地址", "门店地址", "地址", "address"]);
+      const name = getStringValue(row, ["门店名称", "店铺名称", "网点名称", "名称", "门店", "shopName", "shop_name"]);
+      const address = getStringValue(row, ["详细地址", "门店地址", "地址", "address", "shop_address"]);
       const province = getStringValue(row, ["省份", "省", "province"]);
       const city = getStringValue(row, ["城市", "市", "city"]);
-      const poiId = getStringValue(row, ["POI_ID", "POT_ID", "poi_id", "poiId"]);
+      const poiId = getStringValue(row, [
+        "POI_ID",
+        "POI ID",
+        "POIID",
+        "POT_ID",
+        "poi_id",
+        "poiId",
+        "poi id",
+        "poi-id",
+        "poi",
+        "poi编号",
+        "poi号",
+      ]);
 
-      if (!name || !address) {
+      if (!name || !address || !poiId) {
         skipped += 1;
         if (errors.length < 20) {
-          errors.push(`缺少必要字段：${name || "未填写名称"} / ${address || "未填写地址"}`);
+          errors.push(`缺少必要字段：${name || "未填写名称"} / ${poiId || "未填写POI_ID"} / ${address || "未填写地址"}`);
         }
         continue;
       }
@@ -84,15 +121,12 @@ export async function POST(request: Request) {
         skipped += 1;
         continue;
       }
-      // 无 POI_ID 时，退回到名称+地址去重
-      if (!poiId) {
-        const dedupeKey = `${normalizeText(cleanedName)}::${normalizeText(address)}`;
-        if (existingKeys.has(dedupeKey)) {
-          skipped += 1;
-          continue;
-        }
-        existingKeys.add(dedupeKey);
+      const dedupeKey = `${normalizeText(cleanedName)}::${normalizeText(address)}`;
+      if (existingKeys.has(dedupeKey)) {
+        skipped += 1;
+        continue;
       }
+      existingKeys.add(dedupeKey);
 
       const createdShop = await prisma.shop.create({
         data: {
@@ -103,13 +137,13 @@ export async function POST(request: Request) {
           latitude: null,
           longitude: null,
           isSource: true,
-          externalId: poiId || null,  // POI_ID 直接存入 externalId
+          externalId: poiId,
           remark: null,
           userId: user.id,
         },
       });
 
-      if (poiId) existingExternalIds.add(poiId);
+      existingExternalIds.add(poiId);
       created += 1;
       createdShops.push({
         id: createdShop.id,

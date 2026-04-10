@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
-import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard, Upload } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -450,6 +450,8 @@ function GalleryContent() {
   }, []);
 
   const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<number[]>([]);
+  const [isUploadDragActive, setIsUploadDragActive] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const items = useMemo(() => Object.values(productMediaMap).flat(), [productMediaMap]);
 
@@ -575,22 +577,18 @@ function GalleryContent() {
     };
   }, [selectedImage, isUploadModalOpen]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const processUploadFiles = useCallback(async (incomingFiles: File[] | FileList) => {
+    const filesArray = Array.from(incomingFiles);
+    if (filesArray.length === 0) return;
 
-    // 1. Check current count
     const currentCount = uploadForm.urls.length;
     const remainingSlots = 9 - currentCount;
 
     if (remainingSlots <= 0) {
       showToast("最多只能上传 9 个文件", "error");
-      e.target.value = ''; // Reset input
       return;
     }
 
-    // 2. Slice files to fit limit
-    const filesArray = Array.from(files);
     let filesToUpload = filesArray;
     
     if (filesArray.length > remainingSlots) {
@@ -671,8 +669,46 @@ function GalleryContent() {
       showToast("操作失败，请重试", "error");
     } finally {
       setIsUploading(false);
-      e.target.value = '';
     }
+  }, [showToast, uploadForm.urls.length]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    await processUploadFiles(files);
+    e.target.value = "";
+  };
+
+  const handleUploadDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isUploading) {
+      setIsUploadDragActive(true);
+    }
+  };
+
+  const handleUploadDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const nextTarget = e.relatedTarget;
+    if (nextTarget instanceof Node && e.currentTarget.contains(nextTarget)) {
+      return;
+    }
+    setIsUploadDragActive(false);
+  };
+
+  const handleUploadDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsUploadDragActive(false);
+
+    if (isUploading) return;
+
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    await processUploadFiles(files);
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
@@ -1369,74 +1405,121 @@ function GalleryContent() {
                                         )}
                                     </div>
                                     
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {/* Existing Images */}
-                                        {uploadForm.urls.map((file, idx) => {
-                                            const isSelected = selectedDeleteIndices.includes(idx);
-                                            return (
-                                            <div 
-                                                key={idx} 
-                                                onClick={() => {
-                                                    setSelectedDeleteIndices(prev => 
-                                                        prev.includes(idx) 
-                                                            ? prev.filter(i => i !== idx)
-                                                            : [...prev, idx]
-                                                    );
-                                                }}
-                                                className={cn(
-                                                    "relative aspect-square rounded-2xl overflow-hidden border transition-all cursor-pointer",
-                                                    isSelected ? "ring-4 ring-primary ring-offset-2 dark:ring-offset-gray-900 border-primary scale-[0.98]" : "border-border hover:border-primary/50"
-                                                )}
-                                            >
-                                                {file.type === 'video' ? (
-                                                     <video 
-                                                        src={file.url} 
-                                                        className="w-full h-full object-cover pointer-events-none"
-                                                        muted
-                                                    />
-                                                ) : (
-                                                    <Image 
-                                                      src={file.url} 
-                                                      alt="Upload preview"
-                                                      fill 
-                                                      sizes="(max-width: 640px) 33vw, 150px"
-                                                      className="object-cover pointer-events-none" 
-                                                    />
-                                                )}
-                                                
-                                                {/* Selection Checkbox */}
-                                                <div className={cn(
-                                                    "absolute top-2 right-2 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shadow-lg",
-                                                    isSelected 
-                                                        ? "bg-foreground border-foreground text-background scale-110" 
-                                                        : "bg-white/50 dark:bg-zinc-800/50 border-white/50 dark:border-white/20 backdrop-blur"
-                                                )}>
-                                                    {isSelected && <Check size={14} strokeWidth={4} />}
+                                    <div className="space-y-4">
+                                        <div
+                                            onDragOver={handleUploadDragOver}
+                                            onDragLeave={handleUploadDragLeave}
+                                            onDrop={handleUploadDrop}
+                                            onClick={() => !isUploading && uploadInputRef.current?.click()}
+                                            className={cn(
+                                                "group relative overflow-hidden rounded-[28px] border border-dashed p-5 sm:p-6 transition-all duration-300 cursor-pointer",
+                                                isUploadDragActive
+                                                    ? "border-primary bg-primary/10 shadow-lg shadow-primary/10 scale-[0.99]"
+                                                    : "border-zinc-200 dark:border-white/10 bg-zinc-50/90 dark:bg-white/[0.04] hover:border-primary/40 hover:bg-primary/[0.03]"
+                                            )}
+                                        >
+                                            <input
+                                                ref={uploadInputRef}
+                                                type="file"
+                                                className="hidden"
+                                                accept="image/*,video/*"
+                                                multiple
+                                                onChange={handleFileUpload}
+                                            />
+                                            <div className="flex flex-col gap-4">
+                                                <div className="flex items-start gap-4">
+                                                    <div className={cn(
+                                                        "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border transition-all",
+                                                        isUploadDragActive
+                                                            ? "border-primary/30 bg-primary/15 text-primary"
+                                                            : "border-zinc-200/80 dark:border-white/10 bg-white dark:bg-white/10 text-zinc-500 dark:text-zinc-300"
+                                                    )}>
+                                                        {isUploading ? (
+                                                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                                        ) : isUploadDragActive ? (
+                                                            <Upload size={24} />
+                                                        ) : (
+                                                            <Plus size={24} />
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1 space-y-1.5 pt-0.5">
+                                                        <p className="text-sm font-semibold leading-6 text-foreground">
+                                                            {isUploadDragActive ? "松开即可上传文件" : "点击选择文件，或直接拖入这里"}
+                                                        </p>
+                                                        <p className="max-w-md text-xs leading-6 text-muted-foreground">
+                                                            支持图片和视频，多选上传；当前还可上传 {Math.max(0, 9 - uploadForm.urls.length)} 个文件。
+                                                        </p>
+                                                        {typeof isUploading === "string" && (
+                                                            <p className="text-xs font-medium text-primary">{isUploading}</p>
+                                                        )}
+                                                    </div>
                                                 </div>
 
-                                                <div className={cn(
-                                                    "absolute inset-0 bg-black/0 transition-colors z-10",
-                                                    isSelected ? "bg-black/20" : "group-hover:bg-black/10"
-                                                )} />
+                                                <div className="flex flex-wrap items-center gap-2 pl-[72px] sm:pl-[72px]">
+                                                    <span className="rounded-full bg-white/80 dark:bg-white/10 px-3 py-1 text-[11px] font-semibold text-muted-foreground border border-zinc-200/70 dark:border-white/10">
+                                                        最多 9 个
+                                                    </span>
+                                                    <span className="rounded-full bg-white/80 dark:bg-white/10 px-3 py-1 text-[11px] font-semibold text-muted-foreground border border-zinc-200/70 dark:border-white/10">
+                                                        图片 / 视频
+                                                    </span>
+                                                </div>
                                             </div>
-                                        )})}
+                                        </div>
 
-                                        {/* Add Button */}
-                                         <label className="relative aspect-square rounded-2xl border-2 border-dashed border-zinc-200 dark:border-white/5 hover:border-primary/40 dark:hover:border-primary/40 bg-zinc-50 dark:bg-white/5 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer overflow-hidden group">
-                                            <input type="file" className="hidden" accept="image/*,video/*" multiple onChange={handleFileUpload} />
-                                            <div className="p-3 rounded-2xl bg-white dark:bg-white/10 shadow-sm group-hover:bg-primary/10 transition-all duration-300">
-                                                {isUploading ? (
-                                                    <div className="h-6 w-6 animate-spin border-2 border-primary border-t-transparent rounded-full" />
-                                                ) : (
-                                                    <Plus size={24} className="text-zinc-400 dark:text-zinc-500 group-hover:text-primary transition-all scale-100 group-hover:scale-110" />
-                                                )}
+                                        {uploadForm.urls.length > 0 && (
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {uploadForm.urls.map((file, idx) => {
+                                                    const isSelected = selectedDeleteIndices.includes(idx);
+                                                    return (
+                                                    <div 
+                                                        key={idx} 
+                                                        onClick={() => {
+                                                            setSelectedDeleteIndices(prev => 
+                                                                prev.includes(idx) 
+                                                                    ? prev.filter(i => i !== idx)
+                                                                    : [...prev, idx]
+                                                            );
+                                                        }}
+                                                        className={cn(
+                                                            "relative aspect-square rounded-2xl overflow-hidden border transition-all cursor-pointer",
+                                                            isSelected ? "ring-4 ring-primary ring-offset-2 dark:ring-offset-gray-900 border-primary scale-[0.98]" : "border-border hover:border-primary/50"
+                                                        )}
+                                                    >
+                                                        {file.type === 'video' ? (
+                                                             <video 
+                                                                src={file.url} 
+                                                                className="w-full h-full object-cover pointer-events-none"
+                                                                muted
+                                                            />
+                                                        ) : (
+                                                            <Image 
+                                                              src={file.url} 
+                                                              alt="Upload preview"
+                                                              fill 
+                                                              sizes="(max-width: 640px) 33vw, 150px"
+                                                              className="object-cover pointer-events-none" 
+                                                            />
+                                                        )}
+                                                        
+                                                        <div className={cn(
+                                                            "absolute top-2 right-2 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shadow-lg",
+                                                            isSelected 
+                                                                ? "bg-foreground border-foreground text-background scale-110" 
+                                                                : "bg-white/50 dark:bg-zinc-800/50 border-white/50 dark:border-white/20 backdrop-blur"
+                                                        )}>
+                                                            {isSelected && <Check size={14} strokeWidth={4} />}
+                                                        </div>
+
+                                                        <div className={cn(
+                                                            "absolute inset-0 bg-black/0 transition-colors z-10",
+                                                            isSelected ? "bg-black/20" : "group-hover:bg-black/10"
+                                                        )} />
+                                                    </div>
+                                                )})}
                                             </div>
-                                            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center px-2">
-                                                {isUploading ? "上传中" : "添加"}
-                                            </span>
-                                        </label>
+                                        )}
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-2">支持多选，每次最多上传 9 个文件。</p>
+                                    <p className="text-xs text-muted-foreground mt-2">支持多选，每次最多上传 9 个文件，也可以直接把文件拖进上面的区域。</p>
                                 </div>
 
                                 {/* Product Select / Submission Info */}

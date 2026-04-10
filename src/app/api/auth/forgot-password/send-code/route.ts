@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     if (user.status === "DISABLED") {
-      return NextResponse.json({ error: "账户已被禁用，无法重置密码" }, { status: 403 });
+      return NextResponse.json({ error: "当前操作暂时无法完成，请联系管理员" }, { status: 403 });
     }
 
     const lastCode = await prisma.verificationCode.findFirst({

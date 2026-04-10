@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     }
 
     if (user.status === "DISABLED") {
-        return NextResponse.json({ error: "您的账号已被禁用" }, { status: 403 });
+        return NextResponse.json({ error: "登录失败，请检查账号信息或联系管理员" }, { status: 403 });
     }
 
     // Delete used code

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     });
 
     if (user && user.status === 'DISABLED') {
-        return NextResponse.json({ error: "账户已被禁用，无法发送验证码" }, { status: 403 });
+        return NextResponse.json({ error: "验证码发送失败，请稍后重试或联系管理员" }, { status: 403 });
     }
 
     if (!user) {

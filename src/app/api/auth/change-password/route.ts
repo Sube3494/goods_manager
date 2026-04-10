@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     if (user.status === "DISABLED") {
-      return NextResponse.json({ error: "您的账号已被禁用" }, { status: 403 });
+      return NextResponse.json({ error: "当前操作暂时无法完成，请联系管理员" }, { status: 403 });
     }
 
     if (!user.passwordHash) {
