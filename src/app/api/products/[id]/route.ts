@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getLightSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { handlePrismaError } from "@/lib/api-errors";
+
+function normalizeSku(sku: unknown) {
+  if (typeof sku !== "string") {
+    return null;
+  }
+
+  const trimmed = sku.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 export async function GET(
   request: Request,
@@ -82,12 +92,29 @@ export async function PUT(
 
     const body = await request.json();
     const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, remark } = body;
+    const normalizedSku = normalizeSku(sku);
+
+    if (normalizedSku) {
+      const conflict = await prisma.product.findFirst({
+        where: {
+          sku: normalizedSku,
+          id: { not: id }
+        },
+        select: { id: true }
+      });
+
+      if (conflict) {
+        return NextResponse.json({
+          error: `商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`
+        }, { status: 409 });
+      }
+    }
 
     const product = await prisma.product.update({
       where: { id },
       data: {
         name,
-        sku,
+        sku: normalizedSku,
         costPrice: Number(costPrice || body.price), // Fallback to price if costPrice is missing for compatibility
         stock: Number(stock),
         categoryId,
@@ -104,12 +131,7 @@ export async function PUT(
       image: product.image ? storage.resolveUrl(product.image) : null
     });
   } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
-      return NextResponse.json({ 
-        error: "商品编码 (SKU) 已存在，请使用其他编码" 
-      }, { status: 400 });
-    }
-    return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
+    return handlePrismaError(error, "商品", "Failed to update product");
   }
 }
 

@@ -32,7 +32,7 @@ const toolbarButtonMutedClass =
 interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<Product, "id"> & { id?: string }, galleryItems?: GalleryItem[]) => void;
+  onSubmit: (data: Omit<Product, "id"> & { id?: string }, galleryItems?: GalleryItem[]) => Promise<void>;
   initialData?: Product | null;
 }
 
@@ -650,14 +650,13 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
         });
     }
 
-    onSubmit({
-        ...formData,
-        costPrice: Number(formData.costPrice),
-        stock: Number(formData.stock),
-        specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
-        id: initialData?.id
+    await onSubmit({
+      ...formData,
+      costPrice: Number(formData.costPrice),
+      stock: Number(formData.stock),
+      specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
+      id: initialData?.id
     }, galleryImages);
-    onClose();
   };
 
   const handleRotateImage = async (img: GalleryItem) => {

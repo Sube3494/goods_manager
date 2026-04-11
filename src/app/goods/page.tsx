@@ -383,46 +383,49 @@ export default function GoodsPage() {
         body: JSON.stringify(body),
       });
 
-      if (res.ok) {
-        const product = await res.json();
-        
-        // Handle gallery items persistence, especially for new products
-        if (galleryItems && galleryItems.length > 0) {
-          const tempItems = galleryItems.filter(item => item.id.startsWith('temp-'));
-          if (tempItems.length > 0) {
-            await fetch("/api/gallery", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                productId: product.id,
-                urls: tempItems.map(item => ({
-                  url: item.url,
-                  thumbnailUrl: item.thumbnailUrl,
-                  type: item.type
-                }))
-              })
-            });
-          }
-        }
-
-        showToast(editingProduct ? "商品更新成功" : "商品创建成功", "success");
-        setIsNewProductOpen(false);
-        
-        if (editingProduct) {
-          // 静默更新本地数据，避免页面滚动到顶部
-          setItems(prev => prev.map(item => item.id === product.id ? { ...item, ...product } : item));
-        } else {
-          // 新建商品：将其插入到列表最前面，避免全量刷新
-          setItems(prev => [product, ...prev]);
-          setTotalResults(prev => prev + 1);
-          // 如果列表是按某种顺序排列的，且后端返回的数据可能不在首位，
-          // 可以在一段时间后静默同步一次
-        }
-      } else {
-        showToast("操作失败", "error");
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || "操作失败");
       }
-    } catch {
-      showToast("请求失败", "error");
+
+      const product = result;
+      
+      // Handle gallery items persistence, especially for new products
+      if (galleryItems && galleryItems.length > 0) {
+        const tempItems = galleryItems.filter(item => item.id.startsWith('temp-'));
+        if (tempItems.length > 0) {
+          await fetch("/api/gallery", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              productId: product.id,
+              urls: tempItems.map(item => ({
+                url: item.url,
+                thumbnailUrl: item.thumbnailUrl,
+                type: item.type
+              }))
+            })
+          });
+        }
+      }
+
+      showToast(editingProduct ? "商品更新成功" : "商品创建成功", "success");
+      setIsNewProductOpen(false);
+      
+      if (editingProduct) {
+        // 静默更新本地数据，避免页面滚动到顶部
+        setItems(prev => prev.map(item => item.id === product.id ? { ...item, ...product } : item));
+      } else {
+        // 新建商品：将其插入到列表最前面，避免全量刷新
+        setItems(prev => [product, ...prev]);
+        setTotalResults(prev => prev + 1);
+        // 如果列表是按某种顺序排列的，且后端返回的数据可能不在首位，
+        // 可以在一段时间后静默同步一次
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "请求失败";
+      showToast(message, "error");
+      throw error;
     }
   };
   // Sync URL filter to state on mount if needed, or just use state

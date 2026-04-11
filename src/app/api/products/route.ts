@@ -5,6 +5,29 @@ import { getLightSession, getCachedSettings, getAuthorizedUser } from "@/lib/aut
 import { handlePrismaError } from "@/lib/api-errors";
 import { ProductService } from "@/services/productService";
 
+function normalizeSku(sku: unknown) {
+  if (typeof sku !== "string") {
+    return null;
+  }
+
+  const trimmed = sku.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function findConflictingProductBySku(sku: string, excludeId?: string) {
+  return prisma.product.findFirst({
+    where: {
+      sku,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+    },
+  });
+}
+
 // 获取所有商品 (支持分页、筛选、排序)
 export async function GET(request: Request) {
   try {
@@ -62,16 +85,26 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const normalizedSku = normalizeSku(sku);
 
     const storage = await getStorageStrategy();
 
     // 格式化价格和库存
     const stockNum = Number(stock) || 0;
 
+    if (normalizedSku) {
+      const existingProduct = await findConflictingProductBySku(normalizedSku);
+      if (existingProduct) {
+        return NextResponse.json({
+          error: `商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`
+        }, { status: 409 });
+      }
+    }
+
     const product = await prisma.product.create({
       data: {
         name,
-        sku: sku?.trim() || null,
+        sku: normalizedSku,
         costPrice: Number(costPrice) || 0,
         stock: stockNum,
         categoryId: categoryId || undefined,
@@ -132,6 +165,7 @@ export async function PUT(request: Request) {
 
     const body = await request.json();
     const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const normalizedSku = normalizeSku(sku);
 
     const storage = await getStorageStrategy();
 
@@ -147,11 +181,20 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    if (normalizedSku) {
+      const existingProduct = await findConflictingProductBySku(normalizedSku, id);
+      if (existingProduct) {
+        return NextResponse.json({
+          error: `商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`
+        }, { status: 409 });
+      }
+    }
+
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
         name,
-        sku: sku?.trim() || null,
+        sku: normalizedSku,
         costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
         stock: Number(stock) || 0,
         categoryId: categoryId || undefined,

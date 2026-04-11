@@ -1,5 +1,23 @@
 import { NextResponse } from "next/server";
 
+function getUniqueFieldName(error: { meta?: unknown }) {
+  const meta = error.meta;
+  if (!meta || typeof meta !== "object" || !("target" in meta)) {
+    return null;
+  }
+
+  const target = (meta as { target?: unknown }).target;
+  if (Array.isArray(target)) {
+    return target.map(String);
+  }
+
+  if (typeof target === "string") {
+    return [target];
+  }
+
+  return null;
+}
+
 /**
  * 集中处理常见的 Prisma 数据库异常并转换为标准化的 HTTP 响应
  * @param error 捕获到的异常对象
@@ -12,10 +30,19 @@ export function handlePrismaError(error: unknown, entityName: string, defaultErr
   if (error && typeof error === 'object' && 'code' in error) {
     switch (error.code) {
       case 'P2002':
+        if ("meta" in error) {
+          const targets = getUniqueFieldName(error as { meta?: unknown });
+          if (targets?.includes("sku")) {
+            return NextResponse.json({
+              error: "商品编码 (SKU) 已存在，请使用其他编码"
+            }, { status: 409 });
+          }
+        }
+
         // 唯一约束冲突 (Unique Constraint Violated)
         return NextResponse.json({ 
           error: `${entityName}中存在重复的唯一字段 (如编码或名称已存在)` 
-        }, { status: 400 });
+        }, { status: 409 });
 
       case 'P2003':
         // 外键约束冲突 (Foreign Key Constraint Violated)
