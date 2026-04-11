@@ -54,6 +54,10 @@ export class BackupService {
   private static readonly BACKUP_DIR = join(process.cwd(), "public", "backups");
   private static readonly BACKUP_PASSWORD = process.env.BACKUP_PASSWORD || "PickNote_Auto_Backup_Safe_Key"; // 建议从环境变量获取
 
+  private static buildUserScopedWhere(userId?: string) {
+    return userId ? { userId } : undefined;
+  }
+
   static resolveBackupPassword(password?: string | null) {
     const trimmedPassword = typeof password === "string" ? password.trim() : "";
     if (!trimmedPassword) return this.BACKUP_PASSWORD;
@@ -81,30 +85,32 @@ export class BackupService {
   }
 
   static async collectBackupData(userId?: string): Promise<BackupPayload> {
+    const scopedWhere = this.buildUserScopedWhere(userId);
+
     return {
       version: "2.0",
       timestamp: new Date().toISOString(),
       userId,
-      categories: await prisma.category.findMany(),
-      products: await prisma.product.findMany(),
-      suppliers: await prisma.supplier.findMany(),
-      purchaseOrders: await prisma.purchaseOrder.findMany({ include: { items: true } }),
-      outboundOrders: await prisma.outboundOrder.findMany({ include: { items: true } }),
-      brushOrders: await prisma.brushOrder.findMany({ include: { items: true } }),
-      brushProducts: await prisma.brushProduct.findMany(),
-      brushOrderPlans: await prisma.brushOrderPlan.findMany({ include: { items: true } }),
-      settlements: await prisma.settlement.findMany({ include: { items: true } }),
-      storeOpeningBatches: await prisma.storeOpeningBatch.findMany({ include: { items: true } }),
-      shops: await prisma.shop.findMany(),
-      galleryItems: await prisma.galleryItem.findMany(),
-      systemSettings: await prisma.systemSetting.findMany(),
-      users: await prisma.user.findMany(),
-      roleProfiles: await prisma.roleProfile.findMany(),
-      whitelists: await prisma.emailWhitelist.findMany(),
-      invitations: await prisma.invitation.findMany(),
-      registrationRequests: await prisma.registrationRequest.findMany(),
-      pageViews: await prisma.pageView.findMany(),
-      verificationCodes: await prisma.verificationCode.findMany(),
+      categories: await prisma.category.findMany({ where: scopedWhere }),
+      products: await prisma.product.findMany({ where: scopedWhere }),
+      suppliers: await prisma.supplier.findMany({ where: scopedWhere }),
+      purchaseOrders: await prisma.purchaseOrder.findMany({ where: scopedWhere, include: { items: true } }),
+      outboundOrders: await prisma.outboundOrder.findMany({ where: scopedWhere, include: { items: true } }),
+      brushOrders: await prisma.brushOrder.findMany({ where: scopedWhere, include: { items: true } }),
+      brushProducts: await prisma.brushProduct.findMany({ where: scopedWhere }),
+      brushOrderPlans: await prisma.brushOrderPlan.findMany({ where: scopedWhere, include: { items: true } }),
+      settlements: await prisma.settlement.findMany({ where: scopedWhere, include: { items: true } }),
+      storeOpeningBatches: await prisma.storeOpeningBatch.findMany({ where: scopedWhere, include: { items: true } }),
+      shops: await prisma.shop.findMany({ where: scopedWhere }),
+      galleryItems: await prisma.galleryItem.findMany({ where: scopedWhere }),
+      systemSettings: userId ? [] : await prisma.systemSetting.findMany(),
+      users: userId ? [] : await prisma.user.findMany(),
+      roleProfiles: userId ? [] : await prisma.roleProfile.findMany(),
+      whitelists: userId ? [] : await prisma.emailWhitelist.findMany(),
+      invitations: userId ? [] : await prisma.invitation.findMany(),
+      registrationRequests: userId ? [] : await prisma.registrationRequest.findMany(),
+      pageViews: userId ? [] : await prisma.pageView.findMany(),
+      verificationCodes: userId ? [] : await prisma.verificationCode.findMany(),
     };
   }
 

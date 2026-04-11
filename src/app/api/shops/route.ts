@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 
@@ -6,16 +6,19 @@ function normalizeExternalId(value: unknown) {
   return String(value || "").replace(/\s+/g, "").trim();
 }
 
-// GET: 获取所有店铺
-export async function GET() {
+// GET: 获取店铺列表，默认仅返回当前用户自己的数据
+export async function GET(request: NextRequest) {
   try {
     const user = await getAuthorizedUser("logistics:manage");
     if (!user) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const scope = request.nextUrl.searchParams.get("scope");
+    const canViewAllShops = user.role === "SUPER_ADMIN" && scope === "all";
+
     const shops = await prisma.shop.findMany({
-      where: user.role === "SUPER_ADMIN" ? {} : { userId: user.id },
+      where: canViewAllShops ? {} : { userId: user.id },
       orderBy: { createdAt: "desc" },
     });
 
