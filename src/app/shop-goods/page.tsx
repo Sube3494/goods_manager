@@ -39,7 +39,7 @@ export default function ShopGoodsPage() {
     [selectedShopId, shops]
   );
   const pickerQuery = useMemo(
-    () => (selectedShopId ? { shopId: selectedShopId, shopFilterMode: "unassigned", publicOnly: "true" } : undefined),
+    () => (selectedShopId ? { shopId: selectedShopId, shopFilterMode: "unassigned", publicOnly: "true", view: "picker" } : undefined),
     [selectedShopId]
   );
 
@@ -466,6 +466,7 @@ export default function ShopGoodsPage() {
         title={selectedShop ? `添加到 ${selectedShop.name}` : "选择商品"}
         allowCreate={false}
         showPlatformSelector={false}
+        minimalView={true}
         query={pickerQuery}
       />
 

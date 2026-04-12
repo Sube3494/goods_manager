@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { X, Search, Check, Package, Truck, Plus } from "lucide-react";
+import { X, Search, Check, Package, Plus } from "lucide-react";
 import { Product, Supplier, GalleryItem } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
@@ -28,6 +28,7 @@ interface ProductSelectionModalProps {
   allowCreate?: boolean;
   showPlatformSelector?: boolean;
   imageOnly?: boolean;
+  minimalView?: boolean;
   query?: Record<string, string>;
   createPayload?: Record<string, unknown>;
 }
@@ -60,6 +61,7 @@ export function ProductSelectionModal({
   allowCreate = true,
   showPlatformSelector = true,
   imageOnly = false,
+  minimalView = false,
   query,
   createPayload,
 }: ProductSelectionModalProps) {
@@ -139,7 +141,7 @@ export function ProductSelectionModal({
 
       const [pRes, sRes] = await Promise.all([
         fetch(`${fetchPath}?${queryParams.toString()}`),
-        mode === 'initial' ? fetch("/api/suppliers") : Promise.resolve(null)
+        mode === 'initial' && !minimalView ? fetch("/api/suppliers") : Promise.resolve(null)
       ]);
 
       if (version !== resultsVersion.current) return;
@@ -250,6 +252,49 @@ export function ProductSelectionModal({
     const matchesSupplier = !selectedSupplierId || p.supplierId === selectedSupplierId;
     return matchesSupplier;
   });
+  const allFilteredSelected =
+    !singleSelect &&
+    filteredProducts.length > 0 &&
+    filteredProducts.every((product) => tempSelectedIds.includes(product.id));
+
+  const handleToggleSelectAll = async () => {
+    if (singleSelect || filteredProducts.length === 0) {
+      return;
+    }
+
+    if (allFilteredSelected) {
+      setTempSelectedIds([]);
+      setSelectedProducts([]);
+      return;
+    }
+
+    try {
+      const queryParams = new URLSearchParams({
+        page: "1",
+        pageSize: "99999",
+        all: "true",
+        search: debouncedSearch,
+        ...(query || {}),
+      });
+
+      const res = await fetch(`${fetchPath}?${queryParams.toString()}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch all products");
+      }
+
+      const data = await res.json();
+      const allMatchedProducts = Array.isArray(data.items) ? data.items : [];
+      const fullyFilteredProducts = allMatchedProducts.filter((product: Product) => (
+        !selectedSupplierId || product.supplierId === selectedSupplierId
+      ));
+
+      setTempSelectedIds(fullyFilteredProducts.map((product: Product) => product.id));
+      setSelectedProducts(fullyFilteredProducts);
+    } catch (error) {
+      console.error("Failed to select all products:", error);
+      showToast("全选失败", "error");
+    }
+  };
 
   const toggleProduct = (product: Product) => {
     const id = product.id;
@@ -321,21 +366,35 @@ export function ProductSelectionModal({
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full h-11 pl-11 pr-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-sm"
                   />
-                </div>
+                 </div>
 
-                <div className="w-36 sm:w-44 shrink-0">
-                  <CustomSelect
-                    options={[
-                      { value: "", label: "所有供应商" },
-                      ...suppliers.map(s => ({ value: s.id, label: s.name }))
-                    ]}
-                    value={selectedSupplierId}
-                    onChange={setSelectedSupplierId}
-                    placeholder="筛选供应商"
-                    triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
-                  />
-                </div>
+                {!minimalView && (
+                  <div className="w-36 sm:w-44 shrink-0">
+                    <CustomSelect
+                      options={[
+                        { value: "", label: "所有供应商" },
+                        ...suppliers.map(s => ({ value: s.id, label: s.name }))
+                      ]}
+                      value={selectedSupplierId}
+                      onChange={setSelectedSupplierId}
+                      placeholder="筛选供应商"
+                      triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                    />
+                  </div>
+                )}
               </div>
+
+              {!singleSelect && filteredProducts.length > 0 && (
+                <div className="flex items-center justify-end shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAll}
+                    className="rounded-full border border-border/60 bg-white/5 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:text-foreground hover:bg-white/10"
+                  >
+                    {allFilteredSelected ? "取消全选" : "全选当前结果"}
+                  </button>
+                </div>
+              )}
 
               {imageOnly && (
                 <div className="flex items-center gap-2 shrink-0">
@@ -377,7 +436,6 @@ export function ProductSelectionModal({
                     <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
-                      const supplierName = product.supplierId ? suppliers.find(s => s.id === product.supplierId)?.name : "";
                       return (
                          <button
                           key={product.id}
@@ -434,19 +492,19 @@ export function ProductSelectionModal({
                                  </span>
                              )}
                             </div>
-                             {(product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark) && (
+                             {(minimalView ? product.category?.name : (product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark)) && (
                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                                    {product.sku && (
+                                    {!minimalView && product.sku && (
                                       <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
                                         {product.sku}
                                       </span>
                                     )}
-                                    {product.supplierId && suppliers.find(s => s.id === product.supplierId) && (
-                                      <span className="text-[11px] text-muted-foreground flex items-center gap-1 opacity-70">
-                                          <Truck size={10} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{suppliers.find(s => s.id === product.supplierId)?.name}</span>
+                                    {minimalView && product.category?.name && (
+                                      <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0">
+                                        {product.category.name}
                                       </span>
                                     )}
-                                    {product.remark && (
+                                    {!minimalView && product.remark && (
                                         <span className="flex flex-wrap items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
                                             <span className="font-bold opacity-70 shrink-0">注:</span>
                                             <span className="truncate leading-none">{product.remark}</span>
@@ -455,7 +513,7 @@ export function ProductSelectionModal({
                                  </div>
                              )}
 
-                             {showPrice && (
+                             {showPrice && !minimalView && (
                                 <div className="mt-2">
                                 <span className="text-sm font-medium text-primary">
                                     ￥{product.costPrice}
@@ -476,11 +534,11 @@ export function ProductSelectionModal({
                                   {product.name}
                                 </div>
                               )}
-                              {(product.sku || supplierName) && (showImageName || showImageSupplier) && (
+                              {(product.sku || product.category?.name) && (showImageName || showImageSupplier) && (
                                 <div className="mt-1 line-clamp-1 text-[10px] text-white/65">
                                   {[
                                     showImageName ? product.sku : null,
-                                    showImageSupplier ? supplierName : null
+                                    showImageSupplier ? product.category?.name : null
                                   ].filter(Boolean).join(" · ")}
                                 </div>
                               )}

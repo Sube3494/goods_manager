@@ -26,6 +26,7 @@ export class ProductService {
     supplierId: string;
     includePublic?: boolean;
     publicOnly?: boolean;
+    pickerView?: boolean;
     shopId?: string;
     shopFilterMode?: "assigned" | "unassigned";
     includeShopOnly?: boolean;
@@ -45,6 +46,7 @@ export class ProductService {
       supplierId,
       includePublic = false,
       publicOnly = false,
+      pickerView = false,
       shopId,
       shopFilterMode = "assigned",
       includeShopOnly = false,
@@ -146,7 +148,9 @@ export class ProductService {
             const pageIds = allItems.slice(skip, skip + pageSize).map(p => p.id);
             const detailedProducts = await prisma.product.findMany({
               where: { id: { in: pageIds } },
-              include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } },
+              ...(pickerView
+                ? { select: { id: true, name: true, image: true, categoryId: true, category: true } }
+                : { include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } } }),
             });
 
             const sortedProducts = pageIds.map(id => detailedProducts.find(d => d.id === id)).filter(Boolean);
@@ -162,7 +166,9 @@ export class ProductService {
     const [pData, pTotal] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } },
+        ...(pickerView
+          ? { select: { id: true, name: true, image: true, categoryId: true, category: true } }
+          : { include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } } }),
         orderBy: standardOrderBy,
         skip,
         take: pageSize,

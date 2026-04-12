@@ -48,6 +48,7 @@ export async function GET(request: Request) {
     const supplierId = searchParams.get("supplierId") || "all";
     const includePublic = searchParams.get("includePublic") === "true";
     const publicOnly = searchParams.get("publicOnly") === "true";
+    const pickerView = searchParams.get("view") === "picker";
     const shopId = searchParams.get("shopId") || undefined;
     const includeShopOnly = searchParams.get("includeShopOnly") === "true";
     const shopFilterModeParam = searchParams.get("shopFilterMode");
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
       supplierId,
       includePublic,
       publicOnly,
+      pickerView,
       shopId,
       shopFilterMode,
       includeShopOnly,
