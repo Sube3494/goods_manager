@@ -46,6 +46,11 @@ export async function GET(request: Request) {
     const sortByParam = searchParams.get("sortBy") || "sku-asc";
     const idsOnly = searchParams.get("idsOnly") === "true";
     const supplierId = searchParams.get("supplierId") || "all";
+    const includePublic = searchParams.get("includePublic") === "true";
+    const shopId = searchParams.get("shopId") || undefined;
+    const includeShopOnly = searchParams.get("includeShopOnly") === "true";
+    const shopFilterModeParam = searchParams.get("shopFilterMode");
+    const shopFilterMode = shopFilterModeParam === "unassigned" ? "unassigned" : "assigned";
 
     const [field, order] = sortByParam.split("-") as [string, "asc" | "desc"];
 
@@ -61,7 +66,11 @@ export async function GET(request: Request) {
       field,
       order,
       idsOnly,
-      supplierId
+      supplierId,
+      includePublic,
+      shopId,
+      shopFilterMode,
+      includeShopOnly,
     });
 
     if (idsOnly && 'ids' in result.items) {
@@ -84,7 +93,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
     const normalizedSku = normalizeSku(sku);
 
     const storage = await getStorageStrategy();
@@ -101,6 +110,20 @@ export async function POST(request: Request) {
       }
     }
 
+    let resolvedShopId: string | null = null;
+    if (shopId) {
+      const shop = await prisma.shop.findFirst({
+        where: user.role === "SUPER_ADMIN" ? { id: String(shopId) } : { id: String(shopId), userId: user.id },
+        select: { id: true },
+      });
+
+      if (!shop) {
+        return NextResponse.json({ error: "店铺不存在" }, { status: 404 });
+      }
+
+      resolvedShopId = shop.id;
+    }
+
     const product = await prisma.product.create({
       data: {
         name,
@@ -113,13 +136,20 @@ export async function POST(request: Request) {
         pinyin: ProductService.generatePinyinSearchText(name),
         isPublic: isPublic ?? true,
         isDiscontinued: isDiscontinued ?? false,
+        isShopOnly: Boolean(isShopOnly && resolvedShopId),
         specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
         remark: remark || null,
         userId: user.id,
+        ...(resolvedShopId ? {
+          shopProducts: {
+            create: [{ shopId: resolvedShopId }],
+          },
+        } : {}),
       },
       include: {
         category: true,
         supplier: true,
+        shopProducts: { select: { shopId: true } },
       }
     });
 
@@ -148,7 +178,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ...product,
-      image: product.image ? storage.resolveUrl(product.image) : null
+      image: product.image ? storage.resolveUrl(product.image) : null,
+      assignedShopIds: product.shopProducts.map((item) => item.shopId),
     });
   } catch (error: unknown) {
     return handlePrismaError(error, "商品", "Failed to create product");

@@ -16,7 +16,8 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { name: "概览", href: "/", icon: LayoutDashboard, adminOnly: true, permission: "product:read", description: "仓储总览与快捷入口", section: "workspace" },
-  { name: "商品管理", href: "/goods", icon: Package, adminOnly: true, permission: "product:read", description: "商品档案与库存查询", section: "workspace" },
+  { name: "商品管理", href: "/goods", icon: Package, adminOnly: true, superAdminOnly: true, permission: "product:read", description: "商品档案与库存查询", section: "workspace" },
+  { name: "店铺商品", href: "/shop-goods", icon: Store, adminOnly: true, permission: "logistics:manage", description: "按店铺管理经营商品清单", section: "workspace" },
   { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true, permission: "category:manage", description: "维护商品分类结构", section: "workspace" },
   { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true, permission: "supplier:manage", description: "供应商资料与联络信息", section: "workspace" },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true, permission: "purchase:manage", description: "日常采购与到货记录", section: "workspace" },

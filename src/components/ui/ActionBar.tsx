@@ -10,6 +10,11 @@ interface ActionBarProps {
   onDelete?: () => void;
   onEdit?: () => void;
   label?: string;
+  extraActions?: Array<{
+    label: string;
+    onClick: () => void;
+    variant?: "default" | "danger";
+  }>;
 }
 
 export function ActionBar({ 
@@ -19,7 +24,8 @@ export function ActionBar({
   onClear, 
   onDelete, 
   onEdit,
-  label = "项" 
+  label = "项",
+  extraActions = [],
 }: ActionBarProps) {
   const isAllSelected = selectedCount === totalCount && totalCount > 0;
 
@@ -73,6 +79,19 @@ export function ActionBar({
                   删除
                 </button>
               )}
+              {extraActions.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={action.onClick}
+                  className={
+                    action.variant === "danger"
+                      ? "h-9 sm:h-8 px-4 sm:px-6 rounded-full bg-red-500 hover:bg-red-600 text-white text-[11px] sm:text-xs font-black shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all whitespace-nowrap"
+                      : "h-9 sm:h-8 px-4 sm:px-6 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] sm:text-xs font-black shadow-lg shadow-primary/20 active:scale-[0.98] transition-all whitespace-nowrap"
+                  }
+                >
+                  {action.label}
+                </button>
+              ))}
               <div className="w-px h-6 sm:h-8 bg-black/5 dark:bg-white/10 mx-1 sm:mx-2" />
 
               <button 

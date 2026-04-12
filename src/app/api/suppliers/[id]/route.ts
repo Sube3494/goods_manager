@@ -13,8 +13,11 @@ export async function GET(
     }
 
     const { id } = await params;
-    const supplier = await prisma.supplier.findUnique({
-      where: { id }
+    const supplier = await prisma.supplier.findFirst({
+      where: {
+        id,
+        userId: session.id,
+      },
     });
     if (!supplier) {
       return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
@@ -37,8 +40,20 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
+    const existingSupplier = await prisma.supplier.findFirst({
+      where: {
+        id,
+        userId: session.id,
+      },
+      select: { id: true },
+    });
+
+    if (!existingSupplier) {
+      return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
+    }
+
     const supplier = await prisma.supplier.update({
-      where: { id },
+      where: { id: existingSupplier.id },
       data: body
     });
     return NextResponse.json(supplier);
@@ -58,26 +73,47 @@ export async function DELETE(
     }
 
     const { id: idParam } = await params;
-    
     const ids = idParam.split(",");
+    const ownedSuppliers = await prisma.supplier.findMany({
+      where: {
+        id: { in: ids },
+        userId: session.id,
+      },
+      select: { id: true },
+    });
+    const ownedIds = ownedSuppliers.map((item) => item.id);
 
-    // 使用事务确保“先解绑，后删除”的原子性
+    if (ownedIds.length === 0) {
+      return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
+    }
+    if (ownedIds.length !== ids.length) {
+      return NextResponse.json({ error: "包含无权操作的供应商" }, { status: 403 });
+    }
+
     await prisma.$transaction(async (tx) => {
-      // 1. 解绑商品 (将关联商品的 supplierId 置为 null)
       await tx.product.updateMany({
-        where: { supplierId: { in: ids } },
+        where: {
+          supplierId: { in: ownedIds },
+          userId: session.id,
+        },
         data: { supplierId: null }
       });
 
-      // 2. 解绑采购项 (将关联采购单项的 supplierId 置为 null)
       await tx.purchaseOrderItem.updateMany({
-        where: { supplierId: { in: ids } },
+        where: {
+          supplierId: { in: ownedIds },
+          purchaseOrder: {
+            userId: session.id,
+          },
+        },
         data: { supplierId: null }
       });
 
-      // 3. 执行删除
       await tx.supplier.deleteMany({
-        where: { id: { in: ids } }
+        where: {
+          id: { in: ownedIds },
+          userId: session.id,
+        }
       });
     });
     

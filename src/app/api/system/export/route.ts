@@ -15,14 +15,20 @@ export async function GET() {
     // Fetch all relevant data
     const [products, categories, suppliers, purchaseOrders, outboundOrders] = await Promise.all([
       prisma.product.findMany({
+        where: { userId: session.id },
         include: {
           category: true,
           supplier: true
         }
       }),
-      prisma.category.findMany(),
-      prisma.supplier.findMany(),
+      prisma.category.findMany({
+        where: { userId: session.id },
+      }),
+      prisma.supplier.findMany({
+        where: { userId: session.id },
+      }),
       prisma.purchaseOrder.findMany({
+        where: { userId: session.id },
         include: {
           items: {
             include: {
@@ -32,6 +38,7 @@ export async function GET() {
         }
       }),
       prisma.outboundOrder.findMany({
+        where: { userId: session.id },
         include: {
           items: {
             include: {

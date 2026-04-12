@@ -14,13 +14,23 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
+    const existingCategory = await prisma.category.findFirst({
+      where: {
+        id,
+        userId: session.id,
+      },
+    });
+
+    if (!existingCategory) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
     const category = await prisma.category.update({
-      where: { id },
+      where: { id: existingCategory.id },
       data: {
         name: body.name,
         description: body.description,
-
-      }
+      },
     });
     return NextResponse.json(category);
   } catch {
@@ -39,15 +49,28 @@ export async function DELETE(
     }
 
     const { id: idParam } = await params;
-    
-    // 支持逗号分隔的批量 ID
     const ids = idParam.split(",");
+    const ownedCategories = await prisma.category.findMany({
+      where: {
+        id: { in: ids },
+        userId: session.id,
+      },
+      select: { id: true },
+    });
+    const ownedIds = ownedCategories.map((item) => item.id);
 
-    // 检查是否有任何分类下仍有商品 (Check if any category has products)
+    if (ownedIds.length === 0) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+    if (ownedIds.length !== ids.length) {
+      return NextResponse.json({ error: "包含无权操作的分类" }, { status: 403 });
+    }
+
     const productCount = await prisma.product.count({
       where: {
-        categoryId: { in: ids }
-      }
+        categoryId: { in: ownedIds },
+        userId: session.id,
+      },
     });
 
     if (productCount > 0) {
@@ -59,8 +82,9 @@ export async function DELETE(
 
     await prisma.category.deleteMany({
       where: {
-        id: { in: ids }
-      }
+        id: { in: ownedIds },
+        userId: session.id,
+      },
     });
     
     return NextResponse.json({ success: true });

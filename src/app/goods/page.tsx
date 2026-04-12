@@ -89,6 +89,13 @@ export default function GoodsPage() {
   const canCreate = hasPermission(user as SessionUser | null, "product:create");
   const canUpdate = hasPermission(user as SessionUser | null, "product:update");
   const canDelete = hasPermission(user as SessionUser | null, "product:delete");
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+
+  useEffect(() => {
+    if (user && !isSuperAdmin) {
+      setIsLoading(false);
+    }
+  }, [user, isSuperAdmin]);
 
   // Sync ref with items
   useEffect(() => {
@@ -444,6 +451,7 @@ export default function GoodsPage() {
         search: debouncedSearch,
         category: selectedCategory,
         status: selectedStatus,
+        supplierId: selectedSupplier,
         sortBy: sortBy,
       });
 
@@ -517,7 +525,7 @@ export default function GoodsPage() {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, sortBy, showToast]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
 
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
@@ -546,6 +554,10 @@ export default function GoodsPage() {
   // For simplicity and unified UI, we prioritize local state controlled by dropdowns
   
   // No local sorting needed anymore, we trust server-side globally-sorted pagination
+
+  if (user && !isSuperAdmin) {
+    return null;
+  }
 
   return (
     <div className="space-y-8">

@@ -13,7 +13,8 @@ export const GoodsCard = memo(function GoodsCard({
   isSelected = false,
   anySelected = false,
   onToggleSelect,
-  priority
+  priority,
+  hideDiscontinuedState = false,
 }: { 
   product: Product; 
   onEdit?: (product: Product) => void;
@@ -23,6 +24,7 @@ export const GoodsCard = memo(function GoodsCard({
   anySelected?: boolean;
   onToggleSelect?: (id: string) => void;
   priority?: boolean;
+  hideDiscontinuedState?: boolean;
 }) {
   const [isCopied, setIsCopied] = useState(false);
   const { showToast } = useToast();
@@ -48,11 +50,11 @@ export const GoodsCard = memo(function GoodsCard({
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-2xl glass-panel transition-all duration-200 hover:-translate-y-1.5 cursor-pointer",
         isSelected ? "ring-2 ring-primary shadow-lg shadow-primary/20 bg-primary/5" : "hover:shadow-2xl hover:shadow-primary/10",
-        product.isDiscontinued ? "bg-muted/30 border-muted-foreground/20" : ""
+        product.isDiscontinued && !hideDiscontinuedState ? "bg-muted/30 border-muted-foreground/20" : ""
       )}
     >
       {/* Full Card Discontinued Overlay */}
-      {product.isDiscontinued && (
+      {product.isDiscontinued && !hideDiscontinuedState && (
         <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center overflow-hidden">
           {/* 使用普通的半透明遮罩代替昂贵的 backdrop-grayscale 滤镜 */}
           <div className="absolute inset-0 bg-white/60 dark:bg-black/80"></div>
@@ -244,6 +246,7 @@ export const GoodsCard = memo(function GoodsCard({
     prev.product.sku === next.product.sku &&
     prev.product.supplierId === next.product.supplierId &&
     prev.product.categoryId === next.product.categoryId &&
-    prev.product.isDiscontinued === next.product.isDiscontinued
+    prev.product.isDiscontinued === next.product.isDiscontinued &&
+    prev.hideDiscontinuedState === next.hideDiscontinuedState
   );
 });

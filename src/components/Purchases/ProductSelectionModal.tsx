@@ -28,6 +28,8 @@ interface ProductSelectionModalProps {
   allowCreate?: boolean;
   showPlatformSelector?: boolean;
   imageOnly?: boolean;
+  query?: Record<string, string>;
+  createPayload?: Record<string, unknown>;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -58,6 +60,8 @@ export function ProductSelectionModal({
   allowCreate = true,
   showPlatformSelector = true,
   imageOnly = false,
+  query,
+  createPayload,
 }: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
@@ -130,6 +134,7 @@ export function ProductSelectionModal({
         page: targetPage.toString(),
         pageSize: "20",
         search: mode === 'initial' ? "" : debouncedSearch,
+        ...(query || {}),
       });
 
       const [pRes, sRes] = await Promise.all([
@@ -168,7 +173,7 @@ export function ProductSelectionModal({
         setIsNextPageLoading(false);
       }
     }
-  }, [debouncedSearch, fetchPath]);
+  }, [debouncedSearch, fetchPath, query]);
 
   useEffect(() => {
     if (!isOpen || !isInitialized) return;
@@ -204,7 +209,10 @@ export function ProductSelectionModal({
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          ...(createPayload || {}),
+        }),
       });
 
       if (res.ok) {

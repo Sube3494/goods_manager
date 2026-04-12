@@ -45,6 +45,7 @@ export interface Product {
   id: string;
   sku?: string;
   name: string;
+  sourceProductId?: string | null;
   categoryId: string;
   category?: Category;
   costPrice: number;
@@ -52,12 +53,26 @@ export interface Product {
   image?: string;
   isPublic?: boolean;
   isDiscontinued?: boolean;
+  isShopOnly?: boolean;
   specs?: Record<string, string>;
   remark?: string;
   supplierId?: string;
   supplier?: Supplier;
   workspaceId?: string;
   gallery?: GalleryItem[];
+  assignedShopIds?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Shop {
+  id: string;
+  name: string;
+  address?: string | null;
+  province?: string | null;
+  city?: string | null;
+  externalId?: string | null;
+  isSource?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

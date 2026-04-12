@@ -24,8 +24,29 @@ export class ProductService {
     order: 'asc' | 'desc';
     idsOnly: boolean;
     supplierId: string;
+    includePublic?: boolean;
+    shopId?: string;
+    shopFilterMode?: "assigned" | "unassigned";
+    includeShopOnly?: boolean;
   }) {
-    const { userId, role, lowStockThreshold, page, pageSize, search, categoryName, status, field, order, idsOnly, supplierId } = params;
+    const {
+      userId,
+      role,
+      lowStockThreshold,
+      page,
+      pageSize,
+      search,
+      categoryName,
+      status,
+      field,
+      order,
+      idsOnly,
+      supplierId,
+      includePublic = false,
+      shopId,
+      shopFilterMode = "assigned",
+      includeShopOnly = false,
+    } = params;
 
     const andConditions: Prisma.ProductWhereInput[] = [];
     
@@ -33,12 +54,20 @@ export class ProductService {
     if (!userId) {
       andConditions.push({ isPublic: true });
     } else if (role !== "SUPER_ADMIN") {
-      andConditions.push({
-        OR: [
-          { userId: userId },
-          { isPublic: true }
-        ]
-      });
+      andConditions.push(
+        includePublic
+          ? {
+              OR: [
+                { userId },
+                { isPublic: true }
+              ]
+            }
+          : { userId }
+      );
+    }
+
+    if (!shopId && !includeShopOnly) {
+      andConditions.push({ isShopOnly: false });
     }
 
     if (search) {
@@ -59,6 +88,16 @@ export class ProductService {
       } else {
         andConditions.push({ supplierId: supplierId });
       }
+    }
+
+    if (shopId) {
+      andConditions.push(
+        shopFilterMode === "unassigned"
+          ? { shopProducts: { none: { shopId } } }
+          : { shopProducts: { some: { shopId } } }
+      );
+    } else if (shopFilterMode === "unassigned") {
+      andConditions.push({ shopProducts: { none: {} } });
     }
 
     if (status === "low_stock") {
@@ -103,7 +142,7 @@ export class ProductService {
             const pageIds = allItems.slice(skip, skip + pageSize).map(p => p.id);
             const detailedProducts = await prisma.product.findMany({
               where: { id: { in: pageIds } },
-              include: { category: true, supplier: true, gallery: { take: 1 } },
+              include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } },
             });
 
             const sortedProducts = pageIds.map(id => detailedProducts.find(d => d.id === id)).filter(Boolean);
@@ -119,7 +158,7 @@ export class ProductService {
     const [pData, pTotal] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: { category: true, supplier: true, gallery: { take: 1 } },
+        include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } },
         orderBy: standardOrderBy,
         skip,
         take: pageSize,
@@ -136,7 +175,8 @@ export class ProductService {
     const resolved = (products as Record<string, unknown>[]).map(p => ({
       ...p,
       image: p.image ? storage.resolveUrl(p.image as string) : null,
-      gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || []
+      gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || [],
+      assignedShopIds: (p.shopProducts as Array<{ shopId: string }> | undefined)?.map((item) => item.shopId) || [],
     }));
 
     return {

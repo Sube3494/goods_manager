@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
-import { SessionUser } from "@/lib/permissions";
+import { getAuthorizedUser } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { OrderParser } from "@/lib/orderParser";
 import { InventoryService } from "@/services/inventoryService";
+import { ProductService } from "@/services/productService";
 import { AddressItem, BrushShopItem } from "@/lib/types";
 import { Prisma } from "../../../../../prisma/generated-client";
 
@@ -12,6 +13,14 @@ interface UserImportProfile {
   shippingAddresses?: AddressItem[] | null;
   brushShops?: BrushShopItem[] | string[] | null;
 }
+
+type MatchableProduct = {
+  id: string;
+  name: string;
+  sku: string | null;
+  stock: number;
+  sourceProductId?: string | null;
+};
 
 function normalizeText(value: unknown) {
   return String(value || "").trim();
@@ -92,6 +101,170 @@ function inferPlatform(platform: unknown) {
   return rawPlatform || "帮我取货";
 }
 
+async function ensureCategory(userId: string, sourceCategoryName?: string | null) {
+  const name = sourceCategoryName?.trim() || "其他分类";
+
+  let category = await prisma.category.findFirst({
+    where: { userId, name },
+  });
+
+  if (!category) {
+    category = await prisma.category.create({
+      data: {
+        userId,
+        name,
+      },
+    });
+  }
+
+  return category;
+}
+
+async function ensureSupplier(userId: string, sourceSupplierName?: string | null) {
+  const name = sourceSupplierName?.trim();
+  if (!name) {
+    return null;
+  }
+
+  let supplier = await prisma.supplier.findFirst({
+    where: { userId, name },
+  });
+
+  if (!supplier) {
+    supplier = await prisma.supplier.create({
+      data: {
+        userId,
+        name,
+        contact: "",
+        phone: "",
+        email: "",
+        address: "",
+      },
+    });
+  }
+
+  return supplier;
+}
+
+async function generateAvailableSku(baseSku: string | null) {
+  if (!baseSku) {
+    return null;
+  }
+
+  const normalizedBase = baseSku.trim();
+  if (!normalizedBase) {
+    return null;
+  }
+
+  const directHit = await prisma.product.findUnique({
+    where: { sku: normalizedBase },
+    select: { id: true },
+  });
+
+  if (!directHit) {
+    return normalizedBase;
+  }
+
+  for (let i = 1; i <= 999; i += 1) {
+    const candidate = `${normalizedBase}-COPY${i}`;
+    const hit = await prisma.product.findUnique({
+      where: { sku: candidate },
+      select: { id: true },
+    });
+
+    if (!hit) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function importPublicProductForUser(userId: string, sourceProductId: string): Promise<MatchableProduct | null> {
+  const existingImported = await prisma.product.findFirst({
+    where: {
+      userId,
+      sourceProductId,
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      stock: true,
+      sourceProductId: true,
+    },
+  });
+
+  if (existingImported) {
+    return existingImported;
+  }
+
+  const sourceProduct = await prisma.product.findFirst({
+    where: {
+      id: sourceProductId,
+      isPublic: true,
+    },
+    include: {
+      category: true,
+      supplier: true,
+      gallery: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  });
+
+  if (!sourceProduct || sourceProduct.userId === userId) {
+    return null;
+  }
+
+  const [category, supplier, sku] = await Promise.all([
+    ensureCategory(userId, sourceProduct.category?.name),
+    ensureSupplier(userId, sourceProduct.supplier?.name),
+    generateAvailableSku(sourceProduct.sku),
+  ]);
+
+  const product = await prisma.product.create({
+    data: {
+      name: sourceProduct.name,
+      sku,
+      costPrice: sourceProduct.costPrice,
+      stock: 0,
+      image: sourceProduct.image,
+      categoryId: category.id,
+      supplierId: supplier?.id || null,
+      isPublic: false,
+      isDiscontinued: sourceProduct.isDiscontinued,
+      specs: sourceProduct.specs ?? undefined,
+      pinyin: ProductService.generatePinyinSearchText(sourceProduct.name),
+      remark: sourceProduct.remark,
+      userId,
+      sourceProductId: sourceProduct.id,
+      gallery: sourceProduct.gallery.length
+        ? {
+            create: sourceProduct.gallery.map((item) => ({
+              url: item.url,
+              thumbnailUrl: item.thumbnailUrl,
+              tags: item.tags,
+              isPublic: item.isPublic,
+              type: item.type,
+              sortOrder: item.sortOrder,
+              userId,
+            })),
+          }
+        : undefined,
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      stock: true,
+      sourceProductId: true,
+    },
+  });
+
+  return product;
+}
+
 async function restoreOutboundInventory(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -160,10 +333,10 @@ async function restoreOutboundInventory(
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession() as SessionUser | null;
+    const session = await getAuthorizedUser("brush:manage") as SessionUser | null;
     const userId = session?.id;
     if (!session || !userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     if (session.role !== "SUPER_ADMIN") {
@@ -190,6 +363,10 @@ export async function POST(req: NextRequest) {
       realOrdersCount: 0,
       overwrittenCount: 0,
     };
+    const canImportMatchedPublicProduct =
+      hasPermission(session, "product:create") &&
+      hasPermission(session, "category:manage") &&
+      hasPermission(session, "supplier:manage");
 
     // 获取用户的预设店铺列表（用于智能洗清过长的平台店名）
     const userDb = await prisma.user.findUnique({
@@ -220,9 +397,19 @@ export async function POST(req: NextRequest) {
     const normalizedBrushShopNames = Array.from(brushShopNames).map((name) => normalizeText(name)).filter(Boolean);
 
     // 取出用户所有的商品用于智能名称匹配
-    const allProducts = await prisma.product.findMany({
+    const allProducts: MatchableProduct[] = await prisma.product.findMany({
       where: { userId },
-      select: { id: true, name: true, sku: true, stock: true } // 需要库存用于智能补偿
+      select: { id: true, name: true, sku: true, stock: true, sourceProductId: true }
+    });
+    const publicProducts = await prisma.product.findMany({
+      where: {
+        isPublic: true,
+        NOT: { userId },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
     });
 
     for (let i = 0; i < data.length; i++) {
@@ -354,7 +541,19 @@ export async function POST(req: NextRequest) {
         const matchedItems: { productId: string, quantity: number }[] = [];
         let matchFailed = false;
         for (const item of parsedItems) {
-          const product = OrderParser.findBestMatchProduct(item.rawName, allProducts);
+          let product = OrderParser.findBestMatchProduct(item.rawName, allProducts);
+
+          if (!product && canImportMatchedPublicProduct) {
+            const publicProduct = OrderParser.findBestMatchProduct(item.rawName, publicProducts);
+            if (publicProduct) {
+              const importedProduct = await importPublicProductForUser(userId, publicProduct.id);
+              if (importedProduct) {
+                allProducts.push(importedProduct);
+                product = importedProduct;
+              }
+            }
+          }
+
           if (!product) {
             results.failed++;
             results.errors.push(`第 ${rowNumber} 行: 找不到匹配的商品 "${item.rawName}"`);

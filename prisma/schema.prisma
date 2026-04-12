@@ -38,8 +38,10 @@ model Product {
   specs           Json?
   pinyin          String?
   isDiscontinued  Boolean             @default(false)
+  isShopOnly      Boolean             @default(false)
   remark          String?
   userId          String?
+  sourceProductId String?
   brushProducts   BrushProduct[]
   brushOrderItems     BrushOrderItem[]
   brushOrderPlanItems BrushOrderPlanItem[]
@@ -49,12 +51,15 @@ model Product {
   supplier        Supplier?           @relation(fields: [supplierId], references: [id])
   user            User?               @relation(fields: [userId], references: [id])
   orderItems      PurchaseOrderItem[]
+  shopProducts    ShopProduct[]
   storeOpeningItems StoreOpeningItem[]
 
   @@index([categoryId])
   @@index([supplierId])
+  @@index([sourceProductId])
   @@index([userId, pinyin])
   @@index([userId, createdAt])
+  @@unique([userId, sourceProductId])
 }
 
 model Supplier {
@@ -482,10 +487,26 @@ model Shop {
   externalId  String?  // 外部系统ID，如美团POI_ID，用于去重
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
+  shopProducts ShopProduct[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([userId])
   @@index([province, city])
   @@unique([userId, externalId])
+}
+
+model ShopProduct {
+  id        String   @id @default(cuid())
+  shopId     String
+  productId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, productId])
+  @@index([productId])
+  @@index([shopId, createdAt])
 }

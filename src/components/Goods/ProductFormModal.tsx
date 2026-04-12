@@ -34,12 +34,29 @@ interface ProductFormModalProps {
   onClose: () => void;
   onSubmit: (data: Omit<Product, "id"> & { id?: string }, galleryItems?: GalleryItem[]) => Promise<void>;
   initialData?: Product | null;
+  title?: string;
+  hideVisibilityControl?: boolean;
+  hideProductionControl?: boolean;
+  hideSpecsSection?: boolean;
+  hideGallerySection?: boolean;
+  coverOnlyMode?: boolean;
 }
 
 import { createPortal } from "react-dom";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
 
-export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: ProductFormModalProps) {
+export function ProductFormModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
+  title,
+  hideVisibilityControl = false,
+  hideProductionControl = false,
+  hideSpecsSection = false,
+  hideGallerySection = false,
+  coverOnlyMode = false,
+}: ProductFormModalProps) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
     name: initialData?.name || "",
@@ -882,7 +899,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
             className="fixed left-1/2 top-1/2 z-70001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-              <h2 className="text-2xl font-bold text-foreground">{initialData ? "编辑商品" : "新增商品"}</h2>
+              <h2 className="text-2xl font-bold text-foreground">{title || (initialData ? "编辑商品" : "新增商品")}</h2>
               <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={24} />
               </button>
@@ -956,52 +973,55 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                     {user?.role === "SUPER_ADMIN" && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Production Condition Box */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                    <Activity size={16} /> 生产状态
-                                </label>
-                                <div className={cn(
-                                    "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
-                                    formData.isDiscontinued 
-                                        ? "bg-red-500/5 border-red-500/20" 
-                                        : "bg-emerald-500/5 border-emerald-500/20"
-                                )}>
-                                    <span className={cn(
-                                        "text-xs tracking-wider",
-                                        formData.isDiscontinued ? "text-red-500" : "text-emerald-500"
-                                    )}>
-                                        {formData.isDiscontinued ? "已停止生产" : "正常供应"}
-                                    </span>
-                                    <Switch 
-                                        checked={!formData.isDiscontinued} 
-                                        onChange={(val) => setFormData(prev => ({ ...prev, isDiscontinued: !val }))} 
-                                    />
-                                </div>
-                            </div>
+                            {!hideProductionControl && (
+                              <div className="space-y-2">
+                                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                      <Activity size={16} /> 生产状态
+                                  </label>
+                                  <div className={cn(
+                                      "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
+                                      formData.isDiscontinued 
+                                          ? "bg-red-500/5 border-red-500/20" 
+                                          : "bg-emerald-500/5 border-emerald-500/20"
+                                  )}>
+                                      <span className={cn(
+                                          "text-xs tracking-wider",
+                                          formData.isDiscontinued ? "text-red-500" : "text-emerald-500"
+                                      )}>
+                                          {formData.isDiscontinued ? "已停止生产" : "正常供应"}
+                                      </span>
+                                      <Switch 
+                                          checked={!formData.isDiscontinued} 
+                                          onChange={(val) => setFormData(prev => ({ ...prev, isDiscontinued: !val }))} 
+                                      />
+                                  </div>
+                              </div>
+                            )}
 
-                            {/* Visibility Box */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                    <Eye size={16} /> 展示权限
-                                </label>
-                                <div className={cn(
-                                    "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
-                                    formData.isPublic 
-                                        ? "bg-emerald-500/5 border-emerald-500/20" 
-                                        : "bg-amber-500/5 border-amber-500/10"
-                                )}>
-                                    <span className={cn(
-                                        "text-xs tracking-wider",
-                                        formData.isPublic ? "text-emerald-500" : "text-amber-600"
-                                    )}>
-                                        {formData.isPublic ? "公开可见" : "仅自己可见"}
-                                    </span>
-                                    <Switch 
-                                        checked={formData.isPublic} 
-                                        onChange={(val) => setFormData(prev => ({ ...prev, isPublic: val }))} 
-                                    />
-                                </div>
-                            </div>
+                            {!hideVisibilityControl && (
+                              <div className="space-y-2">
+                                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                      <Eye size={16} /> 展示权限
+                                  </label>
+                                  <div className={cn(
+                                      "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
+                                      formData.isPublic 
+                                          ? "bg-emerald-500/5 border-emerald-500/20" 
+                                          : "bg-amber-500/5 border-amber-500/10"
+                                  )}>
+                                      <span className={cn(
+                                          "text-xs tracking-wider",
+                                          formData.isPublic ? "text-emerald-500" : "text-amber-600"
+                                      )}>
+                                          {formData.isPublic ? "公开可见" : "仅自己可见"}
+                                      </span>
+                                      <Switch 
+                                          checked={formData.isPublic} 
+                                          onChange={(val) => setFormData(prev => ({ ...prev, isPublic: val }))} 
+                                      />
+                                  </div>
+                              </div>
+                            )}
                         </div>
                     )}
 
@@ -1060,6 +1080,59 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                         </div>
 
                     </div>
+
+                    {coverOnlyMode && (
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <Camera size={16} /> 商品封面
+                          </label>
+                          {formData.image && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData((prev) => ({ ...prev, image: "" }));
+                                setGalleryImages([]);
+                              }}
+                              className="text-[10px] font-bold uppercase tracking-widest text-destructive hover:text-destructive/80"
+                            >
+                              移除封面
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                          <label className="relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-border bg-white/70 dark:bg-white/5 hover:border-primary/40 hover:bg-primary/5 transition-all">
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/*"
+                              onChange={(e) => handleFileUpload(e, true)}
+                              disabled={!!isUploading}
+                            />
+                            {formData.image ? (
+                              <Image
+                                src={formData.image}
+                                alt="商品封面"
+                                fill
+                                sizes="112px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Camera size={20} />
+                                <span className="text-[11px] font-medium">上传封面</span>
+                              </div>
+                            )}
+                          </label>
+
+                          <div className="min-w-0 text-xs text-muted-foreground leading-6">
+                            <div>仅支持单张封面图。</div>
+                            {isUploading && <div className="text-primary font-medium mt-1">{String(isUploading)}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                             {/* Inbound History */}
                             {initialData && (
@@ -1137,6 +1210,7 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             )}
                         
                     {/* Specifications */}
+                    {!hideSpecsSection && (
                     <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1186,8 +1260,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                             )}
                         </div>
                     </div>
+                    )}
 
                     {/* Real Photos Management */}
+                    {!hideGallerySection && (
                     <div className="space-y-4 pt-4 border-t border-border/50">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1263,7 +1339,6 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 )}
                             </div>
                         </div>
-                    </div>
                         
                         <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3">
                                 {displayList.map((img, index) => {
@@ -1495,7 +1570,9 @@ export function ProductFormModal({ isOpen, onClose, onSubmit, initialData }: Pro
                                 )}
                         </div>
                     </div>
+                    )}
 
+                </div>
                 <div className="flex flex-row justify-end items-center gap-3 sm:gap-4 border-t border-white/10 p-4 sm:p-8 shrink-0">
                     <button
                         type="button"
