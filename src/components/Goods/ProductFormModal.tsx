@@ -336,7 +336,8 @@ export function ProductFormModal({
             const data = await (isMain ? uploadMainImage(file) : uploadGalleryMedia(file, "gallery", (pct) => {
                setIsUploading(`文件 ${completedCount + 1}/${filesArray.length} : ${pct}%`);
             }));
-            const { url, path, type, skipped, thumbnailUrl, thumbnailPath } = data;
+            const { url, path, type, thumbnailUrl, thumbnailPath } = data;
+            const skipped = "skipped" in data ? Boolean(data.skipped) : false;
             const normalizedUrl = isMain && mainImageUploadEndpoint ? url : (path || url);
             
             // 使用函数式状态更新，避免闭包中的陈旧依赖导致重复或遗漏

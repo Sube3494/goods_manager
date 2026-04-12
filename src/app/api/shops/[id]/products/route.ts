@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { Prisma } from "../../../../../../prisma/generated-client";
 
 async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
   return prisma.shop.findFirst({
@@ -119,6 +120,8 @@ export async function GET(
               id: true,
               name: true,
               image: true,
+              categoryId: true,
+              supplierId: true,
               category: { select: { name: true } },
             },
           },
@@ -241,7 +244,7 @@ export async function PUT(
         isPublic,
         isDiscontinued,
         remark: remark || null,
-        specs: null,
+        specs: Prisma.JsonNull,
       },
       select: {
         id: true,
@@ -359,7 +362,7 @@ export async function POST(
         isPublic: product.isPublic,
         isDiscontinued: product.isDiscontinued,
         remark: product.remark,
-        specs: null,
+        specs: Prisma.JsonNull,
       })),
       skipDuplicates: true,
     });

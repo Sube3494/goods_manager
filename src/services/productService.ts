@@ -146,12 +146,20 @@ export class ProductService {
             if (idsOnly) return { items: { ids: allItems.map(p => p.id), total: totalCount } };
 
             const pageIds = allItems.slice(skip, skip + pageSize).map(p => p.id);
-            const detailedProducts = await prisma.product.findMany({
-              where: { id: { in: pageIds } },
-              ...(pickerView
-                ? { select: { id: true, name: true, image: true, categoryId: true, category: true } }
-                : { include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } } }),
-            });
+            const detailedProducts = pickerView
+              ? await prisma.product.findMany({
+                  where: { id: { in: pageIds } },
+                  select: { id: true, name: true, image: true, categoryId: true, category: true },
+                })
+              : await prisma.product.findMany({
+                  where: { id: { in: pageIds } },
+                  include: {
+                    category: true,
+                    supplier: true,
+                    gallery: { take: 1 },
+                    shopProducts: { select: { shopId: true } },
+                  },
+                });
 
             const sortedProducts = pageIds.map(id => detailedProducts.find(d => d.id === id)).filter(Boolean);
             return await this.formatResponse(sortedProducts, totalCount, page, pageSize);
@@ -164,15 +172,26 @@ export class ProductService {
     }
 
     const [pData, pTotal] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        ...(pickerView
-          ? { select: { id: true, name: true, image: true, categoryId: true, category: true } }
-          : { include: { category: true, supplier: true, gallery: { take: 1 }, shopProducts: { select: { shopId: true } } } }),
-        orderBy: standardOrderBy,
-        skip,
-        take: pageSize,
-      }),
+      pickerView
+        ? prisma.product.findMany({
+            where,
+            select: { id: true, name: true, image: true, categoryId: true, category: true },
+            orderBy: standardOrderBy,
+            skip,
+            take: pageSize,
+          })
+        : prisma.product.findMany({
+            where,
+            include: {
+              category: true,
+              supplier: true,
+              gallery: { take: 1 },
+              shopProducts: { select: { shopId: true } },
+            },
+            orderBy: standardOrderBy,
+            skip,
+            take: pageSize,
+          }),
       prisma.product.count({ where })
     ]);
 
