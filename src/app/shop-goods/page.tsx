@@ -72,7 +72,7 @@ export default function ShopGoodsPage() {
   useEffect(() => {
     const fetchShops = async () => {
       try {
-        const res = await fetch("/api/shops");
+        const res = await fetch("/api/shops?source=shipping-addresses");
         const data = await res.json().catch(() => ({ shops: [] }));
         if (!res.ok) {
           showToast(data?.error || "店铺加载失败", "error");

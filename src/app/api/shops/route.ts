@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     const scope = request.nextUrl.searchParams.get("scope");
+    const source = request.nextUrl.searchParams.get("source");
     const canViewAllShops = user.role === "SUPER_ADMIN" && scope === "all";
 
     if (canViewAllShops) {
@@ -82,7 +83,12 @@ export async function GET(request: NextRequest) {
     }
 
     const shops = await prisma.shop.findMany({
-      where: { userId: user.id },
+      where: source === "shipping-addresses"
+        ? {
+            userId: user.id,
+            name: { in: normalizedAddresses.map((item) => item.name) },
+          }
+        : { userId: user.id },
       orderBy: { createdAt: "desc" },
     });
 
