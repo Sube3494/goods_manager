@@ -497,11 +497,24 @@ model Shop {
 }
 
 model ShopProduct {
-  id        String   @id @default(cuid())
-  shopId     String
-  productId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  shopId          String
+  productId       String
+  sku             String?
+  productName     String?
+  productImage    String?
+  categoryId      String?
+  categoryName    String?
+  supplierId      String?
+  costPrice       Float    @default(0)
+  stock           Int      @default(0)
+  isPublic        Boolean  @default(true)
+  isDiscontinued  Boolean  @default(false)
+  remark          String?
+  specs           Json?
+  sourceProductId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)

@@ -31,6 +31,7 @@ interface ProductSelectionModalProps {
   minimalView?: boolean;
   query?: Record<string, string>;
   createPayload?: Record<string, unknown>;
+  emptyStateText?: string;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -64,6 +65,7 @@ export function ProductSelectionModal({
   minimalView = false,
   query,
   createPayload,
+  emptyStateText = "未找到相关商品",
 }: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
@@ -73,6 +75,7 @@ export function ProductSelectionModal({
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showInitialSkeleton, setShowInitialSkeleton] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -87,6 +90,7 @@ export function ProductSelectionModal({
   const [mounted] = useState(typeof window !== "undefined");
   const [targetPlatform, setTargetPlatform] = useState("美团");
   const PLATFORMS = ["美团", "淘宝", "京东"];
+  const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
 
 
   // 初始化重置逻辑
@@ -105,6 +109,7 @@ export function ProductSelectionModal({
       setIsInitialized(true);
     } else {
       setIsInitialized(false);
+      setShowInitialSkeleton(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); // 移除对 selectedIds 的依赖，因为它可能由于父组件重渲染而导致意外重置
@@ -175,7 +180,29 @@ export function ProductSelectionModal({
         setIsNextPageLoading(false);
       }
     }
-  }, [debouncedSearch, fetchPath, query]);
+  }, [debouncedSearch, fetchPath, minimalView, query]);
+
+  useEffect(() => {
+    if (loadingDelayRef.current) {
+      clearTimeout(loadingDelayRef.current);
+      loadingDelayRef.current = null;
+    }
+
+    if (isLoading && products.length === 0) {
+      loadingDelayRef.current = setTimeout(() => {
+        setShowInitialSkeleton(true);
+      }, 180);
+    } else {
+      setShowInitialSkeleton(false);
+    }
+
+    return () => {
+      if (loadingDelayRef.current) {
+        clearTimeout(loadingDelayRef.current);
+        loadingDelayRef.current = null;
+      }
+    };
+  }, [isLoading, products.length]);
 
   useEffect(() => {
     if (!isOpen || !isInitialized) return;
@@ -184,6 +211,7 @@ export function ProductSelectionModal({
 
   useEffect(() => {
     if (!isOpen || !isInitialized || isLoading) return; 
+    if (debouncedSearch.trim() === "") return;
     fetchData('search');
   }, [debouncedSearch, isOpen, isInitialized, isLoading, fetchData]);
 
@@ -426,7 +454,7 @@ export function ProductSelectionModal({
               )}
 
               <div className={cn("flex-1 overflow-y-auto no-scrollbar min-h-0 relative", imageOnly ? "" : "space-y-2")}>
-                 {(isLoading && products.length === 0) ? (
+                 {(showInitialSkeleton && products.length === 0) ? (
                     <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
                         {[...Array(6)].map((_, i) => (
                            <ProductSkeleton key={i} imageOnly={imageOnly} />
@@ -548,9 +576,9 @@ export function ProductSelectionModal({
                       );
                     })}
                     
-                     {filteredProducts.length === 0 && !isLoading && !isSearching && (
+                     {filteredProducts.length === 0 && !showInitialSkeleton && (
                         <div className="py-12 text-center text-muted-foreground">
-                            未找到相关商品
+                            {emptyStateText}
                         </div>
                     )}
                     

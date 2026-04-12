@@ -194,7 +194,6 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMe
 function GalleryContent() {
   const { user } = useUser();
   const isAdmin = !!user;
-  const canImportPublicProduct = hasPermission(user as SessionUser | null, "product:create");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
@@ -232,7 +231,6 @@ function GalleryContent() {
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [importingProductIds, setImportingProductIds] = useState<string[]>([]);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [hoveredDev, setHoveredDev] = useState(false);
   // iOS 兼容性状态
@@ -754,40 +752,6 @@ function GalleryContent() {
 
   const groupedProducts = groups;
 
-  const handleImportPublicProduct = useCallback(async (productId: string) => {
-    if (!canImportPublicProduct) {
-      showToast("当前账号没有导入商品权限", "error");
-      return;
-    }
-
-    if (importingProductIds.includes(productId)) {
-      return;
-    }
-
-    setImportingProductIds((prev) => [...prev, productId]);
-
-    try {
-      const res = await fetch("/api/products/import-public", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceProductId: productId }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || "导入失败", "error");
-        return;
-      }
-
-      showToast(data.message || "已导入到你的商品库", "success");
-    } catch (error) {
-      console.error("Failed to import public product:", error);
-      showToast("导入失败，请稍后重试", "error");
-    } finally {
-      setImportingProductIds((prev) => prev.filter((id) => id !== productId));
-    }
-  }, [canImportPublicProduct, importingProductIds, showToast]);
-
   const handleOpenProductPreview = async (group: GalleryGroupSummary) => {
     try {
       const mediaItems = await ensureProductMediaLoaded(group.productId);
@@ -1192,23 +1156,6 @@ function GalleryContent() {
                             )}
 
                             <div className="relative aspect-square overflow-hidden bg-muted">
-                                {canImportPublicProduct && user && group.product.isPublic && group.product.sourceProductId == null && (
-                                  <div className="absolute left-2.5 top-2.5 z-20">
-                                    <button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        void handleImportPublicProduct(group.product.id);
-                                      }}
-                                      disabled={importingProductIds.includes(group.product.id)}
-                                      className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/55 px-3 py-1.5 text-[10px] font-black text-white shadow-lg backdrop-blur-lg transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      <Plus size={12} />
-                                      <span>{importingProductIds.includes(group.product.id) ? "导入中" : "加入我的商品库"}</span>
-                                    </button>
-                                  </div>
-                                )}
-
                                 {isVideoCover ? (
                                     <div className="relative w-full h-full">
                                         <video 

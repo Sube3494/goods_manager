@@ -40,6 +40,13 @@ interface ProductFormModalProps {
   hideSpecsSection?: boolean;
   hideGallerySection?: boolean;
   coverOnlyMode?: boolean;
+  hideSkuField?: boolean;
+  hideSupplierField?: boolean;
+  hidePricingFields?: boolean;
+  hideRemarkField?: boolean;
+  disableHistorySection?: boolean;
+  showCoverSection?: boolean;
+  mainImageUploadEndpoint?: string;
 }
 
 import { createPortal } from "react-dom";
@@ -56,6 +63,13 @@ export function ProductFormModal({
   hideSpecsSection = false,
   hideGallerySection = false,
   coverOnlyMode = false,
+  hideSkuField = false,
+  hideSupplierField = false,
+  hidePricingFields = false,
+  hideRemarkField = false,
+  disableHistorySection = false,
+  showCoverSection = false,
+  mainImageUploadEndpoint,
 }: ProductFormModalProps) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
@@ -242,7 +256,9 @@ export function ProductFormModal({
           specs: initialData.specs as Record<string, string> || {},
           remark: initialData.remark || ""
         });
-        fetchGallery(initialData.id, initialData.image || "");
+        if (initialData.id && !hideGallerySection) {
+          fetchGallery(initialData.id, initialData.image || "");
+        }
       } else {
         setFormData({
           sku: "",
@@ -259,12 +275,39 @@ export function ProductFormModal({
         });
       }
     }
-  }, [isOpen, initialData]);
+  }, [hideGallerySection, isOpen, initialData]);
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(handle);
   }, []);
+
+  const uploadMainImage = async (file: File) => {
+    if (!mainImageUploadEndpoint) {
+      return uploadGalleryMedia(file, "gallery");
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(mainImageUploadEndpoint, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || "上传失败");
+    }
+
+    return {
+      url: data?.url || "",
+      path: data?.path || data?.url || "",
+      type: data?.type === "video" ? "video" : "image",
+      thumbnailUrl: data?.url || "",
+      thumbnailPath: data?.path || data?.url || "",
+    };
+  };
 
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isMain: boolean = false) => {
@@ -290,16 +333,17 @@ export function ProductFormModal({
             }
 
             // 使用基于切片与断点续传的流通道优化处理
-            const data = await uploadGalleryMedia(file, "gallery", (pct) => {
+            const data = await (isMain ? uploadMainImage(file) : uploadGalleryMedia(file, "gallery", (pct) => {
                setIsUploading(`文件 ${completedCount + 1}/${filesArray.length} : ${pct}%`);
-            });
+            }));
             const { url, path, type, skipped, thumbnailUrl, thumbnailPath } = data;
+            const normalizedUrl = isMain && mainImageUploadEndpoint ? url : (path || url);
             
             // 使用函数式状态更新，避免闭包中的陈旧依赖导致重复或遗漏
             let isDuplicate = false;
             setGalleryImages(prev => {
               const currentUrls = new Set([...prev.map(img => img.url), formData.image]);
-              if (currentUrls.has(url)) {
+              if (currentUrls.has(normalizedUrl)) {
                 isDuplicate = true;
                 return prev;
               }
@@ -318,13 +362,13 @@ export function ProductFormModal({
             const isVideoType = type === 'video';
               
             if (isMain) {
-              setFormData(prev => ({ ...prev, image: url }));
+              setFormData(prev => ({ ...prev, image: normalizedUrl }));
               // Synchronize with gallery list as well
               setGalleryImages(prev => {
-                const existingIndex = prev.findIndex(item => item.id === 'cover-virtual' || item.url === url);
+                const existingIndex = prev.findIndex(item => item.id === 'cover-virtual' || item.url === normalizedUrl);
                 const newItem: GalleryItem = {
                   id: 'cover-virtual',
-                  url,
+                  url: normalizedUrl,
                   thumbnailUrl: thumbnailUrl || url,
                   productId: initialData?.id || "",
                   uploadDate: new Date().toISOString(),
@@ -907,19 +951,20 @@ export function ProductFormModal({
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 custom-scrollbar">
-                    {/* SKU */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <FileText size={16} /> 商品编号 (SKU)
-                        </label>
-                        <input 
-                            type="text" 
-                            value={formData.sku}
-                            onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                            className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
-                            placeholder="例如：SKU-001"
-                        />
-                    </div>
+                    {!hideSkuField && (
+                      <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <FileText size={16} /> 商品编号 (SKU)
+                          </label>
+                          <input 
+                              type="text" 
+                              value={formData.sku}
+                              onChange={(e) => setFormData({...formData, sku: e.target.value})}
+                              className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                              placeholder="例如：SKU-001"
+                          />
+                      </div>
+                    )}
 
                     {/* Name */}
                     <div className="space-y-2">
@@ -953,21 +998,22 @@ export function ProductFormModal({
                             />
                         </div>
 
-                        {/* Supplier */}
-                        <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                    <Truck size={16} /> 供应商
-                                </label>
-                            <CustomSelect 
-                                value={formData.supplierId || ""}
-                                onChange={(value) => setFormData({...formData, supplierId: value})}
-                                options={suppliers.map(s => ({ value: s.id, label: s.name }))}
-                                placeholder="选择供应商"
-                                triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
-                                onAddNew={() => setIsSupplierModalOpen(true)}
-                                addNewLabel="新增供应商"
-                            />
-                        </div>
+                        {!hideSupplierField && (
+                          <div className="space-y-2">
+                                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                      <Truck size={16} /> 供应商
+                                  </label>
+                              <CustomSelect 
+                                  value={formData.supplierId || ""}
+                                  onChange={(value) => setFormData({...formData, supplierId: value})}
+                                  options={suppliers.map(s => ({ value: s.id, label: s.name }))}
+                                  placeholder="选择供应商"
+                                  triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                                  onAddNew={() => setIsSupplierModalOpen(true)}
+                                  addNewLabel="新增供应商"
+                              />
+                          </div>
+                        )}
                     </div>
 
                     {user?.role === "SUPER_ADMIN" && (
@@ -1026,19 +1072,22 @@ export function ProductFormModal({
                     )}
 
                     {/* Remark / 备注 */}
-                    <div className="space-y-2 pb-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <FileText size={16} /> 备忘录 / 备注
-                        </label>
-                        <textarea 
-                            value={formData.remark}
-                            onChange={(e) => setFormData({...formData, remark: e.target.value})}
-                            className="w-full rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-3 text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all resize-none dark:hover:bg-white/10"
-                            placeholder="例如：某些特殊货品的非单进说明（仅作为备忘）..."
-                            rows={3}
-                        />
-                    </div>
+                    {!hideRemarkField && (
+                      <div className="space-y-2 pb-2">
+                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <FileText size={16} /> 备忘录 / 备注
+                          </label>
+                          <textarea 
+                              value={formData.remark}
+                              onChange={(e) => setFormData({...formData, remark: e.target.value})}
+                              className="w-full rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-3 text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all resize-none dark:hover:bg-white/10"
+                              placeholder="例如：某些特殊货品的非单进说明（仅作为备忘）..."
+                              rows={3}
+                          />
+                      </div>
+                    )}
 
+                    {!hidePricingFields && (
                     <div className="grid grid-cols-2 gap-4">
                         {/* Cost Price */}
                         <div className="space-y-2">
@@ -1062,26 +1111,21 @@ export function ProductFormModal({
                                 <Package size={16} /> 商品库存
                             </label>
                             <div className="relative">
-                                {initialData ? (
-                                    <div className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground/60 font-medium cursor-not-allowed">
-                                        {formData.stock || 0}
-                                    </div>
-                                ) : (
-                                    <input 
-                                        type="number" 
-                                        min="0"
-                                        value={formData.stock}
-                                        onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                                        className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
-                                        placeholder="0"
-                                    />
-                                )}
+                                <input 
+                                    type="number" 
+                                    min="0"
+                                    value={formData.stock}
+                                    onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
+                                    placeholder="0"
+                                />
                             </div>
                         </div>
 
                     </div>
+                    )}
 
-                    {coverOnlyMode && (
+                    {(coverOnlyMode || showCoverSection) && (
                       <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">
                           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1092,7 +1136,9 @@ export function ProductFormModal({
                               type="button"
                               onClick={() => {
                                 setFormData((prev) => ({ ...prev, image: "" }));
-                                setGalleryImages([]);
+                                if (coverOnlyMode) {
+                                  setGalleryImages([]);
+                                }
                               }}
                               className="text-[10px] font-bold uppercase tracking-widest text-destructive hover:text-destructive/80"
                             >
@@ -1135,7 +1181,7 @@ export function ProductFormModal({
                     )}
 
                             {/* Inbound History */}
-                            {initialData && (
+                            {initialData && !disableHistorySection && (
                                 <div className="mt-4 p-4 rounded-2xl bg-muted/20 border border-white/5 space-y-3">
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">关联入库记录</h4>

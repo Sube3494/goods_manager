@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Tag, Truck, CheckCircle, Eye, Activity } from "lucide-react";
+import { X, Tag, Truck, CheckCircle, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Category, Supplier } from "@/lib/types";
@@ -16,10 +16,12 @@ interface BatchEditModalProps {
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
     costPrice?: number;
+    stock?: number;
   }) => void;
   categories: Category[];
   suppliers: Supplier[];
   selectedCount: number;
+  hideProductionStatus?: boolean;
 }
 
 // 内部定义的表单组件，利用挂载/卸载生命周期来管理状态重置
@@ -28,13 +30,14 @@ const BatchEditForm = ({
   onConfirm, 
   categories, 
   suppliers, 
-  selectedCount 
+  selectedCount,
+  hideProductionStatus = false,
 }: Omit<BatchEditModalProps, "isOpen">) => {
   const [categoryId, setCategoryId] = useState<string>("keep");
   const [supplierId, setSupplierId] = useState<string>("keep");
-  const [visibility, setVisibility] = useState<string>("keep");
   const [productionStatus, setProductionStatus] = useState<string>("keep");
   const [costPrice, setCostPrice] = useState<string>("");
+  const [stock, setStock] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,13 +47,14 @@ const BatchEditForm = ({
       isPublic?: boolean; 
       isDiscontinued?: boolean; 
       costPrice?: number;
+      stock?: number;
     } = {};
     
     if (categoryId !== "keep") data.categoryId = categoryId;
     if (supplierId !== "keep") data.supplierId = supplierId;
-    if (visibility !== "keep") data.isPublic = visibility === "public";
-    if (productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
+    if (!hideProductionStatus && productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
     if (costPrice.trim() !== "") data.costPrice = parseFloat(costPrice);
+    if (stock.trim() !== "") data.stock = parseInt(stock, 10);
 
     onConfirm(data);
     onClose();
@@ -110,54 +114,55 @@ const BatchEditForm = ({
             />
           </div>
 
-          {/* Visibility Select */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
-              <Eye size={16} /> 可见性
-            </label>
-            <CustomSelect
-              value={visibility}
-              onChange={setVisibility}
-              options={[
-                { value: "keep", label: "保持当前状态" },
-                { value: "public", label: "设为公开可见" },
-                { value: "private", label: "设为隐藏不公开" }
-              ]}
-              triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
-            />
-          </div>
-
           {/* Production Status Select */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
-              <Activity size={16} /> 生产状态
-            </label>
-            <CustomSelect
-              value={productionStatus}
-              onChange={setProductionStatus}
-              options={[
-                { value: "keep", label: "保持当前状态" },
-                { value: "active", label: "正常生产中" },
-                { value: "discontinued", label: "标记为已停产" }
-              ]}
-              triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
-            />
-          </div>
+          {!hideProductionStatus && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+                <Activity size={16} /> 生产状态
+              </label>
+              <CustomSelect
+                value={productionStatus}
+                onChange={setProductionStatus}
+                options={[
+                  { value: "keep", label: "保持当前状态" },
+                  { value: "active", label: "正常生产中" },
+                  { value: "discontinued", label: "标记为已停产" }
+                ]}
+                triggerClassName="w-full rounded-2xl bg-muted/30 border-white/5 h-12"
+              />
+            </div>
+          )}
 
           {/* Cost Price Input */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
               <Tag size={16} className="rotate-90" /> 进货单价
             </label>
-            <div className="relative group/price">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold font-number">¥</span>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-bold font-number pointer-events-none">¥</span>
               <input
                 type="number"
                 step="0.01"
                 placeholder="保持原单价"
                 value={costPrice}
                 onChange={(e) => setCostPrice(e.target.value)}
-                className="w-full h-12 pl-10 pr-4 rounded-2xl bg-muted/30 border border-white/5 focus:border-primary/30 outline-none transition-all font-bold font-number"
+                className="w-full rounded-2xl bg-muted/30 border border-white/5 h-12 pl-10 pr-4 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-bold font-number"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 px-1">
+              <Tag size={16} /> 库存
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                placeholder="保持原库存"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                className="w-full rounded-2xl bg-muted/30 border border-white/5 h-12 px-4 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-bold font-number"
               />
             </div>
           </div>
@@ -173,7 +178,13 @@ const BatchEditForm = ({
           </button>
           <button
             type="submit"
-            disabled={categoryId === "keep" && supplierId === "keep" && visibility === "keep" && productionStatus === "keep" && costPrice.trim() === ""}
+            disabled={
+              categoryId === "keep" &&
+              supplierId === "keep" &&
+              (hideProductionStatus || productionStatus === "keep") &&
+              costPrice.trim() === "" &&
+              stock.trim() === ""
+            }
             className="flex-2 rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
           >
             <CheckCircle size={18} />
@@ -191,7 +202,8 @@ export const BatchEditModal = ({
   onConfirm, 
   categories, 
   suppliers, 
-  selectedCount 
+  selectedCount,
+  hideProductionStatus = false,
 }: BatchEditModalProps) => {
   useEffect(() => {
     if (isOpen) {
@@ -218,6 +230,7 @@ export const BatchEditModal = ({
             categories={categories}
             suppliers={suppliers}
             selectedCount={selectedCount}
+            hideProductionStatus={hideProductionStatus}
           />
         </div>
       )}

@@ -77,6 +77,25 @@ export interface Shop {
   updatedAt?: string;
 }
 
+export interface ShopCatalogItem {
+  id: string;
+  sourceProductId?: string | null;
+  sku?: string | null;
+  name: string;
+  image?: string | null;
+  categoryId?: string | null;
+  categoryName?: string | null;
+  supplierId?: string | null;
+  costPrice?: number | null;
+  stock?: number | null;
+  isPublic?: boolean;
+  isDiscontinued?: boolean;
+  remark?: string | null;
+  specs?: Record<string, string> | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface BrushProduct {
   id: string;
   userId?: string;
