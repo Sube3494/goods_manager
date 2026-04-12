@@ -47,6 +47,7 @@ export async function GET(request: Request) {
     const idsOnly = searchParams.get("idsOnly") === "true";
     const supplierId = searchParams.get("supplierId") || "all";
     const includePublic = searchParams.get("includePublic") === "true";
+    const publicOnly = searchParams.get("publicOnly") === "true";
     const shopId = searchParams.get("shopId") || undefined;
     const includeShopOnly = searchParams.get("includeShopOnly") === "true";
     const shopFilterModeParam = searchParams.get("shopFilterMode");
@@ -68,6 +69,7 @@ export async function GET(request: Request) {
       idsOnly,
       supplierId,
       includePublic,
+      publicOnly,
       shopId,
       shopFilterMode,
       includeShopOnly,

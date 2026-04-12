@@ -39,7 +39,7 @@ export default function ShopGoodsPage() {
     [selectedShopId, shops]
   );
   const pickerQuery = useMemo(
-    () => (selectedShopId ? { shopId: selectedShopId, shopFilterMode: "unassigned", status: "public" } : undefined),
+    () => (selectedShopId ? { shopId: selectedShopId, shopFilterMode: "unassigned", publicOnly: "true" } : undefined),
     [selectedShopId]
   );
 

@@ -25,6 +25,7 @@ export class ProductService {
     idsOnly: boolean;
     supplierId: string;
     includePublic?: boolean;
+    publicOnly?: boolean;
     shopId?: string;
     shopFilterMode?: "assigned" | "unassigned";
     includeShopOnly?: boolean;
@@ -43,6 +44,7 @@ export class ProductService {
       idsOnly,
       supplierId,
       includePublic = false,
+      publicOnly = false,
       shopId,
       shopFilterMode = "assigned",
       includeShopOnly = false,
@@ -51,7 +53,9 @@ export class ProductService {
     const andConditions: Prisma.ProductWhereInput[] = [];
     
     // Visibility and permission filtering logic
-    if (!userId) {
+    if (publicOnly) {
+      andConditions.push({ isPublic: true });
+    } else if (!userId) {
       andConditions.push({ isPublic: true });
     } else if (role !== "SUPER_ADMIN") {
       andConditions.push(
