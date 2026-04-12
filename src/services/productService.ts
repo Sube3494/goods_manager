@@ -57,6 +57,8 @@ export class ProductService {
     // Visibility and permission filtering logic
     if (publicOnly) {
       andConditions.push({ isPublic: true });
+    } else if (shopId && shopFilterMode === "assigned") {
+      andConditions.push({ shopProducts: { some: { shopId } } });
     } else if (!userId) {
       andConditions.push({ isPublic: true });
     } else if (role !== "SUPER_ADMIN") {
@@ -97,11 +99,9 @@ export class ProductService {
     }
 
     if (shopId) {
-      andConditions.push(
-        shopFilterMode === "unassigned"
-          ? { shopProducts: { none: { shopId } } }
-          : { shopProducts: { some: { shopId } } }
-      );
+      if (shopFilterMode === "unassigned") {
+        andConditions.push({ shopProducts: { none: { shopId } } });
+      }
     } else if (shopFilterMode === "unassigned") {
       andConditions.push({ shopProducts: { none: {} } });
     }
