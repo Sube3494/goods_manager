@@ -4,6 +4,30 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { getStorageStrategy } from "@/lib/storage";
 
+type PurchasePickerItem = {
+  id: string;
+  sourceType: "product" | "shopProduct";
+  shopProductId?: string;
+  sourceProductId?: string;
+  shopId?: string;
+  shopName?: string;
+  sku: string;
+  name: string;
+  categoryId: string;
+  category?: { id: string; name: string; count: number };
+  costPrice: number | null;
+  stock: number | null;
+  image: string | null;
+  isPublic: boolean | null;
+  isDiscontinued: boolean | null;
+  isShopOnly: boolean;
+  supplierId?: string;
+  supplier?: undefined;
+  remark: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export async function GET(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
@@ -48,7 +72,7 @@ export async function GET(request: Request) {
     });
 
     const storage = await getStorageStrategy();
-    const merged = shopProducts.map((item) => ({
+    const merged: PurchasePickerItem[] = shopProducts.map((item) => ({
       id: item.id,
       sourceType: "shopProduct" as const,
       shopProductId: item.id,
@@ -97,7 +121,7 @@ export async function GET(request: Request) {
                   : existing.updatedAt,
             });
             return acc;
-          }, new Map<string, (typeof merged)[number] & { sourceType: "product" | "shopProduct"; shopProductId?: string }>())
+          }, new Map<string, PurchasePickerItem>())
         ).map(([, value]) => value)
       : merged;
 
