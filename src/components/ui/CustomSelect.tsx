@@ -124,9 +124,9 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
             >
               <div className="max-h-60 overflow-auto p-1 py-1.5">
                 {options.length > 0 ? (
-                  options.map((option) => (
+                  options.map((option, index) => (
                     <button
-                      key={option.value}
+                      key={`${option.value}-${index}`}
                       type="button"
                       onClick={() => {
                         onChange(option.value);

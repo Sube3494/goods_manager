@@ -128,7 +128,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
                 返回上页
             </button>
             <Link 
-                href="/gallery"
+                href="/"
                 className="px-6 h-11 rounded-full border border-border bg-background/70 hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center"
             >
                 回到首页

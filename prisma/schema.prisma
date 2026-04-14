@@ -109,6 +109,7 @@ model PurchaseOrderItem {
   id                String        @id @default(cuid())
   purchaseOrderId   String
   productId         String
+  shopProductId     String?
   supplierId        String?
   quantity          Int
   remainingQuantity Int?
@@ -116,8 +117,11 @@ model PurchaseOrderItem {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   product           Product       @relation(fields: [productId], references: [id])
+  shopProduct       ShopProduct?  @relation(fields: [shopProductId], references: [id])
   purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   supplier          Supplier?     @relation(fields: [supplierId], references: [id])
+
+  @@index([shopProductId])
 }
 
 model OutboundOrder {
@@ -139,10 +143,14 @@ model OutboundOrderItem {
   id              String        @id @default(cuid())
   outboundOrderId String
   productId       String
+  shopProductId   String?
   quantity        Int
   price           Float         @default(0)
   outboundOrder   OutboundOrder @relation(fields: [outboundOrderId], references: [id], onDelete: Cascade)
   product         Product       @relation(fields: [productId], references: [id])
+  shopProduct     ShopProduct?  @relation(fields: [shopProductId], references: [id])
+
+  @@index([shopProductId])
 }
 
 model GalleryItem {
@@ -502,6 +510,7 @@ model ShopProduct {
   productId       String
   sku             String?
   productName     String?
+  pinyin          String?
   productImage    String?
   categoryId      String?
   categoryName    String?
@@ -518,8 +527,11 @@ model ShopProduct {
 
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchaseOrderItems PurchaseOrderItem[]
+  outboundOrderItems OutboundOrderItem[]
 
   @@unique([shopId, productId])
   @@index([productId])
   @@index([shopId, createdAt])
+  @@index([shopId, pinyin])
 }

@@ -46,13 +46,10 @@ export async function POST(request: Request) {
     let failCount = 0;
     const errors: { sku: string; reason: string }[] = [];
 
-    const importedItems: { productId: string, quantity: number, costPrice: number }[] = [];
-
     for (const item of products) {
         try {
             // Map keys for SKU and Quantity (Supporting both internal formats and exported headers)
             const sku = String(item.sku || item['SKU/店内码'] || item['SKU'] || item['编码'] || item['*SKU'] || "");
-            const quantity = Number(item['入库数量'] || item['*入库数量'] || item['当前库存'] || item.stock || item['数量'] || item['Quantity'] || 0);
             const costPrice = Number(item['进货单价'] || item['*进货单价'] || item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
             // 1. 基础数据解析
             const name = String(item['商品名称'] || item.name || "");
@@ -120,23 +117,10 @@ export async function POST(request: Request) {
                 }
 
                 // UPDATE: Replenishment & metadata update
-                const currentStock = product.stock;
                 const currentCost = product.costPrice || 0;
-                
-                let newCostPrice = currentCost;
-                
-                if (costPrice > 0 && quantity > 0) {
-                    if (currentStock <= 0) {
-                        newCostPrice = costPrice;
-                    } else {
-                        const totalValue = (currentStock * currentCost) + (quantity * costPrice);
-                        const totalQty = currentStock + quantity;
-                        newCostPrice = totalValue / totalQty;
-                    }
-                }
 
                 const updateData: Record<string, unknown> = {
-                    costPrice: newCostPrice,
+                    costPrice: costPrice > 0 ? costPrice : currentCost,
                     pinyin: name ? generatePinyinSearchText(name) : undefined,
                     isPublic,
                     isDiscontinued,
@@ -173,13 +157,6 @@ export async function POST(request: Request) {
                     }
                     updateData.supplierId = supplier.id;
                 }
-
-
-
-                if (quantity > 0) {
-                    updateData.stock = { increment: quantity };
-                }
-
                 // 处理主图
                 if (image && image !== "暂无图片") {
                     let finalImage: string = image;
@@ -219,14 +196,6 @@ export async function POST(request: Request) {
                             });
                         }
                     }
-                }
-
-                if (quantity > 0) {
-                    importedItems.push({
-                        productId: product.id,
-                        quantity: quantity,
-                        costPrice: costPrice
-                    });
                 }
                 successCount++;
             } else {
@@ -318,7 +287,7 @@ export async function POST(request: Request) {
                         categoryId: finalCategoryId as string,
                         supplierId: finalSupplierId,
                         costPrice: costPrice > 0 ? costPrice : 0,
-                        stock: quantity > 0 ? quantity : 0,
+                        stock: 0,
                         image: finalMainImage,
                         pinyin: generatePinyinSearchText(name),
                         userId,
@@ -348,14 +317,6 @@ export async function POST(request: Request) {
                         }
                     });
                 }
-
-                if (quantity > 0) {
-                    importedItems.push({
-                        productId: newProduct.id,
-                        quantity: quantity,
-                        costPrice: costPrice > 0 ? costPrice : 0
-                    });
-                }
                 successCount++;
             }
         } catch (e) {
@@ -364,28 +325,6 @@ export async function POST(request: Request) {
             failCount++;
             errors.push({ sku: String(sku), reason: "数据解析或数据库更新失败" });
         }
-    }
-
-    // 如果有带库存导入的商品，生成一张批量入库单
-    if (importedItems.length > 0) {
-        const orderId = `PO-IMP-${Date.now().toString().slice(-6)}`;
-        await prisma.purchaseOrder.create({
-            data: {
-                id: orderId,
-                type: "Inbound",
-                status: "Received",
-                date: new Date(),
-                userId,
-                totalAmount: importedItems.reduce((acc, curr) => acc + (curr.quantity * curr.costPrice), 0),
-                items: {
-                    create: importedItems.map(item => ({
-                        productId: item.productId,
-                        quantity: item.quantity,
-                        costPrice: item.costPrice
-                    }))
-                }
-            }
-        });
     }
 
     return NextResponse.json({ success: true, successCount, failCount, errors });

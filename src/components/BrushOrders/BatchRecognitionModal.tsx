@@ -290,9 +290,12 @@ export const BatchRecognitionModal = ({ isOpen, onClose, products, onBatchComple
           const matchedItems: Array<{ productId: string; product: Product; quantity: number }> = [];
           if (result.items && Array.isArray(result.items)) {
             result.items.forEach((ri: { name: string; quantity: number }) => {
-              const found = findBestMatch(ri.name, products);
+              const shopScopedProducts = selectedShop
+                ? products.filter((product) => !product.shopName || product.shopName === selectedShop)
+                : products;
+              const found = findBestMatch(ri.name, shopScopedProducts.length > 0 ? shopScopedProducts : products);
               if (found) {
-                matchedItems.push({ productId: found.id, product: found, quantity: ri.quantity || 1 });
+                matchedItems.push({ productId: found.sourceProductId || found.id, product: found, quantity: ri.quantity || 1 });
               }
             });
           }

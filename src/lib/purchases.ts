@@ -108,7 +108,10 @@ export function filterPurchases(
       (item) => item.supplier?.name && pinyinMatch(item.supplier.name, query)
     );
     const matchesProduct = purchase.items.some(
-      (item) => item.product?.name && pinyinMatch(item.product.name, query)
+      (item) => {
+        const productName = item.shopProduct?.name || item.product?.name;
+        return !!productName && pinyinMatch(productName, query);
+      }
     );
     const matchesShopName = !!purchase.shopName && pinyinMatch(purchase.shopName, query);
 

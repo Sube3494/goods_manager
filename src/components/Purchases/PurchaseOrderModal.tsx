@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search } from "lucide-react";
-import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier } from "@/lib/types";
+import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier, Shop } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
@@ -46,7 +46,7 @@ const PurchaseItemRow = memo(({
     onToggle?: (productId: string) => void;
 }) => {
     const productData = useMemo(() => {
-        const p = item.product || products.find(g => g.id === item.productId);
+        const p = item.product || products.find(g => g.id === (item.shopProductId || item.productId));
         const supplierId = p?.supplierId || item.supplierId;
         return {
             imageUrl: item.image || p?.image,
@@ -63,12 +63,12 @@ const PurchaseItemRow = memo(({
     const handleDeleteClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirmingDelete) {
-            onRemove(item.productId);
+            onRemove(item.shopProductId || item.productId);
         } else {
             setConfirmingDelete(true);
             setTimeout(() => setConfirmingDelete(false), 2500);
         }
-    }, [confirmingDelete, item.productId, onRemove]);
+    }, [confirmingDelete, item.productId, item.shopProductId, onRemove]);
 
     return (
         <div 
@@ -81,7 +81,7 @@ const PurchaseItemRow = memo(({
                     : 'bg-white dark:bg-white/10 border-border dark:border-white/5',
                 readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_80px_120px_120px_40px]'
             )}
-            onClick={isBatchMode ? () => onToggle(item.productId) : undefined}
+            onClick={isBatchMode ? () => onToggle(item.shopProductId || item.productId) : undefined}
         >
             {/* Product Info Column */}
             <div className="flex w-full items-center gap-3">
@@ -333,21 +333,32 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
   const [batchConfirming, setBatchConfirming] = useState(false);
+  const purchaseCatalogFetchPath = "/api/purchase-products";
+  const purchaseCatalogQuery = useMemo(
+    () => (formData.shopName ? { shopName: formData.shopName } : undefined),
+    [formData.shopName]
+  );
+  const selectedPurchaseShopId = useMemo(
+    () => shops.find((shop) => shop.name === formData.shopName)?.id || "",
+    [shops, formData.shopName]
+  );
+  const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductId || item.productId, []);
 
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return formData.items;
     const query = searchQuery.toLowerCase();
     return formData.items.filter(item => {
-        const product = item.product || products.find(p => p.id === item.productId);
+        const product = item.product || products.find(p => p.id === getPurchaseItemKey(item));
         const nameMatch = product?.name.toLowerCase().includes(query);
         const skuMatch = product?.sku?.toLowerCase().includes(query);
         return nameMatch || skuMatch;
     });
-  }, [formData.items, searchQuery, products]);
+  }, [formData.items, searchQuery, products, getPurchaseItemKey]);
   const [isUploadingVoucher, setIsUploadingVoucher] = useState(false);
   const [galleryState, setGalleryState] = useState<{
     isOpen: boolean;
@@ -381,8 +392,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   }, [confirmingDeleteIndex]);
 
   const selectedProductIds = useMemo(() => {
-    return formData.items.map(item => item.productId);
-  }, [formData.items]);
+    return formData.items.map(item => getPurchaseItemKey(item));
+  }, [formData.items, getPurchaseItemKey]);
 
 
   // Robust scroll lock logic: standard overflow hidden on both body and html to prevent leakage
@@ -405,10 +416,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     const handle = requestAnimationFrame(() => setMounted(true));
     
     const fetchData = async () => {
-      if (hasFetchedData) return;
       try {
+        const queryString = new URLSearchParams(purchaseCatalogQuery || {}).toString();
         const [pRes, sRes] = await Promise.all([
-          fetch("/api/products"),
+          fetch(queryString ? `${purchaseCatalogFetchPath}?${queryString}` : purchaseCatalogFetchPath),
           fetch("/api/suppliers")
         ]);
         
@@ -422,6 +433,12 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
           const sData = await sRes.json();
           setSuppliers(sData);
         }
+
+        const shopRes = await fetch("/api/shops");
+        if (shopRes.ok) {
+          const shopData = await shopRes.json();
+          setShops(Array.isArray(shopData?.shops) ? shopData.shops : []);
+        }
         setHasFetchedData(true);
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -430,7 +447,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
 
     if (isOpen) fetchData();
     return () => cancelAnimationFrame(handle);
-  }, [isOpen, hasFetchedData]);
+  }, [isOpen, hasFetchedData, purchaseCatalogFetchPath, purchaseCatalogQuery]);
 
   // Sync data and reset form when modal opens or initialData changes
   useEffect(() => {
@@ -538,10 +555,20 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
       let newItems = [...prev.items];
       
       selectedProducts.forEach(product => {
+        const itemKey = product.shopProductId || product.id;
+        const resolvedProductId = product.sourceType === "shopProduct"
+          ? (product.sourceProductId || "")
+          : product.id;
+
+        if (!resolvedProductId) {
+          return;
+        }
+
         // Check against the growing newItems list to prevent duplicates within the same batch
-        if (!newItems.some(item => item.productId === product.id)) {
+        if (!newItems.some(item => (item.shopProductId || item.productId) === itemKey)) {
           newItems.push({
-            productId: product.id,
+            productId: resolvedProductId,
+            shopProductId: product.shopProductId,
             product: product, // Store snapshot for stable name display
             image: product.image,
             supplierId: product.supplierId,
@@ -561,17 +588,17 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     });
   };
 
-  const removeItem = useCallback((productId: string) => {
+  const removeItem = useCallback((itemKey: string) => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.filter(item => item.productId !== productId)
+      items: prev.items.filter(item => (item.shopProductId || item.productId) !== itemKey)
     }));
   }, []);
 
-  const toggleBatchSelect = useCallback((productId: string) => {
+  const toggleBatchSelect = useCallback((itemKey: string) => {
     setBatchSelected(prev => {
       const next = new Set(prev);
-      if (next.has(productId)) next.delete(productId); else next.add(productId);
+      if (next.has(itemKey)) next.delete(itemKey); else next.add(itemKey);
       return next;
     });
   }, []);
@@ -579,16 +606,16 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   const batchDelete = useCallback(() => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.filter(item => !batchSelected.has(item.productId))
+      items: prev.items.filter(item => !batchSelected.has(item.shopProductId || item.productId))
     }));
     setBatchSelected(new Set());
     setBatchMode(false);
   }, [batchSelected]);
 
-  const updateItem = useCallback((productId: string, field: keyof PurchaseOrderItem, value: string | number) => {
+  const updateItem = useCallback((itemKey: string, field: keyof PurchaseOrderItem, value: string | number) => {
     setFormData(prev => {
       const newItems = [...prev.items];
-      const index = newItems.findIndex(item => item.productId === productId);
+      const index = newItems.findIndex(item => (item.shopProductId || item.productId) === itemKey);
       if (index === -1) return prev;
       
       let processedValue: string | number = value;
@@ -915,13 +942,13 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const allIds = filteredItems.map(i => i.productId);
+                                                        const allIds = filteredItems.map(i => i.shopProductId || i.productId);
                                                         const allSelected = allIds.every(id => batchSelected.has(id));
                                                         setBatchSelected(allSelected ? new Set() : new Set(allIds));
                                                     }}
                                                     className="text-[11px] font-bold text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted/80 transition-all active:scale-95 whitespace-nowrap"
                                                 >
-                                                    {filteredItems.every(i => batchSelected.has(i.productId)) ? "取消全选" : "全选"}
+                                                    {filteredItems.every(i => batchSelected.has(i.shopProductId || i.productId)) ? "取消全选" : "全选"}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -1016,14 +1043,14 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
 
                             {filteredItems.map((item) => (
                                 <PurchaseItemRow 
-                                    key={item.productId}
+                                    key={item.shopProductId || item.productId}
                                     item={item}
                                     readOnly={effectiveReadOnly}
                                     products={products}
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
-                                    isChecked={batchMode ? batchSelected.has(item.productId) : undefined}
+                                    isChecked={batchMode ? batchSelected.has(item.shopProductId || item.productId) : undefined}
                                     onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
                                 />
                             ))}
@@ -1571,6 +1598,9 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
             onSelect={handleBatchAdd}
             showPrice={true}
             selectedIds={selectedProductIds}
+            fetchPath={purchaseCatalogFetchPath}
+            query={purchaseCatalogQuery}
+            createPayload={selectedPurchaseShopId ? { shopId: selectedPurchaseShopId, isShopOnly: true } : undefined}
           />
 
           {/* Image Gallery Preview */}

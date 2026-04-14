@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { StatsData } from "@/lib/types";
+import { useUser } from "@/hooks/useUser";
+import { SessionUser } from "@/lib/permissions";
 
 interface StatItem {
   title: string;
@@ -20,60 +22,119 @@ interface StatItem {
 
 export function StatsGrid({ data }: { data: StatsData | null }) {
   const router = useRouter();
-  
-  const stats = [
-    { 
-      title: "库存总货值", 
-      value: data ? `¥${data.totalValue.toLocaleString()}` : "¥0", 
-      icon: Archive, 
-      sub: data ? `合计 ${data.productCount} SKU` : "计算中...", 
-      trend: "资产总计", 
-      trendUp: true,
-      warning: false,
-      color: "from-blue-500/10 to-cyan-500/10",
-      glowColor: "group-hover:shadow-blue-500/20",
-      iconColor: "text-blue-500"
-    },
-    { 
-      title: "商品总量", 
-      value: data ? data.totalStock.toLocaleString() : "0", 
-      icon: Package, 
-      sub: "动态实时更新", 
-      trend: "库存水位", 
-      trendUp: true,
-      warning: false,
-      color: "from-purple-500/10 to-pink-500/10",
-      glowColor: "group-hover:shadow-purple-500/20",
-      iconColor: "text-purple-500",
-      href: "/goods"
-    },
-    { 
-      title: "库存预警", 
-      value: data ? data.lowStockCount.toString() : "0", 
-      icon: AlertTriangle, 
-      sub: "当前急需补货", 
-      trend: (data?.lowStockCount ?? 0) > 0 ? "异常" : "安全", 
-      trendUp: false,
-      warning: (data?.lowStockCount ?? 0) > 0,
-      color: "from-orange-500/10 to-red-500/10",
-      glowColor: "group-hover:shadow-orange-500/20",
-      iconColor: "text-orange-500",
-      href: "/goods?filter=low_stock"
-    },
-    { 
-      title: "待入库订单", 
-      value: data ? `${data.pendingInboundCount.toLocaleString()}` : "0", 
-      icon: ArrowDownRight, 
-      sub: "等待验收清点", 
-      trend: "供应链", 
-      trendUp: true,
-      warning: false,
-      color: "from-emerald-500/10 to-teal-500/10",
-      glowColor: "group-hover:shadow-emerald-500/20",
-      iconColor: "text-emerald-500",
-      href: "/purchases?status=Ordered"
-    },
-  ] as StatItem[];
+  const { user } = useUser();
+  const sessionUser = user as SessionUser | null;
+  const isSuperAdmin = sessionUser?.role === "SUPER_ADMIN";
+  const inventoryHref = "/shop-goods";
+
+  const stats: StatItem[] = isSuperAdmin
+    ? [
+        {
+          title: "库存总货值",
+          value: data ? `¥${data.totalValue.toLocaleString()}` : "¥0",
+          icon: Archive,
+          sub: data ? `合计 ${data.productCount} 门店商品` : "计算中...",
+          trend: "资产总计",
+          trendUp: true,
+          warning: false,
+          color: "from-blue-500/10 to-cyan-500/10",
+          glowColor: "group-hover:shadow-blue-500/20",
+          iconColor: "text-blue-500",
+        },
+        {
+          title: "门店商品",
+          value: data ? data.totalStock.toLocaleString() : "0",
+          icon: Package,
+          sub: "经营库存总量",
+          trend: "库存水位",
+          trendUp: true,
+          warning: false,
+          color: "from-purple-500/10 to-pink-500/10",
+          glowColor: "group-hover:shadow-purple-500/20",
+          iconColor: "text-purple-500",
+          href: inventoryHref,
+        },
+        {
+          title: "低库存商品",
+          value: data ? data.lowStockCount.toString() : "0",
+          icon: AlertTriangle,
+          sub: "当前急需补货",
+          trend: (data?.lowStockCount ?? 0) > 0 ? "异常" : "安全",
+          trendUp: false,
+          warning: (data?.lowStockCount ?? 0) > 0,
+          color: "from-orange-500/10 to-red-500/10",
+          glowColor: "group-hover:shadow-orange-500/20",
+          iconColor: "text-orange-500",
+          href: inventoryHref,
+        },
+        {
+          title: "待入库订单",
+          value: data ? `${data.pendingInboundCount.toLocaleString()}` : "0",
+          icon: ArrowDownRight,
+          sub: "等待验收清点",
+          trend: "供应链",
+          trendUp: true,
+          warning: false,
+          color: "from-emerald-500/10 to-teal-500/10",
+          glowColor: "group-hover:shadow-emerald-500/20",
+          iconColor: "text-emerald-500",
+          href: "/purchases?status=Ordered",
+        },
+      ]
+    : [
+        {
+          title: "经营店铺",
+          value: data ? `${data.shopCount ?? 0}` : "0",
+          icon: Archive,
+          sub: "当前已接入门店",
+          trend: "经营规模",
+          trendUp: true,
+          warning: false,
+          color: "from-blue-500/10 to-cyan-500/10",
+          glowColor: "group-hover:shadow-blue-500/20",
+          iconColor: "text-blue-500",
+          href: "/shop-goods",
+        },
+        {
+          title: "店铺商品",
+          value: data ? data.productCount.toLocaleString() : "0",
+          icon: Package,
+          sub: "合计经营 SKU",
+          trend: "商品池",
+          trendUp: true,
+          warning: false,
+          color: "from-purple-500/10 to-pink-500/10",
+          glowColor: "group-hover:shadow-purple-500/20",
+          iconColor: "text-purple-500",
+          href: inventoryHref,
+        },
+        {
+          title: "库存件数",
+          value: data ? data.totalStock.toLocaleString() : "0",
+          icon: ArrowDownRight,
+          sub: "店铺总库存",
+          trend: "库存水位",
+          trendUp: true,
+          warning: false,
+          color: "from-emerald-500/10 to-teal-500/10",
+          glowColor: "group-hover:shadow-emerald-500/20",
+          iconColor: "text-emerald-500",
+          href: inventoryHref,
+        },
+        {
+          title: "低库存商品",
+          value: data ? data.lowStockCount.toString() : "0",
+          icon: AlertTriangle,
+          sub: "需要尽快补货",
+          trend: (data?.lowStockCount ?? 0) > 0 ? "异常" : "安全",
+          trendUp: false,
+          warning: (data?.lowStockCount ?? 0) > 0,
+          color: "from-orange-500/10 to-red-500/10",
+          glowColor: "group-hover:shadow-orange-500/20",
+          iconColor: "text-orange-500",
+          href: inventoryHref,
+        },
+      ];
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

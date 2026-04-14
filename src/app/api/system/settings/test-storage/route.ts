@@ -7,9 +7,15 @@
  */
 import { NextResponse } from "next/server";
 import * as Minio from "minio";
+import { getAuthorizedUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
+    const session = await getAuthorizedUser("settings:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const config = await request.json();
     
     if (config.storageType === "local") {

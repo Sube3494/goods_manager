@@ -14,7 +14,7 @@ import { GeneralTab } from "@/components/Settings/GeneralTab";
 import { StorageTab } from "@/components/Settings/StorageTab";
 import { DataTab } from "@/components/Settings/DataTab";
 import { SystemTab } from "@/components/Settings/SystemTab";
-import { hasAdminAccess, SessionUser } from "@/lib/permissions";
+import { hasAdminAccess, hasPermission, SessionUser } from "@/lib/permissions";
 
 type ActiveTab = "general" | "storage" | "data" | "system";
 
@@ -52,6 +52,10 @@ function SettingsContent() {
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const canManageRoles = hasAdminAccess(sessionUser, "roles:manage");
   const canManageMembers = hasAdminAccess(sessionUser, "members:manage");
+  const canManageSettings = hasPermission(sessionUser, "settings:manage");
+  const canManageBackups = hasPermission(sessionUser, "backup:manage");
+  const canTransferData = hasPermission(sessionUser, "data:transfer");
+  const canAccessSettingsPage = isSuperAdmin || canManageSettings || canManageBackups || canTransferData;
   const [lowStockThreshold, setLowStockThreshold] = useState<number | "">(10);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
   const [requireLoginForLightbox, setRequireLoginForLightbox] = useState<boolean>(false);
@@ -64,7 +68,7 @@ function SettingsContent() {
   const [thumbnailBackfillRemaining, setThumbnailBackfillRemaining] = useState<number | null>(null);
 
   // Initialize tab based on search params
-  const initialTab = (searchParams.get("tab") as ActiveTab) || (isSuperAdmin ? "general" : "data");
+  const initialTab = (searchParams.get("tab") as ActiveTab) || (canManageSettings ? "general" : "data");
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
 
   // Storage settings
@@ -323,19 +327,29 @@ function SettingsContent() {
   }, [searchParams]);
 
   const tabs = useMemo<TabMeta[]>(() => {
-    if (isSuperAdmin) {
-      return [
+    const nextTabs: TabMeta[] = [];
+
+    if (canManageSettings) {
+      nextTabs.push(
         { id: "general", label: "常规设置", icon: Zap, desc: "主题偏好、预警阈值与工作台体验。", accent: "from-amber-500/20 via-orange-500/10 to-transparent" },
         { id: "storage", label: "存储中心", icon: Database, desc: "文件驱动、对象存储与冲突处理策略。", accent: "from-sky-500/20 via-cyan-500/10 to-transparent" },
-        { id: "data", label: "数据管理", icon: ShieldCheck, desc: "备份归档、恢复流程和高风险数据操作。", accent: "from-emerald-500/20 via-teal-500/10 to-transparent" },
-        { id: "system", label: "关于系统", icon: Info, desc: "版本、运行环境与模块概览。", accent: "from-violet-500/20 via-fuchsia-500/10 to-transparent" },
-      ];
+      );
     }
 
-    return [
-      { id: "data", label: "备份与恢复", icon: Database, desc: "导出当前数据、查看归档并下载备份。", accent: "from-emerald-500/20 via-teal-500/10 to-transparent" },
-    ];
-  }, [isSuperAdmin]);
+    if (canManageBackups || canTransferData) {
+      nextTabs.push(
+        { id: "data", label: canManageSettings ? "数据管理" : "备份与恢复", icon: ShieldCheck, desc: "备份归档、恢复流程和高风险数据操作。", accent: "from-emerald-500/20 via-teal-500/10 to-transparent" },
+      );
+    }
+
+    if (canAccessSettingsPage) {
+      nextTabs.push(
+        { id: "system", label: "关于系统", icon: Info, desc: "版本、运行环境与模块概览。", accent: "from-violet-500/20 via-fuchsia-500/10 to-transparent" },
+      );
+    }
+
+    return nextTabs;
+  }, [canAccessSettingsPage, canManageBackups, canManageSettings, canTransferData]);
 
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const overviewCards = [
@@ -353,8 +367,8 @@ function SettingsContent() {
     },
     {
       label: "管理边界",
-      value: isSuperAdmin ? "超级管理员" : "系统管理员",
-      hint: isSuperAdmin ? "可访问高风险系统级配置与恢复能力。" : "仅展示授权范围内的系统能力。",
+      value: isSuperAdmin ? "超级管理员" : canManageSettings ? "系统配置管理员" : canManageBackups ? "备份管理员" : "数据管理员",
+      hint: isSuperAdmin ? "可访问高风险系统级配置与恢复能力。" : "仅展示当前账号被授权的系统能力。",
       tone: "text-foreground",
     },
   ];
@@ -386,6 +400,17 @@ function SettingsContent() {
     );
   }
 
+  if (!canAccessSettingsPage || tabs.length === 0) {
+    return (
+      <div className="flex h-[60dvh] items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-black text-foreground">当前账号没有系统管理权限</div>
+          <div className="mt-2 text-sm text-muted-foreground">需要被授予系统设置、备份管理或数据导入导出中的至少一项权限。</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-w-0 space-y-6 overflow-x-hidden">
       <div className="relative overflow-hidden rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 dark:bg-white/5 shadow-sm backdrop-blur-xl">
@@ -401,10 +426,10 @@ function SettingsContent() {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl md:text-4xl font-black tracking-tight text-foreground">
-                  {isSuperAdmin ? "系统管理中心" : "系统工作台"}
+                  {canManageSettings ? "系统管理中心" : "系统工作台"}
                 </h1>
                 <p className="mt-2 text-sm md:text-base text-muted-foreground leading-relaxed">
-                  {isSuperAdmin
+                  {canManageSettings
                     ? "把全局逻辑、文件存储、备份恢复和系统状态放到一个更清楚的工作区里。"
                     : "只展示你被授权管理的系统能力，避免把危险操作和日常工作混在一起。"}
                 </p>
@@ -574,8 +599,8 @@ function SettingsContent() {
             shareExpireUnit={shareExpireUnit}
             setShareExpireUnit={setShareExpireUnit}
             saveSettings={saveSettings}
-            mode={isSuperAdmin ? "full" : "backup_only"}
-            canManageDangerZone={isSuperAdmin}
+            mode={canManageSettings ? "full" : "backup_only"}
+            canManageDangerZone={canManageBackups || canTransferData}
           />
         )}
 

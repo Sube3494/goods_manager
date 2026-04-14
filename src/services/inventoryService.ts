@@ -13,7 +13,7 @@ export class InventoryService {
   static async processOutboundFIFO(
     tx: Prisma.TransactionClient,
     userId: string,
-    items: { productId: string; quantity: number }[]
+    items: { productId: string; shopProductId?: string | null; quantity: number }[]
   ) {
     for (const item of items) {
       let remainingToDeduct = item.quantity;
@@ -22,7 +22,7 @@ export class InventoryService {
       // 增加 userId 校验以确保数据隔离安全性
       const batches = await tx.purchaseOrderItem.findMany({
         where: {
-          productId: item.productId,
+          ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId }),
           remainingQuantity: {
             gt: 0
           },
@@ -60,7 +60,7 @@ export class InventoryService {
         });
 
         if (updateResult.count === 0) {
-          throw new Error(`并发冲突：商品 ID ${item.productId} 在该批次库存不足。请重试。`);
+          throw new Error(`并发冲突：商品 ID ${item.shopProductId || item.productId} 在该批次库存不足。请重试。`);
         }
 
         remainingToDeduct -= deductFromThisBatch;
@@ -68,26 +68,47 @@ export class InventoryService {
 
       // 3. 校验库存是否足够 (虽然前端通常有校验，但后端逻辑必须闭环)
       if (remainingToDeduct > 0) {
-        throw new Error(`商品 ID ${item.productId} 库存不足，缺口: ${remainingToDeduct}`);
+        throw new Error(`商品 ID ${item.shopProductId || item.productId} 库存不足，缺口: ${remainingToDeduct}`);
       }
 
-      // 4. 更新商品全局库存总量（带防超卖并发校验）
-      const productResult = await tx.product.updateMany({
-        where: { 
-          id: item.productId,
-          stock: {
-            gte: item.quantity
+      // 4. 更新业务商品库存总量（优先店铺商品）
+      if (item.shopProductId) {
+        const shopProductResult = await tx.shopProduct.updateMany({
+          where: {
+            id: item.shopProductId,
+            shop: { userId },
+            stock: {
+              gte: item.quantity
+            }
+          },
+          data: {
+            stock: {
+              decrement: item.quantity
+            }
           }
-        },
-        data: {
-          stock: {
-            decrement: item.quantity
-          }
-        }
-      });
+        });
 
-      if (productResult.count === 0) {
-        throw new Error(`并发冲突：商品 ID ${item.productId} 的总库存发生变动导致不足。请重试。`);
+        if (shopProductResult.count === 0) {
+          throw new Error(`并发冲突：店铺商品 ID ${item.shopProductId} 的库存发生变动导致不足。请重试。`);
+        }
+      } else {
+        const productResult = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            stock: {
+              gte: item.quantity
+            }
+          },
+          data: {
+            stock: {
+              decrement: item.quantity
+            }
+          }
+        });
+
+        if (productResult.count === 0) {
+          throw new Error(`并发冲突：商品 ID ${item.productId} 的总库存发生变动导致不足。请重试。`);
+        }
       }
     }
   }

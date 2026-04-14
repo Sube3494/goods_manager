@@ -11,6 +11,20 @@ import md5 from "blueimp-md5";
 import { SessionUser } from "@/lib/permissions";
 import { hasPermission } from "@/lib/permissions";
 
+function canAccessDashboard(user: SessionUser | null) {
+  if (!user) return false;
+  return (
+    user.role === "SUPER_ADMIN" ||
+    hasPermission(user, "product:read") ||
+    hasPermission(user, "logistics:manage") ||
+    hasPermission(user, "purchase:manage") ||
+    hasPermission(user, "brush:manage") ||
+    hasPermission(user, "inbound:manage") ||
+    hasPermission(user, "outbound:manage") ||
+    hasPermission(user, "settlement:manage")
+  );
+}
+
 export default function LoginPage() {
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
@@ -167,8 +181,7 @@ export default function LoginPage() {
           const meData = await meRes.json();
           const user = meData.user;
           if (user) {
-            const hasProductRead = hasPermission(user as SessionUser, "product:read");
-            targetUrl = hasProductRead ? "/" : "/gallery";
+            targetUrl = canAccessDashboard(user as SessionUser) ? "/" : "/gallery";
           } else {
             targetUrl = "/gallery";
           }

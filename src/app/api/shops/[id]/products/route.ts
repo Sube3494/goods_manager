@@ -3,6 +3,14 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../../prisma/generated-client";
+import { pinyin } from "pinyin-pro";
+
+function generatePinyinSearchText(name: string): string {
+  if (!name) return "";
+  const fullPinyin = pinyin(name, { toneType: "none", type: "string", v: true }).replace(/\s+/g, "");
+  const firstLetters = pinyin(name, { pattern: "first", toneType: "none", type: "string" }).replace(/\s+/g, "");
+  return `${fullPinyin} ${firstLetters}`.toLowerCase();
+}
 
 async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
   return prisma.shop.findFirst({
@@ -87,13 +95,98 @@ export async function GET(
             OR: [
               { sku: { contains: search, mode: "insensitive" as const } },
               { productName: { contains: search, mode: "insensitive" as const } },
+              { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } },
               { categoryName: { contains: search, mode: "insensitive" as const } },
               { product: { name: { contains: search, mode: "insensitive" as const } } },
+              { product: { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } } },
               { product: { category: { name: { contains: search, mode: "insensitive" as const } } } },
             ],
           }
         : {}),
     };
+
+    const naturalSortBySku = async () => {
+      const allItems = await prisma.shopProduct.findMany({
+        where,
+        select: {
+          id: true,
+          sku: true,
+        },
+      });
+
+      allItems.sort((a, b) => {
+        const aVal = a.sku || "";
+        const bVal = b.sku || "";
+        return sortBy === "sku-desc"
+          ? bVal.localeCompare(aVal, "zh-CN", { numeric: true, sensitivity: "base" })
+          : aVal.localeCompare(bVal, "zh-CN", { numeric: true, sensitivity: "base" });
+      });
+
+      return allItems;
+    };
+
+    if (sortBy === "sku-asc" || sortBy === "sku-desc") {
+      const sortedItems = await naturalSortBySku();
+
+      if (idsOnly) {
+        return NextResponse.json({ ids: sortedItems.map((item) => item.id), total: sortedItems.length });
+      }
+
+      const pageIds = sortedItems.slice(skip, skip + pageSize).map((item) => item.id);
+      const pagedItems = await prisma.shopProduct.findMany({
+        where: {
+          id: { in: pageIds },
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              categoryId: true,
+              supplierId: true,
+              category: { select: { name: true } },
+            },
+          },
+        },
+      });
+
+      const orderedItems = pageIds
+        .map((id) => pagedItems.find((item) => item.id === id))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+      const storage = await getStorageStrategy();
+      const resolved = orderedItems.map((item) => ({
+        id: item.id,
+        sourceProductId: item.sourceProductId || item.productId,
+        sku: item.sku || null,
+        name: item.productName || item.product?.name || "未命名商品",
+        image: item.productImage
+          ? storage.resolveUrl(item.productImage)
+          : item.product?.image
+          ? storage.resolveUrl(item.product.image)
+          : null,
+        categoryId: item.categoryId || item.product?.categoryId || null,
+        categoryName: item.categoryName || item.product?.category?.name || "未分类",
+        supplierId: item.supplierId || item.product?.supplierId || null,
+        costPrice: item.costPrice ?? 0,
+        stock: item.stock ?? 0,
+        isPublic: item.isPublic ?? true,
+        isDiscontinued: item.isDiscontinued ?? false,
+        remark: item.remark || null,
+        specs: item.specs ?? null,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
+
+      return NextResponse.json({
+        items: resolved,
+        total: sortedItems.length,
+        page,
+        pageSize,
+        hasMore: page * pageSize < sortedItems.length,
+      });
+    }
 
     if (idsOnly) {
       const ids = await prisma.shopProduct.findMany({
@@ -234,6 +327,7 @@ export async function PUT(
       where: { id: existing.id },
       data: {
         productName,
+        pinyin: generatePinyinSearchText(productName),
         sku: sku || null,
         categoryId: categoryId || null,
         categoryName: categoryName || "未分类",
@@ -351,18 +445,19 @@ export async function POST(
         shopId,
         productId: product.id,
         sourceProductId: product.id,
-        sku: null,
+        sku: product.sku || null,
         productName: product.name,
+        pinyin: generatePinyinSearchText(product.name),
         productImage: product.image,
         categoryId: categoryMap.get(product.category?.name || "") || null,
         categoryName: product.category?.name || null,
-        supplierId: null,
+        supplierId: product.supplierId || null,
         costPrice: 0,
-        stock: product.stock,
+        stock: 0,
         isPublic: product.isPublic,
         isDiscontinued: product.isDiscontinued,
         remark: product.remark,
-        specs: Prisma.JsonNull,
+        specs: product.specs ?? Prisma.JsonNull,
       })),
       skipDuplicates: true,
     });

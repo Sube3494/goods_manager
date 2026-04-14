@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Package, Plus, Trash2, AlertTriangle, Wand2, Store } from "lucide-react";
@@ -28,7 +28,10 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
     const { user } = useUser();
     const typedUser = user as unknown as UserType;
     // 直接将地址库的 Label 作为店铺列表
-    const shopList = typedUser?.shippingAddresses?.map(addr => ({ id: addr.id, name: addr.label, isDefault: addr.isDefault })) || [];
+    const shopList = useMemo(
+      () => typedUser?.shippingAddresses?.map(addr => ({ id: addr.id, name: addr.label, isDefault: addr.isDefault })) || [],
+      [typedUser?.shippingAddresses]
+    );
 
     const [formData, setFormData] = useState<BrushOrder>(() => ({
         id: initialData?.id || "",
@@ -50,18 +53,30 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
     // 1. Data Fetching & Lifecycle
     useEffect(() => {
         const handle = requestAnimationFrame(() => setMounted(true));
-        fetch("/api/products?pageSize=1000")
+        return () => cancelAnimationFrame(handle);
+    }, []);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const currentShop = shopList.find((shop) => shop.name === formData.shopName);
+        const query = new URLSearchParams({
+          pageSize: "1000",
+          ...(currentShop?.id ? { shopId: currentShop.id } : {}),
+        });
+
+        fetch(`/api/purchase-products?${query.toString()}`)
             .then(res => res.json())
             .then(data => {
                 if (data && Array.isArray(data.items)) {
                     setProducts(data.items);
                 } else if (Array.isArray(data)) {
                     setProducts(data);
+                } else {
+                    setProducts([]);
                 }
             })
             .catch(console.error);
-        return () => cancelAnimationFrame(handle);
-    }, []);
+    }, [isOpen, formData.shopName, shopList]);
 
     // 2. Body Scroll logic - Lock scroll when modal is open to prevent scroll-through
     useEffect(() => {
@@ -120,9 +135,10 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
     const newItems = [...formData.items];
 
     selectedProducts.forEach(product => {
-      if (!currentProductIds.includes(product.id)) {
+      const resolvedProductId = product.sourceProductId || product.id;
+      if (!currentProductIds.includes(resolvedProductId)) {
         newItems.push({
-          productId: product.id,
+          productId: resolvedProductId,
           product: product,
           quantity: 1,
         });
@@ -529,6 +545,11 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         onClose={() => setIsSelectionModalOpen(false)}
         onSelect={handleBatchAdd}
         selectedIds={formData.items.map(i => i.productId)}
+        fetchPath="/api/purchase-products"
+        query={(() => {
+          const currentShop = shopList.find((shop) => shop.name === formData.shopName);
+          return currentShop?.id ? { shopId: currentShop.id } : undefined;
+        })()}
     />
     </>
   );

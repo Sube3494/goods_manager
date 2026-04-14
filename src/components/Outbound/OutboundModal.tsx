@@ -4,11 +4,23 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Minus, Plus, Search } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { Product, OutboundOrder } from "@/lib/types";
+import { Product, OutboundOrder, Shop } from "@/lib/types";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useDebounce } from "@/hooks/useDebounce";
+
+interface SelectedOutboundItem {
+  productId: string;
+  shopProductId?: string;
+  shopName?: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  price: number;
+  image: string;
+  stock: number;
+}
 
 interface OutboundModalProps {
   isOpen: boolean;
@@ -18,9 +30,11 @@ interface OutboundModalProps {
 
 export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [selectedShopId, setSelectedShopId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
-  const [selectedItems, setSelectedItems] = useState<{ productId: string, name: string, sku: string, quantity: number, price: number, image: string, stock: number }[]>([]);
+  const [selectedItems, setSelectedItems] = useState<SelectedOutboundItem[]>([]);
   const [type, setType] = useState("Sale");
   const [note, setNote] = useState("");
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -51,9 +65,10 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         pageSize: "20",
         search: debouncedSearch,
         sortBy: "stock-desc",
+        ...(selectedShopId ? { shopId: selectedShopId } : {}),
       });
 
-      const res = await fetch(`/api/products?${queryParams.toString()}`);
+      const res = await fetch(`/api/purchase-products?${queryParams.toString()}`);
       if (res.ok) {
         const data = await res.json();
         const newItems = Array.isArray(data.items) ? data.items : [];
@@ -77,13 +92,15 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       setIsSearching(false);
       setIsNextPageLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, selectedShopId]);
 
   useEffect(() => {
     if (isOpen) {
       fetchProducts('initial');
     } else {
       setSelectedItems([]);
+      setShops([]);
+      setSelectedShopId("");
       setSearchQuery("");
       setNote("");
       setType("Sale");
@@ -92,9 +109,38 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   }, [isOpen, fetchProducts]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchShops = async () => {
+      try {
+        const res = await fetch("/api/shops");
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = Array.isArray(data?.shops) ? data.shops : [];
+        setShops(items);
+        setSelectedShopId((prev) => {
+          if (prev && items.some((shop: Shop) => shop.id === prev)) {
+            return prev;
+          }
+          return items[0]?.id || "";
+        });
+      } catch (error) {
+        console.error("Failed to fetch shops:", error);
+      }
+    };
+
+    fetchShops();
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen || isLoadingProducts) return;
     fetchProducts('search');
   }, [debouncedSearch, isOpen, isLoadingProducts, fetchProducts]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedItems([]);
+  }, [selectedShopId, isOpen]);
 
   useEffect(() => {
     if (!isOpen || !hasMore || isLoadingProducts || isSearching || isNextPageLoading) return;
@@ -116,11 +162,12 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   }, [isOpen, hasMore, isLoadingProducts, isSearching, isNextPageLoading, fetchProducts]);
 
   const addItem = (product: Product) => {
-    const existing = selectedItems.find(item => item.productId === product.id);
+    const itemKey = product.shopProductId || product.id;
+    const existing = selectedItems.find(item => (item.shopProductId || item.productId) === itemKey);
     if (existing) {
       // If already exists, just show a hint or remove it to toggle? 
       // User said "above it should be selection", usually toggle is better for selection list
-      removeItem(product.id);
+      removeItem(itemKey);
       return;
     }
     
@@ -132,7 +179,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     setSelectedItems([
       ...selectedItems,
       {
-        productId: product.id,
+        productId: product.sourceProductId || product.id,
+        shopProductId: product.shopProductId,
+        shopName: product.shopName,
         name: product.name,
         sku: product.sku || "",
         quantity: 1,
@@ -143,13 +192,13 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     ]);
   };
 
-  const removeItem = (productId: string) => {
-    setSelectedItems(selectedItems.filter(item => item.productId !== productId));
+  const removeItem = (itemKey: string) => {
+    setSelectedItems(selectedItems.filter(item => (item.shopProductId || item.productId) !== itemKey));
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (itemKey: string, delta: number) => {
     setSelectedItems(selectedItems.map(item => {
-      if (item.productId === productId) {
+      if ((item.shopProductId || item.productId) === itemKey) {
         const newQty = Math.max(1, Math.min(item.stock, item.quantity + delta));
         return { ...item, quantity: newQty };
       }
@@ -157,10 +206,10 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     }));
   };
 
-  const handleManualQuantityChange = (productId: string, value: string) => {
+  const handleManualQuantityChange = (itemKey: string, value: string) => {
     const qty = parseInt(value) || 0;
     setSelectedItems(selectedItems.map(item => {
-      if (item.productId === productId) {
+      if ((item.shopProductId || item.productId) === itemKey) {
         return { ...item, quantity: Math.max(0, Math.min(item.stock, qty)) };
       }
       return item;
@@ -172,6 +221,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
     if (selectedItems.length === 0) {
       showToast("请至少选择一个商品", "error");
+      return;
+    }
+
+    if (shops.length > 0 && !selectedShopId) {
+      showToast("请先选择出库门店", "error");
       return;
     }
     
@@ -188,9 +242,10 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
     onSubmit({
       type,
-      note,
+      note: `${selectedShopId ? `[店铺:${shops.find((shop) => shop.id === selectedShopId)?.name || ""}] ` : ""}${note}`.trim(),
       items: selectedItems.map(item => ({
         productId: item.productId,
+        shopProductId: item.shopProductId,
         quantity: item.quantity,
         price: item.price
       }))
@@ -276,10 +331,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                 ) : displayProducts.length > 0 ? (
                   <>
                     {displayProducts.map(p => {
-                      const isSelected = selectedItems.some(item => item.productId === p.id);
+                      const itemKey = p.shopProductId || p.id;
+                      const isSelected = selectedItems.some(item => (item.shopProductId || item.productId) === itemKey);
                       return (
                           <button
-                            key={p.id}
+                            key={itemKey}
                             onClick={() => addItem(p)}
                             className={`w-full text-left p-2 rounded-xl transition-all ${isSelected ? 'bg-primary/10 border-primary/20 ring-1 ring-primary/20 shadow-inner' : 'hover:bg-white dark:hover:bg-white/5 group'}`}
                           >
@@ -293,6 +349,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                               <div className="flex-1 min-w-0">
                                 <p className={`text-xs truncate ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`} title={p.name}>{p.name}</p>
                                 <p className="text-[10px] text-muted-foreground truncate font-mono uppercase tracking-tighter">{p.sku}</p>
+                                {p.shopName && (
+                                  <p className="text-[10px] text-blue-500/80 truncate mt-0.5">门店: {p.shopName}</p>
+                                )}
                               </div>
                                <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-all ${isSelected ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm' : 'bg-muted text-muted-foreground border border-transparent'}`}>
                                   库存 {p.stock}
@@ -338,10 +397,23 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                     <div className="p-4 sm:p-5 grid grid-cols-2 gap-4 shrink-0">
 
 
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">出库业务类型</label>
-                            <CustomSelect 
-                                value={type}
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">出库门店</label>
+                        <CustomSelect
+                            value={selectedShopId}
+                            onChange={setSelectedShopId}
+                            options={shops.map((shop) => ({
+                              value: shop.id,
+                              label: shop.name,
+                            }))}
+                            placeholder="选择门店"
+                            triggerClassName="bg-white dark:bg-gray-800 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">出库业务类型</label>
+                        <CustomSelect 
+                            value={type}
                                 onChange={(val) => setType(val)}
                                 options={[
                                     { value: "Sale", label: "销售出库" },
@@ -352,7 +424,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                 triggerClassName="bg-white dark:bg-gray-800 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
                             />
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-1.5 col-span-2">
                             <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">备注信息</label>
                             <input 
                                 type="text"
@@ -369,7 +441,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                         <div className="space-y-3">
                             {selectedItems.length > 0 ? (
                                 selectedItems.map(item => (
-                                    <div key={item.productId} className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl border border-white/5 bg-white dark:bg-gray-800/40 group shadow-sm">
+                                    <div key={item.shopProductId || item.productId} className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl border border-white/5 bg-white dark:bg-gray-800/40 group shadow-sm">
                                         <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
                                             {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
                                         </div>
@@ -380,11 +452,14 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                             <p className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">
                                                 {item.sku}
                                             </p>
+                                            {item.shopName && (
+                                                <p className="text-[10px] text-blue-500/80 mt-0.5">{item.shopName}</p>
+                                            )}
                                         </div>
                                          <div className="flex items-center bg-muted/30 rounded-lg border border-white/5 p-0.5 ml-auto">
                                              <button 
                                                  type="button"
-                                                 onClick={() => updateQuantity(item.productId, -1)}
+                                                 onClick={() => updateQuantity(item.shopProductId || item.productId, -1)}
                                                  className="p-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-muted-foreground transition-colors"
                                              >
                                                  <Minus size={12} />
@@ -392,12 +467,12 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                              <input 
                                                  type="number"
                                                  value={item.quantity}
-                                                 onChange={(e) => handleManualQuantityChange(item.productId, e.target.value)}
+                                                 onChange={(e) => handleManualQuantityChange(item.shopProductId || item.productId, e.target.value)}
                                                  className="w-8 text-center text-[11px] font-bold bg-transparent no-spinner outline-none"
                                              />
                                              <button 
                                                  type="button"
-                                                 onClick={() => updateQuantity(item.productId, 1)}
+                                                 onClick={() => updateQuantity(item.shopProductId || item.productId, 1)}
                                                  className="p-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-muted-foreground transition-colors"
                                              >
                                                  <Plus size={12} />
@@ -405,7 +480,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                          </div>
                                         <button 
                                             type="button"
-                                            onClick={() => removeItem(item.productId)}
+                                            onClick={() => removeItem(item.shopProductId || item.productId)}
                                             className="p-2 text-muted-foreground/30 hover:text-destructive hover:bg-destructive/5 rounded-xl transition-all"
                                         >
                                             <X size={18} />

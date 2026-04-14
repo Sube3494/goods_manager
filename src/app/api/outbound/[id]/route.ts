@@ -28,7 +28,13 @@ export async function POST(
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.outboundOrder.findUnique({
         where: { id, userId: session.id },
-        include: { items: true }
+        include: {
+          items: {
+            include: {
+              shopProduct: true
+            }
+          }
+        }
       });
 
       if (!order) {
@@ -48,8 +54,9 @@ export async function POST(
         // We restore to the latest available space first (LIFO restore for FIFO deduction)
         const batches = await tx.purchaseOrderItem.findMany({
           where: {
-            productId: item.productId,
+            ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId }),
             purchaseOrder: {
+              userId: session.id,
               status: "Received"
             }
           },
@@ -81,15 +88,26 @@ export async function POST(
           }
         }
 
-        // 2. Update the global product stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              increment: item.quantity
+        // 2. Restore current stock to the original business item
+        if (item.shopProductId) {
+          await tx.shopProduct.update({
+            where: { id: item.shopProductId },
+            data: {
+              stock: {
+                increment: item.quantity
+              }
             }
-          }
-        });
+          });
+        } else {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                increment: item.quantity
+              }
+            }
+          });
+        }
       }
 
       // 3. Create a corresponding Inbound record (PurchaseOrder)
@@ -108,6 +126,7 @@ export async function POST(
           items: {
             create: order.items.map(item => ({
               productId: item.productId,
+              shopProductId: item.shopProductId || null,
               quantity: item.quantity,
               remainingQuantity: item.quantity,
               costPrice: 0 // Financial logic might need refinement here

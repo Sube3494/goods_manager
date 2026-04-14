@@ -128,12 +128,21 @@ export async function POST(request: Request) {
       resolvedShopId = shop.id;
     }
 
+    const category = categoryId
+      ? await prisma.category.findFirst({
+          where: user.role === "SUPER_ADMIN"
+            ? { id: categoryId }
+            : { id: categoryId, userId: user.id },
+          select: { id: true, name: true },
+        })
+      : null;
+
     const product = await prisma.product.create({
       data: {
         name,
         sku: normalizedSku,
         costPrice: Number(costPrice) || 0,
-        stock: stockNum,
+        stock: 0,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image: storage.stripUrl(image),
@@ -146,7 +155,23 @@ export async function POST(request: Request) {
         userId: user.id,
         ...(resolvedShopId ? {
           shopProducts: {
-            create: [{ shopId: resolvedShopId }],
+            create: [{
+              shopId: resolvedShopId,
+              sourceProductId: undefined,
+              sku: normalizedSku,
+              productName: name,
+              pinyin: ProductService.generatePinyinSearchText(name),
+              productImage: storage.stripUrl(image),
+              categoryId: categoryId || null,
+              categoryName: category?.name || null,
+              supplierId: supplierId || null,
+              costPrice: Number(costPrice) || 0,
+              stock: stockNum,
+              isPublic: isPublic ?? true,
+              isDiscontinued: isDiscontinued ?? false,
+              remark: remark || null,
+              specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+            }],
           },
         } : {}),
       },
@@ -156,29 +181,6 @@ export async function POST(request: Request) {
         shopProducts: { select: { shopId: true } },
       }
     });
-
-    // 如果初始库存大于 0，自动生成一张“已入库”状态的采购单作为凭证
-    if (stockNum > 0) {
-      const orderId = `PO-INIT-${Date.now().toString().slice(-6)}`;
-      await prisma.purchaseOrder.create({
-        data: {
-          id: orderId,
-          type: "Inbound",
-          status: "Received",
-          totalAmount: 0,
-          date: new Date(),
-          userId: user.id,
-          items: {
-            create: [{
-              productId: product.id,
-              supplierId: supplierId || null,
-              quantity: stockNum,
-              costPrice: 0
-            }]
-          }
-        }
-      });
-    }
 
     return NextResponse.json({
       ...product,
@@ -199,7 +201,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { id, name, sku, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
     const normalizedSku = normalizeSku(sku);
 
     const storage = await getStorageStrategy();
@@ -231,7 +233,6 @@ export async function PUT(request: Request) {
         name,
         sku: normalizedSku,
         costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
-        stock: Number(stock) || 0,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
         image: image !== undefined ? storage.stripUrl(image) : undefined,

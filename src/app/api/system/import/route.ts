@@ -4,10 +4,10 @@ import { getAuthorizedUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    const session = await getAuthorizedUser("system:manage");
+    const session = await getAuthorizedUser("data:transfer");
     const userId = session?.id;
     if (!session || !userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const data = await request.json();

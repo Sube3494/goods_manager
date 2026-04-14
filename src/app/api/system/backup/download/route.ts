@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { BackupService } from "@/lib/backup-service";
-import { getFreshSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getAuthorizedUser } from "@/lib/auth";
 
 function buildContentDisposition(fileName: string) {
   const safeFileName = fileName.replace(/["\r\n]/g, "_");
@@ -13,9 +12,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedUser("backup:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

@@ -21,6 +21,7 @@ interface ProductSelectionModalProps {
   onClose: () => void;
   onSelect: (products: Product[], platform: string) => void;
   selectedIds: string[];
+  selectedBadgeLabel?: string;
   singleSelect?: boolean;
   showPrice?: boolean;
   fetchPath?: string;
@@ -55,6 +56,7 @@ export function ProductSelectionModal({
   onClose,
   onSelect,
   selectedIds,
+  selectedBadgeLabel = "已在计划中",
   singleSelect = false,
   showPrice = true,
   fetchPath = "/api/products",
@@ -267,7 +269,21 @@ export function ProductSelectionModal({
         showToast("商品创建成功", "success");
         setIsCreateModalOpen(false);
         await fetchData();
-        toggleProduct(product);
+        if (createPayload && typeof createPayload.shopId === "string" && fetchPath === "/api/purchase-products") {
+          const scopedQuery = new URLSearchParams({
+            page: "1",
+            pageSize: "200",
+            all: "true",
+            shopId: String(createPayload.shopId),
+          });
+          const scopedRes = await fetch(`${fetchPath}?${scopedQuery.toString()}`);
+          const scopedData = await scopedRes.json().catch(() => null);
+          const scopedItems = Array.isArray(scopedData?.items) ? scopedData.items : [];
+          const createdShopProduct = scopedItems.find((item: Product) => item.sourceProductId === product.id);
+          toggleProduct(createdShopProduct || product);
+        } else {
+          toggleProduct(product);
+        }
       } else {
         showToast("创建失败", "error");
       }
@@ -280,13 +296,14 @@ export function ProductSelectionModal({
     const matchesSupplier = !selectedSupplierId || p.supplierId === selectedSupplierId;
     return matchesSupplier;
   });
+  const selectableProducts = filteredProducts.filter((product) => !selectedIds.includes(product.id));
   const allFilteredSelected =
     !singleSelect &&
-    filteredProducts.length > 0 &&
-    filteredProducts.every((product) => tempSelectedIds.includes(product.id));
+    selectableProducts.length > 0 &&
+    selectableProducts.every((product) => tempSelectedIds.includes(product.id));
 
   const handleToggleSelectAll = async () => {
-    if (singleSelect || filteredProducts.length === 0) {
+    if (singleSelect || selectableProducts.length === 0) {
       return;
     }
 
@@ -315,9 +332,10 @@ export function ProductSelectionModal({
       const fullyFilteredProducts = allMatchedProducts.filter((product: Product) => (
         !selectedSupplierId || product.supplierId === selectedSupplierId
       ));
+      const fullySelectableProducts = fullyFilteredProducts.filter((product: Product) => !selectedIds.includes(product.id));
 
-      setTempSelectedIds(fullyFilteredProducts.map((product: Product) => product.id));
-      setSelectedProducts(fullyFilteredProducts);
+      setTempSelectedIds(fullySelectableProducts.map((product: Product) => product.id));
+      setSelectedProducts(fullySelectableProducts);
     } catch (error) {
       console.error("Failed to select all products:", error);
       showToast("全选失败", "error");
@@ -326,6 +344,9 @@ export function ProductSelectionModal({
 
   const toggleProduct = (product: Product) => {
     const id = product.id;
+    if (selectedIds.includes(id)) {
+      return;
+    }
     if (singleSelect) {
         setTempSelectedIds([id]);
         setSelectedProducts([product]);
@@ -464,17 +485,21 @@ export function ProductSelectionModal({
                     <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
+                      const isAlreadySelected = selectedIds.includes(product.id);
                       return (
                          <button
                           key={product.id}
                           type="button"
                          onClick={() => toggleProduct(product)}
+                            disabled={isAlreadySelected}
                             className={cn(
                              imageOnly
                                ? "group relative aspect-square overflow-hidden rounded-2xl border transition-all cursor-pointer"
                                : "group relative flex w-full items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer min-h-[108px] text-left",
                              isSelected 
                                ? "bg-white dark:bg-white/5 border-primary shadow-md" 
+                               : isAlreadySelected
+                               ? "bg-white/70 dark:bg-white/5 border-emerald-500/20 shadow-sm opacity-70 cursor-not-allowed"
                                : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
                            )}
                         >
@@ -514,9 +539,9 @@ export function ProductSelectionModal({
                            <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5 pr-10">
                             <div className="flex items-center gap-2">
                              <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
-                             {selectedIds.includes(product.id) && (
+                             {isAlreadySelected && (
                                  <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-green-500/10 text-green-500 border border-green-500/20">
-                                     已在计划中
+                                     {selectedBadgeLabel}
                                  </span>
                              )}
                             </div>
@@ -552,9 +577,9 @@ export function ProductSelectionModal({
                            )}
                            {imageOnly && (
                             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/35 to-transparent px-2.5 pb-2.5 pt-10 text-left">
-                              {selectedIds.includes(product.id) && (
+                              {isAlreadySelected && (
                                 <div className="mb-1 inline-flex rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-200">
-                                  已在计划中
+                                  {selectedBadgeLabel}
                                 </div>
                               )}
                               {showImageName && (

@@ -4,12 +4,12 @@ import { RoleManager, RoleManagerHandle } from "@/components/Admin/RoleManager";
 import { useUser } from "@/hooks/useUser";
 import { useRef } from "react";
 import { Plus, Loader2, ShieldAlert, LayoutGrid, Sparkles, BadgeCheck, PanelsTopLeft } from "lucide-react";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { hasAdminAccess, SessionUser } from "@/lib/permissions";
 
 export default function RolesPage() {
   const { user, isLoading: isUserLoading } = useUser();
   const roleManagerRef = useRef<RoleManagerHandle>(null);
-  const canManageRoles = hasPermission(user as SessionUser | null, "system:manage");
+  const canManageRoles = hasAdminAccess(user as SessionUser | null, "roles:manage");
 
   if (isUserLoading) {
     return (

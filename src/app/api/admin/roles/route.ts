@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getFreshSession } from "@/lib/auth";
-import { hasPermission, ROLE_TEMPLATES, TEMPLATE_LABELS } from "@/lib/permissions";
+import { getAuthorizedAdmin } from "@/lib/auth";
+import { ROLE_TEMPLATES, TEMPLATE_LABELS } from "@/lib/permissions";
 
 // 获取所有角色
 export async function GET() {
   try {
-    const session = await getFreshSession();
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedAdmin("roles:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // 自动同步内置角色模板
@@ -45,9 +45,9 @@ export async function GET() {
 // 创建新角色
 export async function POST(request: Request) {
   try {
-    const session = await getFreshSession();
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedAdmin("roles:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -85,9 +85,9 @@ export async function POST(request: Request) {
 // 更新角色
 export async function PUT(request: Request) {
   try {
-    const session = await getFreshSession();
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedAdmin("roles:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -132,9 +132,9 @@ export async function PUT(request: Request) {
 // 删除角色
 export async function DELETE(request: Request) {
   try {
-    const session = await getFreshSession();
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedAdmin("roles:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

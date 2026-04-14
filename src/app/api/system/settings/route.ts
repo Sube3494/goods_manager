@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "../../../../../prisma/generated-client";
-import { getFreshSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getAuthorizedUserAny } from "@/lib/auth";
 
 // 获取系统设置
 export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedUserAny("settings:manage", "backup:manage", "data:transfer");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // 使用 upsert 确保记录存在
@@ -45,9 +44,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedUserAny("settings:manage", "backup:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();

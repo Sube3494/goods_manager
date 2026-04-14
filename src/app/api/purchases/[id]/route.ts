@@ -47,6 +47,7 @@ export async function PUT(
               deleteMany: {},
               create: items.map((item: PurchaseOrderItemType) => ({
                 productId: item.productId,
+                shopProductId: item.shopProductId || null,
                 supplierId: item.supplierId,
                 quantity: Number(item.quantity) || 0,
                 remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
@@ -59,6 +60,7 @@ export async function PUT(
           items: {
             include: {
               product: true,
+              shopProduct: true,
               supplier: true
             }
           }
@@ -72,45 +74,77 @@ export async function PUT(
         });
 
         for (const item of orderItems) {
-          const product = await tx.product.findUnique({
-            where: { id: item.productId }
-          });
+          const incomingQty = item.quantity;
+          const incomingCost = item.costPrice || 0;
 
-          if (product) {
-            const currentStock = product.stock;
-            const currentCost = product.costPrice || 0;
-            const incomingQty = item.quantity;
-            const incomingCost = item.costPrice || 0;
-
-            let newCostPrice = currentCost;
-
-            if (incomingCost > 0) {
-              if (currentStock <= 0) {
-                newCostPrice = incomingCost;
-              } else {
-                const currentTotalValue = FinanceMath.multiply(currentStock, currentCost);
-                const incomingTotalValue = FinanceMath.multiply(incomingQty, incomingCost);
-                const totalValue = FinanceMath.add(currentTotalValue, incomingTotalValue);
-                const totalQty = currentStock + incomingQty;
-                newCostPrice = FinanceMath.divide(totalValue, totalQty);
-              }
-            }
-
-            await tx.product.update({
-              where: { id: item.productId },
-              data: {
-                stock: { increment: incomingQty },
-                costPrice: newCostPrice
-              }
+          if (item.shopProductId) {
+            const shopProduct = await tx.shopProduct.findUnique({
+              where: { id: item.shopProductId }
             });
 
-            // FIFO 支持：如果该项还没有设置余量
-            if (item.remainingQuantity === null) {
-              await tx.purchaseOrderItem.update({
-                where: { id: item.id },
-                data: { remainingQuantity: incomingQty }
+            if (shopProduct) {
+              const currentStock = shopProduct.stock;
+              const currentCost = shopProduct.costPrice || 0;
+              let newCostPrice = currentCost;
+
+              if (incomingCost > 0) {
+                if (currentStock <= 0) {
+                  newCostPrice = incomingCost;
+                } else {
+                  const currentTotalValue = FinanceMath.multiply(currentStock, currentCost);
+                  const incomingTotalValue = FinanceMath.multiply(incomingQty, incomingCost);
+                  const totalValue = FinanceMath.add(currentTotalValue, incomingTotalValue);
+                  const totalQty = currentStock + incomingQty;
+                  newCostPrice = FinanceMath.divide(totalValue, totalQty);
+                }
+              }
+
+              await tx.shopProduct.update({
+                where: { id: item.shopProductId },
+                data: {
+                  stock: { increment: incomingQty },
+                  costPrice: newCostPrice
+                }
               });
             }
+          } else {
+            const product = await tx.product.findUnique({
+              where: { id: item.productId }
+            });
+
+            if (product) {
+              const currentStock = product.stock;
+              const currentCost = product.costPrice || 0;
+              let newCostPrice = currentCost;
+
+              if (incomingCost > 0) {
+                if (currentStock <= 0) {
+                  newCostPrice = incomingCost;
+                } else {
+                  const currentTotalValue = FinanceMath.multiply(currentStock, currentCost);
+                  const incomingTotalValue = FinanceMath.multiply(incomingQty, incomingCost);
+                  const totalValue = FinanceMath.add(currentTotalValue, incomingTotalValue);
+                  const totalQty = currentStock + incomingQty;
+                  newCostPrice = FinanceMath.divide(totalValue, totalQty);
+                }
+              }
+
+              await tx.product.update({
+                where: { id: item.productId },
+                data: {
+                  stock: { increment: incomingQty },
+                  costPrice: newCostPrice
+                }
+              });
+            }
+          }
+
+          // FIFO 支持：如果该项还没有设置余量
+          if (item.remainingQuantity === null) {
+            await tx.purchaseOrderItem.update({
+              where: { id: item.id },
+              data: { remainingQuantity: incomingQty }
+            });
           }
         }
       }

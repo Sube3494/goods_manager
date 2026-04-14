@@ -40,7 +40,10 @@ export async function GET(request: Request) {
     if (productId) {
       where.items = {
         some: {
-          productId: productId
+          OR: [
+            { productId },
+            { shopProductId: productId },
+          ],
         }
       };
     }
@@ -55,6 +58,7 @@ export async function GET(request: Request) {
           items: {
             include: {
               product: true,
+              shopProduct: true,
               supplier: true
             }
           }
@@ -84,6 +88,10 @@ export async function GET(request: Request) {
       })) : po.trackingData,
       items: po.items.map(item => ({
         ...item,
+        shopProduct: item.shopProduct ? {
+          ...item.shopProduct,
+          image: item.shopProduct.productImage ? storage.resolveUrl(item.shopProduct.productImage) : null
+        } : null,
         product: item.product ? {
           ...item.product,
           image: item.product.image ? storage.resolveUrl(item.product.image) : null
@@ -164,6 +172,7 @@ export async function POST(request: Request) {
           items: {
             create: items.map((item: PurchaseOrderItem) => ({
               productId: item.productId,
+              shopProductId: item.shopProductId || null,
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
               remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
@@ -183,12 +192,21 @@ export async function POST(request: Request) {
       // 如果状态是 Received，增加商品库存 (原子事务)
       if (status === "Received") {
         for (const item of items) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: Number(item.quantity) || 0 }
-            }
-          });
+          if (item.shopProductId) {
+            await tx.shopProduct.update({
+              where: { id: item.shopProductId },
+              data: {
+                stock: { increment: Number(item.quantity) || 0 }
+              }
+            });
+          } else {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: { increment: Number(item.quantity) || 0 }
+              }
+            });
+          }
         }
       }
       

@@ -49,15 +49,15 @@ export function PurchaseOverviewModal({ isOpen, onClose, purchases }: PurchaseOv
 
     for (const po of purchases) {
       for (const item of po.items) {
-        const pid = item.productId;
-        const name = item.product?.name || "未知商品";
-        const sku = item.product?.sku || "";
+        const pid = item.shopProductId || item.productId;
+        const name = item.shopProduct?.name || item.product?.name || "未知商品";
+        const sku = item.shopProduct?.sku || item.product?.sku || "";
         const qty = item.quantity || 0;
-        const sid = item.supplierId || item.product?.supplierId || "";
+        const sid = item.supplierId || item.shopProduct?.supplierId || item.product?.supplierId || "";
         const sname = item.supplier?.name || (item.product as { supplier?: { name: string } })?.supplier?.name || "";
         
         // Pick image: PurchaseOrderItem.image or Product.image
-        const image = item.image || item.product?.image;
+        const image = item.image || item.shopProduct?.image || item.product?.image;
 
 
         // Product aggregation

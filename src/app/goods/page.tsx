@@ -41,7 +41,6 @@ export default function GoodsPage() {
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
   
-  const [lowStockThreshold, setLowStockThreshold] = useState(10);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -163,8 +162,6 @@ export default function GoodsPage() {
       fetch("/api/suppliers").then(r => r.ok && r.json()).then(setSuppliers).catch(() => {});
     }
 
-    // System Settings
-    fetch("/api/system/settings").then(r => r.ok && r.json()).then(s => s && setLowStockThreshold(s.lowStockThreshold)).catch(() => {});
   }, [user]);
 
   useEffect(() => {
@@ -382,7 +379,8 @@ export default function GoodsPage() {
       const method = editingProduct ? "PUT" : "POST";
       const url = "/api/products";
       
-      const body = editingProduct ? { ...data, id: editingProduct.id } : data;
+      const normalizedData = { ...data, stock: 0 };
+      const body = editingProduct ? { ...normalizedData, id: editingProduct.id } : normalizedData;
 
       const res = await fetch(url, {
         method,
@@ -473,7 +471,7 @@ export default function GoodsPage() {
           "SKU/店内码": g.sku || "",
           "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
           "进货单价": g.costPrice,
-          "当前库存": g.stock,
+          "关联门店数": g.assignedShopIds?.length || 0,
           "供应商": g.supplier?.name || "未知供应商",
           "商品图片": g.image || "暂无图片",
           "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
@@ -500,7 +498,7 @@ export default function GoodsPage() {
       const { saveAs } = await import("file-saver");
       
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("商品列表");
+      const worksheet = workbook.addWorksheet("商品模板");
 
       if (exportData.length > 0) {
         const headers = Object.keys(exportData[0]);
@@ -519,7 +517,7 @@ export default function GoodsPage() {
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `商品库导出_${formatLocalDate(new Date())}.xlsx`);
+      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `商品模板库导出_${formatLocalDate(new Date())}.xlsx`);
       showToast(`已导出 ${allGoods.length} 条商品数据`, "success");
     } catch (error) {
       console.error("Export failed:", error);
@@ -564,9 +562,9 @@ export default function GoodsPage() {
       {/* Header section with unified style */}
       <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品模板库</h1>
           <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
-            {isLoading ? "正在从数据库加载商品..." : "统一管理商品信息与SKU"}
+            {isLoading ? "正在从数据库加载模板..." : "统一管理商品模板、SKU 与默认资料"}
           </p>
         </div>
         
@@ -646,7 +644,6 @@ export default function GoodsPage() {
                         { value: 'all', label: '所有状态' },
                         { value: 'public', label: '公开可见' },
                         { value: 'private', label: '隐藏不公开' },
-                        { value: 'low_stock', label: '库存预警告' },
                         { value: 'discontinued', label: '已停产商品' }
                     ]}
                     className="h-full"
@@ -699,8 +696,6 @@ export default function GoodsPage() {
                         { value: 'sku-desc', label: '编号从大到小' },
                         { value: 'createdAt-desc', label: '最新创建' },
                         { value: 'createdAt-asc', label: '最早创建' },
-                        { value: 'stock-desc', label: '库存从高到低' },
-                        { value: 'stock-asc', label: '库存从低到高' },
                         { value: 'name-asc', label: '名称 A-Z' }
                     ]}
                     className="h-full"
@@ -730,14 +725,17 @@ export default function GoodsPage() {
           {filteredGoods.map((product, index) => (
             <GoodsCard 
               key={product.id} 
-              product={product} 
+              product={{ ...product, stock: product.assignedShopIds?.length || 0 }} 
               onEdit={canUpdate ? handleEdit : undefined} 
               onDelete={canDelete ? handleDelete : undefined} 
-              lowStockThreshold={lowStockThreshold}
+              lowStockThreshold={0}
               isSelected={selectedIds.includes(product.id)}
               anySelected={selectedIds.length > 0}
               onToggleSelect={toggleSelectProduct}
               priority={index < 4}
+              stockTitle="关联门店"
+              stockUnit="店"
+              disableLowStockTone={true}
             />
           ))}
         </div>
@@ -779,14 +777,13 @@ export default function GoodsPage() {
         onClose={() => setIsImportOpen(false)}
         onImport={handleImport}
         title="导入商品"
-        description="支持通过 Excel 批量导入商品"
+        description="支持通过 Excel 批量导入商品模板"
         templateFileName="商品导入模版.xlsx"
         templateData={[
           {
             "*商品名称": "示例商品1",
             "*分类": "默认分类",
             "*进货单价": 99.00,
-            "库存": 100,
             "SKU": "EXAMPLE-001",
             "供应商": "默认供应商",
             "商品图片": "https://example.com/main.jpg",
@@ -804,6 +801,7 @@ export default function GoodsPage() {
         onClose={() => setIsNewProductOpen(false)}
         onSubmit={handleSaveItem}
         initialData={editingProduct}
+        hideStockField={true}
       />
 
       <BatchEditModal 

@@ -7,9 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const session = await getAuthorizedUser("system:manage");
+    const session = await getAuthorizedUser("data:transfer");
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Fetch all relevant data

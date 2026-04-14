@@ -41,18 +41,27 @@ export function QuickActions() {
   const router = useRouter();
   const { user } = useUser();
   const sessionUser = user as SessionUser | null;
-  const canManageRoles = hasPermission(sessionUser, "system:manage");
+  const canManageRoles = hasAdminAccess(sessionUser, "roles:manage");
   const canManageMembers =
     hasAdminAccess(sessionUser, "members:manage") ||
     hasAdminAccess(sessionUser, "members:status") ||
     hasAdminAccess(sessionUser, "whitelist:manage");
+  const canManageSettings =
+    hasPermission(sessionUser, "settings:manage") ||
+    hasPermission(sessionUser, "backup:manage") ||
+    hasPermission(sessionUser, "data:transfer");
+  const canAccessGallery =
+    hasPermission(sessionUser, "gallery:upload") ||
+    hasPermission(sessionUser, "gallery:download") ||
+    hasPermission(sessionUser, "gallery:share") ||
+    hasPermission(sessionUser, "gallery:copy");
 
   const otherActions: QuickAction[] = [
     hasPermission(sessionUser, "purchase:manage") ? { label: "采购单管理", icon: ShoppingBag, path: "/purchases", color: "text-blue-500", bg: "bg-blue-500/10 dark:bg-blue-500/5" } : null,
     hasPermission(sessionUser, "supplier:manage") ? { label: "供应商名录", icon: ArrowDownRight, path: "/suppliers", color: "text-emerald-500", bg: "bg-emerald-500/10 dark:bg-emerald-500/5" } : null,
-    { label: "商品实物图库", icon: ImageIcon, path: "/gallery", color: "text-orange-500", bg: "bg-orange-500/10 dark:bg-orange-500/5" },
+    canAccessGallery ? { label: "商品实物图库", icon: ImageIcon, path: "/gallery", color: "text-orange-500", bg: "bg-orange-500/10 dark:bg-orange-500/5" } : null,
     canManageRoles ? { label: "角色权限", icon: Settings, path: "/admin/roles", color: "text-rose-500", bg: "bg-rose-500/10 dark:bg-rose-500/5" } : null,
-    hasPermission(sessionUser, "system:manage") ? { label: "系统备份", icon: Database, path: "/settings?tab=data", color: "text-indigo-500", bg: "bg-indigo-500/10 dark:bg-indigo-500/5" } : null,
+    canManageSettings ? { label: "系统备份", icon: Database, path: "/settings?tab=data", color: "text-indigo-500", bg: "bg-indigo-500/10 dark:bg-indigo-500/5" } : null,
     canManageMembers ? { label: "成员中心", icon: Settings, path: "/admin/members", color: "text-sky-500", bg: "bg-sky-500/10 dark:bg-sky-500/5" } : null,
   ].filter((action): action is QuickAction => Boolean(action));
 
@@ -126,16 +135,6 @@ export function QuickActions() {
           </div>
         </motion.div>
         
-        <div className="flex justify-center border-t border-black/5 dark:border-white/5 pt-4">
-          <motion.button 
-            onClick={() => router.push("/settings")}
-            variants={itemAnim} 
-            className="flex items-center gap-2 text-[10px] font-black text-muted-foreground/30 hover:text-primary transition-colors uppercase tracking-[0.3em]"
-          >
-            <Settings size={12} />
-            系统高级配置
-          </motion.button>
-        </div>
       </div>
     </div>
   );

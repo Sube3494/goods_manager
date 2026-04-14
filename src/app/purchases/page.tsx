@@ -353,14 +353,14 @@ function PurchasesContent() {
       for (const po of targets) {
         const sortedItems = sortPurchaseItems(
             po.items,
-            item => item.product?.sku,
-            item => item.product?.name
+            item => item.shopProduct?.sku || item.product?.sku,
+            item => item.shopProduct?.name || item.product?.name
         );
         for (const item of sortedItems) {
           const qty = item.quantity || 0;
           // 兼容性读取单价：尝试多个可能的属性名
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const price = (item as any).price || item.costPrice || item.product?.costPrice || 0;
+          const price = (item as any).price || item.costPrice || item.shopProduct?.costPrice || item.product?.costPrice || 0;
           const subtotal = qty * price;
           const subtotalFormula = { formula: `E${currentRowIndex}*F${currentRowIndex}`, result: subtotal };
 
@@ -368,7 +368,7 @@ function PurchasesContent() {
           totalAmount += subtotal;
 
           // ── 第一步：预取图片并计算尺寸，用于动态行高 ──
-          const imageUrl = item.image || item.product?.image;
+          const imageUrl = item.image || item.shopProduct?.image || item.product?.image;
           let imageBuffer: ArrayBuffer | null = null;
           let imgW = 0;
           let imgH = 0;
@@ -420,8 +420,8 @@ function PurchasesContent() {
           const row = worksheet.addRow([
             globalIndex++,
             "", // Placeholder for image
-            item.product?.name || "未知商品",
-            item.product?.sku || "",
+            item.shopProduct?.name || item.product?.name || "未知商品",
+            item.shopProduct?.sku || item.product?.sku || "",
             price,
             qty,
             subtotalFormula,

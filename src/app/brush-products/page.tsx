@@ -12,6 +12,7 @@ import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionMo
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ActionBar } from "@/components/ui/ActionBar";
+import { ImportModal } from "@/components/Goods/ImportModal";
 
 async function blobToDataUrl(blob: Blob) {
   return await new Promise<string>((resolve, reject) => {
@@ -61,6 +62,7 @@ export default function BrushProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingKeywords, setEditingKeywords] = useState<Record<string, string>>({});
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
@@ -339,6 +341,35 @@ export default function BrushProductsPage() {
     }
   }, [filteredItems, showToast]);
 
+  const handleImport = useCallback(async (rows: Record<string, unknown>[] | Record<string, unknown[]>) => {
+    try {
+      const payload = Array.isArray(rows) ? rows : [];
+      const res = await fetch("/api/brush-products/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: payload }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data?.error || "导入失败", "error");
+        return;
+      }
+
+      fetchBrushProducts();
+      const summary = [
+        data?.success ? `新增 ${data.success} 条` : "",
+        data?.updated ? `更新 ${data.updated} 条` : "",
+        data?.failed ? `失败 ${data.failed} 条` : "",
+      ].filter(Boolean).join("，");
+
+      showToast(summary || "导入完成", data?.failed ? "info" : "success");
+    } catch (error) {
+      console.error("Failed to import brush products:", error);
+      showToast("导入失败", "error");
+    }
+  }, [fetchBrushProducts, showToast]);
+
   if (!canManage) {
     return (
       <div className="py-24 text-center">
@@ -372,6 +403,13 @@ export default function BrushProductsPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-border bg-white/80 px-4 text-sm font-bold text-foreground transition-all active:scale-95 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 sm:h-12 sm:px-5"
+          >
+            <Plus size={16} />
+            <span className="truncate">导入</span>
+          </button>
           <button
             onClick={handleExport}
             className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-border bg-white/80 px-4 text-sm font-bold text-foreground transition-all active:scale-95 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 sm:h-12 sm:px-5"
@@ -542,6 +580,22 @@ export default function BrushProductsPage() {
         title="选择要加入刷单商品库的商品"
         allowCreate={false}
         showPlatformSelector={false}
+      />
+
+      <ImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImport={handleImport}
+        title="导入刷单商品"
+        description="支持按导出表头回填刷单商品库，至少填写商品名称或 SKU，可同时带入刷单关键词。"
+        templateFileName="刷单商品导入模板.xlsx"
+        templateData={[
+          {
+            商品名称: "示例商品",
+            "SKU/店内码": "EXAMPLE-001",
+            刷单关键词: "按摩仪 送礼",
+          },
+        ]}
       />
 
       <ConfirmModal

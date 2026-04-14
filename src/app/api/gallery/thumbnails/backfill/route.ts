@@ -3,9 +3,9 @@ import { getAuthorizedUserAny } from "@/lib/auth";
 import { backfillGalleryThumbnails, countGalleryItemsMissingThumbnails } from "@/lib/gallery-thumbnails.server";
 
 export async function GET() {
-  const session = await getAuthorizedUserAny("system:manage");
+  const session = await getAuthorizedUserAny("settings:manage");
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
@@ -18,9 +18,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getAuthorizedUserAny("system:manage");
+  const session = await getAuthorizedUserAny("settings:manage");
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {

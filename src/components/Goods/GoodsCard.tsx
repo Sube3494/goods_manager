@@ -15,6 +15,10 @@ export const GoodsCard = memo(function GoodsCard({
   onToggleSelect,
   priority,
   hideDiscontinuedState = false,
+  stockTitle = "库存",
+  stockUnit = "件",
+  disableLowStockTone = false,
+  shopLabel,
 }: { 
   product: Product; 
   onEdit?: (product: Product) => void;
@@ -25,6 +29,10 @@ export const GoodsCard = memo(function GoodsCard({
   onToggleSelect?: (id: string) => void;
   priority?: boolean;
   hideDiscontinuedState?: boolean;
+  stockTitle?: string;
+  stockUnit?: string;
+  disableLowStockTone?: boolean;
+  shopLabel?: string;
 }) {
   const [isCopied, setIsCopied] = useState(false);
   const { showToast } = useToast();
@@ -144,6 +152,11 @@ export const GoodsCard = memo(function GoodsCard({
                 </span>
               </div>
             )}
+            {shopLabel && (
+              <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/8 border border-emerald-500/20 px-2 py-0.5 rounded-full h-5 leading-none">
+                <span className="truncate max-w-[100px]">{shopLabel}</span>
+              </div>
+            )}
           </div>
 
         </div>
@@ -153,9 +166,9 @@ export const GoodsCard = memo(function GoodsCard({
         
         <div className="mt-2 flex items-center justify-between pt-4 border-t border-white/10">
           <div>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">库存</p>
-            <p className={`text-sm font-bold mt-0.5 font-number ${product.stock < lowStockThreshold ? 'text-destructive' : 'text-foreground'}`}>
-               {product.stock} <span className="text-[10px] font-bold inline-block ml-1">件</span>
+            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">{stockTitle}</p>
+            <p className={`text-sm font-bold mt-0.5 font-number ${!disableLowStockTone && product.stock < lowStockThreshold ? 'text-destructive' : 'text-foreground'}`}>
+               {product.stock} <span className="text-[10px] font-bold inline-block ml-1">{stockUnit}</span>
             </p>
           </div>
           <div className="text-right">
@@ -238,6 +251,10 @@ export const GoodsCard = memo(function GoodsCard({
     prev.anySelected === next.anySelected &&
     prev.lowStockThreshold === next.lowStockThreshold &&
     prev.priority === next.priority &&
+    prev.stockTitle === next.stockTitle &&
+    prev.stockUnit === next.stockUnit &&
+    prev.disableLowStockTone === next.disableLowStockTone &&
+    prev.shopLabel === next.shopLabel &&
     prev.product.id === next.product.id &&
     prev.product.name === next.product.name &&
     prev.product.stock === next.product.stock &&

@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { initFIFOData } from "@/lib/fifo-init";
-import { getFreshSession } from "@/lib/auth";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getAuthorizedUser } from "@/lib/auth";
 
 export async function GET() {
   try {
-    const session = await getFreshSession() as SessionUser | null;
-    if (!session || !hasPermission(session, "system:manage")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getAuthorizedUser("settings:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const result = await initFIFOData();

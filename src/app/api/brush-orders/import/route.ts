@@ -20,6 +20,7 @@ type MatchableProduct = {
   sku: string | null;
   stock: number;
   sourceProductId?: string | null;
+  shopName?: string | null;
 };
 
 function normalizeText(value: unknown) {
@@ -396,11 +397,23 @@ export async function POST(req: NextRequest) {
     const internalShopNames = Array.from(internalShops);
     const normalizedBrushShopNames = Array.from(brushShopNames).map((name) => normalizeText(name)).filter(Boolean);
 
-    // 取出用户所有的商品用于智能名称匹配
-    const allProducts: MatchableProduct[] = await prisma.product.findMany({
-      where: { userId },
-      select: { id: true, name: true, sku: true, stock: true, sourceProductId: true }
+    // 取出用户门店商品用于优先匹配，回写时仍使用 sourceProductId / productId
+    const shopProducts = await prisma.shopProduct.findMany({
+      where: {
+        shop: { userId },
+      },
+      include: {
+        shop: { select: { name: true } },
+      },
     });
+    const allProducts: MatchableProduct[] = shopProducts.map((item) => ({
+      id: item.sourceProductId || item.productId,
+      name: item.productName || "未命名商品",
+      sku: item.sku,
+      stock: item.stock,
+      sourceProductId: item.sourceProductId || item.productId,
+      shopName: item.shop.name,
+    }));
     const publicProducts = await prisma.product.findMany({
       where: {
         isPublic: true,
@@ -541,7 +554,13 @@ export async function POST(req: NextRequest) {
         const matchedItems: { productId: string, quantity: number }[] = [];
         let matchFailed = false;
         for (const item of parsedItems) {
-          let product = OrderParser.findBestMatchProduct(item.rawName, allProducts);
+          const shopScopedProducts = shopName
+            ? allProducts.filter((product) => product.shopName === shopName)
+            : allProducts;
+          let product = OrderParser.findBestMatchProduct(
+            item.rawName,
+            shopScopedProducts.length > 0 ? shopScopedProducts : allProducts
+          );
 
           if (!product && canImportMatchedPublicProduct) {
             const publicProduct = OrderParser.findBestMatchProduct(item.rawName, publicProducts);

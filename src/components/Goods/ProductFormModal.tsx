@@ -43,6 +43,7 @@ interface ProductFormModalProps {
   hideSkuField?: boolean;
   hideSupplierField?: boolean;
   hidePricingFields?: boolean;
+  hideStockField?: boolean;
   hideRemarkField?: boolean;
   disableHistorySection?: boolean;
   showCoverSection?: boolean;
@@ -66,6 +67,7 @@ export function ProductFormModal({
   hideSkuField = false,
   hideSupplierField = false,
   hidePricingFields = false,
+  hideStockField = false,
   hideRemarkField = false,
   disableHistorySection = false,
   showCoverSection = false,
@@ -715,7 +717,7 @@ export function ProductFormModal({
     await onSubmit({
       ...formData,
       costPrice: Number(formData.costPrice),
-      stock: Number(formData.stock),
+      stock: hideStockField ? 0 : Number(formData.stock),
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
       id: initialData?.id
     }, galleryImages);
@@ -1089,7 +1091,7 @@ export function ProductFormModal({
                     )}
 
                     {!hidePricingFields && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className={cn("grid gap-4", hideStockField ? "grid-cols-1" : "grid-cols-2")}>
                         {/* Cost Price */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1107,6 +1109,7 @@ export function ProductFormModal({
                         </div>
 
                         {/* Initial Stock */}
+                        {!hideStockField && (
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                 <Package size={16} /> 商品库存
@@ -1122,6 +1125,7 @@ export function ProductFormModal({
                                 />
                             </div>
                         </div>
+                        )}
 
                     </div>
                     )}

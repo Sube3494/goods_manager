@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Trophy, TrendingUp, PackageOpen, ChevronRight, Crown } from "lucide-react";
+import { Trophy, TrendingUp, PackageOpen } from "lucide-react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -36,34 +36,40 @@ export function TopOutboundProducts() {
     fetchTop();
   }, []);
 
+  const cardClass = "h-full w-full overflow-hidden rounded-[22px] border border-black/8 dark:border-white/10 bg-zinc-50/55 dark:bg-white/[0.04] shadow-xs dark:shadow-none backdrop-blur-xl";
+
   const TitleSection = () => (
-    <div className="p-4 sm:p-6 border-b border-black/5 dark:border-white/5 flex items-center justify-between shrink-0">
-      <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
-          <TrendingUp className="text-orange-500" size={16} />
-          出库热销榜
-        </h3>
-        <p className="text-[10px] text-muted-foreground/30 font-medium tracking-tighter">按出库数量排行</p>
+    <div className="flex items-center justify-between gap-3 border-b border-black/6 dark:border-white/8 px-4 py-3 sm:px-5">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+            <TrendingUp size={14} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-black tracking-tight text-foreground">出库热销榜</h3>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">最近热销商品</p>
+          </div>
+        </div>
       </div>
       {items.length > 0 && (
-        <div className="flex items-center gap-1 bg-orange-500/10 px-2 py-1 rounded-lg border border-orange-500/20 shadow-lg shadow-orange-500/5">
-           <Trophy size={10} className="text-orange-500" />
-           <span className="text-[10px] font-black text-orange-500 tracking-widest">前 {items.length} 名</span>
+        <div className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+          <Trophy size={11} />
+          前 {items.length} 名
         </div>
       )}
     </div>
   );
 
   return (
-    <div className="h-full w-full rounded-3xl border border-black/8 dark:border-white/10 bg-zinc-50/50 dark:bg-white/5 flex flex-col backdrop-blur-xl overflow-hidden shadow-xs dark:shadow-none">
+    <div className={cardClass}>
       <TitleSection />
       
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {isLoading ? (
-          <div className="flex flex-col gap-4 p-4 sm:p-6">
+          <div className="flex flex-col gap-2.5 p-3.5 sm:p-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4 animate-pulse">
-                <div className="w-14 h-14 rounded-2xl bg-black/3 dark:bg-white/5 border border-black/3 dark:border-white/5 shrink-0" />
+              <div key={i} className="flex items-center gap-3 animate-pulse rounded-[16px] border border-black/6 dark:border-white/8 bg-white/75 px-3 py-2.5 dark:bg-white/[0.04]">
+                <div className="w-12 h-12 rounded-xl bg-black/3 dark:bg-white/5 border border-black/3 dark:border-white/5 shrink-0" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 bg-black/3 dark:bg-white/5 rounded-full w-2/3" />
                   <div className="h-3 bg-black/3 dark:bg-white/5 rounded-full w-1/3" />
@@ -80,7 +86,7 @@ export function TopOutboundProducts() {
             <p className="text-xs font-black tracking-[0.3em]">暂无数据</p>
           </div>
         ) : (
-          <div className="p-4 space-y-2">
+          <div className="space-y-2 p-3.5 sm:p-4">
             <AnimatePresence>
               {items.map((item, index) => (
                 <motion.div 
@@ -88,21 +94,17 @@ export function TopOutboundProducts() {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="group flex items-center gap-4 p-3 rounded-2xl bg-white/60 dark:bg-white/5 border border-black/3 dark:border-transparent transition-all hover:bg-white hover:dark:bg-white/10 hover:border-black/10 dark:hover:border-white/10 hover:shadow-lg hover:shadow-black/5 hover:-translate-y-0.5"
+                  className="group flex items-center gap-3 rounded-[16px] border border-black/6 dark:border-white/8 bg-white/78 dark:bg-white/[0.03] px-3 py-2.5 transition-colors hover:border-black/10 dark:hover:border-white/12 hover:bg-white dark:hover:bg-white/[0.05]"
                 >
                   <div className="relative shrink-0">
-                    {/* Rank System with Metallic texture */}
                     <div className={cn(
-                      "absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black text-white z-20 shadow-2xl border-2 border-white/20 dark:border-white/20",
-                      index === 0 ? 'bg-linear-to-br from-amber-300 via-amber-500 to-amber-600 scale-110' :
-                      index === 1 ? 'bg-linear-to-br from-slate-200 via-slate-400 to-slate-500' :
-                      index === 2 ? 'bg-linear-to-br from-amber-600 via-amber-800 to-amber-900' :
-                      'bg-black/30 text-white dark:bg-white/10 dark:text-muted-foreground/60 border-black/10 dark:border-white/5'
+                      "absolute -top-2 -right-2 z-20 flex h-5.5 w-5.5 items-center justify-center rounded-full border border-black/8 bg-black/[0.65] text-[9px] font-bold text-white dark:border-white/10 dark:bg-white/[0.14]",
+                      index < 3 && "bg-black/[0.75] dark:bg-white/[0.18]"
                     )}>
-                      {index === 0 ? <Crown size={12} strokeWidth={3} /> : index + 1}
+                      {index + 1}
                     </div>
 
-                    <div className="relative w-14 h-14 rounded-2xl overflow-hidden border border-black/5 dark:border-white/10 bg-black/5 dark:bg-muted/20 shadow-inner group-hover:scale-105 transition-transform">
+                    <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20">
                       {item.product.image ? (
                         <Image
                           src={item.product.image}
@@ -115,30 +117,25 @@ export function TopOutboundProducts() {
                           <PackageOpen size={20} />
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </div>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-bold text-sm text-foreground truncate uppercase group-hover:text-primary transition-colors">
+                      <p className="truncate text-[13px] font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
                         {item.product.name}
                       </p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground/40 font-mono truncate mt-0.5 tracking-tighter">
-                      编码: {item.product.sku}
+                    <p className="mt-1 truncate text-[10px] font-mono text-muted-foreground">
+                      编码: {item.product.sku || "未填写"}
                     </p>
                   </div>
 
-                  <div className="shrink-0 flex flex-col items-end right-align gap-0.5">
-                    <div className="text-xl font-black text-foreground tabular-nums tracking-tighter shadow-primary/20">
+                  <div className="shrink-0 border-l border-black/6 pl-3 text-right dark:border-white/8">
+                    <div className="text-[24px] leading-none font-black tabular-nums tracking-tight text-foreground">
                       {item.totalQuantity}
                     </div>
-                    <span className="text-[8px] font-black text-muted-foreground/40 tracking-[0.2em] leading-none">出库量</span>
-                  </div>
-
-                  <div className="ml-1 opacity-10 group-hover:opacity-100 transition-opacity">
-                    <ChevronRight size={14} className="text-primary" />
+                    <span className="mt-1 block text-[9px] font-bold text-muted-foreground">出库量</span>
                   </div>
                 </motion.div>
               ))}
