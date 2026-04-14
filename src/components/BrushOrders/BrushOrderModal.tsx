@@ -544,6 +544,8 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         onClose={() => setIsSelectionModalOpen(false)}
         onSelect={handleBatchAdd}
         selectedIds={formData.items.map(i => i.productId)}
+        showPrice={false}
+        showSku={false}
         fetchPath="/api/purchase-products"
         query={{ aggregateSource: "true" }}
     />

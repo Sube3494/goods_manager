@@ -24,6 +24,7 @@ interface ProductSelectionModalProps {
   selectedBadgeLabel?: string;
   singleSelect?: boolean;
   showPrice?: boolean;
+  showSku?: boolean;
   fetchPath?: string;
   title?: string;
   allowCreate?: boolean;
@@ -59,6 +60,7 @@ export function ProductSelectionModal({
   selectedBadgeLabel = "已在计划中",
   singleSelect = false,
   showPrice = true,
+  showSku = true,
   fetchPath = "/api/products",
   title = "选择商品",
   allowCreate = true,
@@ -545,9 +547,9 @@ export function ProductSelectionModal({
                                  </span>
                              )}
                             </div>
-                             {(minimalView ? product.category?.name : (product.sku || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark)) && (
+                             {(minimalView ? product.category?.name : ((showSku && product.sku) || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark)) && (
                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                                    {!minimalView && product.sku && (
+                                    {!minimalView && showSku && product.sku && (
                                       <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
                                         {product.sku}
                                       </span>

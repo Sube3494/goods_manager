@@ -580,6 +580,8 @@ export default function BrushProductsPage() {
         onClose={() => setIsPickerOpen(false)}
         onSelect={(products) => handleAddProducts(products)}
         selectedIds={items.map((item) => item.productId)}
+        showPrice={false}
+        showSku={false}
         fetchPath="/api/purchase-products"
         query={{ aggregateSource: "true" }}
         title="选择要加入刷单商品库的商品"
