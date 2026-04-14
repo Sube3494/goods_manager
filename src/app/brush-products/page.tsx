@@ -581,6 +581,7 @@ export default function BrushProductsPage() {
         onSelect={(products) => handleAddProducts(products)}
         selectedIds={items.map((item) => item.productId)}
         fetchPath="/api/purchase-products"
+        query={{ aggregateSource: "true" }}
         title="选择要加入刷单商品库的商品"
         allowCreate={false}
         showPlatformSelector={false}

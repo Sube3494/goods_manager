@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     const supplierId = searchParams.get("supplierId") || "";
     const shopId = searchParams.get("shopId") || "";
     const shopName = (searchParams.get("shopName") || "").trim();
+    const aggregateSource = searchParams.get("aggregateSource") === "true";
 
     const shopProducts = await prisma.shopProduct.findMany({
       where: {
@@ -71,21 +72,50 @@ export async function GET(request: Request) {
       updatedAt: item.updatedAt,
     }));
 
-    merged.sort((a, b) => {
+    const normalizedItems = aggregateSource
+      ? Array.from(
+          merged.reduce((acc, item) => {
+            const key = item.sourceProductId || item.shopProductId || item.id;
+            const existing = acc.get(key);
+            if (!existing) {
+              acc.set(key, {
+                ...item,
+                id: item.sourceProductId || item.id,
+                shopProductId: undefined,
+                sourceType: "product" as const,
+                stock: item.stock || 0,
+              });
+              return acc;
+            }
+
+            acc.set(key, {
+              ...existing,
+              stock: (existing.stock || 0) + (item.stock || 0),
+              updatedAt:
+                new Date(item.updatedAt || 0).getTime() > new Date(existing.updatedAt || 0).getTime()
+                  ? item.updatedAt
+                  : existing.updatedAt,
+            });
+            return acc;
+          }, new Map<string, (typeof merged)[number] & { sourceType: "product" | "shopProduct"; shopProductId?: string }>())
+        ).map(([, value]) => value)
+      : merged;
+
+    normalizedItems.sort((a, b) => {
       const aName = `${a.name} ${a.sku || ""}`.toLowerCase();
       const bName = `${b.name} ${b.sku || ""}`.toLowerCase();
       return aName.localeCompare(bName, "zh-CN", { numeric: true, sensitivity: "base" });
     });
 
     const start = (page - 1) * pageSize;
-    const items = merged.slice(start, start + pageSize);
+    const items = normalizedItems.slice(start, start + pageSize);
 
     return NextResponse.json({
       items,
-      total: merged.length,
+      total: normalizedItems.length,
       page,
       pageSize,
-      hasMore: start + items.length < merged.length,
+      hasMore: start + items.length < normalizedItems.length,
     });
   } catch (error) {
     console.error("Failed to fetch purchase products:", error);
