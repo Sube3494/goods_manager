@@ -24,17 +24,11 @@ interface ShopProductsResponse {
   hasMore?: boolean;
 }
 
-interface GroupedShopCardItem extends ShopCatalogItem {
-  displayId: string;
-  linkedIds: string[];
-  shopNames: string[];
-}
-
 export default function ShopGoodsPage() {
   const { showToast } = useToast();
   const [shops, setShops] = useState<Shop[]>([]);
   const [needsAddress, setNeedsAddress] = useState(false);
-  const [selectedShopId, setSelectedShopId] = useState("all");
+  const [selectedShopId, setSelectedShopId] = useState("");
   const [items, setItems] = useState<ShopCatalogItem[]>([]);
   const itemsRef = useRef<ShopCatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +56,7 @@ export default function ShopGoodsPage() {
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   const selectedShop = useMemo(
-    () => (selectedShopId === "all" ? null : shops.find((shop) => shop.id === selectedShopId) || null),
+    () => shops.find((shop) => shop.id === selectedShopId) || null,
     [selectedShopId, shops]
   );
 
@@ -80,49 +74,16 @@ export default function ShopGoodsPage() {
     [items, selectedShopId]
   );
 
-  const displayedItems = useMemo<GroupedShopCardItem[]>(() => {
-    if (selectedShop) {
-      return items.map((item) => ({
+  const displayedItems = useMemo(
+    () =>
+      items.map((item) => ({
         ...item,
         displayId: item.id,
         linkedIds: [item.id],
         shopNames: item.shopName ? [item.shopName] : [],
-      }));
-    }
-
-    const grouped = new Map<string, GroupedShopCardItem>();
-    items.forEach((item) => {
-      const key = item.sourceProductId || item.productId || `${item.name}::${item.sku || ""}`;
-      const existing = grouped.get(key);
-      if (!existing) {
-        grouped.set(key, {
-          ...item,
-          displayId: `group:${key}`,
-          linkedIds: [item.id],
-          shopNames: item.shopName ? [item.shopName] : [],
-          stock: item.stock || 0,
-          costPrice: item.costPrice ?? 0,
-        });
-        return;
-      }
-
-      existing.linkedIds.push(item.id);
-      if (item.shopName && !existing.shopNames.includes(item.shopName)) {
-        existing.shopNames.push(item.shopName);
-      }
-      existing.stock = (existing.stock || 0) + (item.stock || 0);
-
-      const existingPrice = Number(existing.costPrice ?? 0);
-      const nextPrice = Number(item.costPrice ?? 0);
-      if (existing.linkedIds.length === 2 && existingPrice !== nextPrice) {
-        existing.costPrice = 0;
-      } else if (existing.linkedIds.length > 2 && Number(existing.costPrice ?? 0) !== nextPrice) {
-        existing.costPrice = 0;
-      }
-    });
-
-    return Array.from(grouped.values());
-  }, [items, selectedShop]);
+      })),
+    [items]
+  );
 
   useEffect(() => {
     itemsRef.current = items;
@@ -140,11 +101,17 @@ export default function ShopGoodsPage() {
           return;
         }
         setNeedsAddress(Boolean(data?.needsAddress));
-        setShops(Array.isArray(data?.shops) ? data.shops : []);
+        const nextShops = Array.isArray(data?.shops) ? data.shops : [];
+        setShops(nextShops);
+        setSelectedShopId((current) => {
+          if (current && nextShops.some((shop) => shop.id === current)) return current;
+          return nextShops[0]?.id || "";
+        });
       } catch (error) {
         console.error("Failed to fetch shops:", error);
         showToast("店铺加载失败", "error");
         setNeedsAddress(false);
+        setSelectedShopId("");
       }
     };
     void fetchShops();
@@ -185,19 +152,26 @@ export default function ShopGoodsPage() {
   const buildAggregateQuery = useCallback((page: number, extra?: Record<string, string>) => {
     const queryParams = new URLSearchParams({
       page: String(page),
-      pageSize: selectedShopId === "all" ? "2000" : "20",
+      pageSize: "20",
       search: debouncedSearch,
       categoryName: selectedCategory,
       supplierId: selectedSupplier,
       sortBy,
-      ...(selectedShopId === "all" ? { all: "true" } : {}),
-      ...(selectedShopId !== "all" ? { shopId: selectedShopId } : {}),
+      ...(selectedShopId ? { shopId: selectedShopId } : {}),
       ...extra,
     });
     return queryParams;
   }, [debouncedSearch, selectedCategory, selectedShopId, selectedSupplier, sortBy]);
 
   const fetchShopProducts = useCallback(async (isFirstPage = true) => {
+    if (!selectedShopId) {
+      setItems([]);
+      setHasMore(false);
+      setTotalResults(0);
+      setIsLoading(false);
+      setIsNextPageLoading(false);
+      return;
+    }
     try {
       const targetPage = isFirstPage ? 1 : currentPageRef.current + 1;
       if (isFirstPage && itemsRef.current.length === 0) setIsLoading(true);
@@ -217,7 +191,7 @@ export default function ShopGoodsPage() {
       }
 
       currentPageRef.current = targetPage;
-      setHasMore(selectedShopId === "all" ? false : Boolean(data.hasMore));
+      setHasMore(Boolean(data.hasMore));
       setTotalResults(data.total || 0);
     } catch (error) {
       console.error("Failed to fetch shop products:", error);
@@ -238,7 +212,7 @@ export default function ShopGoodsPage() {
   useEffect(() => {
     const fetchCategoryOptions = async () => {
       try {
-        const queryParams = buildAggregateQuery(1, { all: "true", pageSize: "2000" });
+        const queryParams = buildAggregateQuery(1, { pageSize: "2000" });
         const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
         const data: ShopProductsResponse = await res.json().catch(() => ({}));
         if (!res.ok) return;
@@ -270,10 +244,6 @@ export default function ShopGoodsPage() {
       setSelectedIds([]);
       return;
     }
-    if (!selectedShop) {
-      setSelectedIds(displayedItems.map((item) => item.displayId));
-      return;
-    }
     try {
       const queryParams = buildAggregateQuery(1, { idsOnly: "true" });
       const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
@@ -287,7 +257,7 @@ export default function ShopGoodsPage() {
       console.error("Failed to fetch shop product ids:", error);
       showToast("获取商品失败", "error");
     }
-  }, [buildAggregateQuery, displayedItems, selectedIds.length, selectedShop, showToast]);
+  }, [buildAggregateQuery, displayedItems, selectedIds.length, showToast]);
 
   const handleAssignProducts = useCallback(async (products: Product[]) => {
     if (!selectedShop || products.length === 0) return;
@@ -378,17 +348,13 @@ export default function ShopGoodsPage() {
       showToast("未找到要编辑的店铺商品", "error");
       return;
     }
-    if (!selectedShop && target.linkedIds.length > 1) {
-      showToast("当前是全部店铺聚合视图，请先筛选到单个店铺再编辑这类商品", "error");
-      return;
-    }
     const rawTarget = items.find((item) => item.id === target.linkedIds[0]);
     if (!rawTarget) {
       showToast("未找到要编辑的店铺商品", "error");
       return;
     }
     openEditModal(rawTarget);
-  }, [displayedItems, items, openEditModal, selectedIds, selectedShop, showToast]);
+  }, [displayedItems, items, openEditModal, selectedIds, showToast]);
 
   const handleSaveEdit = useCallback(async (formData: Omit<Product, "id"> & { id?: string }) => {
     if (!editingShopId || !editingItemId) return;
@@ -502,7 +468,7 @@ export default function ShopGoodsPage() {
 
   const handleExport = useCallback(async () => {
     try {
-      const queryParams = buildAggregateQuery(1, { all: "true", pageSize: "2000" });
+      const queryParams = buildAggregateQuery(1, { pageSize: "2000" });
       const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
       const data: ShopProductsResponse = await res.json().catch(() => ({}));
       const exportItems = Array.isArray(data.items) ? data.items : [];
@@ -574,10 +540,10 @@ export default function ShopGoodsPage() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 min-w-0">
             <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">店铺商品</h1>
-            <span className="shrink-0 inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 sm:px-4 h-8 sm:h-10 text-sm sm:text-lg font-bold text-primary font-number shadow-sm">{selectedShop ? totalResults : displayedItems.length}</span>
+            <span className="shrink-0 inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 sm:px-4 h-8 sm:h-10 text-sm sm:text-lg font-bold text-primary font-number shadow-sm">{totalResults}</span>
           </div>
           <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
-            所有店铺商品统一展示，卡片会直接标出所属店铺，也可以按店铺筛选。
+            当前页面固定按单店铺查看，切换店铺只更新筛选结果。
           </p>
         </div>
         {shops.length > 0 && (
@@ -600,7 +566,7 @@ export default function ShopGoodsPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-4 xl:flex gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
           <div className="xl:w-52 h-10 sm:h-11">
-            <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={[{ value: "all", label: "全部店铺" }, ...shops.map((shop) => ({ value: shop.id, label: shop.name }))]} placeholder="全部店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
+            <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={shops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
           </div>
           <div className="xl:w-44 h-10 sm:h-11">
             <CustomSelect value={selectedCategory} onChange={setSelectedCategory} options={categoryOptions} placeholder="全部分类" className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
@@ -628,27 +594,23 @@ export default function ShopGoodsPage() {
       ) : !needsAddress ? (
         <>
           <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-            <p>{selectedShop ? `当前筛选：${selectedShop.name}` : "当前筛选：全部店铺"}</p>
-            {!selectedShop && shops.length > 0 ? <p>要导入或从模板库添加时，先在上面选一个目标店铺。</p> : null}
+            <p>{selectedShop ? `当前店铺：${selectedShop.name}` : "当前店铺：未选择"}</p>
+            {!selectedShop && shops.length > 0 ? <p>请先选择一个店铺再查看商品。</p> : null}
           </div>
           <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 transition-opacity duration-300">
             {displayedItems.map((product, index) => (
-              <GoodsCard key={product.displayId} product={{ id: product.displayId, sku: product.sku || undefined, name: product.name, categoryId: product.categoryId || "", category: product.categoryName ? { id: product.categoryId || "", name: product.categoryName, count: 0 } : undefined, costPrice: product.costPrice || 0, stock: product.stock || 0, image: product.image || undefined, isPublic: product.isPublic ?? true, isDiscontinued: product.isDiscontinued ?? false, remark: product.remark || undefined, specs: product.specs || undefined, supplierId: product.supplierId || undefined }} shopLabel={product.shopNames.length > 2 ? `${product.shopNames[0]} 等 ${product.shopNames.length} 店` : product.shopNames.join(" / ") || product.shopName || undefined} onEdit={() => {
-                if (!selectedShop && product.linkedIds.length > 1) {
-                  showToast("当前是全部店铺聚合视图，请先筛选到单个店铺再编辑这类商品", "error");
-                  return;
-                }
+              <GoodsCard key={product.displayId} product={{ id: product.displayId, sku: product.sku || undefined, name: product.name, categoryId: product.categoryId || "", category: product.categoryName ? { id: product.categoryId || "", name: product.categoryName, count: 0 } : undefined, costPrice: product.costPrice || 0, stock: product.stock || 0, image: product.image || undefined, isPublic: product.isPublic ?? true, isDiscontinued: product.isDiscontinued ?? false, remark: product.remark || undefined, specs: product.specs || undefined, supplierId: product.supplierId || undefined }} shopLabel={product.shopName || undefined} onEdit={() => {
                 const rawTarget = items.find((item) => item.id === product.linkedIds[0]);
                 if (rawTarget) openEditModal(rawTarget);
               }} isSelected={selectedIds.includes(product.displayId)} anySelected={selectedIds.length > 0} onToggleSelect={handleToggleSelect} priority={index < 4} hideDiscontinuedState={true} />
             ))}
           </div>
-          {displayedItems.length > 0 && <div ref={observerTarget} className="flex justify-center mt-8 mb-12 py-4">{isNextPageLoading ? <div className="flex items-center gap-3 text-muted-foreground bg-white/5 px-6 py-2 rounded-full border border-white/10 animate-pulse"><div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" /><span className="text-sm font-medium">正在拉取更多记录...</span></div> : hasMore ? <div className="h-10 invisible" /> : <div className="text-muted-foreground text-sm font-medium flex items-center gap-2 opacity-50"><div className="w-1.5 h-1.5 rounded-full bg-current" />已展示全部店铺商品<div className="w-1.5 h-1.5 rounded-full bg-current" /></div>}</div>}
-          {!isLoading && displayedItems.length === 0 && <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center"><div className="rounded-full bg-muted/50 p-4 mb-4"><Store size={32} className="text-muted-foreground" /></div><h3 className="text-lg font-semibold">还没有店铺商品</h3><p className="text-sm text-muted-foreground">{selectedShop ? `当前筛选店铺是 ${selectedShop.name}，可以从右上角模板库添加。` : "先选择店铺筛选，或直接从右上角导出当前结果。"}</p></div>}
+          {displayedItems.length > 0 && <div ref={observerTarget} className="flex justify-center mt-8 mb-12 py-4">{isNextPageLoading ? <div className="flex items-center gap-3 text-muted-foreground bg-white/5 px-6 py-2 rounded-full border border-white/10 animate-pulse"><div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" /><span className="text-sm font-medium">正在拉取更多记录...</span></div> : hasMore ? <div className="h-10 invisible" /> : <div className="text-muted-foreground text-sm font-medium flex items-center gap-2 opacity-50"><div className="w-1.5 h-1.5 rounded-full bg-current" />当前店铺商品已全部展示<div className="w-1.5 h-1.5 rounded-full bg-current" /></div>}</div>}
+          {!isLoading && displayedItems.length === 0 && <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center"><div className="rounded-full bg-muted/50 p-4 mb-4"><Store size={32} className="text-muted-foreground" /></div><h3 className="text-lg font-semibold">还没有店铺商品</h3><p className="text-sm text-muted-foreground">{selectedShop ? `当前店铺是 ${selectedShop.name}，可以从右上角模板库添加。` : "请先选择一个店铺。"}</p></div>}
         </>
       ) : null}
 
-      <ActionBar selectedCount={selectedIds.length} totalCount={selectedShop ? totalResults : displayedItems.length} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: selectedShop ? `移出 ${selectedShop.name}` : "移出所属店铺", onClick: handleRemoveSelected, variant: "danger" }]} />
+      <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: selectedShop ? `移出 ${selectedShop.name}` : "移出所属店铺", onClick: handleRemoveSelected, variant: "danger" }]} />
       <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="已在当前店铺" title={selectedShop ? `添加到 ${selectedShop.name}` : "选择商品"} allowCreate={false} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="模板库里还没有商品" />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
       <ProductFormModal isOpen={isEditOpen} onClose={() => { setIsEditOpen(false); setEditingProduct(null); setEditingItemId(""); setEditingShopId(""); }} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
