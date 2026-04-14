@@ -33,6 +33,14 @@ interface SystemInfo {
   lastBackup: string;
 }
 
+const FALLBACK_TAB_META: TabMeta = {
+  id: "system",
+  label: "系统工作台",
+  icon: Info,
+  desc: "正在整理当前账号可访问的系统能力。",
+  accent: "from-slate-500/20 via-slate-500/10 to-transparent",
+};
+
 export default function SettingsPage() {
   return (
     <Suspense fallback={
@@ -351,7 +359,7 @@ function SettingsContent() {
     return nextTabs;
   }, [canAccessSettingsPage, canManageBackups, canManageSettings, canTransferData]);
 
-  const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
+  const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0] ?? FALLBACK_TAB_META;
   const overviewCards = [
     {
       label: "当前工作区",
@@ -374,6 +382,9 @@ function SettingsContent() {
   ];
 
   useEffect(() => {
+    if (tabs.length === 0) {
+      return;
+    }
     if (!tabs.some((tab) => tab.id === activeTab)) {
       setActiveTab(tabs[0].id);
     }
