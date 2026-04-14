@@ -265,12 +265,8 @@ export function hasAdminAccess(user: SessionUser | null, capability: AdminCapabi
  */
 export const ROLE_TEMPLATES: Record<string, Record<string, boolean>> = {
   BASIC_VISITOR: BASIC_VISITOR_DEFAULTS,
-  DASHBOARD_VIEWER: {
-    "dashboard:read": true,
-  },
 };
 
 export const TEMPLATE_LABELS: Record<string, string> = {
   BASIC_VISITOR: "基础访客",
-  DASHBOARD_VIEWER: "概述查看",
 };
