@@ -136,15 +136,18 @@ export default function BrushProductsPage() {
 
   const handleAddProducts = async (products: Product[]) => {
     try {
+      const productIds = Array.from(
+        new Set(products.map((product) => product.sourceProductId || product.id).filter(Boolean))
+      );
       const res = await fetch("/api/brush-products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productIds: products.map((product) => product.id) }),
+        body: JSON.stringify({ productIds }),
       });
 
       if (!res.ok) throw new Error("Add failed");
 
-      showToast(`已加入 ${products.length} 个刷单商品`, "success");
+      showToast(`已加入 ${productIds.length} 个刷单商品`, "success");
       setIsPickerOpen(false);
       fetchBrushProducts();
     } catch (error) {
@@ -577,6 +580,7 @@ export default function BrushProductsPage() {
         onClose={() => setIsPickerOpen(false)}
         onSelect={(products) => handleAddProducts(products)}
         selectedIds={items.map((item) => item.productId)}
+        fetchPath="/api/purchase-products"
         title="选择要加入刷单商品库的商品"
         allowCreate={false}
         showPlatformSelector={false}

@@ -143,22 +143,6 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Handle root path for authenticated users without product:read permission
-  if (path === "/" && session) {
-    try {
-      const { payload } = await jwtVerify(session, getJwtKey());
-      const sessionUser = payload as SessionUser;
-      
-      if (!canAccessDashboard(sessionUser)) {
-        return NextResponse.redirect(new URL("/gallery", request.nextUrl));
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-
-
   return response;
 }
 

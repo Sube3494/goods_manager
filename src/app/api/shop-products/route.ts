@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
     const shopId = request.nextUrl.searchParams.get("shopId") || "all";
     const scope = request.nextUrl.searchParams.get("scope");
     const sortBy = request.nextUrl.searchParams.get("sortBy") || "sku-asc";
+    const idsParam = request.nextUrl.searchParams.get("ids") || "";
+    const explicitIds = idsParam.split(",").map((id) => id.trim()).filter(Boolean);
     const page = Math.max(1, parseInt(request.nextUrl.searchParams.get("page") || "1", 10));
     const allMode = request.nextUrl.searchParams.get("all") === "true";
     const idsOnly = request.nextUrl.searchParams.get("idsOnly") === "true";
@@ -38,6 +40,7 @@ export async function GET(request: NextRequest) {
 
     const where = {
       ...(canViewAllShops ? {} : { shop: { userId: user.id } }),
+      ...(explicitIds.length > 0 ? { id: { in: explicitIds } } : {}),
       ...(shopId !== "all" ? { shopId } : {}),
       ...(categoryName !== "all" ? { categoryName } : {}),
       ...(supplierId === "unknown" ? { supplierId: null } : supplierId !== "all" ? { supplierId } : {}),
@@ -75,6 +78,129 @@ export async function GET(request: NextRequest) {
 
       return allItems;
     };
+
+    if (explicitIds.length > 0 && !idsOnly) {
+      const storage = await getStorageStrategy();
+
+      if (sortBy === "sku-asc" || sortBy === "sku-desc") {
+        const sortedItems = await naturalSortBySku();
+        const selectedIds = sortedItems.map((item) => item.id);
+        const selectedItems = await prisma.shopProduct.findMany({
+          where: {
+            id: { in: selectedIds },
+          },
+          include: {
+            shop: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            product: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                categoryId: true,
+                supplierId: true,
+                category: { select: { name: true } },
+              },
+            },
+          },
+        });
+
+        const orderedItems = selectedIds
+          .map((id) => selectedItems.find((item) => item.id === id))
+          .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+        return NextResponse.json({
+          items: orderedItems.map((item) => ({
+            id: item.id,
+            sourceProductId: item.sourceProductId || item.productId,
+            productId: item.productId,
+            sku: item.sku || null,
+            name: item.productName || item.product?.name || "未命名商品",
+            image: item.productImage
+              ? storage.resolveUrl(item.productImage)
+              : item.product?.image
+              ? storage.resolveUrl(item.product.image)
+              : null,
+            categoryId: item.categoryId || item.product?.categoryId || null,
+            categoryName: item.categoryName || item.product?.category?.name || "未分类",
+            supplierId: item.supplierId || item.product?.supplierId || null,
+            costPrice: item.costPrice ?? 0,
+            stock: item.stock ?? 0,
+            shopId: item.shopId,
+            shopName: item.shop?.name || "",
+            isPublic: item.isPublic ?? true,
+            isDiscontinued: item.isDiscontinued ?? false,
+            remark: item.remark || null,
+            specs: item.specs ?? null,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+          })),
+          total: orderedItems.length,
+          page: 1,
+          pageSize: orderedItems.length,
+          hasMore: false,
+        });
+      }
+
+      const selectedItems = await prisma.shopProduct.findMany({
+        where,
+        include: {
+          shop: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              categoryId: true,
+              supplierId: true,
+              category: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: buildOrderBy(sortBy),
+      });
+
+      return NextResponse.json({
+        items: selectedItems.map((item) => ({
+          id: item.id,
+          sourceProductId: item.sourceProductId || item.productId,
+          productId: item.productId,
+          sku: item.sku || null,
+          name: item.productName || item.product?.name || "未命名商品",
+          image: item.productImage
+            ? storage.resolveUrl(item.productImage)
+            : item.product?.image
+            ? storage.resolveUrl(item.product.image)
+            : null,
+          categoryId: item.categoryId || item.product?.categoryId || null,
+          categoryName: item.categoryName || item.product?.category?.name || "未分类",
+          supplierId: item.supplierId || item.product?.supplierId || null,
+          costPrice: item.costPrice ?? 0,
+          stock: item.stock ?? 0,
+          shopId: item.shopId,
+          shopName: item.shop?.name || "",
+          isPublic: item.isPublic ?? true,
+          isDiscontinued: item.isDiscontinued ?? false,
+          remark: item.remark || null,
+          specs: item.specs ?? null,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        })),
+        total: selectedItems.length,
+        page: 1,
+        pageSize: selectedItems.length,
+        hasMore: false,
+      });
+    }
 
     if (sortBy === "sku-asc" || sortBy === "sku-desc") {
       const sortedItems = await naturalSortBySku();

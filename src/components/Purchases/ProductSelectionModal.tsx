@@ -296,7 +296,7 @@ export function ProductSelectionModal({
     const matchesSupplier = !selectedSupplierId || p.supplierId === selectedSupplierId;
     return matchesSupplier;
   });
-  const selectableProducts = filteredProducts.filter((product) => !selectedIds.includes(product.id));
+  const selectableProducts = filteredProducts.filter((product) => !selectedIds.includes(product.sourceProductId || product.id));
   const allFilteredSelected =
     !singleSelect &&
     selectableProducts.length > 0 &&
@@ -332,7 +332,7 @@ export function ProductSelectionModal({
       const fullyFilteredProducts = allMatchedProducts.filter((product: Product) => (
         !selectedSupplierId || product.supplierId === selectedSupplierId
       ));
-      const fullySelectableProducts = fullyFilteredProducts.filter((product: Product) => !selectedIds.includes(product.id));
+      const fullySelectableProducts = fullyFilteredProducts.filter((product: Product) => !selectedIds.includes(product.sourceProductId || product.id));
 
       setTempSelectedIds(fullySelectableProducts.map((product: Product) => product.id));
       setSelectedProducts(fullySelectableProducts);
@@ -344,7 +344,7 @@ export function ProductSelectionModal({
 
   const toggleProduct = (product: Product) => {
     const id = product.id;
-    if (selectedIds.includes(id)) {
+    if (selectedIds.includes(product.sourceProductId || id)) {
       return;
     }
     if (singleSelect) {
@@ -485,7 +485,7 @@ export function ProductSelectionModal({
                     <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
                     {filteredProducts.map(product => {
                       const isSelected = tempSelectedIds.includes(product.id);
-                      const isAlreadySelected = selectedIds.includes(product.id);
+                      const isAlreadySelected = selectedIds.includes(product.sourceProductId || product.id);
                       return (
                          <button
                           key={product.id}

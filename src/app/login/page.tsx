@@ -15,6 +15,7 @@ function canAccessDashboard(user: SessionUser | null) {
   if (!user) return false;
   return (
     user.role === "SUPER_ADMIN" ||
+    hasPermission(user, "dashboard:read") ||
     hasPermission(user, "product:read") ||
     hasPermission(user, "logistics:manage") ||
     hasPermission(user, "purchase:manage") ||

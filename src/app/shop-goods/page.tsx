@@ -281,11 +281,28 @@ export default function ShopGoodsPage() {
     }
   }, [fetchShopProducts, selectedShop, showToast]);
 
+  const fetchSelectedItems = useCallback(async () => {
+    if (selectedIds.length === 0) return [] as ShopCatalogItem[];
+    try {
+      const queryParams = buildAggregateQuery(1, {
+        ids: selectedIds.join(","),
+        pageSize: String(selectedIds.length),
+      });
+      const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
+      const data: ShopProductsResponse = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error("Failed to fetch selected shop products");
+      }
+      return Array.isArray(data.items) ? data.items : [];
+    } catch (error) {
+      console.error("Failed to fetch selected shop products:", error);
+      throw error;
+    }
+  }, [buildAggregateQuery, selectedIds]);
+
   const handleRemoveSelected = useCallback(async () => {
     if (selectedIds.length === 0) return;
-    const selectedItems = displayedItems
-      .filter((item) => selectedIds.includes(item.displayId))
-      .flatMap((item) => items.filter((rawItem) => item.linkedIds.includes(rawItem.id) && rawItem.shopId));
+    const selectedItems = (await fetchSelectedItems()).filter((item) => item.shopId);
     const grouped = selectedItems.reduce<Record<string, string[]>>((acc, item) => {
       const shopId = item.shopId!;
       if (!acc[shopId]) acc[shopId] = [];
@@ -316,7 +333,7 @@ export default function ShopGoodsPage() {
       console.error("Failed to remove products from shops:", error);
       showToast(error instanceof Error ? error.message : "移出店铺失败", "error");
     }
-  }, [displayedItems, fetchShopProducts, items, selectedIds, showToast]);
+  }, [fetchSelectedItems, fetchShopProducts, selectedIds, showToast]);
 
   const openEditModal = useCallback((item: ShopCatalogItem) => {
     setEditingItemId(item.id);
@@ -427,9 +444,7 @@ export default function ShopGoodsPage() {
     const categoryName = updateData.categoryId
       ? categories.find((category) => category.id === updateData.categoryId)?.name || "未分类"
       : undefined;
-    const selectedItems = displayedItems
-      .filter((item) => selectedIds.includes(item.displayId))
-      .flatMap((item) => items.filter((rawItem) => item.linkedIds.includes(rawItem.id) && rawItem.shopId));
+    const selectedItems = (await fetchSelectedItems()).filter((item) => item.shopId);
     const grouped = selectedItems.reduce<Record<string, string[]>>((acc, item) => {
       const shopId = item.shopId!;
       if (!acc[shopId]) acc[shopId] = [];
@@ -464,7 +479,7 @@ export default function ShopGoodsPage() {
       console.error("Failed to batch update shop products:", error);
       showToast(error instanceof Error ? error.message : "批量更新请求失败", "error");
     }
-  }, [categories, displayedItems, items, selectedIds, showToast]);
+  }, [categories, fetchSelectedItems, selectedIds, showToast]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -593,10 +608,6 @@ export default function ShopGoodsPage() {
         <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">{Array.from({ length: 10 }).map((_, index) => <GoodsCardSkeleton key={index} />)}</div>
       ) : !needsAddress ? (
         <>
-          <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-            <p>{selectedShop ? `当前店铺：${selectedShop.name}` : "当前店铺：未选择"}</p>
-            {!selectedShop && shops.length > 0 ? <p>请先选择一个店铺再查看商品。</p> : null}
-          </div>
           <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 transition-opacity duration-300">
             {displayedItems.map((product, index) => (
               <GoodsCard key={product.displayId} product={{ id: product.displayId, sku: product.sku || undefined, name: product.name, categoryId: product.categoryId || "", category: product.categoryName ? { id: product.categoryId || "", name: product.categoryName, count: 0 } : undefined, costPrice: product.costPrice || 0, stock: product.stock || 0, image: product.image || undefined, isPublic: product.isPublic ?? true, isDiscontinued: product.isDiscontinued ?? false, remark: product.remark || undefined, specs: product.specs || undefined, supplierId: product.supplierId || undefined }} onEdit={() => {
