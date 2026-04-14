@@ -101,7 +101,7 @@ export default function ShopGoodsPage() {
           return;
         }
         setNeedsAddress(Boolean(data?.needsAddress));
-        const nextShops = Array.isArray(data?.shops) ? data.shops : [];
+        const nextShops: Shop[] = Array.isArray(data?.shops) ? data.shops : [];
         setShops(nextShops);
         setSelectedShopId((current) => {
           if (current && nextShops.some((shop) => shop.id === current)) return current;
