@@ -52,11 +52,11 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public GET APIs
-  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/brush-plans/public", "/api/uploads"];
+  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/brush-plans/public", "/api/uploads", "/api/map-distance"];
   const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public POST APIs
-  const publicPostApis = ["/api/upload"];
+  const publicPostApis = ["/api/upload", "/api/map-distance"];
   const isPublicPostApi = request.method === "POST" && publicPostApis.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public PATCH APIs (Guest toggle status)
