@@ -11,6 +11,8 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const templateNames = Object.keys(ROLE_TEMPLATES).map((key) => TEMPLATE_LABELS[key] || key);
+
     // 自动同步内置角色模板
     for (const [key, permissions] of Object.entries(ROLE_TEMPLATES)) {
       const name = TEMPLATE_LABELS[key] || key;
@@ -25,6 +27,15 @@ export async function GET() {
         }
       });
     }
+
+    // 清理已经从代码中移除、且未绑定成员的旧系统角色
+    await prisma.roleProfile.deleteMany({
+      where: {
+        isSystem: true,
+        name: { notIn: templateNames },
+        users: { none: {} },
+      },
+    });
 
     const roles = await prisma.roleProfile.findMany({
       orderBy: { createdAt: 'asc' },
