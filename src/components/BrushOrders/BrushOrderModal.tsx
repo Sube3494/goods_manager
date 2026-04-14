@@ -58,10 +58,8 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
 
     useEffect(() => {
         if (!isOpen) return;
-        const currentShop = shopList.find((shop) => shop.name === formData.shopName);
         const query = new URLSearchParams({
           pageSize: "1000",
-          ...(currentShop?.id ? { shopId: currentShop.id } : {}),
         });
 
         fetch(`/api/purchase-products?${query.toString()}`)
@@ -546,10 +544,6 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         onSelect={handleBatchAdd}
         selectedIds={formData.items.map(i => i.productId)}
         fetchPath="/api/purchase-products"
-        query={(() => {
-          const currentShop = shopList.find((shop) => shop.name === formData.shopName);
-          return currentShop?.id ? { shopId: currentShop.id } : undefined;
-        })()}
     />
     </>
   );
