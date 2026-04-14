@@ -12,6 +12,15 @@ import { updateSession } from "@/lib/auth";
 import { jwtVerify } from "jose";
 import { getEffectivePermissions, hasAdminAccess, SessionUser } from "@/lib/permissions";
 
+function canAccessDashboard(user: SessionUser) {
+  const effectivePermissions = getEffectivePermissions(user);
+  return !!(
+    user.role === "SUPER_ADMIN" ||
+    effectivePermissions["all"] ||
+    effectivePermissions["dashboard:read"]
+  );
+}
+
 function getJwtKey() {
   const secretKey = process.env.JWT_SECRET;
   if (!secretKey) {
@@ -79,7 +88,11 @@ export async function proxy(request: NextRequest) {
           const { payload } = await jwtVerify(session, getJwtKey());
           const sessionUser = payload as SessionUser;
           const effectivePermissions = getEffectivePermissions(sessionUser);
-          const hasSystemManage = !!(effectivePermissions["system:manage"] || effectivePermissions["all"]);
+          const hasRolesManage = !!(
+            effectivePermissions["roles:manage"] ||
+            effectivePermissions["system:manage"] ||
+            effectivePermissions["all"]
+          );
           const isRolesPath = path === "/admin/roles" || path.startsWith("/admin/roles/") || path === "/api/admin/roles" || path.startsWith("/api/admin/roles/");
           const isMembersPath =
             path === "/admin/members" ||
@@ -99,8 +112,8 @@ export async function proxy(request: NextRequest) {
             return NextResponse.json({ error: "Forbidden: Super Admin only" }, { status: 403 });
           }
 
-          if (isRolesPath && payload.role !== "SUPER_ADMIN" && !hasSystemManage) {
-            return NextResponse.json({ error: "Forbidden: System managers only" }, { status: 403 });
+          if (isRolesPath && payload.role !== "SUPER_ADMIN" && !hasRolesManage) {
+            return NextResponse.json({ error: "Forbidden: Role managers only" }, { status: 403 });
           }
 
           if (isMembersPath && payload.role !== "SUPER_ADMIN" && !hasMembersAccess) {
@@ -121,11 +134,9 @@ export async function proxy(request: NextRequest) {
   if (path === "/login" && session) {
     try {
       const { payload } = await jwtVerify(session, getJwtKey());
-      const effectivePermissions = getEffectivePermissions(payload as SessionUser);
-      const hasProductRead = effectivePermissions["product:read"] || effectivePermissions["all"];
+      const sessionUser = payload as SessionUser;
       
-      // If user has product:read or is super admin, go to dashboard, else go to gallery
-      const target = (payload.role === "SUPER_ADMIN" || hasProductRead) ? "/" : "/gallery";
+      const target = canAccessDashboard(sessionUser) ? "/" : "/gallery";
       return NextResponse.redirect(new URL(target, request.nextUrl));
     } catch {
       return NextResponse.redirect(new URL("/", request.nextUrl));
@@ -136,10 +147,9 @@ export async function proxy(request: NextRequest) {
   if (path === "/" && session) {
     try {
       const { payload } = await jwtVerify(session, getJwtKey());
-      const effectivePermissions = getEffectivePermissions(payload as SessionUser);
-      const hasProductRead = effectivePermissions["product:read"] || effectivePermissions["all"];
+      const sessionUser = payload as SessionUser;
       
-      if (payload.role !== "SUPER_ADMIN" && !hasProductRead) {
+      if (!canAccessDashboard(sessionUser)) {
         return NextResponse.redirect(new URL("/gallery", request.nextUrl));
       }
     } catch {

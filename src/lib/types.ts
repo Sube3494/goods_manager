@@ -63,6 +63,10 @@ export interface Product {
   assignedShopIds?: string[];
   createdAt?: string;
   updatedAt?: string;
+  sourceType?: "product" | "shopProduct";
+  shopProductId?: string;
+  shopId?: string;
+  shopName?: string;
 }
 
 export interface Shop {
@@ -80,6 +84,7 @@ export interface Shop {
 export interface ShopCatalogItem {
   id: string;
   sourceProductId?: string | null;
+  productId?: string | null;
   sku?: string | null;
   name: string;
   image?: string | null;
@@ -88,6 +93,8 @@ export interface ShopCatalogItem {
   supplierId?: string | null;
   costPrice?: number | null;
   stock?: number | null;
+  shopId?: string | null;
+  shopName?: string | null;
   isPublic?: boolean;
   isDiscontinued?: boolean;
   remark?: string | null;
@@ -141,7 +148,9 @@ export interface PurchaseOrderItem {
   id?: string;
   purchaseOrderId?: string;
   productId: string;
+  shopProductId?: string;
   product?: Product;
+  shopProduct?: ShopCatalogItem;
   image?: string;
   supplierId?: string;
   supplier?: Supplier;
@@ -212,13 +221,93 @@ export interface RecentInboundItem {
 }
 
 export interface StatsData {
+  shopCount?: number;
   productCount: number;
   totalStock: number;
   lowStockCount: number;
   totalValue: number;
   recentInboundItems: RecentInboundItem[];
   pendingInboundCount: number;
+  pendingInboundAmount?: number;
   recentPurchases?: PurchaseOrder[];
+  rangeStart?: string;
+  rangeEnd?: string;
+  rangeDays?: number;
+  purchaseAmount?: number;
+  outboundAmount?: number;
+  purchaseOrderCount?: number;
+  outboundOrderCount?: number;
+  activeShopCount?: number;
+  zeroCostProductCount?: number;
+  zeroStockProductCount?: number;
+  duplicateSourceProductCount?: number;
+  trend?: DashboardTrendPoint[];
+  shopBreakdown?: DashboardShopBreakdown[];
+  alerts?: DashboardAlertItem[];
+  userPaid?: number;
+  platformCommission?: number;
+  deliveryExpense?: number;
+  productCost?: number;
+  promotionExpense?: number;
+  brushExpense?: number;
+  otherExpense?: number;
+  netProfit?: number;
+  platformMatrix?: DashboardPlatformMatrix;
+  businessTrend?: DashboardBusinessTrendPoint[];
+  platformBusinessTrend?: Record<string, DashboardBusinessTrendPoint[]>;
+}
+
+export interface DashboardTrendPoint {
+  date: string;
+  label: string;
+  purchaseAmount: number;
+  outboundAmount: number;
+  purchaseCount: number;
+  outboundCount: number;
+}
+
+export interface DashboardShopBreakdown {
+  shopId: string;
+  shopName: string;
+  skuCount: number;
+  stock: number;
+  lowStockCount: number;
+  value: number;
+}
+
+export interface DashboardAlertItem {
+  key: string;
+  label: string;
+  value: number;
+  tone: "danger" | "warning" | "info";
+  hint: string;
+  href?: string;
+}
+
+export interface DashboardPlatformMatrixCell {
+  platform: string;
+  trueOrderCount: number;
+  brushOrderCount: number;
+  totalCount: number;
+}
+
+export interface DashboardPlatformMatrix {
+  columns: DashboardPlatformMatrixCell[];
+  trueOrderTotal: number;
+  brushOrderTotal: number;
+  grandTotal: number;
+}
+
+export interface DashboardBusinessTrendPoint {
+  date: string;
+  label: string;
+  netProfit: number;
+  orderCount: number;
+  cumulativeOrderCount: number;
+  trueOrderCount: number;
+  brushOrderCount: number;
+  productCost: number;
+  brushExpense: number;
 }
 
 export type BrushStatus = "Draft" | "Completed";
@@ -252,7 +341,9 @@ export interface OutboundOrderItem {
   id?: string;
   outboundOrderId?: string;
   productId: string;
+  shopProductId?: string;
   product?: Product;
+  shopProduct?: ShopCatalogItem;
   quantity: number;
   price: number;
 }

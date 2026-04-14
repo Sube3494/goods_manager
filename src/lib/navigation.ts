@@ -15,7 +15,7 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { name: "概览", href: "/", icon: LayoutDashboard, adminOnly: true, permission: "product:read", description: "仓储总览与快捷入口", section: "workspace" },
+  { name: "概览", href: "/", icon: LayoutDashboard, adminOnly: true, permission: "dashboard:read", description: "仓储总览与快捷入口", section: "workspace" },
   { name: "商品管理", href: "/goods", icon: Package, adminOnly: true, superAdminOnly: true, permission: "product:read", description: "商品档案与库存查询", section: "workspace" },
   { name: "店铺商品", href: "/shop-goods", icon: Store, adminOnly: true, permission: "logistics:manage", description: "按店铺管理经营商品清单", section: "workspace" },
   { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true, permission: "category:manage", description: "维护商品分类结构", section: "workspace" },
@@ -35,10 +35,10 @@ export const navItems: NavItem[] = [
   { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true, permission: "inbound:manage", description: "入库登记与批量导入", section: "workspace" },
   { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true, permission: "outbound:manage", description: "销售、领用与损耗出库", section: "workspace" },
   { name: "结算对账", href: "/settlement", icon: CreditCard, adminOnly: true, permission: "settlement:manage", description: "对账与结算记录", section: "workspace" },
-  { name: "实物相册", href: "/gallery", icon: Camera, public: true, description: "商品实拍与公共素材", section: "workspace" },
+  { name: "实物相册", href: "/gallery", icon: Camera, permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"], description: "商品实拍与公共素材", section: "workspace" },
   { name: "成员管理", href: "/admin/members", icon: Users, adminCapability: ["members:manage", "members:status", "whitelist:manage"], description: "成员、白名单与邀请控制", section: "management" },
-  { name: "角色管理", href: "/admin/roles", icon: ShieldAlert, permission: "system:manage", description: "角色模板与权限矩阵", section: "management" },
-  { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true, permission: "system:manage", description: "系统参数、存储与备份", section: "management" },
+  { name: "角色管理", href: "/admin/roles", icon: ShieldAlert, adminCapability: "roles:manage", description: "角色模板与权限矩阵", section: "management" },
+  { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true, permission: ["settings:manage", "backup:manage", "data:transfer", "system:manage"], description: "系统参数、存储与备份", section: "management" },
 ];
 
 import { hasPermission, SessionUser } from "./permissions";

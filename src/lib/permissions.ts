@@ -1,6 +1,7 @@
 import { JWTPayload } from "jose";
 
 export type Permission = 
+  | "dashboard:read"
   | "product:read" | "product:create" | "product:update" | "product:delete"
   | "category:manage"
   | "supplier:manage"
@@ -12,6 +13,10 @@ export type Permission =
   | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy"
   | "settlement:manage"
   | "logistics:manage"
+  | "roles:manage"
+  | "settings:manage"
+  | "backup:manage"
+  | "data:transfer"
   | "system:manage"
   | "all";
 
@@ -35,6 +40,13 @@ export type AdminCapability =
   | "whitelist:manage";
 
 export const PERMISSION_TREE = [
+  {
+    key: "dashboard",
+    label: "概述看板",
+    children: [
+      { key: "dashboard:read", label: "查看概述" },
+    ]
+  },
   {
     key: "products",
     label: "商品管理",
@@ -119,10 +131,13 @@ export const PERMISSION_TREE = [
     ]
   },
   {
-    key: "system",
-    label: "系统设置",
+    key: "admin_system",
+    label: "后台管理",
     children: [
-      { key: "system:manage", label: "系统管理" },
+      { key: "roles:manage", label: "角色模板管理" },
+      { key: "settings:manage", label: "系统设置" },
+      { key: "backup:manage", label: "备份与恢复" },
+      { key: "data:transfer", label: "数据导入导出" },
     ]
   }
 ];
@@ -142,7 +157,7 @@ export const ADMIN_ACCESS_MATRIX: Record<AdminCapability, {
   "roles:manage": {
     label: "角色模板管理",
     description: "管理角色模板与权限矩阵",
-    permission: "system:manage",
+    permission: "roles:manage",
   },
   "members:manage": {
     label: "成员管理",
@@ -201,6 +216,14 @@ export function getEffectivePermissions(user: SessionUser | null): PermissionMap
   };
 }
 
+const PERMISSION_FALLBACKS: Partial<Record<Permission, Permission[]>> = {
+  "dashboard:read": ["product:read", "logistics:manage", "purchase:manage", "brush:manage", "inbound:manage", "outbound:manage", "settlement:manage"],
+  "roles:manage": ["system:manage"],
+  "settings:manage": ["system:manage"],
+  "backup:manage": ["system:manage"],
+  "data:transfer": ["system:manage"],
+};
+
 /**
  * Check if a user has a specific permission
  */
@@ -211,7 +234,16 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   if (user.role === "SUPER_ADMIN") return true;
 
   const effectivePermissions = getEffectivePermissions(user);
-  return !!(effectivePermissions[permission] || effectivePermissions["all"]);
+  if (effectivePermissions[permission] || effectivePermissions["all"]) {
+    return true;
+  }
+
+  const fallbacks = PERMISSION_FALLBACKS[permission];
+  if (!fallbacks || fallbacks.length === 0) {
+    return false;
+  }
+
+  return fallbacks.some((fallbackPermission) => !!effectivePermissions[fallbackPermission]);
 }
 
 export function hasAdminAccess(user: SessionUser | null, capability: AdminCapability): boolean {
@@ -232,9 +264,13 @@ export function hasAdminAccess(user: SessionUser | null, capability: AdminCapabi
  * Predefined permission templates for common roles
  */
 export const ROLE_TEMPLATES: Record<string, Record<string, boolean>> = {
-  BASIC_VISITOR: BASIC_VISITOR_DEFAULTS
+  BASIC_VISITOR: BASIC_VISITOR_DEFAULTS,
+  DASHBOARD_VIEWER: {
+    "dashboard:read": true,
+  },
 };
 
 export const TEMPLATE_LABELS: Record<string, string> = {
   BASIC_VISITOR: "基础访客",
+  DASHBOARD_VIEWER: "概述查看",
 };
