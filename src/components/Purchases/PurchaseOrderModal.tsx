@@ -169,7 +169,7 @@ const PurchaseItemRow = memo(({
                             type="number" 
                             min="1"
                             value={item.quantity || ""}
-                            onChange={(e) => onUpdate(item.productId, "quantity", e.target.value)}
+                            onChange={(e) => onUpdate(item.shopProductId || item.productId, "quantity", e.target.value)}
                             className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                         />
                     )}
@@ -190,7 +190,7 @@ const PurchaseItemRow = memo(({
                                 type="number" 
                                 step="0.01"
                                 value={item.costPrice || ""}
-                                onChange={(e) => onUpdate(item.productId, "costPrice", e.target.value)}
+                                onChange={(e) => onUpdate(item.shopProductId || item.productId, "costPrice", e.target.value)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                             />
                         </div>
