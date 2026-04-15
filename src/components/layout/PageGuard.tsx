@@ -3,8 +3,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
 import { navItems } from "@/lib/navigation";
-import { hasPermission, SessionUser } from "@/lib/permissions";
-import { useMemo, useState } from "react";
+import { canAccessPath, getDefaultAuthorizedPath, hasPermission, SessionUser } from "@/lib/permissions";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, LogOut, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -15,6 +15,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useUser();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const sessionUser = (user as unknown as SessionUser | null) ?? null;
 
   const isAuthorized = useMemo(() => {
     // 1. Instant allow for public entry points to prevent flickering while loading user session
@@ -48,10 +49,8 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     }
 
     // Since our useUser hook now matches SessionUser or is compatible enough for hasPermission check
-    const sessionUser = user as unknown as SessionUser;
-
     // Role Check
-    if (currentNavItem.superAdminOnly && sessionUser.role !== "SUPER_ADMIN") {
+    if (currentNavItem.superAdminOnly && sessionUser?.role !== "SUPER_ADMIN") {
         return false;
     }
 
@@ -66,7 +65,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     }
 
     return true;
-  }, [pathname, user, isLoading]);
+  }, [pathname, sessionUser, user, isLoading]);
 
   const currentNavItem = useMemo(() => {
     const sortedNavItems = [...navItems].sort((a, b) => b.href.length - a.href.length);
@@ -78,9 +77,28 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
 
   const isLoginRequired = !isLoading && !user && currentNavItem && !currentNavItem.public;
   const loginHref = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+  const fallbackHref = useMemo(
+    () => getDefaultAuthorizedPath(sessionUser),
+    [sessionUser]
+  );
+
+  useEffect(() => {
+    if (isLoading || !sessionUser || isAuthorized !== false) return;
+
+    if (pathname === "/" || !canAccessPath(sessionUser, pathname)) {
+      const target = getDefaultAuthorizedPath(sessionUser);
+      if (target !== pathname) {
+        router.replace(target);
+      }
+    }
+  }, [isAuthorized, isLoading, pathname, router, sessionUser]);
 
   if (isLoading || isAuthorized === null) {
     return null; // Let the parent layout (MainLayout) handle the global loader for better UX
+  }
+
+  if (!isLoginRequired && sessionUser && isAuthorized === false && pathname === "/") {
+    return null;
   }
 
   if (!isAuthorized) {
@@ -128,10 +146,10 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
                 返回上页
             </button>
             <Link 
-                href="/"
+                href={fallbackHref}
                 className="px-6 h-11 rounded-full border border-border bg-background/70 hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center"
             >
-                回到首页
+                回到可访问页面
             </Link>
         </div>
         <ConfirmModal

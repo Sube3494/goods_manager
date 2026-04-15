@@ -8,23 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import md5 from "blueimp-md5";
-import { SessionUser } from "@/lib/permissions";
-import { hasPermission } from "@/lib/permissions";
-
-function canAccessDashboard(user: SessionUser | null) {
-  if (!user) return false;
-  return (
-    user.role === "SUPER_ADMIN" ||
-    hasPermission(user, "dashboard:read") ||
-    hasPermission(user, "product:read") ||
-    hasPermission(user, "logistics:manage") ||
-    hasPermission(user, "purchase:manage") ||
-    hasPermission(user, "brush:manage") ||
-    hasPermission(user, "inbound:manage") ||
-    hasPermission(user, "outbound:manage") ||
-    hasPermission(user, "settlement:manage")
-  );
-}
+import { canAccessPath, getDefaultAuthorizedPath, SessionUser } from "@/lib/permissions";
 
 export default function LoginPage() {
   const { showToast } = useToast();
@@ -173,28 +157,25 @@ export default function LoginPage() {
 
   const resolveTargetUrl = async () => {
     const params = new URLSearchParams(window.location.search);
-    let targetUrl = params.get("callbackUrl");
+    const callbackUrl = params.get("callbackUrl");
+    let targetUrl: string | null = null;
 
-    if (!targetUrl) {
-      try {
-        const meRes = await fetch("/api/auth/me");
-        if (meRes.ok) {
-          const meData = await meRes.json();
-          const user = meData.user;
-          if (user) {
-            targetUrl = canAccessDashboard(user as SessionUser) ? "/" : "/gallery";
-          } else {
-            targetUrl = "/gallery";
-          }
+    try {
+      const meRes = await fetch("/api/auth/me");
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        const user = (meData.user ?? null) as SessionUser | null;
+        if (callbackUrl && canAccessPath(user, callbackUrl)) {
+          targetUrl = callbackUrl;
         } else {
-          targetUrl = "/gallery";
+          targetUrl = getDefaultAuthorizedPath(user);
         }
-      } catch {
-        targetUrl = "/gallery";
       }
+    } catch {
+      targetUrl = null;
     }
 
-    window.location.href = targetUrl || "/";
+    window.location.href = targetUrl || "/gallery";
   };
 
   const handlePasswordLogin = async (e: React.FormEvent) => {

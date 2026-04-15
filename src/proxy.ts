@@ -10,16 +10,7 @@ import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { updateSession } from "@/lib/auth";
 import { jwtVerify } from "jose";
-import { getEffectivePermissions, hasAdminAccess, SessionUser } from "@/lib/permissions";
-
-function canAccessDashboard(user: SessionUser) {
-  const effectivePermissions = getEffectivePermissions(user);
-  return !!(
-    user.role === "SUPER_ADMIN" ||
-    effectivePermissions["all"] ||
-    effectivePermissions["dashboard:read"]
-  );
-}
+import { getDefaultAuthorizedPath, getEffectivePermissions, hasAdminAccess, SessionUser } from "@/lib/permissions";
 
 function getJwtKey() {
   const secretKey = process.env.JWT_SECRET;
@@ -136,7 +127,7 @@ export async function proxy(request: NextRequest) {
       const { payload } = await jwtVerify(session, getJwtKey());
       const sessionUser = payload as SessionUser;
       
-      const target = canAccessDashboard(sessionUser) ? "/" : "/gallery";
+      const target = getDefaultAuthorizedPath(sessionUser);
       return NextResponse.redirect(new URL(target, request.nextUrl));
     } catch {
       return NextResponse.redirect(new URL("/", request.nextUrl));

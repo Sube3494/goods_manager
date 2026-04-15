@@ -246,6 +246,98 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   return fallbacks.some((fallbackPermission) => !!effectivePermissions[fallbackPermission]);
 }
 
+export function hasDirectPermission(user: SessionUser | null, permission: Permission): boolean {
+  if (!user) return false;
+  if (user.role === "SUPER_ADMIN") return true;
+
+  const effectivePermissions = getEffectivePermissions(user);
+  return !!(effectivePermissions[permission] || effectivePermissions["all"]);
+}
+
+export function canAccessDashboardPage(user: SessionUser | null): boolean {
+  return hasDirectPermission(user, "dashboard:read");
+}
+
+type RouteAccessRule = {
+  href: string;
+  superAdminOnly?: boolean;
+  permission?: Permission | Permission[];
+  adminCapability?: AdminCapability | AdminCapability[];
+};
+
+const DEFAULT_ROUTE_RULES: RouteAccessRule[] = [
+  { href: "/", permission: "dashboard:read" },
+  { href: "/goods", superAdminOnly: true, permission: "product:read" },
+  { href: "/shop-goods", permission: "product:read" },
+  { href: "/categories", permission: "category:manage" },
+  { href: "/suppliers", permission: "supplier:manage" },
+  { href: "/purchases", permission: "purchase:manage" },
+  { href: "/setup-purchases", permission: "setup_purchase:manage" },
+  { href: "/distance-calc", permission: "logistics:manage" },
+  { href: "/brush", permission: "brush:manage" },
+  { href: "/inbound", permission: "inbound:manage" },
+  { href: "/outbound", permission: "outbound:manage" },
+  { href: "/settlement", permission: "settlement:manage" },
+  { href: "/gallery", permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"] },
+  { href: "/admin/members", adminCapability: ["members:manage", "members:status", "whitelist:manage"] },
+  { href: "/admin/roles", adminCapability: "roles:manage" },
+  { href: "/settings", permission: ["settings:manage", "backup:manage", "data:transfer", "system:manage"] },
+];
+
+function matchesPath(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+function canAccessRoute(user: SessionUser | null, rule: RouteAccessRule): boolean {
+  if (!user) return false;
+  if (rule.href === "/") return canAccessDashboardPage(user);
+
+  if (rule.superAdminOnly && user.role !== "SUPER_ADMIN") {
+    return false;
+  }
+
+  if (rule.permission) {
+    const permissions = Array.isArray(rule.permission) ? rule.permission : [rule.permission];
+    if (!permissions.some((permission) => hasPermission(user, permission))) {
+      return false;
+    }
+  }
+
+  if (rule.adminCapability) {
+    const capabilities = Array.isArray(rule.adminCapability) ? rule.adminCapability : [rule.adminCapability];
+    if (!capabilities.some((capability) => hasAdminAccess(user, capability))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function canAccessPath(user: SessionUser | null, pathname: string): boolean {
+  const normalizedPath = pathname.trim();
+  if (!normalizedPath.startsWith("/")) return false;
+
+  const publicPaths = ["/gallery", "/media", "/brush-plans/share"];
+  if (publicPaths.some((path) => matchesPath(normalizedPath, path))) {
+    return true;
+  }
+
+  const matchedRule = DEFAULT_ROUTE_RULES.find((rule) => matchesPath(normalizedPath, rule.href));
+  if (!matchedRule) {
+    return !!user;
+  }
+
+  return canAccessRoute(user, matchedRule);
+}
+
+export function getDefaultAuthorizedPath(user: SessionUser | null): string {
+  if (!user) return "/gallery";
+
+  const firstAccessibleRoute = DEFAULT_ROUTE_RULES.find((rule) => canAccessRoute(user, rule));
+  return firstAccessibleRoute?.href ?? "/gallery";
+}
+
 export function hasAdminAccess(user: SessionUser | null, capability: AdminCapability): boolean {
   if (!user) return false;
 

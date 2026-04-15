@@ -17,6 +17,7 @@ import { Shop, StatsData } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
+import { canAccessDashboardPage, getDefaultAuthorizedPath, SessionUser } from "@/lib/permissions";
 
 export default function Home() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -34,6 +35,14 @@ export default function Home() {
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push("/login");
+    }
+  }, [user, isUserLoading, router]);
+
+  useEffect(() => {
+    if (isUserLoading || !user) return;
+
+    if (!canAccessDashboardPage(user as SessionUser)) {
+      router.replace(getDefaultAuthorizedPath(user as SessionUser));
     }
   }, [user, isUserLoading, router]);
 
@@ -124,6 +133,10 @@ export default function Home() {
 
   if (!user) {
     return null; // Will redirect in useEffect
+  }
+
+  if (!canAccessDashboardPage(user as SessionUser)) {
+    return null;
   }
 
   return (
