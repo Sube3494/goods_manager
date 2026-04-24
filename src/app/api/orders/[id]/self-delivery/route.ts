@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
-
-// 5 分钟到店 + 每公里 2 分钟
-const PICKUP_MINUTES = 5;
-const MINUTES_PER_KM = 2;
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
@@ -36,16 +33,24 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       logisticId: order.logisticId,
     });
 
-    // 自配送成功后，计划自动完成配送时间（仅当有距离信息时）
-    if (result.ok && typeof order.distanceKm === "number") {
-      const distanceKm = order.distanceKm;
-      const delayMinutes = PICKUP_MINUTES + distanceKm * MINUTES_PER_KM;
-      const autoCompleteAt = new Date(Date.now() + delayMinutes * 60 * 1000);
-
-      await prisma.autoPickOrder.update({
-        where: { id },
-        data: { autoCompleteAt },
+    if (result.ok) {
+      const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
+        id: order.sourceId,
+        platform: order.platform,
+        orderNo: order.orderNo,
+        orderTime: order.orderTime,
+      }).catch((refreshError) => {
+        console.error("Failed to refresh auto-pick order after self delivery:", refreshError);
+        return null;
       });
+
+      const autoCompleteAt = getEstimatedAutoCompleteAt(refreshedOrder || order);
+      if (autoCompleteAt) {
+        await prisma.autoPickOrder.update({
+          where: { id },
+          data: { autoCompleteAt },
+        });
+      }
     }
 
     return NextResponse.json(result.data, { status: result.status });
@@ -56,4 +61,3 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     }, { status: 500 });
   }
 }
-

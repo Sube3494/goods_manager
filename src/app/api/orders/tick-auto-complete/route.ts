@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand } from "@/lib/autoPickOrders";
+import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,10 @@ export async function POST(_: NextRequest) {
       orderNo: true,
       sourceId: true,
       logisticId: true,
+      orderTime: true,
+      distanceKm: true,
+      deliveryDeadline: true,
+      autoCompleteAt: true,
     },
   });
 
@@ -39,6 +44,16 @@ export async function POST(_: NextRequest) {
 
   for (const order of pendingOrders) {
     try {
+      const recalculatedAutoCompleteAt = getEstimatedAutoCompleteAt(order);
+      if (recalculatedAutoCompleteAt && recalculatedAutoCompleteAt.getTime() > now.getTime()) {
+        await prisma.autoPickOrder.update({
+          where: { id: order.id },
+          data: { autoCompleteAt: recalculatedAutoCompleteAt },
+        });
+        results.push({ id: order.id, ok: true, error: "rescheduled-auto-complete" });
+        continue;
+      }
+
       const result = await callAutoPickCommand(session.id, "/complete-delivery", {
         platform: order.platform,
         dailyPlatformSequence: order.dailyPlatformSequence,

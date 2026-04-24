@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { parseAsShanghaiTime } from "@/lib/dateUtils";
+import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig } from "@/lib/types";
@@ -60,6 +60,13 @@ export const AUTO_PICK_ALLOWED_STATUSES: AutoPickSyncStatus[] = [
   "remind",
   "meal",
 ];
+
+export type AutoPickProgressPayload = {
+  platform?: string;
+  orderNo?: string;
+  pickRemainingSeconds?: number;
+  pickCompleted?: boolean;
+};
 
 type AutoPickWebhookBinding = {
   key: string;
@@ -577,6 +584,138 @@ export async function syncAutoPickOrdersFromPlugin(userId: string, options: { st
     count: results.length,
     orders: results,
   };
+}
+
+function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPayload | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const input = payload as Record<string, unknown>;
+  const platform = String(input.platform || "").trim();
+  const orderNo = String(input.orderNo || "").trim();
+  const pickRemainingSeconds = Number(input.pickRemainingSeconds);
+  const pickCompleted = Boolean(input.pickCompleted);
+
+  if (!platform || !orderNo) {
+    return null;
+  }
+
+  return {
+    platform,
+    orderNo,
+    pickRemainingSeconds: Number.isFinite(pickRemainingSeconds) ? Math.max(0, pickRemainingSeconds) : undefined,
+    pickCompleted,
+  };
+}
+
+export function parseAutoPickProgressPayload(payload: unknown) {
+  return normalizeAutoPickProgressPayload(payload);
+}
+
+function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: string | null) {
+  if (progress.pickCompleted) {
+    return "已拣货";
+  }
+
+  if (typeof progress.pickRemainingSeconds === "number") {
+    const remainingMinutes = Math.ceil(progress.pickRemainingSeconds / 60);
+    if (remainingMinutes <= 0) {
+      return "拣货中";
+    }
+    return `拣货中（约${remainingMinutes}分钟）`;
+  }
+
+  return currentStatus || "拣货中";
+}
+
+export async function applyAutoPickProgress(userId: string, payload: unknown) {
+  const progress = normalizeAutoPickProgressPayload(payload);
+  if (!progress) {
+    throw new Error("Invalid progress payload");
+  }
+
+  const order = await prisma.autoPickOrder.findFirst({
+    where: {
+      userId,
+      platform: progress.platform,
+      orderNo: progress.orderNo,
+    },
+    orderBy: {
+      orderTime: "desc",
+    },
+  });
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  const nextRawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? {
+        ...(order.rawPayload as Record<string, unknown>),
+        pickProgress: {
+          pickRemainingSeconds: progress.pickRemainingSeconds ?? null,
+          pickCompleted: Boolean(progress.pickCompleted),
+          updatedAt: new Date().toISOString(),
+        },
+      }
+    : {
+        pickProgress: {
+          pickRemainingSeconds: progress.pickRemainingSeconds ?? null,
+          pickCompleted: Boolean(progress.pickCompleted),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+  return await prisma.autoPickOrder.update({
+    where: { id: order.id },
+    data: {
+      status: buildProgressStatus(progress, order.status),
+      rawPayload: asPrismaJsonValue(nextRawPayload),
+      lastSyncedAt: new Date(),
+    },
+    include: {
+      items: {
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+}
+
+export async function refreshAutoPickOrderFromPlugin(
+  userId: string,
+  lookup: { id?: string; platform?: string; orderNo?: string; orderTime?: Date | string | null }
+) {
+  const baseUrl = await getAutoPickBaseUrlForUser(userId);
+  const targetDate = lookup.orderTime ? formatLocalDate(lookup.orderTime) : formatLocalDate(new Date());
+  const response = await fetch(`${baseUrl}/all-orders/${targetDate}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(errorText || `Auto-pick refresh failed with status ${response.status}`);
+  }
+
+  const orders = await response.json().catch(() => null) as unknown;
+  if (!Array.isArray(orders)) {
+    throw new Error("Auto-pick plugin returned invalid refresh data");
+  }
+
+  const matched = orders
+    .map((order) => normalizeAutoPickOrderPayload(order))
+    .filter((order): order is AutoPickInboundOrder => Boolean(order))
+    .find((order) => {
+      if (lookup.id && order.id === lookup.id) return true;
+      return order.platform === lookup.platform && order.orderNo === lookup.orderNo;
+    });
+
+  if (!matched) {
+    return null;
+  }
+
+  return await upsertAutoPickOrder(userId, matched);
 }
 
 export async function callAutoPickCommand(userId: string, pathname: "/self-delivery" | "/complete-delivery", payload: Record<string, unknown>) {

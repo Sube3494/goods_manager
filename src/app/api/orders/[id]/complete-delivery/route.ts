@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,22 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       sourceId: order.sourceId,
       logisticId: order.logisticId,
     });
+
+    if (result.ok) {
+      await prisma.autoPickOrder.update({
+        where: { id: order.id },
+        data: { autoCompleteAt: null },
+      });
+
+      await refreshAutoPickOrderFromPlugin(session.id, {
+        id: order.sourceId,
+        platform: order.platform,
+        orderNo: order.orderNo,
+        orderTime: order.orderTime,
+      }).catch((refreshError) => {
+        console.error("Failed to refresh auto-pick order after complete delivery:", refreshError);
+      });
+    }
 
     return NextResponse.json(result.data, { status: result.status });
   } catch (error) {
