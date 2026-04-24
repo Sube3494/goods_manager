@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { CheckCheck, Loader2, MapPin, Package2, Search, Settings2, Timer, Truck, X, Clock } from "lucide-react";
+import { CheckCheck, Loader2, MapPin, Package2, RefreshCw, Search, Settings2, Timer, Truck, X, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -30,6 +30,15 @@ type OrderResponse = {
 function toCurrency(value: number | null | undefined) {
   const amount = Number(value || 0) / 100;
   return `¥${amount.toFixed(2)}`;
+}
+
+function getDisplayStatus(status?: string | null) {
+  const text = String(status || "").trim();
+  if (!text) return "同步中";
+  if (text.includes("已完成")) return "已完成";
+  if (text.includes("配送中")) return "配送中";
+  if (text.includes("已拣货") || text.includes("拣货中")) return "已拣货";
+  return text.split(/[,，]/)[0].trim() || "同步中";
 }
 
 export default function OrdersPage() {
@@ -209,7 +218,7 @@ export default function OrdersPage() {
     return () => clearInterval(id);
   }, [tickAutoComplete, fetchOrders]);
 
-  const runAction = async (orderId: string, action: "self-delivery" | "complete-delivery") => {
+  const runAction = async (orderId: string, action: "self-delivery" | "complete-delivery" | "sync") => {
     setActingId(`${orderId}:${action}`);
     try {
       const response = await fetch(`/api/orders/${orderId}/${action}`, {
@@ -220,8 +229,13 @@ export default function OrdersPage() {
         throw new Error(data?.error || data?.reason || "操作失败");
       }
 
-      showToast(action === "self-delivery" ? "已发起自配送" : "已发送完成配送指令", "success");
-      // 自配送成功后立刻刷新，让 autoCompleteAt 显示出来
+      const successMessage = action === "self-delivery"
+        ? "已发起自配送"
+        : action === "complete-delivery"
+          ? "已发送完成配送指令"
+          : "已同步最新订单状态";
+
+      showToast(successMessage, "success");
       fetchOrders();
     } catch (error) {
       console.error("Order action failed:", error);
@@ -428,7 +442,7 @@ export default function OrdersPage() {
                   <div className="hidden md:block">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                      <span className="text-[13px] font-black text-foreground line-clamp-1">{order.status || "同步中"}</span>
+                      <span className="text-[13px] font-black text-foreground line-clamp-1">{getDisplayStatus(order.status)}</span>
                     </div>
                     <div className="mt-1.5 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
                       <Clock size={12} />
@@ -462,6 +476,15 @@ export default function OrdersPage() {
                   <div className="flex flex-col items-end gap-2 md:mt-0" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1.5">
                       <button
+                        onClick={() => runAction(order.id, "sync")}
+                        disabled={actingId !== ""}
+                        className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-background px-3 text-[11px] font-black text-foreground transition-all hover:bg-muted disabled:opacity-50 xl:h-10 xl:px-4 xl:text-xs"
+                        title="同步当前订单状态"
+                      >
+                        {actingId === `${order.id}:sync` ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                        <span className="hidden xl:inline">同步状态</span>
+                      </button>
+                      <button
                         onClick={() => runAction(order.id, "self-delivery")}
                         disabled={actingId !== ""}
                         className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-background px-3 text-[11px] font-black text-foreground transition-all hover:bg-foreground hover:text-background disabled:opacity-50 xl:h-10 xl:px-4 xl:text-xs"
@@ -481,7 +504,7 @@ export default function OrdersPage() {
                     {order.autoCompleteAt && (
                       <div className="flex items-center gap-1 rounded-lg bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-600 dark:text-amber-400">
                         <Timer size={10} />
-                        <span>自动完成 {formatLocalDateTime(order.autoCompleteAt)}</span>
+                        <span>系统预计自动完成 {formatLocalDateTime(order.autoCompleteAt)}</span>
                       </div>
                     )}
                   </div>
@@ -491,7 +514,7 @@ export default function OrdersPage() {
                 <div className="flex items-center justify-between border-t border-border/30 bg-muted/5 px-6 py-3 md:hidden">
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
                     <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                    {order.status || "同步中"}
+                    {getDisplayStatus(order.status)}
                   </div>
                   <div className="text-sm font-black text-foreground">{toCurrency(order.actualPaid)}</div>
                 </div>
@@ -675,4 +698,3 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
