@@ -12,6 +12,15 @@ function toBooleanFilter(value: string | null) {
   return null;
 }
 
+type MatchedCatalogProduct = {
+  id: string;
+  name: string;
+  sku?: string | null;
+  image?: string | null;
+  sourceType: "product" | "shopProduct";
+  shopName?: string | null;
+};
+
 export async function GET(request: NextRequest) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
@@ -106,8 +115,85 @@ export async function GET(request: NextRequest) {
       deliveryCount: 0,
     });
 
+    const productNos = Array.from(new Set(
+      orders.flatMap((order) => order.items.map((item) => String(item.productNo || "").trim()).filter(Boolean))
+    ));
+
+    const [shopProducts, products] = productNos.length > 0
+      ? await Promise.all([
+          prisma.shopProduct.findMany({
+            where: {
+              shop: { userId: session.id },
+              sku: { in: productNos },
+            },
+            select: {
+              id: true,
+              sku: true,
+              productName: true,
+              productImage: true,
+              shop: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          }),
+          prisma.product.findMany({
+            where: {
+              userId: session.id,
+              sku: { in: productNos },
+            },
+            select: {
+              id: true,
+              sku: true,
+              name: true,
+              image: true,
+            },
+          }),
+        ])
+      : [[], []];
+
+    const shopProductMap = new Map<string, MatchedCatalogProduct>();
+    for (const item of shopProducts) {
+      const sku = String(item.sku || "").trim();
+      if (!sku || shopProductMap.has(sku)) continue;
+      shopProductMap.set(sku, {
+        id: item.id,
+        name: item.productName || sku,
+        sku: item.sku,
+        image: item.productImage,
+        sourceType: "shopProduct",
+        shopName: item.shop?.name || null,
+      });
+    }
+
+    const productMap = new Map<string, MatchedCatalogProduct>();
+    for (const item of products) {
+      const sku = String(item.sku || "").trim();
+      if (!sku || productMap.has(sku)) continue;
+      productMap.set(sku, {
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        image: item.image,
+        sourceType: "product",
+      });
+    }
+
+    const enrichedOrders = orders.map((order) => ({
+      ...order,
+      items: order.items.map((item) => {
+        const sku = String(item.productNo || "").trim();
+        const matchedProduct = sku ? (shopProductMap.get(sku) || productMap.get(sku) || null) : null;
+        return {
+          ...item,
+          matchedProduct,
+        };
+      }),
+    }));
+
     return NextResponse.json({
-      items: orders,
+      items: enrichedOrders,
       meta: {
         total,
         page,

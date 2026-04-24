@@ -118,6 +118,14 @@ export interface AutoPickOrderItem {
   productNo?: string | null;
   quantity: number;
   thumb?: string | null;
+  matchedProduct?: {
+    id: string;
+    name: string;
+    sku?: string | null;
+    image?: string | null;
+    sourceType: "product" | "shopProduct";
+    shopName?: string | null;
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -6,6 +6,10 @@ import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
 
+function isCompletedStatus(status?: string | null) {
+  return String(status || "").includes("已完成");
+}
+
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
@@ -23,6 +27,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    if (isCompletedStatus(order.status)) {
+      return NextResponse.json({ error: "Order already completed" }, { status: 409 });
     }
 
     const result = await callAutoPickCommand(session.id, "/self-delivery", {
