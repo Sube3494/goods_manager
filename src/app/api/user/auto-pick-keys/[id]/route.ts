@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFreshSession } from "@/lib/auth";
-import { SessionUser } from "@/lib/permissions";
+import { getAuthorizedUser } from "@/lib/auth";
 import { revokeAutoPickApiKey } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
 export async function DELETE(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = await getFreshSession() as SessionUser | null;
-  if (!session?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getAuthorizedUser("order:manage");
+  if (!session) {
+    return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
 
   try {
