@@ -5,6 +5,11 @@ import { refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
+function isCancelledStatus(status?: string | null) {
+  const text = String(status || "");
+  return text.includes("取消") || text.includes("退款") || text.includes("关闭");
+}
+
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
@@ -22,6 +27,12 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    if (isCancelledStatus(order.status)) {
+      return NextResponse.json({
+        error: "Order already cancelled",
+      }, { status: 409 });
     }
 
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {

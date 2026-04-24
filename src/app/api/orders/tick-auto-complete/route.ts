@@ -21,6 +21,11 @@ export async function POST(_: NextRequest) {
       autoCompleteAt: {
         lte: now,
       },
+      NOT: [
+        { status: { contains: "取消" } },
+        { status: { contains: "退款" } },
+        { status: { contains: "关闭" } },
+      ],
     },
     select: {
       id: true,

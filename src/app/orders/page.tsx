@@ -73,9 +73,39 @@ function getCommissionDisplay(value: number | null | undefined) {
   };
 }
 
+function getOrderActionErrorMessage(raw: unknown) {
+  const reason = String(raw || "").trim();
+
+  switch (reason) {
+    case "target-order-card-not-found":
+    case "target-order-container-not-found":
+      return "插件当前页面里没有找到这张订单，请先确认订单仍在可操作列表中。";
+    case "target-order-not-in-detail":
+      return "插件打开的订单详情和当前订单不一致，请刷新后重试。";
+    case "maiyatian-confirm-page-not-found":
+    case "not-confirm-page":
+      return "插件当前不在新订单页面，请先切回麦芽田新订单页。";
+    case "self-delivery-option-not-found":
+      return "当前订单没有找到自配送入口。";
+    case "complete-delivery-button-not-found":
+      return "当前订单没有找到完成配送按钮。";
+    case "command-already-running":
+      return "插件当前有其他命令正在执行，请稍后再试。";
+    case "picking-not-completed":
+      return "当前订单还没完成拣货，暂时不能执行这个操作。";
+    case "Order already completed":
+      return "订单已完成，不需要重复操作。";
+    case "Order already cancelled":
+      return "订单已取消，不需要继续处理。";
+    default:
+      return reason || "操作失败";
+  }
+}
+
 function getDisplayStatus(status?: string | null) {
   const text = String(status || "").trim();
   if (!text) return "同步中";
+  if (text.includes("取消") || text.includes("退款") || text.includes("关闭")) return "已取消";
   if (text.includes("已完成")) return "已完成";
   if (text.includes("配送中")) return "配送中";
   if (text.includes("已拣货") || text.includes("拣货中")) return "已拣货";
@@ -86,8 +116,25 @@ function isCompletedStatus(status?: string | null) {
   return getDisplayStatus(status) === "已完成";
 }
 
+function isCancelledStatus(status?: string | null) {
+  return getDisplayStatus(status) === "已取消";
+}
+
+function isTerminalStatus(status?: string | null) {
+  const display = getDisplayStatus(status);
+  return display === "已完成" || display === "已取消";
+}
+
 function getStatusTone(status?: string | null) {
   const display = getDisplayStatus(status);
+
+  if (display === "已取消") {
+    return {
+      badge: "border-slate-500/15 bg-slate-500/10 text-slate-600 dark:text-slate-400",
+      dot: "bg-slate-500",
+      soft: "bg-slate-500/8 text-slate-600 dark:text-slate-300",
+    };
+  }
 
   if (display === "已完成") {
     return {
@@ -193,8 +240,41 @@ function StatusBadge({ status }: { status?: string | null }) {
 function InfoPair({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
-      <span className="max-w-[65%] text-right text-sm font-bold text-foreground">{value}</span>
+      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
+      <span className="max-w-[65%] text-right text-sm font-medium text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function ProductStripItem({ item }: { item: AutoPickOrderItem }) {
+  const display = getOrderItemDisplay(item);
+
+  return (
+    <div className="flex items-center gap-3 rounded-[18px] border border-black/6 bg-white/70 px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.04]">
+      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white dark:bg-white/[0.06]">
+        {display.image ? (
+          <Image
+            src={display.image}
+            alt={display.name}
+            width={44}
+            height={44}
+            className="h-full w-full object-cover"
+            unoptimized
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
+            <Package2 size={16} />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-foreground">{display.name}</div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
+          <span>{display.sku}</span>
+          <span>x{display.quantity}</span>
+          <span>{display.sourceLabel}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -221,7 +301,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-xs font-black transition-all disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50",
         variant === "primary"
           ? "bg-foreground text-background hover:opacity-90 dark:bg-white dark:text-black"
           : "border border-black/8 bg-white/85 text-foreground hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
@@ -250,6 +330,8 @@ function OrderCard({
   const itemCount = getItemCount(order.items);
   const firstItem = order.items[0] ? getOrderItemDisplay(order.items[0]) : null;
   const completed = isCompletedStatus(order.status);
+  const cancelled = isCancelledStatus(order.status);
+  const terminal = isTerminalStatus(order.status);
   const extraItemCount = Math.max(0, order.items.length - 1);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
@@ -260,36 +342,36 @@ function OrderCard({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.03] pl-2.5 pr-3 text-foreground dark:border-white/10 dark:bg-white/[0.04]">
-                    <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden">
+                  <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black/8 bg-black/[0.03] pl-2 pr-2.5 text-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                    <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden">
                       <Image
                         src={platformMeta.iconSrc}
                         alt={platformMeta.iconAlt}
-                        width={24}
-                        height={24}
-                        className="h-6 w-6 object-cover"
+                        width={20}
+                        height={20}
+                        className="h-5 w-5 object-cover"
                         unoptimized
                       />
                     </span>
-                    <span className="pr-0.5 text-base font-black leading-none tracking-tight">#{order.dailyPlatformSequence || 0}</span>
+                    <span className="pr-0.5 text-[15px] font-semibold leading-none tracking-tight">#{order.dailyPlatformSequence || 0}</span>
                   </span>
                   {firstItem?.sourceLabel ? (
-                    <span className="inline-flex h-9 items-center rounded-full border border-black/8 bg-black/[0.03] px-3 text-sm font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                    <span className="inline-flex h-8 items-center rounded-full border border-black/8 bg-black/[0.03] px-2.5 text-[13px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
                       {firstItem.sourceLabel}
                     </span>
                   ) : null}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                   <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">实付</span>
-                    <span className="text-sm font-black text-foreground">{toCurrency(order.actualPaid)}</span>
+                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
+                    <span className="text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
                   </div>
                   <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
-                    <span className="text-sm font-black text-foreground">{commissionDisplay.value}</span>
+                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
+                    <span className="text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
                   </div>
                 </div>
               </div>
@@ -312,7 +394,7 @@ function OrderCard({
         <div className="grid gap-4">
           <div className="rounded-[24px] border border-black/6 bg-black/[0.02] p-4 dark:border-white/8 dark:bg-white/[0.03]">
             <div className="flex items-start gap-4">
-              <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[20px] bg-white shadow-xs dark:bg-white/[0.06]">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[18px] bg-white shadow-xs dark:bg-white/[0.06] sm:h-[72px] sm:w-[72px] sm:rounded-[20px]">
                 {firstItem?.image ? (
                   <Image
                     src={firstItem.image}
@@ -328,8 +410,8 @@ function OrderCard({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商品概览</div>
-                <div className="mt-1 line-clamp-2 text-base font-black leading-snug text-foreground">
+                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">商品概览</div>
+                <div className="mt-1 line-clamp-2 text-[15px] font-medium leading-snug text-foreground sm:text-base">
                   {firstItem?.name || "暂无商品信息"}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium text-muted-foreground">
@@ -337,39 +419,56 @@ function OrderCard({
                   <span>{firstItem ? `x${firstItem.quantity}` : "x0"}</span>
                   <span>共 {itemCount} 件商品</span>
                   {extraItemCount > 0 ? (
-                    <span className="rounded-full border border-dashed border-black/10 bg-black/[0.02] px-2.5 py-1 text-[10px] font-bold text-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                    <span className="rounded-full border border-dashed border-black/10 bg-black/[0.02] px-2.5 py-1 text-[10px] font-medium text-foreground dark:border-white/10 dark:bg-white/[0.04]">
                       另有 +{extraItemCount} 件
                     </span>
                   ) : null}
                 </div>
               </div>
             </div>
+
+            {order.items.length > 1 ? (
+              <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/8">
+                <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">商品清单</div>
+                <div className="grid gap-2.5">
+                  {order.items.slice(1).map((item, index) => (
+                    <ProductStripItem key={`${item.productNo || item.productName}-${index}`} item={item} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
         <div className="mt-4 flex flex-col gap-3 border-t border-black/6 pt-4 dark:border-white/6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             {completed ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/10 px-3 py-1.5 text-xs font-black text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 <CheckCheck size={12} />
                 订单已完成
               </span>
             ) : null}
-            {!completed && order.autoCompleteAt ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/15 bg-amber-500/10 px-3 py-1.5 text-xs font-black text-amber-700 dark:text-amber-400">
+            {cancelled ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-500/15 bg-slate-500/10 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+                <X size={12} />
+                订单已取消
+              </span>
+            ) : null}
+            {!terminal && order.autoCompleteAt ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/15 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
                 <TimerReset size={12} />
                 预计自动完成 {formatLocalDateTime(order.autoCompleteAt)}
               </span>
             ) : null}
             {order.lastSyncedAt ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+              <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
                 <RefreshCw size={12} />
                 最近同步 {formatLocalDateTime(order.lastSyncedAt)}
               </span>
             ) : null}
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
             <ActionButton
               label={expanded ? "收起详情" : "展开详情"}
               icon={expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -377,25 +476,25 @@ function OrderCard({
             />
             <ActionButton
               label="同步"
-              title={completed ? "订单已完成，不需要再次同步" : undefined}
+              title={terminal ? (cancelled ? "订单已取消，不需要再次同步" : "订单已完成，不需要再次同步") : undefined}
               icon={actingId === `${order.id}:sync` ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               onClick={() => onRunAction(order.id, "sync")}
-              disabled={Boolean(actingId) || completed}
+              disabled={Boolean(actingId) || terminal}
             />
             <ActionButton
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || completed}
-              title={completed ? "订单已完成，不能再次发起自配" : undefined}
+              disabled={Boolean(actingId) || terminal}
+              title={terminal ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配") : undefined}
             />
             <ActionButton
               label="完成配送"
               variant="primary"
               icon={actingId === `${order.id}:complete-delivery` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
               onClick={() => onRunAction(order.id, "complete-delivery")}
-              disabled={Boolean(actingId) || completed}
-              title={completed ? "订单已完成，不能重复完成配送" : undefined}
+              disabled={Boolean(actingId) || terminal}
+              title={terminal ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送") : undefined}
             />
           </div>
         </div>
@@ -403,53 +502,22 @@ function OrderCard({
 
       {expanded ? (
         <div className="border-t border-black/6 bg-zinc-50/60 px-4 py-5 dark:border-white/6 dark:bg-white/[0.025] sm:px-5">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
-              <div className="mb-4 flex items-center gap-2">
-                <Package2 size={15} className="text-muted-foreground" />
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商品明细</h3>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {order.items.map((item, index) => {
-                  const display = getOrderItemDisplay(item);
-                  return (
-                    <div
-                      key={`${display.sku}-${index}`}
-                      className="flex items-center gap-3 rounded-[20px] border border-black/6 bg-black/[0.02] p-3 dark:border-white/8 dark:bg-white/[0.03]"
-                    >
-                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white dark:bg-white/[0.06]">
-                        {display.image ? (
-                          <Image
-                            src={display.image}
-                            alt={display.name}
-                            width={56}
-                            height={56}
-                            className="h-full w-full object-cover"
-                            unoptimized
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
-                            <Package2 size={18} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black text-foreground">{display.name}</div>
-                        <div className="mt-1 text-xs font-medium text-muted-foreground">{display.sku}</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-black/[0.04] px-2.5 py-1 text-[10px] font-bold text-foreground dark:bg-white/[0.07]">{display.sourceLabel}</span>
-                          <span className="rounded-full bg-primary/8 px-2.5 py-1 text-[10px] font-bold text-primary">x{display.quantity}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">系统信息</h3>
+              <div className="space-y-3">
+                <InfoPair label="订单编号" value={order.orderNo} />
+                <InfoPair label="原始 ID" value={order.sourceId} />
+                <InfoPair label="配送地址" value={order.userAddress} />
+                <InfoPair label="坐标" value={order.longitude && order.latitude ? `${order.longitude}, ${order.latitude}` : "-"} />
+                <InfoPair label="距离类型" value={order.distanceIsLinear ? "直线距离" : "路面距离"} />
+                <InfoPair label="送达时限" value={order.deliveryDeadline || "-"} />
               </div>
             </section>
 
             <div className="space-y-4">
               <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
-                <h3 className="mb-4 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">物流信息</h3>
+                <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">物流信息</h3>
                 <div className="space-y-3">
                   <InfoPair label="物流平台" value={order.delivery?.logisticName || "第三方平台"} />
                   <InfoPair label="轨迹" value={order.delivery?.track || "暂无轨迹"} />
@@ -458,17 +526,6 @@ function OrderCard({
                 </div>
               </section>
 
-              <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
-                <h3 className="mb-4 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统信息</h3>
-                <div className="space-y-3">
-                  <InfoPair label="订单编号" value={order.orderNo} />
-                  <InfoPair label="原始 ID" value={order.sourceId} />
-                  <InfoPair label="配送地址" value={order.userAddress} />
-                  <InfoPair label="坐标" value={order.longitude && order.latitude ? `${order.longitude}, ${order.latitude}` : "-"} />
-                  <InfoPair label="距离类型" value={order.distanceIsLinear ? "直线距离" : "路面距离"} />
-                  <InfoPair label="送达时限" value={order.deliveryDeadline || "-"} />
-                </div>
-              </section>
             </div>
           </div>
         </div>
@@ -784,7 +841,8 @@ export default function OrdersPage() {
       const response = await fetch(`/api/orders/${orderId}/${action}`, { method: "POST" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data?.error || data?.reason || "操作失败");
+        showToast(getOrderActionErrorMessage(data?.error || data?.reason), "error");
+        return;
       }
 
       showToast(
@@ -798,7 +856,7 @@ export default function OrdersPage() {
       fetchOrders();
     } catch (error) {
       console.error("Order action failed:", error);
-      showToast(error instanceof Error ? error.message : "操作失败", "error");
+      showToast(error instanceof Error ? getOrderActionErrorMessage(error.message) : "操作失败", "error");
     } finally {
       setActingId("");
     }
@@ -854,8 +912,8 @@ export default function OrdersPage() {
     }
   };
 
-  const todayPendingOrders = useMemo(() => orders.filter((item) => !isCompletedStatus(item.status)), [orders]);
-  const todayCompletedOrders = useMemo(() => orders.filter((item) => isCompletedStatus(item.status)), [orders]);
+  const todayPendingOrders = useMemo(() => orders.filter((item) => !isTerminalStatus(item.status)), [orders]);
+  const todayCompletedOrders = useMemo(() => orders.filter((item) => isTerminalStatus(item.status)), [orders]);
   const visibleOrders = activeTab === "today" ? todayPendingOrders : orders;
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || status !== "all" || hasDelivery !== "all" || startDate || endDate);
 
