@@ -6,7 +6,6 @@ import { Plus, Search, ShoppingBag, Upload, Download, Check, X as ClearIcon, Che
 import { useToast } from "@/components/ui/Toast";
 import { BrushOrderModal } from "@/components/BrushOrders/BrushOrderModal";
 import { ImportModal } from "@/components/Goods/ImportModal";
-import { BatchRecognitionModal } from "@/components/BrushOrders/BatchRecognitionModal";
 import { BatchEditOrderModal } from "@/components/BrushOrders/BatchEditOrderModal";
 import { BrushOrder, User as UserType } from "@/lib/types";
 import { formatLocalDateTime, formatLocalDate, formatLocalMonth } from "@/lib/dateUtils";
@@ -37,10 +36,8 @@ export default function BrushOrdersPage() {
   const [endDate, setEndDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isBatchEditModalOpen, setIsBatchEditModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [products, setProducts] = useState<import("@/lib/types").Product[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -248,17 +245,6 @@ export default function BrushOrdersPage() {
   useEffect(() => {
     setMounted(true);
     fetchData();
-    // 刷单优先使用用户门店商品目录做匹配，再回写到底层模板商品 ID
-    fetch("/api/purchase-products?all=true&pageSize=2000")
-      .then(res => res.json())
-      .then(data => {
-        if (data && Array.isArray(data.items)) {
-          setProducts(data.items);
-        } else if (Array.isArray(data)) {
-          setProducts(data);
-        }
-      })
-      .catch(console.error);
   }, [fetchData]);
 
   const handleCreate = () => {
@@ -1092,18 +1078,6 @@ export default function BrushOrdersPage() {
         onSubmit={handleSave}
         initialData={editingOrder}
         readOnly={readOnly}
-        onOpenBatch={() => {
-          setIsModalOpen(false);
-          setIsBatchModalOpen(true);
-        }}
-      />
-
-      <BatchRecognitionModal
-        isOpen={isBatchModalOpen}
-        onClose={() => setIsBatchModalOpen(false)}
-        products={products}
-        onBatchComplete={fetchData}
-        showToast={showToast}
       />
 
       <ConfirmModal 

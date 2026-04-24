@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, AlertTriangle, Wand2, Store } from "lucide-react";
+import { X, Package, Plus, Trash2, AlertTriangle, Store } from "lucide-react";
 import Image from "next/image";
 import { BrushOrder, Product, User as UserType } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -18,12 +18,11 @@ interface BrushOrderModalProps {
   onSubmit: (data: Partial<BrushOrder>) => void;
   initialData?: BrushOrder | null;
   readOnly?: boolean;
-  onOpenBatch?: () => void;
 }
 
 const BRUSH_TYPES = ["美团", "淘宝", "京东"];
 
-export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false, onOpenBatch }: BrushOrderModalProps) {
+export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOnly = false }: BrushOrderModalProps) {
     const { showToast } = useToast();
     const { user } = useUser();
     const typedUser = user as unknown as UserType;
@@ -224,16 +223,6 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
                         <h2 className="text-2xl font-bold">{readOnly ? "刷单详情" : (initialData ? "编辑刷单" : "新建刷单")}</h2>
                     </div>
                     <div className="flex items-center gap-3">
-                        {!readOnly && (
-                            <button
-                                type="button"
-                                onClick={onOpenBatch}
-                                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 transition-all font-bold active:scale-95"
-                            >
-                                <Wand2 size={18} />
-                                <span className="hidden sm:inline">一键识别</span>
-                            </button>
-                        )}
                         <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-red-500/10 dark:hover:text-red-500 rounded-full transition-colors">
                             <X size={24} />
                         </button>

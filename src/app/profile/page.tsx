@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   User,
   Mail,
@@ -25,7 +25,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import md5 from "blueimp-md5";
-import { User as UserType, AddressItem } from "@/lib/types";
+import { User as UserType, AddressItem, AutoPickApiKey } from "@/lib/types";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -41,6 +41,12 @@ export default function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [autoPickKeys, setAutoPickKeys] = useState<AutoPickApiKey[]>([]);
+  const [autoPickKeyLabel, setAutoPickKeyLabel] = useState("");
+  const [newAutoPickKey, setNewAutoPickKey] = useState("");
+  const [isLoadingAutoPickKeys, setIsLoadingAutoPickKeys] = useState(false);
+  const [isCreatingAutoPickKey, setIsCreatingAutoPickKey] = useState(false);
+  const [deletingAutoPickKeyId, setDeletingAutoPickKeyId] = useState("");
 
   useEffect(() => {
     if (typedUser?.name) {
@@ -61,6 +67,28 @@ export default function ProfilePage() {
       ]);
     }
   }, [typedUser?.name, typedUser?.shippingAddress, typedUser?.shippingAddresses]);
+
+  const fetchAutoPickKeys = useCallback(async () => {
+    setIsLoadingAutoPickKeys(true);
+    try {
+      const res = await fetch("/api/user/auto-pick-keys");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setAutoPickKeys(Array.isArray(data.items) ? data.items : []);
+      } else {
+        showToast(data.error || "加载推单凭证失败", "error");
+      }
+    } catch (error) {
+      console.error("Load auto-pick keys failed:", error);
+      showToast("加载推单凭证失败", "error");
+    } finally {
+      setIsLoadingAutoPickKeys(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchAutoPickKeys();
+  }, [fetchAutoPickKeys]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -110,6 +138,33 @@ export default function ProfilePage() {
   };
 
   const passwordStrength = getPasswordStrength(newPassword);
+  const defaultAddress = addressList.find((item) => item.isDefault) || null;
+  const activeAutoPickKeyCount = autoPickKeys.length;
+  const latestAutoPickKey = autoPickKeys[0] || null;
+  const topStats = [
+    {
+      label: "账户身份",
+      value: user?.role === "SUPER_ADMIN" ? "超级管理员" : "普通成员",
+      hint: "当前账号的系统角色",
+    },
+    {
+      label: "地址档案",
+      value: `${addressList.length} 条`,
+      hint: defaultAddress?.label || "尚未设置默认地址",
+    },
+    {
+      label: "推单凭证",
+      value: `${activeAutoPickKeyCount} 个`,
+      hint: latestAutoPickKey?.lastUsedAt
+        ? `最近使用 ${new Date(latestAutoPickKey.lastUsedAt).toLocaleString("zh-CN")}`
+        : "暂未使用记录",
+    },
+    {
+      label: "安全状态",
+      value: user?.hasPassword ? "已启用密码" : "待完善",
+      hint: user?.hasPassword ? "可以直接修改登录密码" : "建议尽快设置登录密码",
+    },
+  ];
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -154,6 +209,60 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCreateAutoPickKey = async () => {
+    const label = autoPickKeyLabel.trim();
+    if (!label) {
+      showToast("请先填写凭证名称", "error");
+      return;
+    }
+
+    setIsCreatingAutoPickKey(true);
+    try {
+      const res = await fetch("/api/user/auto-pick-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "创建凭证失败", "error");
+        return;
+      }
+
+      setAutoPickKeyLabel("");
+      setNewAutoPickKey(String(data.apiKey || ""));
+      setAutoPickKeys((prev) => data.item ? [data.item, ...prev] : prev);
+      showToast("推单凭证已生成，请立即复制", "success");
+    } catch (error) {
+      console.error("Create auto-pick key failed:", error);
+      showToast("创建凭证失败", "error");
+    } finally {
+      setIsCreatingAutoPickKey(false);
+    }
+  };
+
+  const handleDeleteAutoPickKey = async (id: string) => {
+    setDeletingAutoPickKeyId(id);
+    try {
+      const res = await fetch(`/api/user/auto-pick-keys/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "删除凭证失败", "error");
+        return;
+      }
+
+      setAutoPickKeys((prev) => prev.filter((item) => item.id !== id));
+      showToast("推单凭证已删除", "success");
+    } catch (error) {
+      console.error("Delete auto-pick key failed:", error);
+      showToast("删除凭证失败", "error");
+    } finally {
+      setDeletingAutoPickKeyId("");
+    }
+  };
+
   if (isUserLoading) {
     return (
       <div className="flex h-[60dvh] items-center justify-center">
@@ -171,67 +280,97 @@ export default function ProfilePage() {
       </div>
 
       <div className="relative mx-auto max-w-6xl">
-        <div className="mb-6 flex flex-col gap-4 px-3 sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:px-0">
-          <div className="flex items-start gap-3 sm:items-center sm:gap-4">
-            <Link
-              href="/"
-              className="group mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary dark:bg-white/5 sm:mt-0 sm:h-11 sm:w-11"
-            >
-              <ArrowLeft size={20} className="transition-transform group-hover:-translate-x-0.5" />
-            </Link>
-            <div className="min-w-0 space-y-1">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary sm:text-[11px]">
-                <Sparkles size={12} />
-                Account Studio
-              </div>
-              <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-4xl">个人信息</h1>
-              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">统一管理资料、常用地址和登录安全设置。</p>
+        <section className="mb-6 overflow-hidden rounded-[28px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/82 dark:shadow-black/20 sm:mb-8">
+          <div className="relative px-4 py-5 sm:px-8 sm:py-7">
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -left-10 top-0 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+              <div className="absolute right-0 top-6 h-36 w-36 rounded-full bg-sky-500/10 blur-3xl" />
+              <div className="absolute bottom-0 left-1/3 h-28 w-28 rounded-full bg-amber-500/10 blur-3xl" />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:min-w-[280px] sm:gap-3">
-            <div className="rounded-2xl border border-border/70 bg-white/80 px-3 py-3 shadow-sm backdrop-blur-sm dark:bg-white/5 sm:px-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">身份</div>
-              <div className="mt-1 text-sm font-bold text-foreground">{user?.role === "SUPER_ADMIN" ? "超级管理员" : "普通成员"}</div>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-white/80 px-3 py-3 shadow-sm backdrop-blur-sm dark:bg-white/5 sm:px-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">地址数</div>
-              <div className="mt-1 text-sm font-bold text-foreground">{addressList.length} 条</div>
+            <div className="relative flex flex-col gap-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <Link
+                    href="/"
+                    className="group mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:text-primary dark:bg-white/5 sm:mt-0 sm:h-11 sm:w-11"
+                  >
+                    <ArrowLeft size={20} className="transition-transform group-hover:-translate-x-0.5" />
+                  </Link>
+                  <div className="min-w-0 space-y-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary sm:text-[11px]">
+                      <Sparkles size={12} />
+                      Account Studio
+                    </div>
+                    <h1 className="text-3xl font-black tracking-tight text-foreground sm:text-5xl">个人中心</h1>
+                    <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                      把个人资料、常用地址、推单凭证和登录安全放进同一个账户工作台里，减少来回切换。
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-3 py-1.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
+                    <ShieldCheck size={13} />
+                    自助管理已开启
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/80 px-3 py-1.5 text-[11px] font-black text-foreground dark:bg-white/5">
+                    <BadgeCheck size={13} />
+                    {user?.email}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                {topStats.map((item) => (
+                  <div key={item.label} className="rounded-[22px] border border-border/60 bg-white/80 px-4 py-4 shadow-sm backdrop-blur-sm dark:bg-white/5">
+                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">{item.label}</div>
+                    <div className="mt-2 text-lg font-black text-foreground sm:text-xl">{item.value}</div>
+                    <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{item.hint}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <div className="sticky top-18 z-20 mx-3 mb-5 rounded-[24px] border border-border/60 bg-white/78 p-2 shadow-lg shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/82 sm:mx-0 lg:hidden">
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
           <a
             href="#profile-overview"
-            className="inline-flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88 sm:flex-1"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88"
           >
             概览
           </a>
           <a
             href="#profile-core"
-            className="inline-flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88 sm:flex-1"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88"
           >
             基本资料
           </a>
           <a
             href="#address-library"
-            className="inline-flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88 sm:flex-1"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88"
           >
             地址库
           </a>
           <a
+            href="#auto-pick-keys"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88"
+          >
+            推单凭证
+          </a>
+          <a
             href="#security-center"
-            className="inline-flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88 sm:flex-1"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/88 px-4 text-xs font-black text-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary/30 hover:text-primary dark:bg-[#101726]/88"
           >
             安全设置
           </a>
         </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 lg:gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <motion.aside
+        <div className="space-y-6">
+          <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
@@ -243,7 +382,8 @@ export default function ProfilePage() {
               <div className="relative overflow-hidden rounded-[24px] border border-border/60 bg-linear-to-br from-white via-white to-muted/35 p-4 text-foreground dark:from-white/10 dark:via-white/7 dark:to-transparent dark:text-white sm:p-6">
                 <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-primary/8 to-transparent dark:from-white/6" />
                 <div className="absolute -right-8 top-0 h-28 w-28 rounded-full bg-primary/10 blur-3xl dark:bg-white/8" />
-                <div className="relative flex items-center gap-4 text-left sm:flex-col sm:items-center sm:text-center">
+                <div className="relative grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-center">
+                  <div className="flex items-center gap-4 text-left sm:gap-5">
                   <a
                     href="https://cravatar.cn/"
                     target="_blank"
@@ -273,29 +413,36 @@ export default function ProfilePage() {
                       {user?.role === "SUPER_ADMIN" ? "超级管理员" : "普通成员"}
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3 sm:mt-5">
-                <div className="rounded-2xl border border-border/60 bg-muted/10 p-4 dark:bg-white/5">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">头像管理</div>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">头像来自 Cravatar，点击上方头像可快速跳转并更新展示。</p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-border/60 bg-muted/10 p-4 dark:bg-white/5">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">默认地址</div>
-                    <div className="mt-1 text-sm font-bold text-foreground">{addressList.find((item) => item.isDefault)?.label || "未设置"}</div>
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-muted/10 p-4 dark:bg-white/5">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">安全状态</div>
-                    <div className="mt-1 text-sm font-bold text-emerald-600 dark:text-emerald-400">已启用密码</div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-border/60 bg-white/70 p-4 dark:bg-white/5">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">头像管理</div>
+                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">头像来自 Cravatar，点击左侧头像可快速跳转并更新展示。</p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/70 p-4 dark:bg-white/5">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">默认地址</div>
+                      <div className="mt-2 text-sm font-bold text-foreground">{defaultAddress?.label || "未设置"}</div>
+                      <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                        {defaultAddress?.address || "建议至少维护一个默认收货地址，方便后续采购和物流。"}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/70 p-4 dark:bg-white/5">
+                      <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">快捷跳转</div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-black">
+                        <a href="#profile-core" className="rounded-xl border border-border/60 bg-white/70 px-3 py-2 text-center text-foreground transition hover:border-primary/30 hover:text-primary dark:bg-white/5">资料</a>
+                        <a href="#address-library" className="rounded-xl border border-border/60 bg-white/70 px-3 py-2 text-center text-foreground transition hover:border-primary/30 hover:text-primary dark:bg-white/5">地址</a>
+                        <a href="#auto-pick-keys" className="rounded-xl border border-border/60 bg-white/70 px-3 py-2 text-center text-foreground transition hover:border-primary/30 hover:text-primary dark:bg-white/5">推单</a>
+                        <a href="#security-center" className="rounded-xl border border-border/60 bg-white/70 px-3 py-2 text-center text-foreground transition hover:border-primary/30 hover:text-primary dark:bg-white/5">安全</a>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </section>
-          </motion.aside>
+          </motion.section>
 
-          <motion.main
+          <motion.section
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.08 }}
@@ -476,6 +623,132 @@ export default function ProfilePage() {
             </section>
 
             <section
+              id="auto-pick-keys"
+              className="scroll-mt-28 overflow-hidden rounded-[24px] border border-border/70 bg-white/84 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[28px]"
+            >
+              <div className="border-b border-border/60 bg-linear-to-r from-primary/6 via-transparent to-sky-500/6 px-4 py-4 sm:px-8 sm:py-5">
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Auto-Pick Console</div>
+                <div className="mt-2 flex flex-col gap-4">
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight text-foreground">推单凭证</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">把插件接入、凭证生成和最近使用状态放到同一个面板里，方便你自己维护。</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-black md:max-w-sm">
+                    <div className="rounded-2xl border border-border/60 bg-white/75 px-3 py-2 text-foreground dark:bg-white/5">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">总凭证</div>
+                      <div className="mt-1 text-sm">{activeAutoPickKeyCount}</div>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/75 px-3 py-2 text-foreground dark:bg-white/5">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">最近状态</div>
+                      <div className="mt-1 text-sm">{latestAutoPickKey?.lastUsedAt ? "有使用记录" : "等待启用"}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-4 sm:p-8">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_320px]">
+                  <div className="rounded-[22px] border border-border/60 bg-linear-to-br from-muted/15 to-white/70 p-4 dark:from-white/5 dark:to-white/2">
+                    <label className="flex items-center gap-2 px-1 text-xs font-black uppercase tracking-widest text-muted-foreground/70">
+                      <KeyRound size={14} className="text-primary" /> 凭证名称
+                    </label>
+                    <div className="mt-3 flex flex-col gap-3 md:flex-row">
+                      <input
+                        type="text"
+                        value={autoPickKeyLabel}
+                        onChange={(e) => setAutoPickKeyLabel(e.target.value)}
+                        placeholder="例如：麦芽田主账号 / 值班机"
+                        className="h-12 min-w-0 flex-1 rounded-2xl border border-border bg-white px-5 text-sm outline-none transition-all placeholder:text-muted-foreground/35 focus:border-primary/45 focus:ring-4 focus:ring-primary/10 dark:bg-white/5"
+                      />
+                      <button
+                        onClick={handleCreateAutoPickKey}
+                        disabled={isCreatingAutoPickKey}
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-foreground px-5 text-sm font-black text-background transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black"
+                      >
+                        {isCreatingAutoPickKey ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                        生成新凭证
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-sky-500/20 bg-sky-500/8 p-4">
+                    <div className="text-xs font-black text-sky-600 dark:text-sky-400">接入说明</div>
+                    <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
+                      <p>1. 插件上报地址填你的主站 `/api/v1/api-key/listened-orders`。</p>
+                      <p>2. 插件的 `MYSHOP_API_KEY` 直接填这里生成的凭证。</p>
+                      <p>3. 谁的账户生成 key，订单就归属谁，不按门店分配。</p>
+                    </div>
+                  </div>
+                </div>
+
+                {newAutoPickKey && (
+                  <div className="rounded-[22px] border border-emerald-500/20 bg-emerald-500/8 p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">新凭证，仅展示一次</div>
+                        <div className="mt-2 break-all rounded-2xl bg-black/5 px-3 py-3 font-mono text-xs text-foreground dark:bg-white/8">
+                          {newAutoPickKey}
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(newAutoPickKey);
+                          showToast("凭证已复制", "success");
+                        }}
+                        className="shrink-0 rounded-xl border border-emerald-500/20 bg-white/80 px-3 py-2 text-xs font-black text-emerald-600 transition hover:bg-white dark:bg-white/10"
+                      >
+                        复制
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {isLoadingAutoPickKeys ? (
+                    <div className="flex min-h-[220px] items-center justify-center rounded-[26px] border border-border/60 bg-muted/10">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : autoPickKeys.length === 0 ? (
+                    <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-[26px] border-2 border-dashed border-border/50 bg-muted/10 text-center">
+                      <KeyRound size={26} className="text-muted-foreground/50" />
+                      <div>
+                        <p className="text-sm font-black text-foreground">还没有推单凭证</p>
+                        <p className="mt-1 text-xs text-muted-foreground">先生成一个 key，再把它填到插件的 `MYSHOP_API_KEY` 里。</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      {autoPickKeys.map((item) => (
+                        <div key={item.id} className="rounded-[22px] border border-border/60 bg-linear-to-br from-muted/10 to-white/70 p-4 shadow-sm dark:from-white/5 dark:to-white/2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-black text-foreground">{item.label}</div>
+                              <div className="mt-2 inline-flex rounded-full border border-border/60 bg-white/70 px-3 py-1 font-mono text-[11px] text-muted-foreground dark:bg-white/5">
+                                {item.keyPrefix}...
+                              </div>
+                              <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                                <p>创建时间：{item.createdAt ? new Date(item.createdAt).toLocaleString("zh-CN") : "-"}</p>
+                                <p>最近使用：{item.lastUsedAt ? new Date(item.lastUsedAt).toLocaleString("zh-CN") : "暂无"}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteAutoPickKey(item.id)}
+                              disabled={deletingAutoPickKeyId === item.id}
+                              className="inline-flex h-10 items-center justify-center rounded-2xl border border-destructive/15 bg-destructive/5 px-3 text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                              title="删除凭证"
+                            >
+                              {deletingAutoPickKeyId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section
               id="security-center"
               className="scroll-mt-28 overflow-hidden rounded-[24px] border border-border/70 bg-white/84 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[28px]"
             >
@@ -593,7 +866,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             </section>
-          </motion.main>
+          </motion.section>
         </div>
       </div>
     </div>

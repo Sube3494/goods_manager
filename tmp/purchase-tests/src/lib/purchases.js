@@ -91,7 +91,10 @@ function filterPurchases(purchases, filters) {
         }
         const matchesId = (0, pinyin_1.pinyinMatch)(purchase.id, query);
         const matchesSupplier = purchase.items.some((item) => item.supplier?.name && (0, pinyin_1.pinyinMatch)(item.supplier.name, query));
-        const matchesProduct = purchase.items.some((item) => item.product?.name && (0, pinyin_1.pinyinMatch)(item.product.name, query));
+        const matchesProduct = purchase.items.some((item) => {
+            const productName = item.shopProduct?.name || item.product?.name;
+            return !!productName && (0, pinyin_1.pinyinMatch)(productName, query);
+        });
         const matchesShopName = !!purchase.shopName && (0, pinyin_1.pinyinMatch)(purchase.shopName, query);
         return matchesId || matchesSupplier || matchesProduct || matchesShopName;
     });

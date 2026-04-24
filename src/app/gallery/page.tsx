@@ -477,6 +477,23 @@ function GalleryContent() {
     return nextItems as GalleryItem[];
   }, [productMediaMap]);
 
+  const refreshProductMedia = useCallback(async (productId: string) => {
+    const res = await fetch(`/api/gallery/product/${productId}`);
+    if (!res.ok) {
+      throw new Error("Failed to refresh gallery product items");
+    }
+
+    const data = await res.json();
+    const nextItems = data.items || [];
+
+    setProductMediaMap((prev) => ({
+      ...prev,
+      [productId]: nextItems,
+    }));
+
+    return nextItems as GalleryItem[];
+  }, []);
+
   const fetchData = useCallback(async (isFirstPage = true) => {
     try {
       const targetPage = isFirstPage ? 1 : currentPageRef.current + 1;
@@ -711,9 +728,11 @@ function GalleryContent() {
     await processUploadFiles(files);
   };
 
-  const handleUploadSubmit = async (e: React.FormEvent) => {
+  const handleUploadSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (uploadForm.urls.length === 0 || !uploadForm.productId) return;
+
+    const targetProductId = uploadForm.productId;
 
     try {
       const res = await fetch("/api/gallery", {
@@ -728,12 +747,8 @@ function GalleryContent() {
       if (res.ok) {
         setIsUploadModalOpen(false);
         setUploadForm({ productId: "", urls: [], tags: "" });
-        if (uploadForm.productId) {
-          setProductMediaMap(prev => {
-            const next = { ...prev };
-            delete next[uploadForm.productId];
-            return next;
-          });
+        if (targetProductId) {
+          await refreshProductMedia(targetProductId);
         }
         showToast("发布成功", "success");
         fetchData(true);
@@ -745,7 +760,7 @@ function GalleryContent() {
       console.error("Gallery submit failed:", error);
       showToast("发布失败", "error");
     }
-  };
+  }, [fetchData, refreshProductMedia, showToast, uploadForm]);
 
   // Server-side filtered items
   const filteredItems = items;
@@ -1415,7 +1430,7 @@ function GalleryContent() {
                                                 "group relative overflow-hidden rounded-[28px] border border-dashed p-5 sm:p-6 transition-all duration-300 cursor-pointer",
                                                 isUploadDragActive
                                                     ? "border-primary bg-primary/10 shadow-lg shadow-primary/10 scale-[0.99]"
-                                                    : "border-zinc-200 dark:border-white/10 bg-zinc-50/90 dark:bg-white/[0.04] hover:border-primary/40 hover:bg-primary/[0.03]"
+                                                    : "border-zinc-200 dark:border-white/10 bg-zinc-50/90 dark:bg-white/4 hover:border-primary/40 hover:bg-primary/3"
                                             )}
                                         >
                                             <input
@@ -1914,6 +1929,7 @@ function GalleryContent() {
                                 />
                             </div>
 
+                        {relatedImages.length > 0 && (
                          <div className="absolute bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none px-4">
                             <motion.div 
                                 className="bg-zinc-900/40 backdrop-blur-3xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 max-w-full overflow-hidden transition-all duration-700 ring-1 ring-white/5 opacity-100 translate-y-0"
@@ -1989,6 +2005,7 @@ function GalleryContent() {
                                 )}
                             </motion.div>
                         </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>,

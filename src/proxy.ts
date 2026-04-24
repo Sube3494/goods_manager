@@ -26,6 +26,9 @@ export async function proxy(request: NextRequest) {
   const response = sessionResponse || NextResponse.next();
 
   const path = request.nextUrl.pathname;
+  const isPublicApiKeyWebhook =
+    request.method === "POST" &&
+    (path === "/api/v1/api-key/listened-orders" || path.startsWith("/api/v1/api-key/listened-orders/"));
 
   // Define public paths that don't require authentication
   // STRICT MODE: Only Login, Gallery, and share pages are public.
@@ -59,7 +62,7 @@ export async function proxy(request: NextRequest) {
 
   // Protect private routes
   // If pass is NOT public AND NOT a public GET API AND NOT a public POST API AND NOT a public PATCH API AND no session
-  if (!isPublicPath && !isPublicGetApi && !isPublicPostApi && !isPublicPatchApi && !session) {
+  if (!isPublicPath && !isPublicGetApi && !isPublicPostApi && !isPublicPatchApi && !isPublicApiKeyWebhook && !session) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

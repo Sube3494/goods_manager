@@ -1417,8 +1417,9 @@ export function StoreDispatchMap({
         return;
       }
 
-      setTargetQuery(match.name);
-      setTargetPoint(match);
+      const resolvedMatch = match;
+      setTargetQuery(resolvedMatch.name);
+      setTargetPoint(resolvedMatch);
       const regionLabel = activeProvince === ALL_REGIONS ? ALL_REGIONS : `${activeProvince}${activeCity}`;
       const nearbyStoreCount =
         !activeCity || activeCity === ALL_REGIONS
@@ -1428,12 +1429,12 @@ export function StoreDispatchMap({
               if (parts.city === UNKNOWN_CITY || parts.city === activeCity) return false;
               const coordinates = getShopCoordinates(shop);
               if (!coordinates) return false;
-              return getDistanceMeters(coordinates, match.location) <= CROSS_CITY_RADIUS_METERS;
+              return getDistanceMeters(coordinates, resolvedMatch.location) <= CROSS_CITY_RADIUS_METERS;
             }).length;
       setSearchFeedback(
         nearbyStoreCount > 0
-          ? `已在 ${regionLabel} 范围内定位：${match.name}，并自动纳入邻近城市门店参与调货。`
-          : `已在 ${regionLabel} 范围内定位：${match.name}`
+          ? `已在 ${regionLabel} 范围内定位：${resolvedMatch.name}，并自动纳入邻近城市门店参与调货。`
+          : `已在 ${regionLabel} 范围内定位：${resolvedMatch.name}`
       );
     } catch (error) {
       console.error("Resolve target failed:", error);
@@ -1908,7 +1909,7 @@ export function StoreDispatchMap({
     <>
     <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-background text-foreground">
       <style>{markerStyles}</style>
-      <div className="shrink-0 border-b border-border/60 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-5">
+      <div className="shrink-0 border-b border-border/60 bg-background/95 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-background/80 sm:px-5">
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1 sm:min-w-[128px] sm:flex-none">
             <CustomSelect
@@ -1939,7 +1940,7 @@ export function StoreDispatchMap({
             />
           </div>
 
-          <div className="order-3 w-full min-w-0 sm:order-none sm:min-w-[280px] sm:flex-1">
+          <div className="order-3 w-full min-w-0 sm:order-0 sm:min-w-[280px] sm:flex-1">
             <div className="relative">
               <Search
                 size={15}
@@ -2039,7 +2040,7 @@ export function StoreDispatchMap({
           />
           {isShopListOpen &&
             createPortal(
-              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
                 <div
                   className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                   onClick={() => setIsShopListOpen(false)}
@@ -2105,10 +2106,10 @@ export function StoreDispatchMap({
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground sm:justify-end">
-                    <div className="inline-flex h-8 items-center rounded-full border border-border/70 bg-white/[0.03] px-3 text-xs font-medium text-foreground">
+                    <div className="inline-flex h-8 items-center rounded-full border border-border/70 bg-white/3 px-3 text-xs font-medium text-foreground">
                       当前 {searchedShops.length} 家
                     </div>
-                    <div className="inline-flex h-8 items-center rounded-full border border-border/70 bg-white/[0.03] px-3 text-xs font-medium text-muted-foreground">
+                    <div className="inline-flex h-8 items-center rounded-full border border-border/70 bg-white/3 px-3 text-xs font-medium text-muted-foreground">
                       总计 {shops.length} 家
                     </div>
                     <div className="flex items-center gap-2">
@@ -2146,7 +2147,7 @@ export function StoreDispatchMap({
                       >
                         {searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id)) ? "取消全选" : "全选当前列表"}
                       </button>
-                      <div className="inline-flex h-9 items-center justify-center rounded-full bg-white/[0.04] px-4 text-xs font-medium text-muted-foreground">
+                      <div className="inline-flex h-9 items-center justify-center rounded-full bg-white/4 px-4 text-xs font-medium text-muted-foreground">
                         已选 <span className="mx-1 font-bold text-foreground">{selectedShopIds.length}</span> / 当前 {searchedShops.length}
                       </div>
                       <button

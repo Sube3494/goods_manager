@@ -1,0 +1,42 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getAuthorizedUser } from "@/lib/auth";
+import { callAutoPickCommand } from "@/lib/autoPickOrders";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const session = await getAuthorizedUser("order:manage");
+  if (!session) {
+    return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+  }
+
+  try {
+    const { id } = await context.params;
+    const order = await prisma.autoPickOrder.findFirst({
+      where: {
+        id,
+        userId: session.id,
+      },
+    });
+
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const result = await callAutoPickCommand(session.id, "/complete-delivery", {
+      platform: order.platform,
+      dailyPlatformSequence: order.dailyPlatformSequence,
+      orderNo: order.orderNo,
+      sourceId: order.sourceId,
+      logisticId: order.logisticId,
+    });
+
+    return NextResponse.json(result.data, { status: result.status });
+  } catch (error) {
+    console.error("Failed to complete delivery:", error);
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : "Failed to complete delivery",
+    }, { status: 500 });
+  }
+}

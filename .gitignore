@@ -56,3 +56,5 @@ next-env.d.ts
 
 # Prisma Generated Client
 /prisma/generated-client*
+/auto-pick
+

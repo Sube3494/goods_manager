@@ -199,6 +199,8 @@ model User {
   settlements        Settlement[]
   storeOpeningBatches StoreOpeningBatch[]
   shops              Shop[]
+  autoPickApiKeys    AutoPickApiKey[]
+  autoPickOrders     AutoPickOrder[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
 }
 
@@ -534,4 +536,72 @@ model ShopProduct {
   @@index([productId])
   @@index([shopId, createdAt])
   @@index([shopId, pinyin])
+}
+
+model AutoPickOrder {
+  id                    String              @id @default(cuid())
+  userId                String
+  sourceId              String
+  logisticId            String?
+  city                  Int?
+  platform              String
+  dailyPlatformSequence Int                 @default(0)
+  orderNo               String
+  orderTime             DateTime
+  userAddress           String
+  longitude             Float?
+  latitude              Float?
+  status                String?
+  deliveryDeadline      String?
+  distanceKm            Float?
+  distanceIsLinear      Boolean             @default(false)
+  actualPaid            Int                 @default(0)
+  platformCommission    Int                 @default(0)
+  delivery              Json?
+  rawPayload            Json?
+  lastSyncedAt          DateTime?
+  autoCompleteAt        DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  user                  User                @relation(fields: [userId], references: [id])
+  items                 AutoPickOrderItem[]
+
+  @@unique([userId, platform, orderNo])
+  @@index([userId, orderTime(sort: Desc)])
+  @@index([userId, status])
+  @@index([userId, platform])
+  @@index([sourceId])
+  @@index([autoCompleteAt])
+}
+
+model AutoPickOrderItem {
+  id          String        @id @default(cuid())
+  orderId     String
+  productName String
+  productNo   String?
+  quantity    Int           @default(1)
+  thumb       String?
+  rawPayload  Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  order       AutoPickOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productNo])
+}
+
+model AutoPickApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  label       String
+  keyHash     String    @unique
+  keyPrefix   String
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([userId, createdAt(sort: Desc)])
 }

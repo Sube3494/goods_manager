@@ -5,6 +5,7 @@ export type Permission =
   | "product:read" | "product:create" | "product:update" | "product:delete"
   | "category:manage"
   | "supplier:manage"
+  | "order:manage"
   | "purchase:manage"
   | "setup_purchase:manage"
   | "inbound:manage"
@@ -69,6 +70,13 @@ export const PERMISSION_TREE = [
     label: "供应商管理",
     children: [
       { key: "supplier:manage", label: "供应商管理" },
+    ]
+  },
+  {
+    key: "orders",
+    label: "订单管理",
+    children: [
+      { key: "order:manage", label: "订单管理" },
     ]
   },
   {
@@ -218,6 +226,7 @@ export function getEffectivePermissions(user: SessionUser | null): PermissionMap
 
 const PERMISSION_FALLBACKS: Partial<Record<Permission, Permission[]>> = {
   "dashboard:read": ["product:read", "logistics:manage", "purchase:manage", "brush:manage", "inbound:manage", "outbound:manage", "settlement:manage"],
+  "order:manage": ["purchase:manage", "outbound:manage", "brush:manage"],
   "roles:manage": ["system:manage"],
   "settings:manage": ["system:manage"],
   "backup:manage": ["system:manage"],
@@ -271,6 +280,7 @@ const DEFAULT_ROUTE_RULES: RouteAccessRule[] = [
   { href: "/shop-goods", permission: "product:read" },
   { href: "/categories", permission: "category:manage" },
   { href: "/suppliers", permission: "supplier:manage" },
+  { href: "/orders", permission: "order:manage" },
   { href: "/purchases", permission: "purchase:manage" },
   { href: "/setup-purchases", permission: "setup_purchase:manage" },
   { href: "/distance-calc", permission: "logistics:manage" },

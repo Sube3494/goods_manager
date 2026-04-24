@@ -62,6 +62,7 @@ export function BareAmapTest({
   const mapRef = useRef<any>(null);
   const onReadyRef = useRef(onReady);
   const onDestroyRef = useRef(onDestroy);
+  const mapStyleRef = useRef(mapStyle);
   const [status, setStatus] = useState("初始化中...");
   const [error, setError] = useState("");
 
@@ -75,6 +76,10 @@ export function BareAmapTest({
   useEffect(() => {
     onDestroyRef.current = onDestroy;
   }, [onDestroy]);
+
+  useEffect(() => {
+    mapStyleRef.current = mapStyle;
+  }, [mapStyle]);
 
   useEffect(() => {
     let disposed = false;
@@ -97,7 +102,7 @@ export function BareAmapTest({
           viewMode: "2D",
           zoom,
           center,
-          mapStyle,
+          mapStyle: mapStyleRef.current,
         });
 
         mapRef.current = map;

@@ -82,14 +82,14 @@ export function StoreModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
         onClick={onClose} 
       />
       
       <div className="relative w-full max-w-[560px] overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-2xl animate-in fade-in zoom-in duration-200 backdrop-blur-xl sm:rounded-[28px]">
-        <div className="border-b border-border/60 bg-white/[0.02] px-5 py-5 dark:bg-white/[0.03] sm:px-7 sm:py-6">
+        <div className="border-b border-border/60 bg-white/2 px-5 py-5 dark:bg-white/3 sm:px-7 sm:py-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-[24px] font-black tracking-tight text-foreground sm:text-[28px]">

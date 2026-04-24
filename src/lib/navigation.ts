@@ -20,6 +20,7 @@ export const navItems: NavItem[] = [
   { name: "店铺商品", href: "/shop-goods", icon: Store, adminOnly: true, permission: "product:read", description: "按店铺管理经营商品清单", section: "workspace" },
   { name: "分类管理", href: "/categories", icon: Layers, adminOnly: true, permission: "category:manage", description: "维护商品分类结构", section: "workspace" },
   { name: "供应商管理", href: "/suppliers", icon: Truck, adminOnly: true, permission: "supplier:manage", description: "供应商资料与联络信息", section: "workspace" },
+  { name: "订单管理", href: "/orders", icon: ShoppingCart, adminOnly: true, permission: "order:manage", description: "接收自动推单并处理配送动作", section: "workspace" },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true, permission: "purchase:manage", description: "日常采购与到货记录", section: "workspace" },
   { name: "开店进货", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "setup_purchase:manage", description: "开店批次与商品准备", section: "workspace" },
   { name: "智能调货", href: "/distance-calc", icon: Navigation2, permission: "logistics:manage", description: "地图测距与最优配送方案", section: "workspace" },

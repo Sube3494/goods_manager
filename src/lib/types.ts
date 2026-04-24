@@ -103,6 +103,67 @@ export interface ShopCatalogItem {
   updatedAt?: string;
 }
 
+export interface AutoPickDelivery {
+  logisticName?: string;
+  sendFee?: number;
+  pickupTime?: string;
+  track?: string;
+  riderName?: string;
+}
+
+export interface AutoPickOrderItem {
+  id?: string;
+  orderId?: string;
+  productName: string;
+  productNo?: string | null;
+  quantity: number;
+  thumb?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AutoPickOrder {
+  id: string;
+  userId: string;
+  sourceId: string;
+  logisticId?: string | null;
+  city?: number | null;
+  platform: string;
+  dailyPlatformSequence: number;
+  orderNo: string;
+  orderTime: string;
+  userAddress: string;
+  longitude?: number | null;
+  latitude?: number | null;
+  status?: string | null;
+  deliveryDeadline?: string | null;
+  distanceKm?: number | null;
+  distanceIsLinear: boolean;
+  actualPaid: number;
+  platformCommission: number;
+  delivery?: AutoPickDelivery | null;
+  items: AutoPickOrderItem[];
+  autoCompleteAt?: string | null;
+  lastSyncedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AutoPickApiKey {
+  id: string;
+  label: string;
+  keyPrefix: string;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AutoPickIntegrationConfig {
+  pluginBaseUrl: string;
+  inboundApiKey: string;
+}
+
 export interface BrushProduct {
   id: string;
   userId?: string;
