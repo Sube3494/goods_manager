@@ -73,7 +73,11 @@ function getCommissionDisplay(value: number | null | undefined) {
   };
 }
 
-function getExpectedIncome(actualPaid: number | null | undefined, platformCommission: number | null | undefined) {
+function getExpectedIncome(expectedIncome: number | null | undefined, actualPaid: number | null | undefined, platformCommission: number | null | undefined) {
+  const directIncome = Number(expectedIncome);
+  if (Number.isFinite(directIncome)) {
+    return directIncome;
+  }
   const paid = Number(actualPaid || 0);
   const commission = Number(platformCommission || 0);
   return paid - commission;
@@ -215,6 +219,10 @@ function getOrderItemDisplay(item: AutoPickOrderItem) {
   };
 }
 
+function getOrderSourceLabel(order: AutoPickOrder, firstItem: ReturnType<typeof getOrderItemDisplay> | null) {
+  return order.matchedShopName || firstItem?.sourceLabel || "";
+}
+
 function getItemCount(items: AutoPickOrderItem[]) {
   return items.reduce((sum, item) => sum + item.quantity, 0);
 }
@@ -346,7 +354,8 @@ function OrderCard({
   const extraItemCount = Math.max(0, order.items.length - 1);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
-  const expectedIncome = getExpectedIncome(order.actualPaid, order.platformCommission);
+  const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
+  const sourceLabel = getOrderSourceLabel(order, firstItem);
 
   return (
     <article className="overflow-hidden rounded-[30px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04]">
@@ -369,9 +378,9 @@ function OrderCard({
                     </span>
                     <span className="pr-0.5 text-[15px] font-semibold leading-none tracking-tight">#{order.dailyPlatformSequence || 0}</span>
                   </span>
-                  {firstItem?.sourceLabel ? (
+                  {sourceLabel ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-black/8 bg-black/[0.03] px-2.5 text-[13px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
-                      {firstItem.sourceLabel}
+                      {sourceLabel}
                     </span>
                   ) : null}
                   <StatusBadge status={order.status} />
@@ -532,6 +541,8 @@ function OrderCard({
                 <InfoPair label="订单编号" value={order.orderNo} />
                 <InfoPair label="原始 ID" value={order.sourceId} />
                 <InfoPair label="订单状态" value={getDisplayStatus(order.status)} />
+                <InfoPair label="识别门店" value={order.matchedShopName || "-"} />
+                <InfoPair label="门店地址" value={order.shopAddress || "-"} />
                 <InfoPair label="配送地址" value={order.userAddress} />
                 <InfoPair label="坐标" value={order.longitude && order.latitude ? `${order.longitude}, ${order.latitude}` : "-"} />
                 <InfoPair label="距离类型" value={order.distanceIsLinear ? "直线距离" : "路面距离"} />

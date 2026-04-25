@@ -141,6 +141,8 @@ export interface AutoPickOrder {
   orderNo: string;
   orderTime: string;
   userAddress: string;
+  shopAddress?: string | null;
+  matchedShopName?: string | null;
   longitude?: number | null;
   latitude?: number | null;
   status?: string | null;
@@ -148,6 +150,7 @@ export interface AutoPickOrder {
   distanceKm?: number | null;
   distanceIsLinear: boolean;
   actualPaid: number;
+  expectedIncome?: number | null;
   platformCommission: number;
   delivery?: AutoPickDelivery | null;
   items: AutoPickOrderItem[];

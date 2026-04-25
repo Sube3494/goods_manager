@@ -20,6 +20,7 @@ export type AutoPickInboundOrder = {
   orderNo?: string;
   orderTime?: string;
   userAddress?: string;
+  shopAddress?: string;
   longitude?: number;
   latitude?: number;
   status?: string;
@@ -27,6 +28,7 @@ export type AutoPickInboundOrder = {
   distanceKm?: number;
   distanceIsLinear?: boolean;
   actualPaid?: number;
+  expectedIncome?: number;
   platformCommission?: number;
   delivery?: {
     logisticName?: string;
@@ -406,6 +408,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     orderNo: String(input.orderNo || "").trim(),
     orderTime: String(input.orderTime || "").trim(),
     userAddress: String(input.userAddress || "").trim(),
+    shopAddress: String(input.shopAddress || input.storeAddress || input.merchantAddress || "").trim() || undefined,
     longitude: Number.isFinite(Number(input.longitude)) ? Number(input.longitude) : undefined,
     latitude: Number.isFinite(Number(input.latitude)) ? Number(input.latitude) : undefined,
     status: String(input.status || "").trim() || undefined,
@@ -413,6 +416,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     distanceKm: Number.isFinite(Number(input.distanceKm)) ? Number(input.distanceKm) : undefined,
     distanceIsLinear: Boolean(input.distanceIsLinear),
     actualPaid: Number.isFinite(Number(input.actualPaid)) ? Number(input.actualPaid) : 0,
+    expectedIncome: Number.isFinite(Number(input.expectedIncome)) ? Number(input.expectedIncome) : undefined,
     platformCommission: Number.isFinite(Number(input.platformCommission)) ? Number(input.platformCommission) : 0,
     delivery: input.delivery && typeof input.delivery === "object" ? {
       logisticName: String((input.delivery as Record<string, unknown>).logisticName || "").trim() || undefined,
