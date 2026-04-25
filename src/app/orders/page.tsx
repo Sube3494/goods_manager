@@ -73,6 +73,12 @@ function getCommissionDisplay(value: number | null | undefined) {
   };
 }
 
+function getExpectedIncome(actualPaid: number | null | undefined, platformCommission: number | null | undefined) {
+  const paid = Number(actualPaid || 0);
+  const commission = Number(platformCommission || 0);
+  return paid - commission;
+}
+
 function getOrderActionErrorMessage(raw: unknown) {
   const reason = String(raw || "").trim();
 
@@ -340,6 +346,7 @@ function OrderCard({
   const extraItemCount = Math.max(0, order.items.length - 1);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
+  const expectedIncome = getExpectedIncome(order.actualPaid, order.platformCommission);
 
   return (
     <article className="overflow-hidden rounded-[30px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04]">
@@ -367,12 +374,17 @@ function OrderCard({
                       {firstItem.sourceLabel}
                     </span>
                   ) : null}
+                  <StatusBadge status={order.status} />
                 </div>
 
                 <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                   <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
                     <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
                     <span className="text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
+                  </div>
+                  <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
+                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
+                    <span className="text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
                   </div>
                   <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
                     <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
@@ -519,6 +531,7 @@ function OrderCard({
               <div className="space-y-3">
                 <InfoPair label="订单编号" value={order.orderNo} />
                 <InfoPair label="原始 ID" value={order.sourceId} />
+                <InfoPair label="订单状态" value={getDisplayStatus(order.status)} />
                 <InfoPair label="配送地址" value={order.userAddress} />
                 <InfoPair label="坐标" value={order.longitude && order.latitude ? `${order.longitude}, ${order.latitude}` : "-"} />
                 <InfoPair label="距离类型" value={order.distanceIsLinear ? "直线距离" : "路面距离"} />
@@ -527,6 +540,14 @@ function OrderCard({
             </section>
 
             <div className="space-y-4">
+              <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
+                <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">金额信息</h3>
+                <div className="space-y-3">
+                  <InfoPair label="顾客实付" value={toCurrency(order.actualPaid)} />
+                  <InfoPair label="预计到手" value={toCurrency(expectedIncome)} />
+                  <InfoPair label={commissionDisplay.label} value={commissionDisplay.value} />
+                </div>
+              </section>
               <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
                 <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">物流信息</h3>
                 <div className="space-y-3">
