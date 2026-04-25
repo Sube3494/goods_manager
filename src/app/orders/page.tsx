@@ -125,6 +125,10 @@ function isTerminalStatus(status?: string | null) {
   return display === "已完成" || display === "已取消";
 }
 
+function isDeliveringStatus(status?: string | null) {
+  return getDisplayStatus(status) === "配送中";
+}
+
 function getStatusTone(status?: string | null) {
   const display = getDisplayStatus(status);
 
@@ -332,6 +336,7 @@ function OrderCard({
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
   const terminal = isTerminalStatus(order.status);
+  const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
   const extraItemCount = Math.max(0, order.items.length - 1);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
@@ -485,8 +490,14 @@ function OrderCard({
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal}
-              title={terminal ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配") : undefined}
+              disabled={Boolean(actingId) || terminal || delivering}
+              title={
+                terminal
+                  ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
+                  : delivering
+                    ? "订单已在配送中，不能重复发起自配"
+                    : undefined
+              }
             />
             <ActionButton
               label="完成配送"
@@ -520,6 +531,7 @@ function OrderCard({
                 <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">物流信息</h3>
                 <div className="space-y-3">
                   <InfoPair label="物流平台" value={order.delivery?.logisticName || "第三方平台"} />
+                  <InfoPair label="配送人" value={order.delivery?.riderName || "-"} />
                   <InfoPair label="轨迹" value={order.delivery?.track || "暂无轨迹"} />
                   <InfoPair label="取餐时间" value={order.delivery?.pickupTime || "-"} />
                   <InfoPair label="配送费" value={order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"} />

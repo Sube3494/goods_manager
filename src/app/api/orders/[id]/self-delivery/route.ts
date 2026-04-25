@@ -62,12 +62,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
 
       const autoCompleteAt = getEstimatedAutoCompleteAt(refreshedOrder || order);
-      if (autoCompleteAt) {
-        await prisma.autoPickOrder.update({
-          where: { id },
-          data: { autoCompleteAt },
-        });
-      }
+      await prisma.autoPickOrder.update({
+        where: { id },
+        data: {
+          status: "配送中",
+          deliveryDeadline: refreshedOrder?.deliveryDeadline || order.deliveryDeadline || null,
+          autoCompleteAt: autoCompleteAt || null,
+        },
+      });
     }
 
     return NextResponse.json(result.data, { status: result.status });

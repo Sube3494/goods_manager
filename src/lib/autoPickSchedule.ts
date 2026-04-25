@@ -2,6 +2,7 @@ import { parseAsShanghaiTime } from "@/lib/dateUtils";
 
 const PICKUP_MINUTES = 5;
 const MINUTES_PER_KM = 2;
+const RIDER_UPSTAIRS_MINUTES = 5;
 const DELIVERY_DEADLINE_LEAD_MINUTES = 5;
 
 export type SchedulableAutoPickOrder = {
@@ -46,7 +47,7 @@ export function parseExpectedDeliveryTime(deadlineText: string | null | undefine
 export function getEstimatedAutoCompleteAt(order: SchedulableAutoPickOrder) {
   const distanceKm = typeof order.distanceKm === "number" ? order.distanceKm : null;
   const heuristicAt = distanceKm != null
-    ? new Date(Date.now() + (PICKUP_MINUTES + distanceKm * MINUTES_PER_KM) * 60 * 1000)
+    ? new Date(Date.now() + (PICKUP_MINUTES + distanceKm * MINUTES_PER_KM + RIDER_UPSTAIRS_MINUTES) * 60 * 1000)
     : null;
 
   const expectedAt = parseExpectedDeliveryTime(order.deliveryDeadline, order.orderTime);

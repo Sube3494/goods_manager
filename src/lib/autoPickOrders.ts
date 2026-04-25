@@ -466,8 +466,6 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     throw new Error("Order items are required");
   }
 
-  const deliveryValue = normalized.delivery ? asPrismaJsonValue(normalized.delivery) : Prisma.DbNull;
-
   return await prisma.$transaction(async (tx) => {
     const existing = await tx.autoPickOrder.findUnique({
       where: {
@@ -477,7 +475,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
           orderNo: normalized.orderNo || "",
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        sourceId: true,
+        logisticId: true,
+        status: true,
+        deliveryDeadline: true,
+        delivery: true,
+      },
     });
 
     if (existing) {
@@ -485,6 +490,16 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         where: { orderId: existing.id },
       });
     }
+
+    const sourceId = normalized.id || existing?.sourceId || "";
+    const logisticId = normalized.logisticId || existing?.logisticId || null;
+    const status = normalized.status || existing?.status || null;
+    const deliveryDeadline = normalized.deliveryDeadline || existing?.deliveryDeadline || null;
+    const nextDeliveryValue = normalized.delivery
+      ? asPrismaJsonValue(normalized.delivery)
+      : hasDeliveryValue(existing?.delivery)
+        ? (existing?.delivery as Prisma.InputJsonValue)
+        : Prisma.DbNull;
 
     return await tx.autoPickOrder.upsert({
       where: {
@@ -496,8 +511,8 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       },
       create: {
         userId,
-        sourceId: normalized.id || "",
-        logisticId: normalized.logisticId || null,
+        sourceId,
+        logisticId,
         city: normalized.city,
         platform: normalized.platform || "",
         dailyPlatformSequence: normalized.dailyPlatformSequence || 0,
@@ -506,13 +521,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         userAddress: normalized.userAddress || "",
         longitude: normalized.longitude,
         latitude: normalized.latitude,
-        status: normalized.status || null,
-        deliveryDeadline: normalized.deliveryDeadline || null,
+        status,
+        deliveryDeadline,
         distanceKm: normalized.distanceKm,
         distanceIsLinear: Boolean(normalized.distanceIsLinear),
         actualPaid: Math.round(Number(normalized.actualPaid || 0)),
         platformCommission: Math.round(Number(normalized.platformCommission || 0)),
-        delivery: deliveryValue,
+        delivery: nextDeliveryValue,
         rawPayload: asPrismaJsonValue(normalized),
         lastSyncedAt: new Date(),
         items: {
@@ -520,21 +535,21 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         },
       },
       update: {
-        sourceId: normalized.id || "",
-        logisticId: normalized.logisticId || null,
+        sourceId,
+        logisticId,
         city: normalized.city,
         dailyPlatformSequence: normalized.dailyPlatformSequence || 0,
         orderTime,
         userAddress: normalized.userAddress || "",
         longitude: normalized.longitude,
         latitude: normalized.latitude,
-        status: normalized.status || null,
-        deliveryDeadline: normalized.deliveryDeadline || null,
+        status,
+        deliveryDeadline,
         distanceKm: normalized.distanceKm,
         distanceIsLinear: Boolean(normalized.distanceIsLinear),
         actualPaid: Math.round(Number(normalized.actualPaid || 0)),
         platformCommission: Math.round(Number(normalized.platformCommission || 0)),
-        delivery: deliveryValue,
+        delivery: nextDeliveryValue,
         rawPayload: asPrismaJsonValue(normalized),
         lastSyncedAt: new Date(),
         items: {
@@ -627,6 +642,10 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   }
 
   return currentStatus || "拣货中";
+}
+
+function hasDeliveryValue(value: unknown) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0);
 }
 
 export async function applyAutoPickProgress(userId: string, payload: unknown) {
