@@ -13,16 +13,20 @@ export class InventoryService {
   static async processOutboundFIFO(
     tx: Prisma.TransactionClient,
     userId: string,
-    items: { productId: string; shopProductId?: string | null; quantity: number }[]
+    items: { productId?: string | null; shopProductId?: string | null; quantity: number }[]
   ) {
     for (const item of items) {
       let remainingToDeduct = item.quantity;
+
+      if (!item.shopProductId && !item.productId) {
+        throw new Error("出库商品缺少关联标识，无法扣减库存");
+      }
 
       // 1. 查找该商品所有可用的入库批次，按日期升序排列 (先进先出)
       // 增加 userId 校验以确保数据隔离安全性
       const batches = await tx.purchaseOrderItem.findMany({
         where: {
-          ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId }),
+          ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId! }),
           remainingQuantity: {
             gt: 0
           },
@@ -94,7 +98,7 @@ export class InventoryService {
       } else {
         const productResult = await tx.product.updateMany({
           where: {
-            id: item.productId,
+            id: item.productId!,
             stock: {
               gte: item.quantity
             }

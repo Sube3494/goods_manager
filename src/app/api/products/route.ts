@@ -115,10 +115,11 @@ export async function POST(request: Request) {
     }
 
     let resolvedShopId: string | null = null;
+    let resolvedShopName = "";
     if (shopId) {
       const shop = await prisma.shop.findFirst({
         where: user.role === "SUPER_ADMIN" ? { id: String(shopId) } : { id: String(shopId), userId: user.id },
-        select: { id: true },
+        select: { id: true, name: true },
       });
 
       if (!shop) {
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
       }
 
       resolvedShopId = shop.id;
+      resolvedShopName = shop.name || "";
     }
 
     const category = categoryId
@@ -136,6 +138,50 @@ export async function POST(request: Request) {
           select: { id: true, name: true },
         })
       : null;
+
+    if (resolvedShopId && isShopOnly) {
+      const shopProduct = await prisma.shopProduct.create({
+        data: {
+          shopId: resolvedShopId,
+          sourceProductId: null,
+          sku: normalizedSku,
+          productName: name,
+          pinyin: ProductService.generatePinyinSearchText(name),
+          productImage: storage.stripUrl(image),
+          categoryId: categoryId || null,
+          categoryName: category?.name || null,
+          supplierId: supplierId || null,
+          costPrice: Number(costPrice) || 0,
+          stock: stockNum,
+          isPublic: isPublic ?? true,
+          isDiscontinued: isDiscontinued ?? false,
+          remark: remark || null,
+          specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+        },
+      });
+
+      return NextResponse.json({
+        id: shopProduct.id,
+        shopProductId: shopProduct.id,
+        sourceType: "shopProduct",
+        sourceProductId: null,
+        isStandaloneShopProduct: true,
+        name: shopProduct.productName || name,
+        sku: shopProduct.sku,
+        categoryId: shopProduct.categoryId,
+        costPrice: shopProduct.costPrice,
+        stock: shopProduct.stock,
+        image: shopProduct.productImage ? storage.resolveUrl(shopProduct.productImage) : null,
+        supplierId: shopProduct.supplierId,
+        isPublic: shopProduct.isPublic,
+        isDiscontinued: shopProduct.isDiscontinued,
+        specs: shopProduct.specs,
+        remark: shopProduct.remark,
+        shopId: shopProduct.shopId,
+        shopName: resolvedShopName,
+        assignedShopIds: [shopProduct.shopId],
+      });
+    }
 
     const product = await prisma.product.create({
       data: {

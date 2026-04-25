@@ -98,7 +98,7 @@ export async function POST(
               }
             }
           });
-        } else {
+        } else if (item.productId) {
           await tx.product.update({
             where: { id: item.productId },
             data: {
@@ -125,7 +125,7 @@ export async function POST(
           note: `单据由出库退回自动产生。关联出库单: ${order.id}`,
           items: {
             create: order.items.map(item => ({
-              productId: item.productId,
+              productId: item.productId || null,
               shopProductId: item.shopProductId || null,
               quantity: item.quantity,
               remainingQuantity: item.quantity,

@@ -116,8 +116,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           items: orderedItems.map((item) => ({
             id: item.id,
-            sourceProductId: item.sourceProductId || item.productId,
-            productId: item.productId,
+            sourceProductId: item.sourceProductId || item.productId || item.id,
+            productId: item.productId || null,
             sku: item.sku || null,
             name: item.productName || item.product?.name || "未命名商品",
             image: item.productImage
@@ -134,6 +134,9 @@ export async function GET(request: NextRequest) {
             shopName: item.shop?.name || "",
             isPublic: item.isPublic ?? true,
             isDiscontinued: item.isDiscontinued ?? false,
+            sourceType: "shopProduct" as const,
+            shopProductId: item.id,
+            isStandaloneShopProduct: !item.productId,
             remark: item.remark || null,
             specs: item.specs ?? null,
             createdAt: item.createdAt,
@@ -172,8 +175,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         items: selectedItems.map((item) => ({
           id: item.id,
-          sourceProductId: item.sourceProductId || item.productId,
-          productId: item.productId,
+          sourceProductId: item.sourceProductId || item.productId || item.id,
+          productId: item.productId || null,
           sku: item.sku || null,
           name: item.productName || item.product?.name || "未命名商品",
           image: item.productImage
@@ -190,6 +193,9 @@ export async function GET(request: NextRequest) {
           shopName: item.shop?.name || "",
           isPublic: item.isPublic ?? true,
           isDiscontinued: item.isDiscontinued ?? false,
+          sourceType: "shopProduct" as const,
+          shopProductId: item.id,
+          isStandaloneShopProduct: !item.productId,
           remark: item.remark || null,
           specs: item.specs ?? null,
           createdAt: item.createdAt,
@@ -241,8 +247,8 @@ export async function GET(request: NextRequest) {
       const storage = await getStorageStrategy();
       const resolved = orderedItems.map((item) => ({
         id: item.id,
-        sourceProductId: item.sourceProductId || item.productId,
-        productId: item.productId,
+        sourceProductId: item.sourceProductId || item.productId || item.id,
+        productId: item.productId || null,
         sku: item.sku || null,
         name: item.productName || item.product?.name || "未命名商品",
         image: item.productImage
@@ -259,6 +265,9 @@ export async function GET(request: NextRequest) {
         shopName: item.shop?.name || "",
         isPublic: item.isPublic ?? true,
         isDiscontinued: item.isDiscontinued ?? false,
+        sourceType: "shopProduct" as const,
+        shopProductId: item.id,
+        isStandaloneShopProduct: !item.productId,
         remark: item.remark || null,
         specs: item.specs ?? null,
         createdAt: item.createdAt,
@@ -315,8 +324,8 @@ export async function GET(request: NextRequest) {
     const storage = await getStorageStrategy();
     const resolved = items.map((item) => ({
       id: item.id,
-      sourceProductId: item.sourceProductId || item.productId,
-      productId: item.productId,
+      sourceProductId: item.sourceProductId || item.productId || item.id,
+      productId: item.productId || null,
       sku: item.sku || null,
       name: item.productName || item.product?.name || "未命名商品",
       image: item.productImage
@@ -333,6 +342,9 @@ export async function GET(request: NextRequest) {
       shopName: item.shop?.name || "",
       isPublic: item.isPublic ?? true,
       isDiscontinued: item.isDiscontinued ?? false,
+      sourceType: "shopProduct" as const,
+      shopProductId: item.id,
+      isStandaloneShopProduct: !item.productId,
       remark: item.remark || null,
       specs: item.specs ?? null,
       createdAt: item.createdAt,

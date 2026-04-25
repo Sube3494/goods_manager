@@ -281,7 +281,12 @@ export function ProductSelectionModal({
           const scopedRes = await fetch(`${fetchPath}?${scopedQuery.toString()}`);
           const scopedData = await scopedRes.json().catch(() => null);
           const scopedItems = Array.isArray(scopedData?.items) ? scopedData.items : [];
-          const createdShopProduct = scopedItems.find((item: Product) => item.sourceProductId === product.id);
+          const createdShopProduct = scopedItems.find((item: Product) =>
+            item.id === product.id ||
+            item.shopProductId === product.shopProductId ||
+            item.sourceProductId === product.sourceProductId ||
+            item.sourceProductId === product.id
+          );
           toggleProduct(createdShopProduct || product);
         } else {
           toggleProduct(product);

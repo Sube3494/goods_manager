@@ -158,7 +158,8 @@ export async function GET(
       const storage = await getStorageStrategy();
       const resolved = orderedItems.map((item) => ({
         id: item.id,
-        sourceProductId: item.sourceProductId || item.productId,
+        sourceProductId: item.sourceProductId || item.productId || item.id,
+        productId: item.productId || null,
         sku: item.sku || null,
         name: item.productName || item.product?.name || "未命名商品",
         image: item.productImage
@@ -173,6 +174,9 @@ export async function GET(
         stock: item.stock ?? 0,
         isPublic: item.isPublic ?? true,
         isDiscontinued: item.isDiscontinued ?? false,
+        sourceType: "shopProduct" as const,
+        shopProductId: item.id,
+        isStandaloneShopProduct: !item.productId,
         remark: item.remark || null,
         specs: item.specs ?? null,
         createdAt: item.createdAt,
@@ -236,7 +240,8 @@ export async function GET(
     const storage = await getStorageStrategy();
     const resolved = items.map((item) => ({
       id: item.id,
-      sourceProductId: item.sourceProductId || item.productId,
+      sourceProductId: item.sourceProductId || item.productId || item.id,
+      productId: item.productId || null,
       sku: item.sku || null,
       name: item.productName || item.product?.name || "未命名商品",
       image: item.productImage
@@ -251,6 +256,9 @@ export async function GET(
       stock: item.stock ?? 0,
       isPublic: item.isPublic ?? true,
       isDiscontinued: item.isDiscontinued ?? false,
+      sourceType: "shopProduct" as const,
+      shopProductId: item.id,
+      isStandaloneShopProduct: !item.productId,
       remark: item.remark || null,
       specs: item.specs ?? null,
       createdAt: item.createdAt,

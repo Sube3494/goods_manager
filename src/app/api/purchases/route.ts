@@ -171,7 +171,7 @@ export async function POST(request: Request) {
           userId: session.id,
           items: {
             create: items.map((item: PurchaseOrderItem) => ({
-              productId: item.productId,
+              productId: item.productId || null,
               shopProductId: item.shopProductId || null,
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
                 stock: { increment: Number(item.quantity) || 0 }
               }
             });
-          } else {
+          } else if (item.productId) {
             await tx.product.update({
               where: { id: item.productId },
               data: {

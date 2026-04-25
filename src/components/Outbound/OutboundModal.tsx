@@ -11,7 +11,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useDebounce } from "@/hooks/useDebounce";
 
 interface SelectedOutboundItem {
-  productId: string;
+  productId?: string | null;
   shopProductId?: string;
   shopName?: string;
   name: string;
@@ -46,6 +46,10 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   const { showToast } = useToast();
 
   const [mobileView, setMobileView] = useState<"selection" | "review">("selection");
+  const getItemKey = useCallback(
+    (item: { productId?: string | null; shopProductId?: string | null }) => item.shopProductId || item.productId || "",
+    []
+  );
 
   const fetchProducts = useCallback(async (mode: 'initial' | 'search' | 'next' = 'initial') => {
     if (mode === 'initial') {
@@ -163,7 +167,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
   const addItem = (product: Product) => {
     const itemKey = product.shopProductId || product.id;
-    const existing = selectedItems.find(item => (item.shopProductId || item.productId) === itemKey);
+    const existing = selectedItems.find(item => getItemKey(item) === itemKey);
     if (existing) {
       // If already exists, just show a hint or remove it to toggle? 
       // User said "above it should be selection", usually toggle is better for selection list
@@ -179,7 +183,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     setSelectedItems([
       ...selectedItems,
       {
-        productId: product.sourceProductId || product.id,
+        productId: product.sourceProductId || product.productId || (product.sourceType === "shopProduct" ? null : product.id),
         shopProductId: product.shopProductId,
         shopName: product.shopName,
         name: product.name,
@@ -193,12 +197,12 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   };
 
   const removeItem = (itemKey: string) => {
-    setSelectedItems(selectedItems.filter(item => (item.shopProductId || item.productId) !== itemKey));
+    setSelectedItems(selectedItems.filter(item => getItemKey(item) !== itemKey));
   };
 
   const updateQuantity = (itemKey: string, delta: number) => {
     setSelectedItems(selectedItems.map(item => {
-      if ((item.shopProductId || item.productId) === itemKey) {
+      if (getItemKey(item) === itemKey) {
         const newQty = Math.max(1, Math.min(item.stock, item.quantity + delta));
         return { ...item, quantity: newQty };
       }
@@ -209,7 +213,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   const handleManualQuantityChange = (itemKey: string, value: string) => {
     const qty = parseInt(value) || 0;
     setSelectedItems(selectedItems.map(item => {
-      if ((item.shopProductId || item.productId) === itemKey) {
+      if (getItemKey(item) === itemKey) {
         return { ...item, quantity: Math.max(0, Math.min(item.stock, qty)) };
       }
       return item;
@@ -332,7 +336,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                   <>
                     {displayProducts.map(p => {
                       const itemKey = p.shopProductId || p.id;
-                      const isSelected = selectedItems.some(item => (item.shopProductId || item.productId) === itemKey);
+                      const isSelected = selectedItems.some(item => getItemKey(item) === itemKey);
                       return (
                           <button
                             key={itemKey}
@@ -441,7 +445,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                         <div className="space-y-3">
                             {selectedItems.length > 0 ? (
                                 selectedItems.map(item => (
-                                    <div key={item.shopProductId || item.productId} className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl border border-white/5 bg-white dark:bg-gray-800/40 group shadow-sm">
+                                    <div key={getItemKey(item)} className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl border border-white/5 bg-white dark:bg-gray-800/40 group shadow-sm">
                                         <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
                                             {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
                                         </div>
@@ -459,7 +463,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                          <div className="flex items-center bg-muted/30 rounded-lg border border-white/5 p-0.5 ml-auto">
                                              <button 
                                                  type="button"
-                                                 onClick={() => updateQuantity(item.shopProductId || item.productId, -1)}
+                                                 onClick={() => updateQuantity(getItemKey(item), -1)}
                                                  className="p-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-muted-foreground transition-colors"
                                              >
                                                  <Minus size={12} />
@@ -467,12 +471,12 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                              <input 
                                                  type="number"
                                                  value={item.quantity}
-                                                 onChange={(e) => handleManualQuantityChange(item.shopProductId || item.productId, e.target.value)}
+                                                 onChange={(e) => handleManualQuantityChange(getItemKey(item), e.target.value)}
                                                  className="w-8 text-center text-[11px] font-bold bg-transparent no-spinner outline-none"
                                              />
                                              <button 
                                                  type="button"
-                                                 onClick={() => updateQuantity(item.shopProductId || item.productId, 1)}
+                                                 onClick={() => updateQuantity(getItemKey(item), 1)}
                                                  className="p-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-muted-foreground transition-colors"
                                              >
                                                  <Plus size={12} />
@@ -480,7 +484,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                          </div>
                                         <button 
                                             type="button"
-                                            onClick={() => removeItem(item.shopProductId || item.productId)}
+                                            onClick={() => removeItem(getItemKey(item))}
                                             className="p-2 text-muted-foreground/30 hover:text-destructive hover:bg-destructive/5 rounded-xl transition-all"
                                         >
                                             <X size={18} />

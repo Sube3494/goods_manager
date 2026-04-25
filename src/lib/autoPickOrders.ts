@@ -3,6 +3,7 @@ import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig } from "@/lib/types";
+import { ProductService } from "@/services/productService";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -473,6 +474,8 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
   }
 
   return await prisma.$transaction(async (tx) => {
+    await ensureShopProductsForAutoPickOrder(tx, userId, normalized, items);
+
     const existing = await tx.autoPickOrder.findUnique({
       where: {
         userId_platform_orderNo: {
@@ -657,6 +660,128 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
 
 function hasDeliveryValue(value: unknown) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0);
+}
+
+function toNormalizedText(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
+    .replace(/[（(].*?[)）]/g, " ")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
+async function ensurePushCategory(tx: Prisma.TransactionClient, userId: string) {
+  const existing = await tx.category.findFirst({
+    where: {
+      userId,
+      name: "推送添加",
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  return await tx.category.create({
+    data: {
+      userId,
+      name: "推送添加",
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+}
+
+async function ensureShopProductsForAutoPickOrder(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  normalized: AutoPickInboundOrder,
+  items: Array<{
+    productName: string;
+    productNo: string | null;
+    quantity: number;
+    thumb: string | null;
+    rawPayload: AutoPickInboundItem;
+  }>
+) {
+  const externalShopId = String(normalized.shopId || "").trim();
+  if (!externalShopId || items.length === 0) {
+    return;
+  }
+
+  const shop = await tx.shop.findFirst({
+    where: {
+      userId,
+      externalId: externalShopId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!shop?.id) {
+    return;
+  }
+
+  const existingShopProducts = await tx.shopProduct.findMany({
+    where: {
+      shopId: shop.id,
+    },
+    select: {
+      productName: true,
+    },
+  });
+
+  const existingNames = new Set(
+    existingShopProducts
+      .map((item) => toNormalizedText(item.productName))
+      .filter(Boolean)
+  );
+
+  const missingItems = items.filter((item) => {
+    const normalizedName = toNormalizedText(item.productName);
+    return normalizedName && !existingNames.has(normalizedName);
+  });
+
+  if (missingItems.length === 0) {
+    return;
+  }
+
+  const category = await ensurePushCategory(tx, userId);
+
+  for (const item of missingItems) {
+    const normalizedName = toNormalizedText(item.productName);
+    if (!normalizedName || existingNames.has(normalizedName)) {
+      continue;
+    }
+
+    await tx.shopProduct.create({
+      data: {
+        shopId: shop.id,
+        sourceProductId: null,
+        sku: item.productNo || null,
+        productName: item.productName,
+        pinyin: ProductService.generatePinyinSearchText(item.productName),
+        productImage: item.thumb || null,
+        categoryId: category.id,
+        categoryName: category.name,
+        costPrice: 0,
+        stock: 0,
+        isPublic: false,
+        isDiscontinued: false,
+        remark: "自动推单补建",
+        specs: Prisma.JsonNull,
+      },
+    });
+
+    existingNames.add(normalizedName);
+  }
 }
 
 function isCancelledStatus(status?: string | null) {

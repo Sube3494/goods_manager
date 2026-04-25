@@ -43,11 +43,38 @@ function readExpectedIncomeFromRawPayload(rawPayload: unknown) {
   return Number.isFinite(value) ? value : null;
 }
 
-function resolvePlatformCommission(expectedIncome: number | null, actualPaid: number, fallbackCommission: number) {
-  if (Number.isFinite(Number(expectedIncome))) {
-    return Math.round(Number(expectedIncome) - Number(actualPaid || 0));
+function isJDPlatform(platform: string | null | undefined) {
+  return String(platform || "").includes("京东");
+}
+
+function resolveIncomeMetrics(
+  platform: string | null | undefined,
+  expectedIncome: number | null,
+  actualPaid: number,
+  fallbackCommission: number
+) {
+  if (isJDPlatform(platform)) {
+    const settledBase = Math.max(0, Math.round(Number(actualPaid || 0) - 100));
+    const platformCommission = Math.max(0, Math.round(settledBase * 0.06));
+    const resolvedExpectedIncome = Math.max(0, settledBase - platformCommission);
+    return {
+      expectedIncome: resolvedExpectedIncome,
+      platformCommission,
+    };
   }
-  return Math.round(Number(fallbackCommission || 0));
+
+  if (Number.isFinite(Number(expectedIncome))) {
+    const resolvedExpectedIncome = Math.round(Number(expectedIncome));
+    return {
+      expectedIncome: resolvedExpectedIncome,
+      platformCommission: Math.round(resolvedExpectedIncome - Number(actualPaid || 0)),
+    };
+  }
+
+  return {
+    expectedIncome: null,
+    platformCommission: Math.round(Number(fallbackCommission || 0)),
+  };
 }
 
 function readShopAddressFromRawPayload(rawPayload: unknown) {
@@ -228,9 +255,9 @@ export async function GET(request: NextRequest) {
 
     const summary = orders.reduce((acc, order) => {
       const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
-      const platformCommission = resolvePlatformCommission(expectedIncome, order.actualPaid, order.platformCommission);
+      const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
       acc.actualPaid += order.actualPaid;
-      acc.platformCommission += platformCommission;
+      acc.platformCommission += metrics.platformCommission;
       acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
       if (order.delivery) {
         acc.deliveryCount += 1;
@@ -243,16 +270,28 @@ export async function GET(request: NextRequest) {
       deliveryCount: 0,
     });
 
-    const productNos = Array.from(new Set(
-      orders.flatMap((order) => order.items.map((item) => String(item.productNo || "").trim()).filter(Boolean))
+    const productNames = Array.from(new Set(
+      orders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
     ));
 
-    const [shopProducts, products] = productNos.length > 0
+    const [products, shopProducts] = productNames.length > 0
       ? await Promise.all([
+          prisma.product.findMany({
+            where: {
+              userId: session.id,
+              name: { in: productNames },
+            },
+            select: {
+              id: true,
+              sku: true,
+              name: true,
+              image: true,
+            },
+          }),
           prisma.shopProduct.findMany({
             where: {
               shop: { userId: session.id },
-              sku: { in: productNos },
+              productName: { in: productNames },
             },
             select: {
               id: true,
@@ -262,20 +301,9 @@ export async function GET(request: NextRequest) {
               shop: {
                 select: {
                   name: true,
+                  externalId: true,
                 },
               },
-            },
-          }),
-          prisma.product.findMany({
-            where: {
-              userId: session.id,
-              sku: { in: productNos },
-            },
-            select: {
-              id: true,
-              sku: true,
-              name: true,
-              image: true,
             },
           }),
         ])
@@ -285,37 +313,11 @@ export async function GET(request: NextRequest) {
       ? (userProfile.shippingAddresses as ShippingAddress[])
       : [];
 
-    const shopProductMap = new Map<string, MatchedCatalogProduct>();
-    const shopScopedProductMap = new Map<string, MatchedCatalogProduct>();
-    for (const item of shopProducts) {
-      const sku = String(item.sku || "").trim();
-      if (!sku || shopProductMap.has(sku)) continue;
-      shopProductMap.set(sku, {
-        id: item.id,
-        name: item.productName || sku,
-        sku: item.sku,
-        image: item.productImage,
-        sourceType: "shopProduct",
-        shopName: item.shop?.name || null,
-      });
-      const scopedShopName = String(item.shop?.name || "").trim();
-      if (scopedShopName) {
-        shopScopedProductMap.set(`${scopedShopName}::${sku}`, {
-          id: item.id,
-          name: item.productName || sku,
-          sku: item.sku,
-          image: item.productImage,
-          sourceType: "shopProduct",
-          shopName: item.shop?.name || null,
-        });
-      }
-    }
-
     const productMap = new Map<string, MatchedCatalogProduct>();
     for (const item of products) {
-      const sku = String(item.sku || "").trim();
-      if (!sku || productMap.has(sku)) continue;
-      productMap.set(sku, {
+      const normalizedName = toNormalizedText(item.name);
+      if (!normalizedName || productMap.has(normalizedName)) continue;
+      productMap.set(normalizedName, {
         id: item.id,
         name: item.name,
         sku: item.sku,
@@ -324,27 +326,56 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const enrichedOrders = orders.map((order) => ({
+    const shopProductMap = new Map<string, MatchedCatalogProduct[]>();
+    for (const item of shopProducts) {
+      const normalizedName = toNormalizedText(item.productName);
+      if (!normalizedName) continue;
+
+      const current = shopProductMap.get(normalizedName) || [];
+      current.push({
+        id: item.id,
+        name: item.productName || "未命名商品",
+        sku: item.sku,
+        image: item.productImage,
+        sourceType: "shopProduct",
+        shopName: item.shop?.name || null,
+      });
+      shopProductMap.set(normalizedName, current);
+    }
+
+    const enrichedOrders = orders.map((order) => {
+      const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
+      const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
+      return {
       ...order,
       shopId: readShopIdFromRawPayload(order.rawPayload),
       shopAddress: readShopAddressFromRawPayload(order.rawPayload),
       rawShopName: readShopNameFromRawPayload(order.rawPayload),
-      expectedIncome: readExpectedIncomeFromRawPayload(order.rawPayload),
-    })).map((order) => {
+      expectedIncome: metrics.expectedIncome,
+      platformCommission: metrics.platformCommission,
+    };
+    }).map((order) => {
       const matchedShopName = matchShopName(order.shopId, order.shopAddress, order.rawShopName, shippingAddresses);
       return {
         ...order,
-        platformCommission: resolvePlatformCommission(order.expectedIncome, order.actualPaid, order.platformCommission),
         matchedShopName,
         items: order.items.map((item) => {
-        const sku = String(item.productNo || "").trim();
-        const matchedProduct = sku
-          ? ((matchedShopName ? shopScopedProductMap.get(`${matchedShopName}::${sku}`) : null) || shopProductMap.get(sku) || productMap.get(sku) || null)
-          : null;
-        return {
-          ...item,
-          matchedProduct,
-        };
+          const normalizedProductName = toNormalizedText(item.productName);
+          const matchedShopProducts = normalizedProductName
+            ? (shopProductMap.get(normalizedProductName) || [])
+            : [];
+          const matchedProduct = !normalizedProductName
+            ? null
+            : (
+                matchedShopProducts.find((product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()) ||
+                matchedShopProducts[0] ||
+                productMap.get(normalizedProductName) ||
+                null
+              );
+          return {
+            ...item,
+            matchedProduct,
+          };
         }),
       };
     });

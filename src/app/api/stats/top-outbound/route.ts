@@ -60,7 +60,10 @@ export async function GET(request: NextRequest) {
     }>();
 
     for (const item of outboundItems) {
-      const key = item.shopProductId || item.productId;
+      const key = item.shopProductId || item.productId || "";
+      if (!key) {
+        continue;
+      }
       const current = aggregateMap.get(key);
       const displayProduct = item.shopProduct
         ? {
@@ -90,7 +93,7 @@ export async function GET(request: NextRequest) {
         }
       } else {
         aggregateMap.set(key, {
-          productId: item.productId,
+          productId: item.productId || item.shopProductId || key,
           shopProductId: item.shopProductId || undefined,
           totalQuantity: item.quantity,
           latestOutboundAt: item.outboundOrder?.date instanceof Date ? item.outboundOrder.date.toISOString() : undefined,

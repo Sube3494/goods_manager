@@ -46,6 +46,7 @@ export interface Product {
   id: string;
   sku?: string;
   name: string;
+  productId?: string | null;
   sourceProductId?: string | null;
   categoryId: string;
   category?: Category;
@@ -68,6 +69,7 @@ export interface Product {
   shopProductId?: string;
   shopId?: string;
   shopName?: string;
+  isStandaloneShopProduct?: boolean;
 }
 
 export interface Shop {
@@ -221,7 +223,7 @@ export interface PurchaseOrder {
 export interface PurchaseOrderItem {
   id?: string;
   purchaseOrderId?: string;
-  productId: string;
+  productId?: string | null;
   shopProductId?: string;
   product?: Product;
   shopProduct?: ShopCatalogItem;
@@ -414,7 +416,7 @@ export interface BrushOrder {
 export interface OutboundOrderItem {
   id?: string;
   outboundOrderId?: string;
-  productId: string;
+  productId?: string | null;
   shopProductId?: string;
   product?: Product;
   shopProduct?: ShopCatalogItem;

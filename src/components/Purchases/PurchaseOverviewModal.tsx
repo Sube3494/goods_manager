@@ -49,7 +49,10 @@ export function PurchaseOverviewModal({ isOpen, onClose, purchases }: PurchaseOv
 
     for (const po of purchases) {
       for (const item of po.items) {
-        const pid = item.shopProductId || item.productId;
+        const pid = item.shopProductId || item.productId || "";
+        if (!pid) {
+          continue;
+        }
         const name = item.shopProduct?.name || item.product?.name || "未知商品";
         const sku = item.shopProduct?.sku || item.product?.sku || "";
         const qty = item.quantity || 0;

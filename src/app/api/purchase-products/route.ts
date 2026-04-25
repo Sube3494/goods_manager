@@ -76,7 +76,7 @@ export async function GET(request: Request) {
       id: item.id,
       sourceType: "shopProduct" as const,
       shopProductId: item.id,
-      sourceProductId: item.productId,
+      sourceProductId: item.sourceProductId || item.productId || item.id,
       shopId: item.shopId,
       shopName: item.shop.name,
       sku: item.sku || "",
@@ -92,6 +92,7 @@ export async function GET(request: Request) {
       supplierId: item.supplierId || undefined,
       supplier: undefined,
       remark: item.remark,
+      isStandaloneShopProduct: !item.productId,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     }));

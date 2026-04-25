@@ -208,7 +208,7 @@ function getOrderItemDisplay(item: AutoPickOrderItem) {
   const matchedProduct = item.matchedProduct;
   return {
     name: matchedProduct?.name || item.productName || "未命名商品",
-    sku: matchedProduct?.sku || item.productNo || "-",
+    sku: item.productNo || matchedProduct?.sku || "-",
     image: matchedProduct?.image || item.thumb || null,
     quantity: item.quantity,
     sourceLabel: matchedProduct

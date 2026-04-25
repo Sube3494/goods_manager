@@ -269,9 +269,12 @@ async function importPublicProductForUser(userId: string, sourceProductId: strin
 async function restoreOutboundInventory(
   tx: Prisma.TransactionClient,
   userId: string,
-  items: { productId: string; quantity: number }[]
+  items: { productId: string | null; quantity: number }[]
 ) {
   for (const item of items) {
+    if (!item.productId) {
+      continue;
+    }
     let remainingToRestore = item.quantity;
 
     const batches = await tx.purchaseOrderItem.findMany({
@@ -406,14 +409,25 @@ export async function POST(req: NextRequest) {
         shop: { select: { name: true } },
       },
     });
-    const allProducts: MatchableProduct[] = shopProducts.map((item) => ({
-      id: item.sourceProductId || item.productId,
-      name: item.productName || "未命名商品",
-      sku: item.sku,
-      stock: item.stock,
-      sourceProductId: item.sourceProductId || item.productId,
-      shopName: item.shop.name,
-    }));
+    const standaloneShopProducts = shopProducts
+      .map((item) => {
+        const resolvedId = item.sourceProductId || item.productId;
+        if (!resolvedId) {
+          return null;
+        }
+
+        return {
+          id: resolvedId,
+          name: item.productName || "未命名商品",
+          sku: item.sku,
+          stock: item.stock,
+          sourceProductId: resolvedId,
+          shopName: item.shop.name,
+        };
+      });
+    const allProducts: MatchableProduct[] = standaloneShopProducts.filter(
+      (item): item is NonNullable<typeof item> => item !== null
+    );
     const publicProducts = await prisma.product.findMany({
       where: {
         isPublic: true,
@@ -588,7 +602,7 @@ export async function POST(req: NextRequest) {
         if (matchFailed) continue;
 
         let existingBrush: { id: string; items: { productId: string; quantity: number }[] } | null = null;
-        let existingOutbound: { id: string; items: { productId: string; quantity: number }[] } | null = null;
+        let existingOutbound: { id: string; items: { productId: string | null; quantity: number }[] } | null = null;
 
         if (strOrderId) {
           existingBrush = await prisma.brushOrder.findFirst({

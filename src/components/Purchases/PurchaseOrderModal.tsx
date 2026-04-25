@@ -45,8 +45,9 @@ const PurchaseItemRow = memo(({
     isChecked?: boolean;
     onToggle?: (productId: string) => void;
 }) => {
+    const itemKey = item.shopProductId || item.productId || "";
     const productData = useMemo(() => {
-        const p = item.product || products.find(g => g.id === (item.shopProductId || item.productId));
+        const p = item.product || products.find(g => g.id === itemKey);
         const supplierId = p?.supplierId || item.supplierId;
         return {
             imageUrl: item.image || p?.image,
@@ -63,12 +64,12 @@ const PurchaseItemRow = memo(({
     const handleDeleteClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirmingDelete) {
-            onRemove(item.shopProductId || item.productId);
+            onRemove(itemKey);
         } else {
             setConfirmingDelete(true);
             setTimeout(() => setConfirmingDelete(false), 2500);
         }
-    }, [confirmingDelete, item.productId, item.shopProductId, onRemove]);
+    }, [confirmingDelete, itemKey, onRemove]);
 
     return (
         <div 
@@ -81,7 +82,7 @@ const PurchaseItemRow = memo(({
                     : 'bg-white dark:bg-white/10 border-border dark:border-white/5',
                 readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_80px_120px_120px_40px]'
             )}
-            onClick={isBatchMode ? () => onToggle(item.shopProductId || item.productId) : undefined}
+            onClick={isBatchMode ? () => onToggle(itemKey) : undefined}
         >
             {/* Product Info Column */}
             <div className="flex w-full items-center gap-3">
@@ -169,7 +170,7 @@ const PurchaseItemRow = memo(({
                             type="number" 
                             min="1"
                             value={item.quantity || ""}
-                            onChange={(e) => onUpdate(item.shopProductId || item.productId, "quantity", e.target.value)}
+                            onChange={(e) => onUpdate(itemKey, "quantity", e.target.value)}
                             className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                         />
                     )}
@@ -190,7 +191,7 @@ const PurchaseItemRow = memo(({
                                 type="number" 
                                 step="0.01"
                                 value={item.costPrice || ""}
-                                onChange={(e) => onUpdate(item.shopProductId || item.productId, "costPrice", e.target.value)}
+                                onChange={(e) => onUpdate(itemKey, "costPrice", e.target.value)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                             />
                         </div>
@@ -347,7 +348,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     () => shops.find((shop) => shop.name === formData.shopName)?.id || "",
     [shops, formData.shopName]
   );
-  const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductId || item.productId, []);
+  const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductId || item.productId || "", []);
 
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return formData.items;
@@ -392,7 +393,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   }, [confirmingDeleteIndex]);
 
   const selectedProductIds = useMemo(() => {
-    return formData.items.map(item => getPurchaseItemKey(item));
+    return formData.items.map(item => getPurchaseItemKey(item)).filter(Boolean);
   }, [formData.items, getPurchaseItemKey]);
 
 
@@ -557,12 +558,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
       selectedProducts.forEach(product => {
         const itemKey = product.shopProductId || product.id;
         const resolvedProductId = product.sourceType === "shopProduct"
-          ? (product.sourceProductId || "")
+          ? (product.sourceProductId || product.productId || null)
           : product.id;
-
-        if (!resolvedProductId) {
-          return;
-        }
 
         // Check against the growing newItems list to prevent duplicates within the same batch
         if (!newItems.some(item => (item.shopProductId || item.productId) === itemKey)) {
@@ -591,7 +588,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   const removeItem = useCallback((itemKey: string) => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.filter(item => (item.shopProductId || item.productId) !== itemKey)
+      items: prev.items.filter(item => getPurchaseItemKey(item) !== itemKey)
     }));
   }, []);
 
@@ -606,7 +603,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   const batchDelete = useCallback(() => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.filter(item => !batchSelected.has(item.shopProductId || item.productId))
+      items: prev.items.filter(item => !batchSelected.has(getPurchaseItemKey(item)))
     }));
     setBatchSelected(new Set());
     setBatchMode(false);
@@ -615,7 +612,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   const updateItem = useCallback((itemKey: string, field: keyof PurchaseOrderItem, value: string | number) => {
     setFormData(prev => {
       const newItems = [...prev.items];
-      const index = newItems.findIndex(item => (item.shopProductId || item.productId) === itemKey);
+      const index = newItems.findIndex(item => getPurchaseItemKey(item) === itemKey);
       if (index === -1) return prev;
       
       let processedValue: string | number = value;
@@ -942,13 +939,13 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const allIds = filteredItems.map(i => i.shopProductId || i.productId);
+                                                        const allIds = filteredItems.map(i => getPurchaseItemKey(i)).filter(Boolean);
                                                         const allSelected = allIds.every(id => batchSelected.has(id));
                                                         setBatchSelected(allSelected ? new Set() : new Set(allIds));
                                                     }}
                                                     className="text-[11px] font-bold text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted/80 transition-all active:scale-95 whitespace-nowrap"
                                                 >
-                                                    {filteredItems.every(i => batchSelected.has(i.shopProductId || i.productId)) ? "取消全选" : "全选"}
+                                                    {filteredItems.every(i => batchSelected.has(getPurchaseItemKey(i))) ? "取消全选" : "全选"}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -1043,14 +1040,14 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
 
                             {filteredItems.map((item) => (
                                 <PurchaseItemRow 
-                                    key={item.shopProductId || item.productId}
+                                    key={getPurchaseItemKey(item)}
                                     item={item}
                                     readOnly={effectiveReadOnly}
                                     products={products}
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
-                                    isChecked={batchMode ? batchSelected.has(item.shopProductId || item.productId) : undefined}
+                                    isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
                                     onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
                                 />
                             ))}

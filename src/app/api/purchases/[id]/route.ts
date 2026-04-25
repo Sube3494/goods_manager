@@ -46,7 +46,7 @@ export async function PUT(
             items: {
               deleteMany: {},
               create: items.map((item: PurchaseOrderItemType) => ({
-                productId: item.productId,
+                productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 supplierId: item.supplierId,
                 quantity: Number(item.quantity) || 0,
@@ -107,7 +107,7 @@ export async function PUT(
                 }
               });
             }
-          } else {
+          } else if (item.productId) {
             const product = await tx.product.findUnique({
               where: { id: item.productId }
             });

@@ -108,7 +108,7 @@ model PurchaseOrder {
 model PurchaseOrderItem {
   id                String        @id @default(cuid())
   purchaseOrderId   String
-  productId         String
+  productId         String?
   shopProductId     String?
   supplierId        String?
   quantity          Int
@@ -116,11 +116,12 @@ model PurchaseOrderItem {
   costPrice         Float
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
-  product           Product       @relation(fields: [productId], references: [id])
+  product           Product?      @relation(fields: [productId], references: [id])
   shopProduct       ShopProduct?  @relation(fields: [shopProductId], references: [id])
   purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   supplier          Supplier?     @relation(fields: [supplierId], references: [id])
 
+  @@index([productId])
   @@index([shopProductId])
 }
 
@@ -142,14 +143,15 @@ model OutboundOrder {
 model OutboundOrderItem {
   id              String        @id @default(cuid())
   outboundOrderId String
-  productId       String
+  productId       String?
   shopProductId   String?
   quantity        Int
   price           Float         @default(0)
   outboundOrder   OutboundOrder @relation(fields: [outboundOrderId], references: [id], onDelete: Cascade)
-  product         Product       @relation(fields: [productId], references: [id])
+  product         Product?      @relation(fields: [productId], references: [id])
   shopProduct     ShopProduct?  @relation(fields: [shopProductId], references: [id])
 
+  @@index([productId])
   @@index([shopProductId])
 }
 
@@ -509,7 +511,7 @@ model Shop {
 model ShopProduct {
   id              String   @id @default(cuid())
   shopId          String
-  productId       String
+  productId       String?
   sku             String?
   productName     String?
   pinyin          String?
@@ -528,7 +530,7 @@ model ShopProduct {
   updatedAt       DateTime @updatedAt
 
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   purchaseOrderItems PurchaseOrderItem[]
   outboundOrderItems OutboundOrderItem[]
 

@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     const normalizedItems = items.map((item: OutboundItem) => {
       const shopProduct = item.shopProductId ? shopProductMap.get(item.shopProductId) : null;
       return {
-        productId: shopProduct?.productId || item.productId,
+        productId: shopProduct?.productId || item.productId || null,
         shopProductId: shopProduct?.id || null,
         quantity: item.quantity,
         price: item.price,
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
           userId: user.id,
           items: {
             create: normalizedItems.map((item) => ({
-              productId: item.productId,
+              productId: item.productId || null,
               shopProductId: item.shopProductId || null,
               quantity: item.quantity,
               price: FinanceMath.add(item.price || 0, 0)
