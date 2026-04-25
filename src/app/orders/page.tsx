@@ -237,9 +237,9 @@ function MetricCard({
   hint: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-black/8 bg-white/80 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/[0.05]">
+    <div className="rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/[0.05]">
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-black tracking-tight text-foreground">{value}</div>
+      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{value}</div>
       <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
@@ -699,6 +699,7 @@ export default function OrdersPage() {
   const [isIntegrationOpen, setIsIntegrationOpen] = useState(false);
   const [isSavingIntegration, setIsSavingIntegration] = useState(false);
   const [isTestingIntegration, setIsTestingIntegration] = useState(false);
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -963,6 +964,36 @@ export default function OrdersPage() {
     }
   };
 
+  const syncOrders = async () => {
+    setIsBulkSyncing(true);
+    try {
+      const targetDate = activeTab === "today"
+        ? todayDate
+        : (endDate || startDate || todayDate);
+      const response = await fetch("/api/orders/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "date",
+          date: targetDate,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || "批量同步失败");
+      }
+
+      showToast(`已同步 ${Number(data?.synced || 0)} 单`, "success");
+      await fetchOrders({ silent: true });
+    } catch (error) {
+      console.error("Failed to sync orders:", error);
+      showToast(error instanceof Error ? error.message : "批量同步失败", "error");
+    } finally {
+      setIsBulkSyncing(false);
+    }
+  };
+
   const filteredOrders = useMemo(() => {
     if (shop === "all") {
       return orders;
@@ -977,72 +1008,78 @@ export default function OrdersPage() {
   return (
     <div className="relative px-2 sm:px-1">
       <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-700 sm:space-y-8">
-        <section className="overflow-hidden rounded-[28px] border border-black/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),rgba(244,244,245,0.82)_48%,rgba(236,253,245,0.72)_100%)] px-4 py-4 shadow-xs dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),rgba(255,255,255,0.04)_45%,rgba(16,185,129,0.05)_100%)] sm:px-5">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="inline-flex items-center rounded-full border border-black/8 bg-white/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground dark:border-white/10 dark:bg-white/[0.05]">
-                Order Center
+        <section className="rounded-[24px] border border-black/8 bg-white/72 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/[0.04] sm:px-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">订单管理</h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {activeTab === "today" ? "聚焦今天待处理订单" : "按时间和状态回看订单"}
+                </p>
               </div>
-              <h1 className="mt-3 text-2xl font-black tracking-tight text-foreground sm:text-3xl">订单管理</h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                这版不再沿用原来那套独立工作台外观，直接回到系统现有页面的版式语言，把筛选、状态、商品和配送动作收进同一层次里。
-              </p>
 
-              <div className="mt-5 flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setActiveTab("today")}
-                  className={cn(
-                    "rounded-full px-4 py-2.5 text-sm font-black transition-all",
-                    activeTab === "today"
-                      ? "bg-foreground text-background shadow-lg dark:bg-white dark:text-black"
-                      : "border border-black/8 bg-white/80 text-foreground hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
-                  )}
+                  onClick={syncOrders}
+                  disabled={isBulkSyncing || isLoading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
-                  今日推单
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("all")}
-                  className={cn(
-                    "rounded-full px-4 py-2.5 text-sm font-black transition-all",
-                    activeTab === "all"
-                      ? "bg-foreground text-background shadow-lg dark:bg-white dark:text-black"
-                      : "border border-black/8 bg-white/80 text-foreground hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
-                  )}
-                >
-                  全部订单
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsIntegrationOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
-                >
-                  <Settings2 size={15} />
-                  对接配置
+                  {isBulkSyncing ? <Loader2 size={15} className="animate-spin" /> : <ArrowUpRight size={15} />}
+                  一键同步
                 </button>
                 <button
                   type="button"
                   onClick={() => fetchOrders()}
                   disabled={isLoading || isRefreshing}
-                  className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="inline-flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   {isLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
                   刷新订单
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsIntegrationOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                >
+                  <Settings2 size={15} />
+                  对接配置
+                </button>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:w-[520px] xl:grid-cols-2">
-              <MetricCard
-                label="当前模式"
-                value={activeTab === "today" ? "今日推单" : "全部订单"}
-                hint={activeTab === "today" ? "仅展示今日订单" : "支持历史时间筛选"}
-              />
+            <div className="inline-flex w-full rounded-xl border border-black/8 bg-black/[0.03] p-1 dark:border-white/10 dark:bg-white/[0.04] sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setActiveTab("today")}
+                className={cn(
+                  "flex-1 rounded-lg px-5 py-2.5 text-sm font-black transition-all sm:min-w-[140px]",
+                  activeTab === "today"
+                    ? "bg-foreground text-background dark:bg-white dark:text-black"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                今日推单
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("all")}
+                className={cn(
+                  "flex-1 rounded-lg px-5 py-2.5 text-sm font-black transition-all sm:min-w-[140px]",
+                  activeTab === "all"
+                    ? "bg-foreground text-background dark:bg-white dark:text-black"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                全部订单
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
               <MetricCard
                 label="当前订单"
                 value={activeTab === "today" ? todayPendingOrders.length : visibleOrders.length}
-                hint={activeTab === "today" ? "仅显示今日待处理" : "当前页筛选结果"}
+                hint={activeTab === "today" ? "今日待处理" : "当前页筛选结果"}
               />
               <MetricCard
                 label="用户实付"
