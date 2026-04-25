@@ -12,6 +12,7 @@ interface AddressItem {
   label: string;
   address: string;
   isDefault: boolean;
+  externalId?: string;
 }
 
 interface User {

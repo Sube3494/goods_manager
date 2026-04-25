@@ -63,6 +63,7 @@ export default function ProfilePage() {
           label: "默认地址",
           address: typedUser.shippingAddress,
           isDefault: true,
+          externalId: "",
         },
       ]);
     }
@@ -91,6 +92,18 @@ export default function ProfilePage() {
   }, [fetchAutoPickKeys]);
 
   const handleSave = async () => {
+    const missingLabel = addressList.find((item) => !String(item.label || "").trim());
+    if (missingLabel) {
+      showToast(`有门店缺少门店简称`, "error");
+      return;
+    }
+
+    const missingExternalId = addressList.find((item) => !String(item.externalId || "").trim());
+    if (missingExternalId) {
+      showToast(`门店“${missingExternalId.label || missingExternalId.address || "未命名地址"}”缺少门店ID`, "error");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch("/api/user/profile", {
@@ -517,7 +530,7 @@ export default function ProfilePage() {
                   <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">收货地址库</h3>
                 </div>
                 <button
-                  onClick={() => setAddressList([...addressList, { id: Math.random().toString(36).substr(2, 9), label: "", address: "", isDefault: addressList.length === 0 }])}
+                  onClick={() => setAddressList([...addressList, { id: Math.random().toString(36).substr(2, 9), label: "", address: "", isDefault: addressList.length === 0, externalId: "" }])}
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/6 px-4 text-sm font-black text-primary transition-all hover:bg-primary/12 active:scale-[0.98] sm:w-auto"
                 >
                   <Plus size={16} />
@@ -543,14 +556,19 @@ export default function ProfilePage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                               <input
                                 type="text"
-                                placeholder="地址标签，例如：总仓 / 南区门店"
+                                placeholder="门店简称（必填）"
+                                required
                                 value={item.label}
                                 onChange={(e) => {
                                   const newList = [...addressList];
                                   newList[index] = { ...newList[index], label: e.target.value };
                                   setAddressList(newList);
                                 }}
-                                className="h-11 min-w-0 flex-1 rounded-2xl border border-border/60 bg-white px-4 text-sm font-bold outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 dark:bg-white/5"
+                                className={`h-11 min-w-0 flex-1 rounded-2xl border bg-white px-4 text-sm font-bold outline-none transition-all focus:ring-4 focus:ring-primary/10 dark:bg-white/5 ${
+                                  String(item.label || "").trim()
+                                    ? "border-border/60 focus:border-primary/40"
+                                    : "border-destructive/35 focus:border-destructive/45"
+                                }`}
                               />
                               <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
                                 <button
@@ -577,6 +595,23 @@ export default function ProfilePage() {
                                 </button>
                               </div>
                             </div>
+
+                            <input
+                              type="text"
+                              placeholder="门店ID（必填）"
+                              required
+                              value={item.externalId || ""}
+                              onChange={(e) => {
+                                const newList = [...addressList];
+                                newList[index] = { ...newList[index], externalId: e.target.value.trim() };
+                                setAddressList(newList);
+                              }}
+                              className={`h-11 w-full rounded-2xl border bg-white px-4 text-sm font-mono outline-none transition-all focus:ring-4 focus:ring-primary/10 dark:bg-white/5 ${
+                                String(item.externalId || "").trim()
+                                  ? "border-border/60 focus:border-primary/40"
+                                  : "border-destructive/35 focus:border-destructive/45"
+                              }`}
+                            />
 
                             <textarea
                               placeholder="详细地址..."

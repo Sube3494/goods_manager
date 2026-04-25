@@ -19,6 +19,7 @@ export interface AddressItem {
   label: string;
   address: string;
   isDefault: boolean;
+  externalId?: string;
   serviceFeeRate?: number;
 }
 
@@ -134,6 +135,7 @@ export interface AutoPickOrder {
   id: string;
   userId: string;
   sourceId: string;
+  shopId?: string | null;
   logisticId?: string | null;
   city?: number | null;
   platform: string;

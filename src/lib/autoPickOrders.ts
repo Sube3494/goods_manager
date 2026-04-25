@@ -13,6 +13,7 @@ export type AutoPickInboundItem = {
 
 export type AutoPickInboundOrder = {
   id?: string;
+  shopId?: string;
   logisticId?: string;
   city?: number;
   platform?: string;
@@ -401,6 +402,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
 
   const normalized: AutoPickInboundOrder = {
     id: String(input.id || "").trim(),
+    shopId: String(input.shopId || input.shop_id || input.storeId || input.store_id || input.merchant_id || "").trim() || undefined,
     logisticId: String(input.logisticId || "").trim(),
     city: Number.isFinite(Number(input.city)) ? Number(input.city) : undefined,
     platform: String(input.platform || "").trim(),
