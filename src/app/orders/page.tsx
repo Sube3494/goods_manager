@@ -502,10 +502,10 @@ function OrderCard({
             />
             <ActionButton
               label="同步"
-              title={terminal ? (cancelled ? "订单已取消，不需要再次同步" : "订单已完成，不需要再次同步") : undefined}
+              title={cancelled ? "订单已取消，不需要再次同步" : undefined}
               icon={actingId === `${order.id}:sync` ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               onClick={() => onRunAction(order.id, "sync")}
-              disabled={Boolean(actingId) || terminal}
+              disabled={Boolean(actingId) || cancelled}
             />
             <ActionButton
               label="自配"
