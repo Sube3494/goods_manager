@@ -43,6 +43,13 @@ function readExpectedIncomeFromRawPayload(rawPayload: unknown) {
   return Number.isFinite(value) ? value : null;
 }
 
+function resolvePlatformCommission(expectedIncome: number | null, actualPaid: number, fallbackCommission: number) {
+  if (Number.isFinite(Number(expectedIncome))) {
+    return Math.round(Number(expectedIncome) - Number(actualPaid || 0));
+  }
+  return Math.round(Number(fallbackCommission || 0));
+}
+
 function readShopAddressFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -220,8 +227,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     const summary = orders.reduce((acc, order) => {
+      const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
+      const platformCommission = resolvePlatformCommission(expectedIncome, order.actualPaid, order.platformCommission);
       acc.actualPaid += order.actualPaid;
-      acc.platformCommission += order.platformCommission;
+      acc.platformCommission += platformCommission;
       acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
       if (order.delivery) {
         acc.deliveryCount += 1;
@@ -325,6 +334,7 @@ export async function GET(request: NextRequest) {
       const matchedShopName = matchShopName(order.shopId, order.shopAddress, order.rawShopName, shippingAddresses);
       return {
         ...order,
+        platformCommission: resolvePlatformCommission(order.expectedIncome, order.actualPaid, order.platformCommission),
         matchedShopName,
         items: order.items.map((item) => {
         const sku = String(item.productNo || "").trim();
