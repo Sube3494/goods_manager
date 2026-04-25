@@ -351,7 +351,6 @@ function OrderCard({
   const cancelled = isCancelledStatus(order.status);
   const terminal = isTerminalStatus(order.status);
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
-  const extraItemCount = Math.max(0, order.items.length - 1);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
@@ -419,50 +418,18 @@ function OrderCard({
       <div className="px-4 py-4 sm:px-5">
         <div className="grid gap-4">
           <div className="rounded-[24px] border border-black/6 bg-black/[0.02] p-4 dark:border-white/8 dark:bg-white/[0.03]">
-            <div className="flex items-start gap-4">
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[18px] bg-white shadow-xs dark:bg-white/[0.06] sm:h-[72px] sm:w-[72px] sm:rounded-[20px]">
-                {firstItem?.image ? (
-                  <Image
-                    src={firstItem.image}
-                    alt={firstItem.name}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
-                    <Package2 size={24} />
-                  </div>
-                )}
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                {order.items.length > 1 ? "商品列表" : "商品"}
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">商品概览</div>
-                <div className="mt-1 line-clamp-2 text-[15px] font-medium leading-snug text-foreground sm:text-base">
-                  {firstItem?.name || "暂无商品信息"}
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium text-muted-foreground">
-                  <span>{firstItem?.sku || "-"}</span>
-                  <span>{firstItem ? `x${firstItem.quantity}` : "x0"}</span>
-                  <span>共 {itemCount} 件商品</span>
-                  {extraItemCount > 0 ? (
-                    <span className="rounded-full border border-dashed border-black/10 bg-black/[0.02] px-2.5 py-1 text-[10px] font-medium text-foreground dark:border-white/10 dark:bg-white/[0.04]">
-                      另有 +{extraItemCount} 件
-                    </span>
-                  ) : null}
-                </div>
-              </div>
+              <div className="text-xs font-medium text-muted-foreground">共 {itemCount} 件商品</div>
             </div>
 
-            {order.items.length > 1 ? (
-              <div className="mt-4 border-t border-black/6 pt-4 dark:border-white/8">
-                <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">商品清单</div>
-                <div className="grid gap-2.5">
-                  {order.items.slice(1).map((item, index) => (
-                    <ProductStripItem key={`${item.productNo || item.productName}-${index}`} item={item} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <div className="mt-3 grid gap-2.5">
+              {order.items.map((item, index) => (
+                <ProductStripItem key={`${item.productNo || item.productName}-${index}`} item={item} />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -711,6 +678,7 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<OrdersTab>("today");
   const [query, setQuery] = useState("");
   const [platform, setPlatform] = useState("all");
+  const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
   const [hasDelivery, setHasDelivery] = useState("all");
   const [startDate, setStartDate] = useState("");
@@ -718,6 +686,7 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [showCompletedToday, setShowCompletedToday] = useState(false);
   const [actingId, setActingId] = useState("");
@@ -770,8 +739,13 @@ export default function OrdersPage() {
     }
   }, [showToast]);
 
-  const fetchOrders = useCallback(async () => {
-    setIsLoading(true);
+  const fetchOrders = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (silent) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
       const params = new URLSearchParams({
         page: String(currentPage),
@@ -805,7 +779,11 @@ export default function OrdersPage() {
       console.error("Failed to fetch orders:", error);
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
     } finally {
-      setIsLoading(false);
+      if (silent) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
     }
   }, [activeTab, currentPage, endDate, hasDelivery, pageSize, platform, query, showToast, startDate, status, todayDate]);
 
@@ -819,7 +797,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, endDate, hasDelivery, platform, query, startDate, status]);
+  }, [activeTab, endDate, hasDelivery, platform, query, shop, startDate, status]);
 
   const tickAutoComplete = useCallback(async () => {
     try {
@@ -831,11 +809,34 @@ export default function OrdersPage() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      tickAutoComplete().then(() => fetchOrders());
+      tickAutoComplete().then(() => fetchOrders({ silent: true }));
     }, 60 * 1000);
 
     return () => clearInterval(timer);
   }, [fetchOrders, tickAutoComplete]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchOrders({ silent: true });
+      }
+    };
+
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchOrders({ silent: true });
+      }
+    }, 5 * 1000);
+
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+    };
+  }, [fetchOrders]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],
@@ -860,6 +861,11 @@ export default function OrdersPage() {
     ];
   }, [statuses]);
 
+  const shopOptions = useMemo(() => {
+    const labels = Array.from(new Set(orders.map((item) => String(item.matchedShopName || "").trim()).filter(Boolean)));
+    return [{ value: "all", label: "全部店铺" }, ...labels.map((label) => ({ value: label, label }))];
+  }, [orders]);
+
   const deliveryOptions = [
     { value: "all", label: "全部配送" },
     { value: "true", label: "已有配送" },
@@ -869,6 +875,7 @@ export default function OrdersPage() {
   const resetFilters = () => {
     setQuery("");
     setPlatform("all");
+    setShop("all");
     setStatus("all");
     setHasDelivery("all");
     setStartDate("");
@@ -897,7 +904,7 @@ export default function OrdersPage() {
             : "已同步最新订单状态",
         "success"
       );
-      fetchOrders();
+      fetchOrders({ silent: true });
     } catch (error) {
       console.error("Order action failed:", error);
       showToast(error instanceof Error ? getOrderActionErrorMessage(error.message) : "操作失败", "error");
@@ -956,10 +963,16 @@ export default function OrdersPage() {
     }
   };
 
-  const todayPendingOrders = useMemo(() => orders.filter((item) => !isTerminalStatus(item.status)), [orders]);
-  const todayCompletedOrders = useMemo(() => orders.filter((item) => isTerminalStatus(item.status)), [orders]);
-  const visibleOrders = activeTab === "today" ? todayPendingOrders : orders;
-  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || status !== "all" || hasDelivery !== "all" || startDate || endDate);
+  const filteredOrders = useMemo(() => {
+    if (shop === "all") {
+      return orders;
+    }
+    return orders.filter((item) => String(item.matchedShopName || "").trim() === shop);
+  }, [orders, shop]);
+  const todayPendingOrders = useMemo(() => filteredOrders.filter((item) => !isTerminalStatus(item.status)), [filteredOrders]);
+  const todayCompletedOrders = useMemo(() => filteredOrders.filter((item) => isTerminalStatus(item.status)), [filteredOrders]);
+  const visibleOrders = activeTab === "today" ? todayPendingOrders : filteredOrders;
+  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || hasDelivery !== "all" || startDate || endDate);
 
   return (
     <div className="relative px-2 sm:px-1">
@@ -1010,8 +1023,8 @@ export default function OrdersPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={fetchOrders}
-                  disabled={isLoading}
+                  onClick={() => fetchOrders()}
+                  disabled={isLoading || isRefreshing}
                   className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   {isLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
@@ -1024,12 +1037,12 @@ export default function OrdersPage() {
               <MetricCard
                 label="当前模式"
                 value={activeTab === "today" ? "今日推单" : "全部订单"}
-                hint={activeTab === "today" ? `固定日期 ${todayDate}` : "支持历史时间筛选"}
+                hint={activeTab === "today" ? "仅展示今日订单" : "支持历史时间筛选"}
               />
               <MetricCard
                 label="当前订单"
-                value={activeTab === "today" ? todayPendingOrders.length : meta.total}
-                hint={activeTab === "today" ? "仅显示今日待处理" : "当前筛选结果总数"}
+                value={activeTab === "today" ? todayPendingOrders.length : visibleOrders.length}
+                hint={activeTab === "today" ? "仅显示今日待处理" : "当前页筛选结果"}
               />
               <MetricCard
                 label="用户实付"
@@ -1064,7 +1077,7 @@ export default function OrdersPage() {
               ) : null}
             </div>
 
-            <div className={cn("grid gap-3", activeTab === "today" ? "lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_220px]" : "lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]")}>
+            <div className={cn("grid gap-3", activeTab === "today" ? "lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]" : "lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]")}>
               <label className="flex h-11 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]">
                 <Search size={16} className="text-muted-foreground" />
                 <input
@@ -1090,6 +1103,13 @@ export default function OrdersPage() {
                 triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
               />
               <CustomSelect
+                value={shop}
+                onChange={setShop}
+                options={shopOptions}
+                className="h-11"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              />
+              <CustomSelect
                 value={hasDelivery}
                 onChange={setHasDelivery}
                 options={deliveryOptions}
@@ -1097,11 +1117,7 @@ export default function OrdersPage() {
                 triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
               />
 
-              {activeTab === "today" ? (
-                <div className="flex h-11 items-center rounded-xl border border-black/8 bg-white px-4 text-xs font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.03]">
-                  今日视图固定为 {todayDate}
-                </div>
-              ) : (
+              {activeTab === "today" ? null : (
                 <>
                   <DatePicker
                     value={startDate}
@@ -1181,12 +1197,12 @@ export default function OrdersPage() {
             </section>
           ) : null}
 
-          {!isLoading && orders.length === 0 ? (
+          {!isLoading && visibleOrders.length === 0 ? (
             <div className="rounded-[28px] border border-black/8 bg-white/76 py-8 dark:border-white/10 dark:bg-white/[0.04]">
               <EmptyState
                 icon={<Package2 size={56} strokeWidth={1.5} className="text-muted-foreground/25" />}
-                title="当前还没有订单"
-                description="检查 auto-pick 插件连接和回调地址；来单后这里会按系统页面风格自动汇总展示。"
+                title="当前没有匹配订单"
+                description="可以换个筛选条件试试；如果本该有数据，再检查 auto-pick 插件连接和回调地址。"
               />
             </div>
           ) : null}
