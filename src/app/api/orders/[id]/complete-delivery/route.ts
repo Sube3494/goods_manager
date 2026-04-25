@@ -52,10 +52,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     if (result.ok) {
       await prisma.autoPickOrder.update({
         where: { id: order.id },
-        data: { autoCompleteAt: null },
+        data: {
+          status: "已完成",
+          autoCompleteAt: null,
+          lastSyncedAt: new Date(),
+        },
       });
 
-      await refreshAutoPickOrderFromPlugin(session.id, {
+      void refreshAutoPickOrderFromPlugin(session.id, {
         id: order.sourceId,
         platform: order.platform,
         orderNo: order.orderNo,
