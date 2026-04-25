@@ -497,8 +497,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
     const sourceId = normalized.id || existing?.sourceId || "";
     const logisticId = normalized.logisticId || existing?.logisticId || null;
-    const status = normalized.status || existing?.status || null;
-    const deliveryDeadline = normalized.deliveryDeadline || existing?.deliveryDeadline || null;
+    const shouldKeepTerminalStatus = isTerminalStatus(existing?.status) && !isTerminalStatus(normalized.status);
+    const status = shouldKeepTerminalStatus
+      ? existing?.status || null
+      : normalized.status || existing?.status || null;
+    const deliveryDeadline = shouldKeepTerminalStatus
+      ? existing?.deliveryDeadline || normalized.deliveryDeadline || null
+      : normalized.deliveryDeadline || existing?.deliveryDeadline || null;
     const nextDeliveryValue = normalized.delivery
       ? asPrismaJsonValue(normalized.delivery)
       : hasDeliveryValue(existing?.delivery)
@@ -652,6 +657,19 @@ function hasDeliveryValue(value: unknown) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0);
 }
 
+function isCancelledStatus(status?: string | null) {
+  const text = String(status || "").trim();
+  return text.includes("取消") || text.includes("退款") || text.includes("关闭");
+}
+
+function isCompletedStatus(status?: string | null) {
+  return String(status || "").trim().includes("已完成");
+}
+
+function isTerminalStatus(status?: string | null) {
+  return isCompletedStatus(status) || isCancelledStatus(status);
+}
+
 export async function applyAutoPickProgress(userId: string, payload: unknown) {
   const progress = normalizeAutoPickProgressPayload(payload);
   if (!progress) {
@@ -671,6 +689,17 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
 
   if (!order) {
     throw new Error("Order not found");
+  }
+
+  if (isTerminalStatus(order.status)) {
+    return await prisma.autoPickOrder.findUniqueOrThrow({
+      where: { id: order.id },
+      include: {
+        items: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
   }
 
   const nextRawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)

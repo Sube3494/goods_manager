@@ -22,6 +22,7 @@ export async function POST(_: NextRequest) {
         lte: now,
       },
       NOT: [
+        { status: { contains: "已完成" } },
         { status: { contains: "取消" } },
         { status: { contains: "退款" } },
         { status: { contains: "关闭" } },
