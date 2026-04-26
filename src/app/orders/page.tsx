@@ -245,6 +245,23 @@ function formatDistanceKm(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} km` : "-";
 }
 
+function formatCompactDateTime(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+
+  const date = new Date(text);
+  if (!Number.isNaN(date.getTime())) {
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+    const hours = `${date.getHours()}`.padStart(2, "0");
+    const minutes = `${date.getMinutes()}`.padStart(2, "0");
+    return `${month}-${day} ${hours}:${minutes}`;
+  }
+
+  const match = text.match(/(\d{2}-\d{2}\s+\d{2}:\d{2}|\d{2}:\d{2})/);
+  return match?.[1] || text;
+}
+
 function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange">) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
@@ -303,11 +320,34 @@ function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "statu
   );
 }
 
-function InfoPair({ label, value }: { label: string; value: string }) {
+function DetailStat({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
-      <span className="max-w-[65%] text-right text-sm font-medium text-foreground">{value}</span>
+    <div className="rounded-2xl border border-black/6 bg-black/[0.02] px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.03]">
+      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 text-sm font-semibold text-foreground", valueClassName)}>{value}</div>
+    </div>
+  );
+}
+
+function DetailBlock({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-black/6 bg-black/[0.02] px-3 py-3 dark:border-white/8 dark:bg-white/[0.03]">
+      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="mt-1.5 break-words text-sm font-medium leading-5 text-foreground">{value}</div>
     </div>
   );
 }
@@ -316,8 +356,8 @@ function ProductStripItem({ item }: { item: AutoPickOrderItem }) {
   const display = getOrderItemDisplay(item);
 
   return (
-    <div className="flex items-center gap-3 rounded-[18px] border border-black/6 bg-white/70 px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.04]">
-      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white dark:bg-white/[0.06]">
+    <div className="flex items-center gap-2.5 rounded-[16px] border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/[0.04] sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
+      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/[0.06] sm:h-11 sm:w-11 sm:rounded-xl">
         {display.image ? (
           <Image
             src={display.image}
@@ -334,8 +374,10 @@ function ProductStripItem({ item }: { item: AutoPickOrderItem }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">{display.name}</div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
+        <div className="line-clamp-2 break-words text-[13px] font-medium leading-4.5 text-foreground sm:text-sm sm:leading-5 sm:line-clamp-1">
+          {display.name}
+        </div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1">
           <span>{display.sku}</span>
           <span>x{display.quantity}</span>
         </div>
@@ -351,6 +393,7 @@ function ActionButton({
   disabled,
   variant = "default",
   title,
+  mobileIconOnly = false,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -358,6 +401,7 @@ function ActionButton({
   disabled?: boolean;
   variant?: "default" | "primary";
   title?: string;
+  mobileIconOnly?: boolean;
 }) {
   return (
     <button
@@ -366,14 +410,15 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-2xl px-3 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:gap-2 sm:px-4",
+        mobileIconOnly && "aspect-square px-0 sm:aspect-auto sm:px-4",
         variant === "primary"
           ? "bg-foreground text-background hover:opacity-90 dark:bg-white dark:text-black"
           : "border border-black/8 bg-white/85 text-foreground hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
       )}
     >
       {icon}
-      {label}
+      <span className={cn(mobileIconOnly ? "sr-only sm:not-sr-only sm:inline" : "")}>{label}</span>
     </button>
   );
 }
@@ -404,14 +449,16 @@ function OrderCard({
   const sourceLabel = getOrderSourceLabel(order);
   const deadlineDisplay = getDeadlineDisplay(order);
   const autoCompleteFailed = hasAutoCompleteFailure(order);
+  const compactCompletedAt = formatCompactDateTime(order.completedAt);
+  const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
   return (
-    <article className="overflow-hidden rounded-[30px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04]">
-      <div className="border-b border-black/6 px-4 py-4 dark:border-white/6 sm:px-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <article className="overflow-hidden rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[30px]">
+      <div className="border-b border-black/6 px-3.5 py-3.5 dark:border-white/6 sm:px-5 sm:py-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5 sm:gap-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black/8 bg-black/[0.03] pl-2 pr-2.5 text-foreground dark:border-white/10 dark:bg-white/[0.04]">
                     <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden">
                       <Image
@@ -426,41 +473,70 @@ function OrderCard({
                     <span className="pr-0.5 text-[15px] font-semibold leading-none tracking-tight">#{order.dailyPlatformSequence || 0}</span>
                   </span>
                   {sourceLabel ? (
-                    <span className="inline-flex h-8 items-center rounded-full border border-black/8 bg-black/[0.03] px-2.5 text-[13px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
-                      {sourceLabel}
+                    <span className="inline-flex h-8 min-w-0 max-w-[calc(100vw-11rem)] items-center rounded-full border border-black/8 bg-black/[0.03] px-2.5 text-[13px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] sm:max-w-[220px]">
+                      <span className="truncate">{sourceLabel}</span>
                     </span>
                   ) : null}
                   {subscribe ? (
-                    <span className="inline-flex h-8 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2.5 text-[13px] font-medium text-violet-700 dark:text-violet-400">
+                    <span className="inline-flex h-8 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2.5 text-[13px] font-medium leading-none text-violet-700 dark:text-violet-400">
                       预约单
                     </span>
                   ) : null}
                   <StatusBadge order={order} />
                 </div>
+              </div>
 
-                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-                  <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
-                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
-                    <span className="text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="w-full rounded-[18px] border border-black/8 bg-black/[0.02] px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03] sm:hidden">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</div>
+                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</div>
+                    </div>
+                    <div className="min-w-0 text-right">
+                      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</div>
+                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
+                    </div>
+                    <div className="col-span-2 flex min-w-0 items-center justify-between border-t border-black/6 pt-2 dark:border-white/8">
+                      <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
+                    </div>
                   </div>
-                  <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
-                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
-                    <span className="text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
+                </div>
+
+                <div className="hidden w-full grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
+                  <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
+                    <span className="truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
                   </div>
-                  <div className="inline-flex h-9 items-center gap-2 rounded-full border border-black/8 bg-black/[0.02] px-3 dark:border-white/10 dark:bg-white/[0.03]">
-                    <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
-                    <span className="text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
+                  <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
+                    <span className="truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
+                  </div>
+                  <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] sm:col-span-1 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
+                    <span className="truncate text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
                   </div>
                 </div>
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs font-medium text-muted-foreground sm:hidden">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <Clock3 size={12} className="shrink-0" />
+                    <span className="truncate">{formatLocalDateTime(order.orderTime)}</span>
+                  </span>
+                  <span className="inline-flex min-w-0 items-center justify-end gap-1.5 text-right">
+                    <MapPin size={12} className="shrink-0" />
+                    <span className="truncate">{pickup ? "到店自取" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
+                  <span className="hidden sm:inline-flex sm:items-center sm:gap-1.5">
                     <Clock3 size={13} />
                     {formatLocalDateTime(order.orderTime)}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="hidden sm:inline-flex sm:items-center sm:gap-1.5">
                     <MapPin size={13} />
                     {pickup ? "到店自取" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}
                   </span>
@@ -471,9 +547,9 @@ function OrderCard({
         </div>
       </div>
 
-      <div className="px-4 py-4 sm:px-5">
-        <div className="grid gap-4">
-          <div className="rounded-[24px] border border-black/6 bg-black/[0.02] p-4 dark:border-white/8 dark:bg-white/[0.03]">
+      <div className="px-3.5 py-3 sm:px-5 sm:py-4">
+        <div className="grid gap-3">
+          <div className="rounded-[18px] border border-black/6 bg-black/[0.02] p-2.5 dark:border-white/8 dark:bg-white/[0.03] sm:rounded-[24px] sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
                 {order.items.length > 1 ? "商品列表" : "商品"}
@@ -481,7 +557,7 @@ function OrderCard({
               <div className="text-xs font-medium text-muted-foreground">共 {itemCount} 件商品</div>
             </div>
 
-            <div className="mt-3 grid gap-2.5">
+            <div className="mt-2 grid gap-1.5 sm:mt-2.5 sm:gap-2">
               {order.items.map((item, index) => (
                 <ProductStripItem key={`${item.productNo || item.productName}-${index}`} item={item} />
               ))}
@@ -489,47 +565,57 @@ function OrderCard({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 border-t border-black/6 pt-4 dark:border-white/6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-2.5 flex flex-col gap-2 border-t border-black/6 pt-2.5 dark:border-white/6 lg:flex-row lg:items-center lg:justify-between lg:pt-4">
+          <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
             {completed ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <CheckCheck size={12} />
-                {order.completedAt
-                  ? `${formatLocalDateTime(order.completedAt)} ${pickup ? "已自提" : "已完成"}`
-                  : pickup ? "已自提" : "订单已完成"}
+                {order.completedAt ? (
+                  <>
+                    <span className="truncate sm:hidden">{`${compactCompletedAt} ${pickup ? "自提" : "完成"}`}</span>
+                    <span className="hidden sm:inline">{`${formatLocalDateTime(order.completedAt)} ${pickup ? "已自提" : "已完成"}`}</span>
+                  </>
+                ) : pickup ? "已自提" : "订单已完成"}
               </span>
             ) : null}
             {cancelled ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-slate-500/15 bg-slate-500/10 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-500/15 bg-slate-500/10 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <X size={12} />
                 订单已取消
               </span>
             ) : null}
             {!terminal && order.autoCompleteAt ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/15 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <TimerReset size={12} />
                 预计自动完成 {formatLocalDateTime(order.autoCompleteAt)}
               </span>
             ) : null}
             {autoCompleteFailed ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-rose-500/15 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-700 dark:text-rose-400">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-700 dark:text-rose-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <X size={12} />
                 自动完成失败
               </span>
             ) : null}
             {deadlineDisplay !== "-" ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-black/8 bg-white/85 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <Clock3 size={12} />
-                {pickup ? `取货时间 ${deadlineDisplay}` : subscribe ? `预约送达 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
+                <span className="sm:hidden">
+                  <span className="truncate">{pickup ? `取货 ${compactDeadlineDisplay}` : subscribe ? `预约 ${compactDeadlineDisplay}` : `最晚 ${compactDeadlineDisplay}`}</span>
+                </span>
+                <span className="hidden sm:inline">
+                  {pickup ? `取货时间 ${deadlineDisplay}` : subscribe ? `预约送达 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
+                </span>
               </span>
             ) : null}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 lg:min-w-[440px]">
             <ActionButton
               label={expanded ? "收起详情" : "展开详情"}
               icon={expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               onClick={() => onToggleExpanded(order.id)}
+              mobileIconOnly
+              title={expanded ? "收起详情" : "展开详情"}
             />
             <ActionButton
               label="同步"
@@ -537,12 +623,14 @@ function OrderCard({
               icon={actingId === `${order.id}:sync` ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               onClick={() => onRunAction(order.id, "sync")}
               disabled={Boolean(actingId) || cancelled}
+              mobileIconOnly
             />
             <ActionButton
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
               disabled={Boolean(actingId) || terminal || delivering || pickup}
+              mobileIconOnly
               title={
                 pickup
                   ? "到店自取订单不需要发起自配送"
@@ -559,6 +647,7 @@ function OrderCard({
               icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
               onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
               disabled={Boolean(actingId) || terminal}
+              mobileIconOnly
               title={
                 pickup
                   ? (terminal ? (cancelled ? "订单已取消，不能完成自提" : "订单已自提，不能重复完成自提") : undefined)
@@ -572,48 +661,60 @@ function OrderCard({
       </div>
 
       {expanded ? (
-        <div className="border-t border-black/6 bg-zinc-50/60 px-4 py-5 dark:border-white/6 dark:bg-white/[0.025] sm:px-5">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
-              <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">系统信息</h3>
-              <div className="space-y-3">
-                <InfoPair label="订单编号" value={order.orderNo} />
-                <InfoPair label="原始 ID" value={order.sourceId} />
-                <InfoPair label="订单状态" value={getDisplayStatus(order)} />
-                <InfoPair label="系统门店" value={order.matchedShopName || "-"} />
-                <InfoPair label="门店地址" value={order.rawShopAddress || order.shopAddress || "-"} />
-                <InfoPair label="履约方式" value={pickup ? "到店自取" : "配送上门"} />
-                <InfoPair label="配送地址" value={pickup ? "-" : order.userAddress} />
-                <InfoPair label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
-                <InfoPair label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
-                <InfoPair label={pickup ? "取货时间区间" : subscribe ? "预约送达" : "最晚送达"} value={deadlineDisplay} />
+        <div className="border-t border-black/6 bg-zinc-50/60 px-3.5 py-4 dark:border-white/6 dark:bg-white/[0.025] sm:px-5 sm:py-5">
+          <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/[0.04] sm:rounded-[24px] sm:p-4">
+              <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-4">系统信息</h3>
+              <div className="grid grid-cols-2 gap-2.5">
+                <DetailStat label="订单状态" value={getDisplayStatus(order)} />
+                <DetailStat label="履约方式" value={pickup ? "到店自取" : "配送上门"} />
+                <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
+                <DetailStat label={pickup ? "取货时间" : subscribe ? "预约送达" : "最晚送达"} value={deadlineDisplay} />
+              </div>
+              <div className="mt-2.5 space-y-2.5">
+                <DetailBlock label="系统门店" value={order.matchedShopName || "-"} />
+                <DetailBlock label="门店地址" value={order.rawShopAddress || order.shopAddress || "-"} />
+                <DetailBlock label="配送地址" value={pickup ? "-" : order.userAddress} />
+                <DetailBlock label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
+                <div className="space-y-2.5">
+                  <DetailStat label="订单编号" value={order.orderNo} valueClassName="break-all text-[13px] sm:text-sm" />
+                  <DetailStat label="原始 ID" value={order.sourceId} valueClassName="break-all text-[13px] sm:text-sm" />
+                </div>
                 {autoCompleteFailed ? (
-                  <>
-                    <InfoPair label="自动完成任务" value="失败" />
-                    <InfoPair label="失败次数" value={String(order.autoCompleteJobAttempts || 0)} />
-                    <InfoPair label="失败原因" value={order.autoCompleteJobError || "-"} />
-                  </>
+                  <div className="rounded-2xl border border-rose-500/15 bg-rose-500/8 px-3 py-3 dark:bg-rose-500/[0.08]">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <DetailStat label="自动完成任务" value="失败" />
+                      <DetailStat label="失败次数" value={String(order.autoCompleteJobAttempts || 0)} />
+                    </div>
+                    <div className="mt-2.5">
+                      <DetailBlock label="失败原因" value={order.autoCompleteJobError || "-"} />
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </section>
 
             <div className="space-y-4">
-              <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
-                <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">金额信息</h3>
-                <div className="space-y-3">
-                  <InfoPair label="顾客实付" value={toCurrency(order.actualPaid)} />
-                  <InfoPair label="预计到手" value={toCurrency(expectedIncome)} />
-                  <InfoPair label={commissionDisplay.label} value={commissionDisplay.value} />
+              <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/[0.04] sm:rounded-[24px] sm:p-4">
+                <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-4">金额信息</h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
+                  <DetailStat label="预计到手" value={toCurrency(expectedIncome)} />
+                  <div className="col-span-2">
+                    <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
+                  </div>
                 </div>
               </section>
-              <section className="rounded-[24px] border border-black/6 bg-white/80 p-4 dark:border-white/8 dark:bg-white/[0.04]">
-                <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">物流信息</h3>
-                <div className="space-y-3">
-                  <InfoPair label="物流平台" value={order.delivery?.logisticName || "第三方平台"} />
-                  <InfoPair label="配送人" value={order.delivery?.riderName || "-"} />
-                  <InfoPair label="轨迹" value={order.delivery?.track || "暂无轨迹"} />
-                  <InfoPair label="取餐时间" value={order.delivery?.pickupTime || "-"} />
-                  <InfoPair label="配送费" value={order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"} />
+              <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/[0.04] sm:rounded-[24px] sm:p-4">
+                <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-4">物流信息</h3>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <DetailStat label="物流平台" value={order.delivery?.logisticName || "第三方平台"} />
+                  <DetailStat label="配送人" value={order.delivery?.riderName || "-"} />
+                  <DetailStat label="取餐时间" value={order.delivery?.pickupTime || "-"} />
+                  <DetailStat label="配送费" value={order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"} />
+                </div>
+                <div className="mt-2.5">
+                  <DetailBlock label="轨迹" value={order.delivery?.track || "暂无轨迹"} />
                 </div>
               </section>
 
