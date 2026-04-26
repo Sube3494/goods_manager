@@ -75,12 +75,18 @@ export async function GET(request: NextRequest) {
     });
 
     const existingByName = new Map(existingShops.map((shop) => [shop.name.trim(), shop]));
+    const existingByExternalId = new Map(
+      existingShops
+        .map((shop) => [normalizeExternalId(shop.externalId), shop] as const)
+        .filter(([externalId]) => Boolean(externalId))
+    );
     const createdShops: typeof existingShops = [];
 
     for (const addr of normalizedAddresses) {
-      const existing = existingByName.get(addr.name);
+      const existing = (addr.externalId ? existingByExternalId.get(addr.externalId) : null) || existingByName.get(addr.name);
       if (existing) {
         const shouldUpdate =
+          String(existing.name || "").trim() !== addr.name ||
           String(existing.address || "").trim() !== addr.address ||
           String(existing.externalId || "").trim() !== String(addr.externalId || "").trim() ||
           !sameNullableNumber(existing.longitude, addr.longitude) ||
@@ -90,6 +96,7 @@ export async function GET(request: NextRequest) {
           const updated = await prisma.shop.update({
             where: { id: existing.id },
             data: {
+              name: addr.name,
               address: addr.address,
               externalId: addr.externalId || null,
               longitude: addr.longitude,
@@ -97,6 +104,9 @@ export async function GET(request: NextRequest) {
             },
           });
           existingByName.set(updated.name.trim(), updated);
+          if (addr.externalId) {
+            existingByExternalId.set(addr.externalId, updated);
+          }
         }
         continue;
       }
@@ -115,6 +125,9 @@ export async function GET(request: NextRequest) {
       });
 
       existingByName.set(created.name.trim(), created);
+      if (addr.externalId) {
+        existingByExternalId.set(addr.externalId, created);
+      }
       createdShops.push(created);
     }
 
