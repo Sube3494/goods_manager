@@ -59,6 +59,11 @@ function isJDPlatform(platform: string | null | undefined) {
   return String(platform || "").includes("京东");
 }
 
+function shouldPreferAddressMatch(platform: string | null | undefined) {
+  const text = String(platform || "").trim();
+  return text.includes("京东") || text.includes("淘宝");
+}
+
 function resolveIncomeMetrics(
   platform: string | null | undefined,
   expectedIncome: number | null,
@@ -213,57 +218,73 @@ function normalizeShopAddressForMatch(value: string | null | undefined) {
     .toLowerCase();
 }
 
-function matchShopName(rawShopName: string | null, rawShopAddress: string | null, shippingAddresses: ShippingAddress[]) {
+function matchShopName(
+  platform: string | null | undefined,
+  rawShopName: string | null,
+  rawShopAddress: string | null,
+  shippingAddresses: ShippingAddress[]
+) {
   const normalizedRawShopName = toNormalizedText(rawShopName);
   const looseRawShopName = toLooseNormalizedText(rawShopName);
   const normalizedShopAddress = normalizeShopAddressForMatch(rawShopAddress);
+  const preferAddressMatch = shouldPreferAddressMatch(platform);
 
-  if (looseRawShopName) {
-    const matchedByShopName = shippingAddresses.find((addr) => {
-      const label = String(addr.label || "").trim();
-      const coreLabel = stripShopSuffix(label);
-      const looseLabel = toLooseNormalizedText(label);
-      const looseCoreLabel = toLooseNormalizedText(coreLabel);
-      return Boolean(
-        (looseLabel && (looseRawShopName.includes(looseLabel) || looseLabel.includes(looseRawShopName))) ||
-        (looseCoreLabel && (looseRawShopName.includes(looseCoreLabel) || looseCoreLabel.includes(looseRawShopName)))
-      );
-    });
+  const matchByShopName = () => {
+    if (looseRawShopName) {
+      const matchedByShopName = shippingAddresses.find((addr) => {
+        const label = String(addr.label || "").trim();
+        const coreLabel = stripShopSuffix(label);
+        const looseLabel = toLooseNormalizedText(label);
+        const looseCoreLabel = toLooseNormalizedText(coreLabel);
+        return Boolean(
+          (looseLabel && (looseRawShopName.includes(looseLabel) || looseLabel.includes(looseRawShopName))) ||
+          (looseCoreLabel && (looseRawShopName.includes(looseCoreLabel) || looseLabel.includes(looseRawShopName)))
+        );
+      });
 
-    if (matchedByShopName?.label) {
-      return String(matchedByShopName.label).trim();
+      if (matchedByShopName?.label) {
+        return String(matchedByShopName.label).trim();
+      }
     }
-  }
 
-  if (normalizedRawShopName) {
-    const matchedByNormalizedShopName = shippingAddresses.find((addr) => {
-      const label = String(addr.label || "").trim();
-      const normalizedLabel = toNormalizedText(label);
-      const normalizedCoreLabel = toNormalizedText(stripShopSuffix(label));
-      return Boolean(
-        (normalizedLabel && (normalizedRawShopName.includes(normalizedLabel) || normalizedLabel.includes(normalizedRawShopName))) ||
-        (normalizedCoreLabel && (normalizedRawShopName.includes(normalizedCoreLabel) || normalizedCoreLabel.includes(normalizedRawShopName)))
-      );
-    });
+    if (normalizedRawShopName) {
+      const matchedByNormalizedShopName = shippingAddresses.find((addr) => {
+        const label = String(addr.label || "").trim();
+        const normalizedLabel = toNormalizedText(label);
+        const normalizedCoreLabel = toNormalizedText(stripShopSuffix(label));
+        return Boolean(
+          (normalizedLabel && (normalizedRawShopName.includes(normalizedLabel) || normalizedLabel.includes(normalizedRawShopName))) ||
+          (normalizedCoreLabel && (normalizedRawShopName.includes(normalizedCoreLabel) || normalizedCoreLabel.includes(normalizedRawShopName)))
+        );
+      });
 
-    if (matchedByNormalizedShopName?.label) {
-      return String(matchedByNormalizedShopName.label).trim();
+      if (matchedByNormalizedShopName?.label) {
+        return String(matchedByNormalizedShopName.label).trim();
+      }
     }
-  }
 
-  if (!normalizedShopAddress) {
     return null;
-  }
+  };
 
-  const matchedByAddress = shippingAddresses.find((addr) => {
-    const detailAddress = normalizeShopAddressForMatch(getAddressDetail(addr));
-    if (!detailAddress || !normalizedShopAddress) {
-      return false;
+  const matchByAddress = () => {
+    if (!normalizedShopAddress) {
+      return null;
     }
-    return detailAddress.includes(normalizedShopAddress) || normalizedShopAddress.includes(detailAddress);
-  });
 
-  return matchedByAddress?.label ? String(matchedByAddress.label).trim() : null;
+    const matchedByAddress = shippingAddresses.find((addr) => {
+      const detailAddress = normalizeShopAddressForMatch(getAddressDetail(addr));
+      if (!detailAddress || !normalizedShopAddress) {
+        return false;
+      }
+      return detailAddress.includes(normalizedShopAddress) || normalizedShopAddress.includes(detailAddress);
+    });
+
+    return matchedByAddress?.label ? String(matchedByAddress.label).trim() : null;
+  };
+
+  return preferAddressMatch
+    ? (matchByAddress() || matchByShopName())
+    : (matchByShopName() || matchByAddress());
 }
 
 export async function GET(request: NextRequest) {
@@ -497,7 +518,7 @@ export async function GET(request: NextRequest) {
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
       };
     }).map((order) => {
-      const matchedShopName = matchShopName(order.rawShopName, order.rawShopAddress, shippingAddresses);
+      const matchedShopName = matchShopName(order.platform, order.rawShopName, order.rawShopAddress, shippingAddresses);
 
       return {
         ...order,
