@@ -122,6 +122,21 @@ function readShopNameFromRawPayload(rawPayload: unknown) {
   return null;
 }
 
+function readDeliveryTimeRangeFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const value = String(
+    record.deliveryTimeRange
+    || record.delivery_time_range
+    || record.delivery_time_format
+    || record.deliveryTimeFormat
+    || ""
+  ).trim();
+  return value || null;
+}
+
 function isPickupOrder(rawPayload: unknown, userAddress?: string | null) {
   const candidates = [userAddress];
 
@@ -374,14 +389,15 @@ export async function GET(request: NextRequest) {
       const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
       const pickup = isPickupOrder(order.rawPayload, order.userAddress);
       return {
-      ...order,
-      shopId: readShopIdFromRawPayload(order.rawPayload),
-      shopAddress: readShopAddressFromRawPayload(order.rawPayload),
-      rawShopName: readShopNameFromRawPayload(order.rawPayload),
-      isPickup: pickup,
-      expectedIncome: metrics.expectedIncome,
-      platformCommission: metrics.platformCommission,
-    };
+        ...order,
+        shopId: readShopIdFromRawPayload(order.rawPayload),
+        shopAddress: readShopAddressFromRawPayload(order.rawPayload),
+        rawShopName: readShopNameFromRawPayload(order.rawPayload),
+        deliveryTimeRange: readDeliveryTimeRangeFromRawPayload(order.rawPayload),
+        isPickup: pickup,
+        expectedIncome: metrics.expectedIncome,
+        platformCommission: metrics.platformCommission,
+      };
     }).map((order) => {
       const matchedShopName = matchShopName(order.shopId, order.shopAddress, order.rawShopName, shippingAddresses);
 

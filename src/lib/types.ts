@@ -157,6 +157,7 @@ export interface AutoPickOrder {
   latitude?: number | null;
   status?: string | null;
   deliveryDeadline?: string | null;
+  deliveryTimeRange?: string | null;
   distanceKm?: number | null;
   distanceIsLinear: boolean;
   actualPaid: number;

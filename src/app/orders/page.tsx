@@ -257,8 +257,10 @@ function formatDistanceKm(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} km` : "-";
 }
 
-function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline">) {
-  const text = String(order.deliveryDeadline || "").trim();
+function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange">) {
+  const deadlineText = String(order.deliveryDeadline || "").trim();
+  const rangeText = String(order.deliveryTimeRange || "").trim();
+  const text = order.isPickup ? (rangeText || deadlineText) : deadlineText;
   if (!text) {
     return "-";
   }

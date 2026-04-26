@@ -27,6 +27,7 @@ export type AutoPickInboundOrder = {
   latitude?: number;
   status?: string;
   deliveryDeadline?: string;
+  deliveryTimeRange?: string;
   distanceKm?: number;
   distanceIsLinear?: boolean;
   actualPaid?: number;
@@ -98,15 +99,6 @@ function looksLikeDeliveryTimeRange(value: unknown) {
 
 function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
   const directDeadline = String(input.deliveryDeadline || input.delivery_deadline || "").trim();
-  const rangeText = String(input.delivery_time_format || input.deliveryTimeFormat || "").trim();
-  if (rangeText) {
-    return rangeText;
-  }
-
-  if (looksLikeDeliveryTimeRange(directDeadline)) {
-    return directDeadline;
-  }
-
   const startTimestamp = Number(input.delivery_time || input.deliveryTime || 0);
   const endTimestamp = Number(input.delivery_end || input.deliveryEnd || 0);
 
@@ -118,21 +110,16 @@ function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
     : null;
 
   if (startAt && endAt) {
-    const sameDay = startAt.getFullYear() === endAt.getFullYear()
-      && startAt.getMonth() === endAt.getMonth()
-      && startAt.getDate() === endAt.getDate();
-
-    if (sameDay) {
-      const endHours = String(endAt.getHours()).padStart(2, "0");
-      const endMinutes = String(endAt.getMinutes()).padStart(2, "0");
-      return `${formatDeadlineSegment(startAt)}-${endHours}:${endMinutes}`;
-    }
-
-    return `${formatDeadlineSegment(startAt)} - ${formatDeadlineSegment(endAt)}`;
+    return formatDeadlineSegment(startAt);
   }
 
   if (startAt) {
     return formatDeadlineSegment(startAt);
+  }
+
+  if (looksLikeDeliveryTimeRange(directDeadline)) {
+    const firstTimeMatch = directDeadline.match(/^(.*?\d{1,2}:\d{2})/);
+    return firstTimeMatch?.[1]?.trim() || directDeadline;
   }
 
   if (endAt) {
@@ -140,6 +127,17 @@ function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
   }
 
   return undefined;
+}
+
+function resolveAutoPickDeliveryTimeRange(input: Record<string, unknown>) {
+  const rangeText = String(
+    input.deliveryTimeRange
+    || input.delivery_time_range
+    || input.delivery_time_format
+    || input.deliveryTimeFormat
+    || ""
+  ).trim();
+  return rangeText || undefined;
 }
 
 function asPrismaJsonValue<T>(value: T): Prisma.InputJsonValue {
@@ -475,6 +473,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     latitude: Number.isFinite(Number(input.latitude)) ? Number(input.latitude) : undefined,
     status: String(input.status || "").trim() || undefined,
     deliveryDeadline: resolveAutoPickDeliveryDeadline(input),
+    deliveryTimeRange: resolveAutoPickDeliveryTimeRange(input),
     distanceKm: Number.isFinite(Number(input.distanceKm)) ? Number(input.distanceKm) : undefined,
     distanceIsLinear: Boolean(input.distanceIsLinear),
     actualPaid: Number.isFinite(Number(input.actualPaid)) ? Number(input.actualPaid) : 0,
