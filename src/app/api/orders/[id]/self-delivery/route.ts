@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
@@ -107,6 +108,16 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           autoCompleteAt: autoCompleteAt || null,
         },
       });
+
+      if (autoCompleteAt) {
+        await ensureAutoCompleteJob({
+          userId: session.id,
+          orderId: id,
+          dueAt: autoCompleteAt,
+        });
+      } else {
+        await cancelAutoCompleteJob(id, "missing-auto-complete-time");
+      }
     }
 
     return NextResponse.json(result.data, { status: result.status });

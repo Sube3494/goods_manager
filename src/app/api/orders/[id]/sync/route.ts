@@ -2,12 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 
 export const dynamic = "force-dynamic";
 
 function isCancelledStatus(status?: string | null) {
   const text = String(status || "");
   return text.includes("取消") || text.includes("退款") || text.includes("关闭");
+}
+
+function isCompletedStatus(status?: string | null) {
+  const text = String(status || "").trim();
+  const normalized = text.toLowerCase();
+  return text.includes("已完成")
+    || normalized === "done"
+    || normalized === "completed"
+    || normalized === "complete"
+    || normalized === "finished"
+    || normalized === "finish";
 }
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -46,6 +58,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({
         error: "插件中未找到该订单的最新状态",
       }, { status: 404 });
+    }
+
+    if (isCompletedStatus(refreshedOrder.status) || isCancelledStatus(refreshedOrder.status)) {
+      await cancelAutoCompleteJob(order.id, "order-synced-to-terminal");
     }
 
     return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           lastSyncedAt: new Date(),
         },
       });
+      await cancelAutoCompleteJob(order.id, "manual-pickup-complete");
 
       void refreshAutoPickOrderFromPlugin(session.id, {
         id: order.sourceId,

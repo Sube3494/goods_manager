@@ -203,6 +203,7 @@ model User {
   shops              Shop[]
   autoPickApiKeys    AutoPickApiKey[]
   autoPickOrders     AutoPickOrder[]
+  autoPickAutoCompleteJobs AutoPickAutoCompleteJob[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
 }
 
@@ -567,6 +568,7 @@ model AutoPickOrder {
   updatedAt             DateTime            @updatedAt
   user                  User                @relation(fields: [userId], references: [id])
   items                 AutoPickOrderItem[]
+  autoCompleteJob       AutoPickAutoCompleteJob?
 
   @@unique([userId, platform, orderNo])
   @@index([userId, orderTime(sort: Desc)])
@@ -574,6 +576,27 @@ model AutoPickOrder {
   @@index([userId, platform])
   @@index([sourceId])
   @@index([autoCompleteAt])
+}
+
+model AutoPickAutoCompleteJob {
+  id            String        @id @default(cuid())
+  userId        String
+  orderId       String        @unique
+  dueAt         DateTime
+  status        String        @default("pending")
+  attempts      Int           @default(0)
+  lockedAt      DateTime?
+  lastAttemptAt DateTime?
+  completedAt   DateTime?
+  lastError     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         AutoPickOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, dueAt])
+  @@index([dueAt])
+  @@index([userId, status])
 }
 
 model AutoPickOrderItem {
