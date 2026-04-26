@@ -4,6 +4,7 @@ import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoP
 const AUTO_COMPLETE_RETRY_DELAY_MS = 15 * 1000;
 const AUTO_COMPLETE_STALE_LOCK_MS = 2 * 60 * 1000;
 const AUTO_COMPLETE_RECONCILE_MS = 60 * 1000;
+const AUTO_COMPLETE_MAX_ATTEMPTS = 20;
 
 type AutoCompleteSchedulerState = {
   timer?: NodeJS.Timeout;
@@ -125,6 +126,35 @@ async function markJobSuccess(jobId: string, orderId: string, userId: string, so
 }
 
 async function markJobRetry(jobId: string, error: string) {
+  const currentJob = await prisma.autoPickAutoCompleteJob.findUnique({
+    where: { id: jobId },
+    select: { attempts: true, orderId: true },
+  });
+
+  if (!currentJob) {
+    return;
+  }
+
+  if ((currentJob.attempts || 0) >= AUTO_COMPLETE_MAX_ATTEMPTS) {
+    await prisma.$transaction([
+      prisma.autoPickOrder.update({
+        where: { id: currentJob.orderId },
+        data: {
+          autoCompleteAt: null,
+        },
+      }),
+      prisma.autoPickAutoCompleteJob.update({
+        where: { id: jobId },
+        data: {
+          status: "failed",
+          lockedAt: null,
+          lastError: error.slice(0, 1000),
+        },
+      }),
+    ]);
+    return;
+  }
+
   await prisma.autoPickAutoCompleteJob.update({
     where: { id: jobId },
     data: {
@@ -340,11 +370,56 @@ export async function startAutoCompleteScheduler() {
   }
 
   state.started = true;
+  await reconcileMissingAutoCompleteJobs();
   await scheduleNextAutoCompleteJob();
 
   if (!state.reconcileTimer) {
     state.reconcileTimer = setInterval(() => {
       void runAutoCompleteSchedulerCycle();
     }, AUTO_COMPLETE_RECONCILE_MS);
+  }
+}
+
+export async function reconcileMissingAutoCompleteJobs(limit = 100) {
+  const orders = await prisma.autoPickOrder.findMany({
+    where: {
+      autoCompleteAt: {
+        not: null,
+      },
+      autoCompleteJob: {
+        is: null,
+      },
+    },
+    select: {
+      id: true,
+      userId: true,
+      autoCompleteAt: true,
+      status: true,
+    },
+    take: limit,
+  });
+
+  for (const order of orders) {
+    if (!order.autoCompleteAt || isTerminalStatus(order.status)) {
+      continue;
+    }
+
+    await prisma.autoPickAutoCompleteJob.upsert({
+      where: { orderId: order.id },
+      create: {
+        userId: order.userId,
+        orderId: order.id,
+        dueAt: order.autoCompleteAt,
+        status: "pending",
+      },
+      update: {
+        userId: order.userId,
+        dueAt: order.autoCompleteAt,
+        status: "pending",
+        lockedAt: null,
+        completedAt: null,
+        lastError: null,
+      },
+    });
   }
 }
