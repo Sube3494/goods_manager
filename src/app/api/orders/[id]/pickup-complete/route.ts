@@ -3,53 +3,13 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
+import {
+  isAutoPickOrderCancelledStatus,
+  isAutoPickOrderCompletedStatus,
+  isAutoPickPickupOrder,
+} from "@/lib/autoPickOrderStatus";
 
 export const dynamic = "force-dynamic";
-
-function isCompletedStatus(status?: string | null) {
-  const text = String(status || "").trim();
-  const normalized = text.toLowerCase();
-  return text.includes("已完成")
-    || normalized === "done"
-    || normalized === "completed"
-    || normalized === "complete"
-    || normalized === "finished"
-    || normalized === "finish";
-}
-
-function isCancelledStatus(status?: string | null) {
-  const text = String(status || "").trim();
-  const normalized = text.toLowerCase();
-  return text.includes("取消")
-    || text.includes("退款")
-    || text.includes("关闭")
-    || normalized === "cancel"
-    || normalized === "cancelled"
-    || normalized === "canceled"
-    || normalized === "closed"
-    || normalized === "refund";
-}
-
-function isPickupOrder(rawPayload: unknown, userAddress?: string | null) {
-  const candidates = [userAddress];
-
-  if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
-    const record = rawPayload as Record<string, unknown>;
-    candidates.push(
-      String(record.unencrypted_map_address || ""),
-      String(record.unencrypted_address || ""),
-      String(record.user_remark || ""),
-      String(record.address || ""),
-      String(record.map_address || ""),
-      String(record.deliveryType || ""),
-      String(record.delivery_type || ""),
-      String(record.fulfilmentType || ""),
-      String(record.fulfilment_type || "")
-    );
-  }
-
-  return candidates.some((item) => /到店自取|门店自取|上门自取|自提/.test(String(item || "").trim()));
-}
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
@@ -70,15 +30,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (isCompletedStatus(order.status)) {
+    if (isAutoPickOrderCompletedStatus(order.status)) {
       return NextResponse.json({ error: "Order already completed" }, { status: 409 });
     }
 
-    if (isCancelledStatus(order.status)) {
+    if (isAutoPickOrderCancelledStatus(order.status)) {
       return NextResponse.json({ error: "Order already cancelled" }, { status: 409 });
     }
 
-    if (!isPickupOrder(order.rawPayload, order.userAddress)) {
+    if (!isAutoPickPickupOrder(order.rawPayload, order.userAddress)) {
       return NextResponse.json({ error: "Non-pickup order does not require pickup complete" }, { status: 409 });
     }
 

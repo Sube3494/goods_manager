@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { getAddressDetail } from "@/lib/addressBook";
+import { isAutoPickPickupOrder } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../../../prisma/generated-client";
 
 export const dynamic = "force-dynamic";
@@ -137,27 +138,6 @@ function readDeliveryTimeRangeFromRawPayload(rawPayload: unknown) {
   return value || null;
 }
 
-function isPickupOrder(rawPayload: unknown, userAddress?: string | null) {
-  const candidates = [userAddress];
-
-  if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
-    const record = rawPayload as Record<string, unknown>;
-    candidates.push(
-      String(record.unencrypted_map_address || ""),
-      String(record.unencrypted_address || ""),
-      String(record.user_remark || ""),
-      String(record.address || ""),
-      String(record.map_address || ""),
-      String(record.deliveryType || ""),
-      String(record.delivery_type || ""),
-      String(record.fulfilmentType || ""),
-      String(record.fulfilment_type || "")
-    );
-  }
-
-  return candidates.some((item) => /到店自取|门店自取|上门自取|自提/.test(String(item || "").trim()));
-}
-
 function stripShopSuffix(value: string) {
   return String(value || "").trim().replace(/(店|一店|二店|三店|分店|总店)$/, "");
 }
@@ -263,9 +243,44 @@ export async function GET(request: NextRequest) {
     const [orders, total, platformRows, statusRows, userProfile] = await Promise.all([
       prisma.autoPickOrder.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          sourceId: true,
+          shopId: true,
+          logisticId: true,
+          city: true,
+          platform: true,
+          dailyPlatformSequence: true,
+          orderNo: true,
+          orderTime: true,
+          userAddress: true,
+          shopAddress: true,
+          longitude: true,
+          latitude: true,
+          status: true,
+          deliveryDeadline: true,
+          deliveryTimeRange: true,
+          distanceKm: true,
+          distanceIsLinear: true,
+          actualPaid: true,
+          expectedIncome: true,
+          platformCommission: true,
+          delivery: true,
+          rawPayload: true,
+          lastSyncedAt: true,
+          autoCompleteAt: true,
+          createdAt: true,
+          updatedAt: true,
           items: {
             orderBy: { createdAt: "asc" },
+          },
+          autoCompleteJob: {
+            select: {
+              status: true,
+              lastError: true,
+              attempts: true,
+            },
           },
         },
         orderBy: [
@@ -385,18 +400,23 @@ export async function GET(request: NextRequest) {
     }
 
     const enrichedOrders = orders.map((order) => {
-      const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
+      const expectedIncome = typeof order.expectedIncome === "number"
+        ? order.expectedIncome
+        : readExpectedIncomeFromRawPayload(order.rawPayload);
       const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
-      const pickup = isPickupOrder(order.rawPayload, order.userAddress);
+      const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress);
       return {
         ...order,
-        shopId: readShopIdFromRawPayload(order.rawPayload),
-        shopAddress: readShopAddressFromRawPayload(order.rawPayload),
+        shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload),
+        shopAddress: order.shopAddress || readShopAddressFromRawPayload(order.rawPayload),
         rawShopName: readShopNameFromRawPayload(order.rawPayload),
-        deliveryTimeRange: readDeliveryTimeRangeFromRawPayload(order.rawPayload),
+        deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isPickup: pickup,
         expectedIncome: metrics.expectedIncome,
         platformCommission: metrics.platformCommission,
+        autoCompleteJobStatus: order.autoCompleteJob?.status || null,
+        autoCompleteJobError: order.autoCompleteJob?.lastError || null,
+        autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
       };
     }).map((order) => {
       const matchedShopName = matchShopName(order.shopId, order.shopAddress, order.rawShopName, shippingAddresses);

@@ -552,13 +552,17 @@ model AutoPickOrder {
   orderNo               String
   orderTime             DateTime
   userAddress           String
+  shopId                String?
+  shopAddress           String?
   longitude             Float?
   latitude              Float?
   status                String?
   deliveryDeadline      String?
+  deliveryTimeRange     String?
   distanceKm            Float?
   distanceIsLinear      Boolean             @default(false)
   actualPaid            Int                 @default(0)
+  expectedIncome        Int?
   platformCommission    Int                 @default(0)
   delivery              Json?
   rawPayload            Json?
@@ -583,7 +587,7 @@ model AutoPickAutoCompleteJob {
   userId        String
   orderId       String        @unique
   dueAt         DateTime
-  status        String        @default("pending")
+  status        AutoPickAutoCompleteJobStatus @default(PENDING)
   attempts      Int           @default(0)
   lockedAt      DateTime?
   lastAttemptAt DateTime?
@@ -597,6 +601,14 @@ model AutoPickAutoCompleteJob {
   @@index([status, dueAt])
   @@index([dueAt])
   @@index([userId, status])
+}
+
+enum AutoPickAutoCompleteJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  CANCELLED
+  FAILED
 }
 
 model AutoPickOrderItem {

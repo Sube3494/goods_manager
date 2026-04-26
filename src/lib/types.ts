@@ -166,6 +166,9 @@ export interface AutoPickOrder {
   delivery?: AutoPickDelivery | null;
   items: AutoPickOrderItem[];
   autoCompleteAt?: string | null;
+  autoCompleteJobStatus?: string | null;
+  autoCompleteJobError?: string | null;
+  autoCompleteJobAttempts?: number | null;
   lastSyncedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;

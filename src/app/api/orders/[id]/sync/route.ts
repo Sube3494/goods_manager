@@ -3,24 +3,9 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
+import { isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
 
 export const dynamic = "force-dynamic";
-
-function isCancelledStatus(status?: string | null) {
-  const text = String(status || "");
-  return text.includes("取消") || text.includes("退款") || text.includes("关闭");
-}
-
-function isCompletedStatus(status?: string | null) {
-  const text = String(status || "").trim();
-  const normalized = text.toLowerCase();
-  return text.includes("已完成")
-    || normalized === "done"
-    || normalized === "completed"
-    || normalized === "complete"
-    || normalized === "finished"
-    || normalized === "finish";
-}
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
@@ -41,7 +26,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (isCancelledStatus(order.status)) {
+    if (isAutoPickOrderCancelledStatus(order.status)) {
       return NextResponse.json({
         error: "Order already cancelled",
       }, { status: 409 });
@@ -60,7 +45,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       }, { status: 404 });
     }
 
-    if (isCompletedStatus(refreshedOrder.status) || isCancelledStatus(refreshedOrder.status)) {
+    if (isAutoPickOrderCompletedStatus(refreshedOrder.status) || isAutoPickOrderCancelledStatus(refreshedOrder.status)) {
       await cancelAutoCompleteJob(order.id, "order-synced-to-terminal");
     }
 

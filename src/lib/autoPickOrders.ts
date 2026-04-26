@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
+import { isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig } from "@/lib/types";
@@ -546,8 +547,11 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         id: true,
         sourceId: true,
         logisticId: true,
+        shopId: true,
+        shopAddress: true,
         status: true,
         deliveryDeadline: true,
+        deliveryTimeRange: true,
         delivery: true,
       },
     });
@@ -560,13 +564,18 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
     const sourceId = normalized.id || existing?.sourceId || "";
     const logisticId = normalized.logisticId || existing?.logisticId || null;
-    const shouldKeepTerminalStatus = isTerminalStatus(existing?.status) && !isTerminalStatus(normalized.status);
+    const shopId = normalized.shopId || existing?.shopId || null;
+    const shopAddress = normalized.shopAddress || existing?.shopAddress || null;
+    const shouldKeepTerminalStatus = isAutoPickOrderTerminalStatus(existing?.status) && !isAutoPickOrderTerminalStatus(normalized.status);
     const status = shouldKeepTerminalStatus
       ? existing?.status || null
       : normalized.status || existing?.status || null;
     const deliveryDeadline = shouldKeepTerminalStatus
       ? existing?.deliveryDeadline || normalized.deliveryDeadline || null
       : normalized.deliveryDeadline || existing?.deliveryDeadline || null;
+    const deliveryTimeRange = shouldKeepTerminalStatus
+      ? existing?.deliveryTimeRange || normalized.deliveryTimeRange || null
+      : normalized.deliveryTimeRange || existing?.deliveryTimeRange || null;
     const nextDeliveryValue = normalized.delivery
       ? asPrismaJsonValue(normalized.delivery)
       : hasDeliveryValue(existing?.delivery)
@@ -591,13 +600,17 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         orderNo: normalized.orderNo || "",
         orderTime,
         userAddress: normalized.userAddress || "",
+        shopId,
+        shopAddress,
         longitude: normalized.longitude,
         latitude: normalized.latitude,
         status,
         deliveryDeadline,
+        deliveryTimeRange,
         distanceKm: normalized.distanceKm,
         distanceIsLinear: Boolean(normalized.distanceIsLinear),
         actualPaid: Math.round(Number(normalized.actualPaid || 0)),
+        expectedIncome: Number.isFinite(Number(normalized.expectedIncome)) ? Math.round(Number(normalized.expectedIncome)) : null,
         platformCommission: Math.round(Number(normalized.platformCommission || 0)),
         delivery: nextDeliveryValue,
         rawPayload: asPrismaJsonValue(normalized),
@@ -613,13 +626,17 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         dailyPlatformSequence: normalized.dailyPlatformSequence || 0,
         orderTime,
         userAddress: normalized.userAddress || "",
+        shopId,
+        shopAddress,
         longitude: normalized.longitude,
         latitude: normalized.latitude,
         status,
         deliveryDeadline,
+        deliveryTimeRange,
         distanceKm: normalized.distanceKm,
         distanceIsLinear: Boolean(normalized.distanceIsLinear),
         actualPaid: Math.round(Number(normalized.actualPaid || 0)),
+        expectedIncome: Number.isFinite(Number(normalized.expectedIncome)) ? Math.round(Number(normalized.expectedIncome)) : null,
         platformCommission: Math.round(Number(normalized.platformCommission || 0)),
         delivery: nextDeliveryValue,
         rawPayload: asPrismaJsonValue(normalized),
@@ -842,34 +859,6 @@ async function ensureShopProductsForAutoPickOrder(
   }
 }
 
-function isCancelledStatus(status?: string | null) {
-  const text = String(status || "").trim();
-  const normalized = text.toLowerCase();
-  return text.includes("取消")
-    || text.includes("退款")
-    || text.includes("关闭")
-    || normalized === "cancel"
-    || normalized === "cancelled"
-    || normalized === "canceled"
-    || normalized === "closed"
-    || normalized === "refund";
-}
-
-function isCompletedStatus(status?: string | null) {
-  const text = String(status || "").trim();
-  const normalized = text.toLowerCase();
-  return text.includes("已完成")
-    || normalized === "done"
-    || normalized === "completed"
-    || normalized === "complete"
-    || normalized === "finished"
-    || normalized === "finish";
-}
-
-function isTerminalStatus(status?: string | null) {
-  return isCompletedStatus(status) || isCancelledStatus(status);
-}
-
 export async function applyAutoPickProgress(userId: string, payload: unknown) {
   const progress = normalizeAutoPickProgressPayload(payload);
   if (!progress) {
@@ -891,7 +880,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     throw new Error("Order not found");
   }
 
-  if (isTerminalStatus(order.status)) {
+  if (isAutoPickOrderTerminalStatus(order.status)) {
     return await prisma.autoPickOrder.findUniqueOrThrow({
       where: { id: order.id },
       include: {
@@ -968,6 +957,67 @@ export async function refreshAutoPickOrderFromPlugin(
   }
 
   return await upsertAutoPickOrder(userId, matched);
+}
+
+export async function backfillPersistedAutoPickOrderFields(userId: string) {
+  const orders = await prisma.autoPickOrder.findMany({
+    where: {
+      userId,
+      OR: [
+        { shopId: null },
+        { shopAddress: null },
+        { deliveryTimeRange: null },
+        { expectedIncome: null },
+      ],
+    },
+    select: {
+      id: true,
+      rawPayload: true,
+      shopId: true,
+      shopAddress: true,
+      deliveryTimeRange: true,
+      expectedIncome: true,
+    },
+  });
+
+  let updatedCount = 0;
+
+  for (const order of orders) {
+    const normalized = normalizeAutoPickOrderPayload(order.rawPayload);
+    if (!normalized) {
+      continue;
+    }
+
+    const nextData: Prisma.AutoPickOrderUpdateInput = {};
+
+    if (!order.shopId && normalized.shopId) {
+      nextData.shopId = normalized.shopId;
+    }
+
+    if (!order.shopAddress && normalized.shopAddress) {
+      nextData.shopAddress = normalized.shopAddress;
+    }
+
+    if (!order.deliveryTimeRange && normalized.deliveryTimeRange) {
+      nextData.deliveryTimeRange = normalized.deliveryTimeRange;
+    }
+
+    if (order.expectedIncome == null && Number.isFinite(Number(normalized.expectedIncome))) {
+      nextData.expectedIncome = Math.round(Number(normalized.expectedIncome));
+    }
+
+    if (Object.keys(nextData).length === 0) {
+      continue;
+    }
+
+    await prisma.autoPickOrder.update({
+      where: { id: order.id },
+      data: nextData,
+    });
+    updatedCount += 1;
+  }
+
+  return { count: updatedCount };
 }
 
 export async function callAutoPickCommand(userId: string, pathname: "/self-delivery" | "/complete-delivery" | "/pickup-complete", payload: Record<string, unknown>) {

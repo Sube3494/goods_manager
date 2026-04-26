@@ -1,10 +1,17 @@
 import prisma from "@/lib/prisma";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
+import { AutoPickAutoCompleteJobStatus } from "../../prisma/generated-client";
 
 const AUTO_COMPLETE_RETRY_DELAY_MS = 15 * 1000;
 const AUTO_COMPLETE_STALE_LOCK_MS = 2 * 60 * 1000;
 const AUTO_COMPLETE_RECONCILE_MS = 60 * 1000;
 const AUTO_COMPLETE_MAX_ATTEMPTS = 20;
+const JOB_PENDING = AutoPickAutoCompleteJobStatus.PENDING;
+const JOB_RUNNING = AutoPickAutoCompleteJobStatus.RUNNING;
+const JOB_COMPLETED = AutoPickAutoCompleteJobStatus.COMPLETED;
+const JOB_CANCELLED = AutoPickAutoCompleteJobStatus.CANCELLED;
+const JOB_FAILED = AutoPickAutoCompleteJobStatus.FAILED;
 
 type AutoCompleteSchedulerState = {
   timer?: NodeJS.Timeout;
@@ -32,29 +39,6 @@ function getSchedulerState() {
   return scoped.autoPickAutoCompleteScheduler;
 }
 
-function isTerminalStatus(status?: string | null) {
-  const text = String(status || "").trim();
-  const normalized = text.toLowerCase();
-
-  const completed = text.includes("已完成")
-    || normalized === "done"
-    || normalized === "completed"
-    || normalized === "complete"
-    || normalized === "finished"
-    || normalized === "finish";
-
-  const cancelled = text.includes("取消")
-    || text.includes("退款")
-    || text.includes("关闭")
-    || normalized === "cancel"
-    || normalized === "cancelled"
-    || normalized === "canceled"
-    || normalized === "closed"
-    || normalized === "refund";
-
-  return completed || cancelled;
-}
-
 async function clearSchedulerTimer() {
   const state = getSchedulerState();
   if (state.timer) {
@@ -71,7 +55,7 @@ export async function scheduleNextAutoCompleteJob() {
 
   const nextJob = await prisma.autoPickAutoCompleteJob.findFirst({
     where: {
-      status: "pending",
+      status: JOB_PENDING,
     },
     orderBy: {
       dueAt: "asc",
@@ -107,7 +91,7 @@ async function markJobSuccess(jobId: string, orderId: string, userId: string, so
     prisma.autoPickAutoCompleteJob.update({
       where: { id: jobId },
       data: {
-        status: "completed",
+        status: JOB_COMPLETED,
         completedAt: new Date(),
         lockedAt: null,
         lastError: null,
@@ -146,7 +130,7 @@ async function markJobRetry(jobId: string, error: string) {
       prisma.autoPickAutoCompleteJob.update({
         where: { id: jobId },
         data: {
-          status: "failed",
+          status: JOB_FAILED,
           lockedAt: null,
           lastError: error.slice(0, 1000),
         },
@@ -158,7 +142,7 @@ async function markJobRetry(jobId: string, error: string) {
   await prisma.autoPickAutoCompleteJob.update({
     where: { id: jobId },
     data: {
-      status: "pending",
+      status: JOB_PENDING,
       dueAt: new Date(Date.now() + AUTO_COMPLETE_RETRY_DELAY_MS),
       lockedAt: null,
       lastError: error.slice(0, 1000),
@@ -177,7 +161,7 @@ async function markJobCancelled(jobId: string, orderId: string, error?: string) 
     prisma.autoPickAutoCompleteJob.update({
       where: { id: jobId },
       data: {
-        status: "cancelled",
+        status: JOB_CANCELLED,
         lockedAt: null,
         lastError: error?.slice(0, 1000) || null,
       },
@@ -190,9 +174,9 @@ async function tryLockJob(jobId: string, staleBefore: Date) {
     where: {
       id: jobId,
       OR: [
-        { status: "pending" },
+        { status: JOB_PENDING },
         {
-          status: "running",
+          status: JOB_RUNNING,
           lockedAt: {
             lte: staleBefore,
           },
@@ -200,7 +184,7 @@ async function tryLockJob(jobId: string, staleBefore: Date) {
       ],
     },
     data: {
-      status: "running",
+      status: JOB_RUNNING,
       lockedAt: new Date(),
       lastAttemptAt: new Date(),
       attempts: {
@@ -218,13 +202,13 @@ export async function processDueAutoCompleteJobs(limit = 20) {
     where: {
       OR: [
         {
-          status: "pending",
+          status: JOB_PENDING,
           dueAt: {
             lte: new Date(),
           },
         },
         {
-          status: "running",
+          status: JOB_RUNNING,
           lockedAt: {
             lte: staleBefore,
           },
@@ -261,7 +245,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
     }
 
     const order = job.order;
-    if (!order || isTerminalStatus(order.status)) {
+    if (!order || isAutoPickOrderTerminalStatus(order.status)) {
       await markJobCancelled(job.id, job.orderId, "order-terminal-before-auto-complete");
       results.push({ id: job.id, ok: true });
       continue;
@@ -309,6 +293,7 @@ export async function runAutoCompleteSchedulerCycle() {
 
   state.running = true;
   try {
+    await reconcileMissingAutoCompleteJobs();
     const result = await processDueAutoCompleteJobs();
     if (result.processed > 0) {
       console.log(`[auto-pick-auto-complete] processed=${result.processed} ok=${result.succeeded} fail=${result.failed}`);
@@ -326,19 +311,19 @@ export async function ensureAutoCompleteJob(params: { userId: string; orderId: s
     where: {
       orderId: params.orderId,
     },
-    create: {
-      userId: params.userId,
-      orderId: params.orderId,
-      dueAt: params.dueAt,
-      status: "pending",
-    },
-    update: {
-      userId: params.userId,
-      dueAt: params.dueAt,
-      status: "pending",
-      lockedAt: null,
-      completedAt: null,
-      lastError: null,
+      create: {
+        userId: params.userId,
+        orderId: params.orderId,
+        dueAt: params.dueAt,
+        status: JOB_PENDING,
+      },
+      update: {
+        userId: params.userId,
+        dueAt: params.dueAt,
+        status: JOB_PENDING,
+        lockedAt: null,
+        completedAt: null,
+        lastError: null,
     },
   });
 
@@ -350,11 +335,11 @@ export async function cancelAutoCompleteJob(orderId: string, reason = "manual-ca
     where: {
       orderId,
       status: {
-        in: ["pending", "running"],
+        in: [JOB_PENDING, JOB_RUNNING],
       },
     },
     data: {
-      status: "cancelled",
+      status: JOB_CANCELLED,
       lockedAt: null,
       lastError: reason.slice(0, 1000),
     },
@@ -400,7 +385,7 @@ export async function reconcileMissingAutoCompleteJobs(limit = 100) {
   });
 
   for (const order of orders) {
-    if (!order.autoCompleteAt || isTerminalStatus(order.status)) {
+    if (!order.autoCompleteAt || isAutoPickOrderTerminalStatus(order.status)) {
       continue;
     }
 
@@ -410,12 +395,12 @@ export async function reconcileMissingAutoCompleteJobs(limit = 100) {
         userId: order.userId,
         orderId: order.id,
         dueAt: order.autoCompleteAt,
-        status: "pending",
+        status: JOB_PENDING,
       },
       update: {
         userId: order.userId,
         dueAt: order.autoCompleteAt,
-        status: "pending",
+        status: JOB_PENDING,
         lockedAt: null,
         completedAt: null,
         lastError: null,

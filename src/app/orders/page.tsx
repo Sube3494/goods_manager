@@ -26,6 +26,13 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
+import {
+  getBaseAutoPickStatusDisplay,
+  isAutoPickOrderCancelledStatus,
+  isAutoPickOrderCompletedStatus,
+  isAutoPickOrderDeliveringStatus,
+  isAutoPickOrderTerminalStatus,
+} from "@/lib/autoPickOrderStatus";
 import { AutoPickIntegrationConfig, AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
@@ -52,6 +59,10 @@ type OrderResponse = {
     deliveryCount: number;
   };
 };
+
+const MIN_REFRESH_GAP_MS = 10 * 1000;
+const TODAY_ACTIVE_REFRESH_MS = 30 * 1000;
+const TODAY_IDLE_REFRESH_MS = 90 * 1000;
 
 function toCurrency(value: number | null | undefined) {
   const amount = Number(value || 0) / 100;
@@ -116,35 +127,8 @@ function getOrderActionErrorMessage(raw: unknown) {
   }
 }
 
-function getBaseDisplayStatus(status?: string | null) {
-  const text = String(status || "").trim();
-  const normalized = text.toLowerCase();
-  if (!text) return "同步中";
-  if (
-    text.includes("取消")
-    || text.includes("退款")
-    || text.includes("关闭")
-    || normalized === "cancel"
-    || normalized === "cancelled"
-    || normalized === "canceled"
-    || normalized === "closed"
-    || normalized === "refund"
-  ) return "已取消";
-  if (
-    text.includes("已完成")
-    || normalized === "done"
-    || normalized === "completed"
-    || normalized === "complete"
-    || normalized === "finished"
-    || normalized === "finish"
-  ) return "已完成";
-  if (text.includes("配送中") || normalized === "delivering") return "配送中";
-  if (text.includes("已拣货") || text.includes("拣货中")) return "已拣货";
-  return text.split(/[,，]/)[0].trim() || "同步中";
-}
-
 function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
-  const baseStatus = getBaseDisplayStatus(order.status);
+  const baseStatus = getBaseAutoPickStatusDisplay(order.status);
   if (!order.isPickup) {
     return baseStatus;
   }
@@ -155,20 +139,19 @@ function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
 }
 
 function isCompletedStatus(status?: string | null) {
-  return getBaseDisplayStatus(status) === "已完成";
+  return isAutoPickOrderCompletedStatus(status);
 }
 
 function isCancelledStatus(status?: string | null) {
-  return getBaseDisplayStatus(status) === "已取消";
+  return isAutoPickOrderCancelledStatus(status);
 }
 
 function isTerminalStatus(status?: string | null) {
-  const display = getBaseDisplayStatus(status);
-  return display === "已完成" || display === "已取消";
+  return isAutoPickOrderTerminalStatus(status);
 }
 
 function isDeliveringStatus(status?: string | null) {
-  return getBaseDisplayStatus(status) === "配送中";
+  return isAutoPickOrderDeliveringStatus(status);
 }
 
 function getStatusTone(display: string) {
@@ -202,6 +185,11 @@ function getStatusTone(display: string) {
     dot: "bg-amber-500",
     soft: "bg-amber-500/8 text-amber-700 dark:text-amber-300",
   };
+}
+
+function hasAutoCompleteFailure(order: Pick<AutoPickOrder, "autoCompleteJobStatus">) {
+  return String(order.autoCompleteJobStatus || "").trim().toLowerCase() === "failed"
+    || String(order.autoCompleteJobStatus || "").trim().toUpperCase() === "FAILED";
 }
 
 function getPlatformBadgeMeta(platform?: string | null) {
@@ -410,6 +398,7 @@ function OrderCard({
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
   const sourceLabel = getOrderSourceLabel(order);
   const deadlineDisplay = getDeadlineDisplay(order);
+  const autoCompleteFailed = hasAutoCompleteFailure(order);
   return (
     <article className="overflow-hidden rounded-[30px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="border-b border-black/6 px-4 py-4 dark:border-white/6 sm:px-5">
@@ -510,6 +499,12 @@ function OrderCard({
                 预计自动完成 {formatLocalDateTime(order.autoCompleteAt)}
               </span>
             ) : null}
+            {autoCompleteFailed ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-rose-500/15 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-700 dark:text-rose-400">
+                <X size={12} />
+                自动完成失败
+              </span>
+            ) : null}
             {deadlineDisplay !== "-" ? (
               <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
                 <Clock3 size={12} />
@@ -580,6 +575,13 @@ function OrderCard({
                 <InfoPair label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
                 <InfoPair label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
                 <InfoPair label={pickup ? "取货时间区间" : "最晚送达"} value={deadlineDisplay} />
+                {autoCompleteFailed ? (
+                  <>
+                    <InfoPair label="自动完成任务" value="失败" />
+                    <InfoPair label="失败次数" value={String(order.autoCompleteJobAttempts || 0)} />
+                    <InfoPair label="失败原因" value={order.autoCompleteJobError || "-"} />
+                  </>
+                ) : null}
               </div>
             </section>
 
@@ -724,6 +726,8 @@ export default function OrdersPage() {
   const { showToast } = useToast();
   const todayDate = formatLocalDate(new Date());
   const modalRef = useRef<HTMLDivElement | null>(null);
+  const isFetchingRef = useRef(false);
+  const lastRefreshAtRef = useRef(0);
 
   const [isMounted, setIsMounted] = useState(false);
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -806,8 +810,17 @@ export default function OrdersPage() {
     }
   }, [showToast]);
 
+  const patchOrder = useCallback((orderId: string, updater: (order: AutoPickOrder) => AutoPickOrder) => {
+    setOrders((current) => current.map((order) => (order.id === orderId ? updater(order) : order)));
+  }, []);
+
   const fetchOrders = useCallback(async (options?: { silent?: boolean }) => {
+    if (isFetchingRef.current) {
+      return;
+    }
+
     const silent = Boolean(options?.silent);
+    isFetchingRef.current = true;
     if (silent) {
       setIsRefreshing(true);
     } else {
@@ -846,6 +859,7 @@ export default function OrdersPage() {
       console.error("Failed to fetch orders:", error);
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
     } finally {
+      isFetchingRef.current = false;
       if (silent) {
         setIsRefreshing(false);
       } else {
@@ -865,29 +879,6 @@ export default function OrdersPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, endDate, hasDelivery, platform, query, shop, startDate, status]);
-
-  useEffect(() => {
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") {
-        fetchOrders({ silent: true });
-      }
-    };
-
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        fetchOrders({ silent: true });
-      }
-    }, 15 * 1000);
-
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    window.addEventListener("focus", refreshWhenVisible);
-
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.removeEventListener("focus", refreshWhenVisible);
-    };
-  }, [fetchOrders]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],
@@ -947,6 +938,32 @@ export default function OrdersPage() {
         return;
       }
 
+      const nowIso = new Date().toISOString();
+      if (action === "self-delivery") {
+        patchOrder(orderId, (order) => ({
+          ...order,
+          status: "配送中",
+          autoCompleteJobStatus: order.autoCompleteJobStatus === "FAILED" ? "PENDING" : order.autoCompleteJobStatus,
+          autoCompleteJobError: null,
+        }));
+      } else if (action === "pickup-complete" || action === "complete-delivery") {
+        patchOrder(orderId, (order) => ({
+          ...order,
+          status: "已完成",
+          autoCompleteAt: null,
+          autoCompleteJobStatus: "COMPLETED",
+          autoCompleteJobError: null,
+          lastSyncedAt: nowIso,
+        }));
+      } else if (action === "sync" && data?.status) {
+        patchOrder(orderId, (order) => ({
+          ...order,
+          status: String(data.status),
+          lastSyncedAt: typeof data.lastSyncedAt === "string" ? data.lastSyncedAt : nowIso,
+          autoCompleteAt: (String(data.status).includes("完成") || String(data.status).includes("取消")) ? null : order.autoCompleteAt,
+        }));
+      }
+
       showToast(
         action === "self-delivery"
           ? "已发起自配送"
@@ -957,7 +974,7 @@ export default function OrdersPage() {
             : "已同步最新订单状态",
         "success"
       );
-      fetchOrders({ silent: true });
+      void fetchOrders({ silent: true });
     } catch (error) {
       console.error("Order action failed:", error);
       showToast(error instanceof Error ? getOrderActionErrorMessage(error.message) : "操作失败", "error");
@@ -1036,7 +1053,14 @@ export default function OrdersPage() {
         throw new Error(data?.error || "批量同步失败");
       }
 
-      showToast(`已同步 ${Number(data?.synced || 0)} 单`, "success");
+      const syncedCount = Number(data?.synced || 0);
+      const backfilledCount = Number(data?.backfilled || 0);
+      showToast(
+        backfilledCount > 0
+          ? `已同步 ${syncedCount} 单，补齐 ${backfilledCount} 单`
+          : `已同步 ${syncedCount} 单`,
+        "success"
+      );
       await fetchOrders({ silent: true });
     } catch (error) {
       console.error("Failed to sync orders:", error);
@@ -1056,6 +1080,55 @@ export default function OrdersPage() {
   const todayCompletedOrders = useMemo(() => filteredOrders.filter((item) => isTerminalStatus(item.status)), [filteredOrders]);
   const visibleOrders = activeTab === "today" ? todayPendingOrders : filteredOrders;
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || hasDelivery !== "all" || startDate || endDate);
+  const hasLiveOrders = todayPendingOrders.length > 0;
+  const autoRefreshIntervalMs = activeTab === "today"
+    ? (hasLiveOrders ? TODAY_ACTIVE_REFRESH_MS : TODAY_IDLE_REFRESH_MS)
+    : 0;
+
+  useEffect(() => {
+    const triggerRefresh = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastRefreshAtRef.current < MIN_REFRESH_GAP_MS) {
+        return;
+      }
+
+      lastRefreshAtRef.current = now;
+      void fetchOrders({ silent: true });
+    };
+
+    const refreshWhenVisible = () => {
+      triggerRefresh();
+    };
+
+    let timer: number | null = null;
+
+    const scheduleNext = () => {
+      if (!autoRefreshIntervalMs) {
+        return;
+      }
+
+      timer = window.setTimeout(() => {
+        triggerRefresh();
+        scheduleNext();
+      }, autoRefreshIntervalMs);
+    };
+
+    scheduleNext();
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
+
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+    };
+  }, [autoRefreshIntervalMs, fetchOrders]);
 
   return (
     <div className="relative px-2 sm:px-1">
