@@ -263,6 +263,10 @@ function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDea
     return "-";
   }
 
+  if (!/\d{1,2}:\d{2}/.test(text)) {
+    return "-";
+  }
+
   if (order.isPickup) {
     return text;
   }
@@ -272,7 +276,8 @@ function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDea
     return rangeMatch[1].trim();
   }
 
-  return text;
+  const firstTimeMatch = text.match(/^(.*?\d{1,2}:\d{2})/);
+  return firstTimeMatch?.[1]?.trim() || "-";
 }
 
 function MetricCard({

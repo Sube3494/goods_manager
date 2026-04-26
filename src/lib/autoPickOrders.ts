@@ -91,15 +91,20 @@ function formatDeadlineSegment(date: Date) {
   return `${month}-${day} ${hours}:${minutes}`;
 }
 
+function looksLikeDeliveryTimeRange(value: unknown) {
+  const text = String(value || "").trim();
+  return /\d{1,2}:\d{2}/.test(text);
+}
+
 function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
   const directDeadline = String(input.deliveryDeadline || input.delivery_deadline || "").trim();
-  if (directDeadline) {
-    return directDeadline;
-  }
-
   const rangeText = String(input.delivery_time_format || input.deliveryTimeFormat || "").trim();
   if (rangeText) {
     return rangeText;
+  }
+
+  if (looksLikeDeliveryTimeRange(directDeadline)) {
+    return directDeadline;
   }
 
   const startTimestamp = Number(input.delivery_time || input.deliveryTime || 0);
