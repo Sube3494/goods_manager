@@ -487,6 +487,12 @@ function OrderCard({
                 {pickup ? "已自提" : "订单已完成"}
               </span>
             ) : null}
+            {completed && order.completedAt ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                <Clock3 size={12} />
+                完成时间 {formatLocalDateTime(order.completedAt)}
+              </span>
+            ) : null}
             {cancelled ? (
               <span className="inline-flex items-center gap-2 rounded-full border border-slate-500/15 bg-slate-500/10 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
                 <X size={12} />

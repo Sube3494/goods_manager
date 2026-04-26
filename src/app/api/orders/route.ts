@@ -307,6 +307,7 @@ export async function GET(request: NextRequest) {
           rawPayload: true,
           lastSyncedAt: true,
           autoCompleteAt: true,
+          completedAt: true,
           createdAt: true,
           updatedAt: true,
           items: {
