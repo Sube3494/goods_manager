@@ -98,6 +98,7 @@ function readShopNameFromRawPayload(rawPayload: unknown) {
     ? record.extend as Record<string, unknown>
     : null;
   const candidates = [
+    record.rawShopName,
     extend?.channel_name,
     record.channel_name,
     record.shop_name,
@@ -106,6 +107,29 @@ function readShopNameFromRawPayload(rawPayload: unknown) {
     record.storeName,
     record.merchantName,
     record.merchant_name,
+  ];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readShopAddressFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const candidates = [
+    record.rawShopAddress,
+    record.shop_name,
+    record.shopAddress,
+    record.storeAddress,
+    record.merchantAddress,
+    record.store_address,
+    record.merchant_address,
   ];
   for (const item of candidates) {
     const value = String(item || "").trim();
@@ -149,10 +173,10 @@ function normalizeShopAddressForMatch(value: string | null | undefined) {
     .toLowerCase();
 }
 
-function matchShopName(rawShopName: string | null, shopAddress: string | null, shippingAddresses: ShippingAddress[]) {
+function matchShopName(rawShopName: string | null, rawShopAddress: string | null, shippingAddresses: ShippingAddress[]) {
   const normalizedRawShopName = toNormalizedText(rawShopName);
   const looseRawShopName = toLooseNormalizedText(rawShopName);
-  const normalizedShopAddress = normalizeShopAddressForMatch(shopAddress);
+  const normalizedShopAddress = normalizeShopAddressForMatch(rawShopAddress);
 
   if (looseRawShopName) {
     const matchedByShopName = shippingAddresses.find((addr) => {
@@ -422,6 +446,7 @@ export async function GET(request: NextRequest) {
         shopId: order.shopId,
         shopAddress: order.shopAddress,
         rawShopName: readShopNameFromRawPayload(order.rawPayload) || order.shopAddress || null,
+        rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isPickup: pickup,
         expectedIncome: metrics.expectedIncome,
@@ -431,7 +456,7 @@ export async function GET(request: NextRequest) {
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
       };
     }).map((order) => {
-      const matchedShopName = matchShopName(order.rawShopName, order.shopAddress, shippingAddresses);
+      const matchedShopName = matchShopName(order.rawShopName, order.rawShopAddress, shippingAddresses);
 
       return {
         ...order,

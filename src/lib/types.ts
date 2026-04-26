@@ -150,6 +150,8 @@ export interface AutoPickOrder {
   orderTime: string;
   userAddress: string;
   shopAddress?: string | null;
+  rawShopName?: string | null;
+  rawShopAddress?: string | null;
   matchedShopName?: string | null;
   isPickup?: boolean;
   longitude?: number | null;
