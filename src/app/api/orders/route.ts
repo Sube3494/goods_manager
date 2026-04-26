@@ -298,6 +298,7 @@ function readCompletedAtFromRawPayload(rawPayload: unknown) {
     delivery?.finished_time
     ?? record.finished_time
     ?? record.finishedTime
+    ?? record.completedAt
     ?? 0
   );
 
@@ -305,7 +306,7 @@ function readCompletedAtFromRawPayload(rawPayload: unknown) {
     return new Date(directTimestamp * 1000).toISOString();
   }
 
-  const directText = String(record.finished_time || record.finishedTime || "").trim();
+  const directText = String(record.completedAt || record.finished_time || record.finishedTime || "").trim();
   if (directText && /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(directText)) {
     return directText.replace(" ", "T");
   }
