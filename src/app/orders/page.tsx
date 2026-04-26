@@ -790,7 +790,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders, tickAutoComplete]);
+  }, [fetchOrders]);
 
   useEffect(() => {
     fetchIntegrationConfig();
