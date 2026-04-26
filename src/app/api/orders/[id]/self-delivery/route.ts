@@ -4,6 +4,12 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
+type ShippingAddress = {
+  externalId?: string;
+  longitude?: number | null;
+  latitude?: number | null;
+};
+
 export const dynamic = "force-dynamic";
 
 function isCompletedStatus(status?: string | null) {
@@ -73,23 +79,21 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
       const schedulingOrder = refreshedOrder || order;
       const shopExternalId = readShopIdFromRawPayload(schedulingOrder.rawPayload);
-      const shop = shopExternalId
-        ? await prisma.shop.findFirst({
-            where: {
-              userId: session.id,
-              externalId: shopExternalId,
-            },
-            select: {
-              longitude: true,
-              latitude: true,
-            },
-          })
+      const userProfile = await prisma.user.findUnique({
+        where: { id: session.id },
+        select: { shippingAddresses: true },
+      });
+      const shippingAddresses = Array.isArray(userProfile?.shippingAddresses)
+        ? (userProfile.shippingAddresses as ShippingAddress[])
+        : [];
+      const matchedShippingAddress = shopExternalId
+        ? shippingAddresses.find((item) => String(item.externalId || "").trim() === shopExternalId)
         : null;
 
       const autoCompleteAt = getEstimatedAutoCompleteAt({
         ...schedulingOrder,
-        shopLongitude: shop?.longitude ?? null,
-        shopLatitude: shop?.latitude ?? null,
+        shopLongitude: matchedShippingAddress?.longitude ?? null,
+        shopLatitude: matchedShippingAddress?.latitude ?? null,
       });
       await prisma.autoPickOrder.update({
         where: { id },

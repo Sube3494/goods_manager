@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { getAddressDetail } from "@/lib/addressBook";
 
 function normalizeExternalId(value: unknown) {
   return String(value || "").replace(/\s+/g, "").trim();
+}
+
+function sameNullableNumber(left: number | null | undefined, right: number | null | undefined) {
+  const normalizedLeft = Number.isFinite(Number(left)) ? Number(left) : null;
+  const normalizedRight = Number.isFinite(Number(right)) ? Number(right) : null;
+  return normalizedLeft === normalizedRight;
 }
 
 type ShippingAddress = {
   id?: string;
   label?: string;
   address?: string;
+  detailAddress?: string;
   isDefault?: boolean;
+  externalId?: string;
+  longitude?: number;
+  latitude?: number;
 };
 
 // GET: 获取店铺列表，默认仅返回当前用户自己的数据
@@ -46,8 +57,11 @@ export async function GET(request: NextRequest) {
       .map((item, index) => ({
         id: String(item?.id || `address-${index}`),
         name: String(item?.label || "").trim(),
-        address: String(item?.address || "").trim(),
+        address: getAddressDetail(item),
         isDefault: Boolean(item?.isDefault),
+        externalId: normalizeExternalId(item?.externalId),
+        longitude: Number.isFinite(Number(item?.longitude)) ? Number(item?.longitude) : null,
+        latitude: Number.isFinite(Number(item?.latitude)) ? Number(item?.latitude) : null,
       }))
       .filter((item) => item.name && item.address);
 
@@ -64,7 +78,26 @@ export async function GET(request: NextRequest) {
     const createdShops: typeof existingShops = [];
 
     for (const addr of normalizedAddresses) {
-      if (existingByName.has(addr.name)) {
+      const existing = existingByName.get(addr.name);
+      if (existing) {
+        const shouldUpdate =
+          String(existing.address || "").trim() !== addr.address ||
+          String(existing.externalId || "").trim() !== String(addr.externalId || "").trim() ||
+          !sameNullableNumber(existing.longitude, addr.longitude) ||
+          !sameNullableNumber(existing.latitude, addr.latitude);
+
+        if (shouldUpdate) {
+          const updated = await prisma.shop.update({
+            where: { id: existing.id },
+            data: {
+              address: addr.address,
+              externalId: addr.externalId || null,
+              longitude: addr.longitude,
+              latitude: addr.latitude,
+            },
+          });
+          existingByName.set(updated.name.trim(), updated);
+        }
         continue;
       }
 
@@ -73,6 +106,9 @@ export async function GET(request: NextRequest) {
           userId: user.id,
           name: addr.name,
           address: addr.address,
+          externalId: addr.externalId || null,
+          longitude: addr.longitude,
+          latitude: addr.latitude,
           isSource: true,
           remark: "自动从店铺地址同步",
         },

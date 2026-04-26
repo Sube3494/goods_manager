@@ -11,8 +11,13 @@ interface AddressItem {
   id: string;
   label: string;
   address: string;
+  detailAddress?: string;
+  contactName?: string;
+  contactPhone?: string;
   isDefault: boolean;
   externalId?: string;
+  longitude?: number;
+  latitude?: number;
 }
 
 interface User {

@@ -26,6 +26,7 @@ import Link from "next/link";
 import Image from "next/image";
 import md5 from "blueimp-md5";
 import { User as UserType, AddressItem, AutoPickApiKey } from "@/lib/types";
+import { buildAddressDisplay, getAddressDetail } from "@/lib/addressBook";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -55,13 +56,22 @@ export default function ProfilePage() {
 
     const addresses = typedUser?.shippingAddresses;
     if (Array.isArray(addresses)) {
-      setAddressList(addresses);
+      setAddressList(addresses.map((item) => ({
+        ...item,
+        detailAddress: item.detailAddress || getAddressDetail(item),
+        contactName: item.contactName || "",
+        contactPhone: item.contactPhone || "",
+        address: item.address || buildAddressDisplay(item),
+      })));
     } else if (typeof typedUser?.shippingAddress === "string" && typedUser.shippingAddress) {
       setAddressList([
         {
           id: "legacy",
           label: "默认地址",
           address: typedUser.shippingAddress,
+          detailAddress: typedUser.shippingAddress,
+          contactName: "",
+          contactPhone: "",
           isDefault: true,
           externalId: "",
         },
@@ -528,9 +538,10 @@ export default function ProfilePage() {
                 <div>
                   <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Address Library</div>
                   <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">收货地址库</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">保存时会按详细地址自动解析门店经纬度，后续订单距离和自配送预估会优先使用这组坐标。</p>
                 </div>
                 <button
-                  onClick={() => setAddressList([...addressList, { id: Math.random().toString(36).substr(2, 9), label: "", address: "", isDefault: addressList.length === 0, externalId: "" }])}
+                  onClick={() => setAddressList([...addressList, { id: Math.random().toString(36).substr(2, 9), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0, externalId: "" }])}
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/6 px-4 text-sm font-black text-primary transition-all hover:bg-primary/12 active:scale-[0.98] sm:w-auto"
                 >
                   <Plus size={16} />
@@ -613,12 +624,37 @@ export default function ProfilePage() {
                               }`}
                             />
 
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                              <input
+                                type="text"
+                                placeholder="联系人"
+                                value={item.contactName || ""}
+                                onChange={(e) => {
+                                  const newList = [...addressList];
+                                  newList[index] = { ...newList[index], contactName: e.target.value };
+                                  setAddressList(newList);
+                                }}
+                                className="h-11 w-full rounded-2xl border border-border/60 bg-white px-4 text-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 dark:bg-white/5"
+                              />
+                              <input
+                                type="text"
+                                placeholder="联系电话"
+                                value={item.contactPhone || ""}
+                                onChange={(e) => {
+                                  const newList = [...addressList];
+                                  newList[index] = { ...newList[index], contactPhone: e.target.value };
+                                  setAddressList(newList);
+                                }}
+                                className="h-11 w-full rounded-2xl border border-border/60 bg-white px-4 text-sm outline-none transition-all focus:border-primary/40 focus:ring-4 focus:ring-primary/10 dark:bg-white/5"
+                              />
+                            </div>
+
                             <textarea
                               placeholder="详细地址..."
-                              value={item.address}
+                              value={item.detailAddress || ""}
                               onChange={(e) => {
                                 const newList = [...addressList];
-                                newList[index] = { ...newList[index], address: e.target.value };
+                                newList[index] = { ...newList[index], detailAddress: e.target.value };
                                 setAddressList(newList);
                               }}
                               rows={3}
@@ -648,6 +684,20 @@ export default function ProfilePage() {
                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">%</span>
                             </div>
                             <p className="mt-2 px-1 text-[11px] leading-relaxed text-muted-foreground/60">用于结算和地址维度统计，留空则按系统默认处理。</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-4 py-3 text-xs text-muted-foreground dark:bg-white/5">
+                          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">展示地址</div>
+                          <div className="mt-2 text-foreground">
+                            {buildAddressDisplay(item) || "请补全联系人、电话和详细地址"}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-4 py-3 text-xs text-muted-foreground dark:bg-white/5">
+                          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">门店坐标</div>
+                          <div className="mt-2 font-mono text-foreground">
+                            {item.longitude != null && item.latitude != null ? `${item.longitude}, ${item.latitude}` : "保存后自动生成"}
                           </div>
                         </div>
                       </div>

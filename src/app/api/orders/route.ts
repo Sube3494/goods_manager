@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { calculateStraightLineDistanceKm } from "@/lib/autoPickSchedule";
+import { getAddressDetail } from "@/lib/addressBook";
 import { Prisma } from "../../../../prisma/generated-client";
 
 export const dynamic = "force-dynamic";
@@ -23,16 +24,11 @@ type MatchedCatalogProduct = {
 };
 
 type ShippingAddress = {
+  id?: string;
   label?: string;
   address?: string;
+  detailAddress?: string;
   externalId?: string;
-};
-
-type ShopLocation = {
-  id: string;
-  name: string;
-  address?: string | null;
-  externalId?: string | null;
   longitude?: number | null;
   latitude?: number | null;
 };
@@ -145,7 +141,7 @@ function matchShopName(shopId: string | null, shopAddress: string | null, rawSho
 
   if (normalizedShopAddress) {
     const directMatch = shippingAddresses.find((addr) => {
-      const address = String(addr.address || "").trim();
+      const address = getAddressDetail(addr);
       if (!address) return false;
       return address.includes(normalizedShopAddress) || normalizedShopAddress.includes(address);
     });
@@ -180,16 +176,16 @@ function matchShopName(shopId: string | null, shopAddress: string | null, rawSho
   return matchedByShopName?.label ? String(matchedByShopName.label).trim() : null;
 }
 
-function matchShopRecord(
+function matchShippingAddressRecord(
   shopId: string | null,
   shopAddress: string | null,
   rawShopName: string | null,
   matchedShopName: string | null,
-  shops: ShopLocation[]
+  shippingAddresses: ShippingAddress[]
 ) {
   const normalizedShopId = String(shopId || "").trim();
   if (normalizedShopId) {
-    const matchedById = shops.find((shop) => String(shop.externalId || "").trim() === normalizedShopId);
+    const matchedById = shippingAddresses.find((addr) => String(addr.externalId || "").trim() === normalizedShopId);
     if (matchedById) {
       return matchedById;
     }
@@ -197,35 +193,36 @@ function matchShopRecord(
 
   const normalizedMatchedShopName = toNormalizedText(matchedShopName);
   if (normalizedMatchedShopName) {
-    const matchedByName = shops.find((shop) => toNormalizedText(shop.name) === normalizedMatchedShopName);
+    const matchedByName = shippingAddresses.find((addr) => toNormalizedText(addr.label) === normalizedMatchedShopName);
     if (matchedByName) {
       return matchedByName;
     }
   }
 
-  const normalizedRawShopName = toNormalizedText(rawShopName);
-  if (normalizedRawShopName) {
-    const matchedByRawName = shops.find((shop) => {
-      const normalizedName = toNormalizedText(shop.name);
-      const normalizedCoreName = toNormalizedText(stripShopSuffix(shop.name));
-      return Boolean(
-        (normalizedName && (normalizedRawShopName.includes(normalizedName) || normalizedName.includes(normalizedRawShopName))) ||
-        (normalizedCoreName && (normalizedRawShopName.includes(normalizedCoreName) || normalizedCoreName.includes(normalizedRawShopName)))
-      );
-    });
-    if (matchedByRawName) {
-      return matchedByRawName;
-    }
-  }
-
   const normalizedShopAddress = String(shopAddress || "").trim();
   if (normalizedShopAddress) {
-    const matchedByAddress = shops.find((shop) => {
-      const address = String(shop.address || "").trim();
+      const matchedByAddress = shippingAddresses.find((addr) => {
+      const address = getAddressDetail(addr);
       return Boolean(address && (address.includes(normalizedShopAddress) || normalizedShopAddress.includes(address)));
     });
     if (matchedByAddress) {
       return matchedByAddress;
+    }
+  }
+
+  const normalizedRawShopName = toNormalizedText(rawShopName);
+  if (normalizedRawShopName) {
+    const matchedByRawName = shippingAddresses.find((addr) => {
+      const label = String(addr.label || "").trim();
+      const normalizedLabel = toNormalizedText(label);
+      const normalizedCoreLabel = toNormalizedText(stripShopSuffix(label));
+      return Boolean(
+        (normalizedLabel && (normalizedRawShopName.includes(normalizedLabel) || normalizedLabel.includes(normalizedRawShopName))) ||
+        (normalizedCoreLabel && (normalizedRawShopName.includes(normalizedCoreLabel) || normalizedCoreLabel.includes(normalizedRawShopName)))
+      );
+    });
+    if (matchedByRawName) {
+      return matchedByRawName;
     }
   }
 
@@ -281,7 +278,7 @@ export async function GET(request: NextRequest) {
       ...(hasDelivery === false ? { delivery: { equals: Prisma.DbNull } } : {}),
     };
 
-    const [orders, total, platformRows, statusRows, userProfile, shops] = await Promise.all([
+    const [orders, total, platformRows, statusRows, userProfile] = await Promise.all([
       prisma.autoPickOrder.findMany({
         where,
         include: {
@@ -312,17 +309,6 @@ export async function GET(request: NextRequest) {
       prisma.user.findUnique({
         where: { id: session.id },
         select: { shippingAddresses: true },
-      }),
-      prisma.shop.findMany({
-        where: { userId: session.id },
-        select: {
-          id: true,
-          name: true,
-          address: true,
-          externalId: true,
-          longitude: true,
-          latitude: true,
-        },
       }),
     ]);
 
@@ -429,30 +415,30 @@ export async function GET(request: NextRequest) {
     };
     }).map((order) => {
       const matchedShopName = matchShopName(order.shopId, order.shopAddress, order.rawShopName, shippingAddresses);
-      const matchedShop = matchShopRecord(order.shopId, order.shopAddress, order.rawShopName, matchedShopName, shops);
+      const matchedShippingAddress = matchShippingAddressRecord(order.shopId, order.shopAddress, order.rawShopName, matchedShopName, shippingAddresses);
       const hasUserCoord = Number.isFinite(order.longitude) && Number.isFinite(order.latitude);
-      const hasShopCoord = Number.isFinite(matchedShop?.longitude) && Number.isFinite(matchedShop?.latitude);
+      const resolvedShopLongitude = matchedShippingAddress?.longitude ?? null;
+      const resolvedShopLatitude = matchedShippingAddress?.latitude ?? null;
+      const hasShopCoord = Number.isFinite(resolvedShopLongitude) && Number.isFinite(resolvedShopLatitude);
       const linearDistanceKm = hasUserCoord && hasShopCoord
         ? calculateStraightLineDistanceKm(
             {
-              longitude: Number(matchedShop?.longitude),
-              latitude: Number(matchedShop?.latitude),
+              longitude: Number(resolvedShopLongitude),
+              latitude: Number(resolvedShopLatitude),
             },
             {
               longitude: Number(order.longitude),
               latitude: Number(order.latitude),
             }
           )
-        : order.distanceIsLinear
-          ? order.distanceKm ?? null
-          : null;
+        : null;
       const routeDistanceKm = order.distanceIsLinear ? null : (order.distanceKm ?? null);
 
       return {
         ...order,
         matchedShopName,
-        shopLongitude: matchedShop?.longitude ?? null,
-        shopLatitude: matchedShop?.latitude ?? null,
+        shopLongitude: resolvedShopLongitude,
+        shopLatitude: resolvedShopLatitude,
         linearDistanceKm,
         routeDistanceKm,
         items: order.items.map((item) => {
