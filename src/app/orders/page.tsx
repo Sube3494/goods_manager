@@ -107,6 +107,8 @@ function getOrderActionErrorMessage(raw: unknown) {
       return "订单已完成，不需要重复操作。";
     case "Order already cancelled":
       return "订单已取消，不需要继续处理。";
+    case "Pickup order does not require self delivery":
+      return "到店自取订单不需要发起自配送。";
     default:
       return reason || "操作失败";
   }
@@ -137,6 +139,17 @@ function isTerminalStatus(status?: string | null) {
 
 function isDeliveringStatus(status?: string | null) {
   return getDisplayStatus(status) === "配送中";
+}
+
+function getFulfillmentBadge(order: AutoPickOrder) {
+  if (order.isPickup) {
+    return {
+      label: "到店自取",
+      className: "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    };
+  }
+
+  return null;
 }
 
 function getStatusTone(status?: string | null) {
@@ -224,25 +237,6 @@ function getItemCount(items: AutoPickOrderItem[]) {
 
 function formatDistanceKm(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} km` : "-";
-}
-
-function getDistanceSummary(order: AutoPickOrder) {
-  const route = formatDistanceKm(order.routeDistanceKm);
-  const linear = formatDistanceKm(order.linearDistanceKm);
-
-  if (order.routeDistanceKm != null && order.linearDistanceKm != null) {
-    return `路线 ${route} / 直线 ${linear}`;
-  }
-
-  if (order.routeDistanceKm != null) {
-    return `路线 ${route}`;
-  }
-
-  if (order.linearDistanceKm != null) {
-    return `直线 ${linear}`;
-  }
-
-  return "距离待同步";
 }
 
 function MetricCard({
@@ -366,10 +360,12 @@ function OrderCard({
   const cancelled = isCancelledStatus(order.status);
   const terminal = isTerminalStatus(order.status);
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
+  const pickup = Boolean(order.isPickup);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
   const sourceLabel = getOrderSourceLabel(order);
+  const fulfillmentBadge = getFulfillmentBadge(order);
 
   return (
     <article className="overflow-hidden rounded-[30px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04]">
@@ -395,6 +391,11 @@ function OrderCard({
                   {sourceLabel ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-black/8 bg-black/[0.03] px-2.5 text-[13px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
                       {sourceLabel}
+                    </span>
+                  ) : null}
+                  {fulfillmentBadge ? (
+                    <span className={cn("inline-flex h-8 items-center rounded-full border px-2.5 text-[13px] font-medium", fulfillmentBadge.className)}>
+                      {fulfillmentBadge.label}
                     </span>
                   ) : null}
                   <StatusBadge status={order.status} />
@@ -424,7 +425,7 @@ function OrderCard({
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin size={13} />
-                    {getDistanceSummary(order)}
+                    {pickup ? "到店自取" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}
                   </span>
                 </div>
               </div>
@@ -496,9 +497,11 @@ function OrderCard({
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal || delivering}
+              disabled={Boolean(actingId) || terminal || delivering || pickup}
               title={
-                terminal
+                pickup
+                  ? "到店自取订单不需要发起自配送"
+                  : terminal
                   ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
                   : delivering
                     ? "订单已在配送中，不能重复发起自配"
@@ -510,8 +513,14 @@ function OrderCard({
               variant="primary"
               icon={actingId === `${order.id}:complete-delivery` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
               onClick={() => onRunAction(order.id, "complete-delivery")}
-              disabled={Boolean(actingId) || terminal}
-              title={terminal ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送") : undefined}
+              disabled={Boolean(actingId) || terminal || pickup}
+              title={
+                pickup
+                  ? "到店自取订单不需要完成配送"
+                  : terminal
+                    ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
+                    : undefined
+              }
             />
           </div>
         </div>
@@ -528,12 +537,10 @@ function OrderCard({
                 <InfoPair label="订单状态" value={getDisplayStatus(order.status)} />
                 <InfoPair label="识别门店" value={order.matchedShopName || "-"} />
                 <InfoPair label="门店地址" value={order.shopAddress || "-"} />
-                <InfoPair label="配送地址" value={order.userAddress} />
-                <InfoPair label="收货坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
-                <InfoPair label="门店坐标" value={order.shopLongitude != null && order.shopLatitude != null ? `${order.shopLongitude}, ${order.shopLatitude}` : "-"} />
-                <InfoPair label="直线距离" value={formatDistanceKm(order.linearDistanceKm)} />
-                <InfoPair label="路线距离" value={formatDistanceKm(order.routeDistanceKm)} />
-                <InfoPair label="同步来源" value={order.distanceIsLinear ? "插件当前是直线值" : "插件当前是路线值"} />
+                <InfoPair label="履约方式" value={pickup ? "到店自取" : "配送上门"} />
+                <InfoPair label="配送地址" value={pickup ? "-" : order.userAddress} />
+                <InfoPair label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
+                <InfoPair label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
                 <InfoPair label="送达时限" value={order.deliveryDeadline || "-"} />
               </div>
             </section>

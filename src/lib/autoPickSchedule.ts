@@ -8,58 +8,8 @@ const DELIVERY_DEADLINE_LEAD_MINUTES = 5;
 export type SchedulableAutoPickOrder = {
   orderTime: Date | string;
   distanceKm?: number | null;
-  distanceIsLinear?: boolean | null;
   deliveryDeadline?: string | null;
-  longitude?: number | null;
-  latitude?: number | null;
-  shopLongitude?: number | null;
-  shopLatitude?: number | null;
 };
-
-export function calculateStraightLineDistanceKm(
-  origin: { longitude: number; latitude: number },
-  destination: { longitude: number; latitude: number }
-) {
-  const toRadians = (value: number) => (value * Math.PI) / 180;
-  const earthRadiusKm = 6378.137;
-  const latDiff = toRadians(destination.latitude - origin.latitude);
-  const lngDiff = toRadians(destination.longitude - origin.longitude);
-  const lat1 = toRadians(origin.latitude);
-  const lat2 = toRadians(destination.latitude);
-
-  const a =
-    Math.sin(latDiff / 2) * Math.sin(latDiff / 2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(lngDiff / 2) * Math.sin(lngDiff / 2);
-
-  return 2 * earthRadiusKm * Math.asin(Math.sqrt(a));
-}
-
-export function resolveSchedulingDistanceKm(order: SchedulableAutoPickOrder) {
-  if (typeof order.distanceKm === "number" && order.distanceIsLinear === false) {
-    return order.distanceKm;
-  }
-
-  const hasShopCoord = Number.isFinite(order.shopLongitude) && Number.isFinite(order.shopLatitude);
-  const hasUserCoord = Number.isFinite(order.longitude) && Number.isFinite(order.latitude);
-  if (hasShopCoord && hasUserCoord) {
-    return calculateStraightLineDistanceKm(
-      {
-        longitude: Number(order.shopLongitude),
-        latitude: Number(order.shopLatitude),
-      },
-      {
-        longitude: Number(order.longitude),
-        latitude: Number(order.latitude),
-      }
-    );
-  }
-
-  if (typeof order.distanceKm === "number") {
-    return order.distanceKm;
-  }
-
-  return null;
-}
 
 export function parseExpectedDeliveryTime(deadlineText: string | null | undefined, orderTime: Date | string) {
   const text = String(deadlineText || "").replace(/\s+/g, " ").trim();
@@ -95,7 +45,7 @@ export function parseExpectedDeliveryTime(deadlineText: string | null | undefine
 }
 
 export function getEstimatedAutoCompleteAt(order: SchedulableAutoPickOrder) {
-  const distanceKm = resolveSchedulingDistanceKm(order);
+  const distanceKm = typeof order.distanceKm === "number" ? order.distanceKm : null;
   const heuristicAt = distanceKm != null
     ? new Date(Date.now() + (PICKUP_MINUTES + distanceKm * MINUTES_PER_KM + RIDER_UPSTAIRS_MINUTES) * 60 * 1000)
     : null;

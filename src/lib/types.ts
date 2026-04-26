@@ -152,16 +152,13 @@ export interface AutoPickOrder {
   userAddress: string;
   shopAddress?: string | null;
   matchedShopName?: string | null;
-  shopLongitude?: number | null;
-  shopLatitude?: number | null;
+  isPickup?: boolean;
   longitude?: number | null;
   latitude?: number | null;
   status?: string | null;
   deliveryDeadline?: string | null;
   distanceKm?: number | null;
   distanceIsLinear: boolean;
-  linearDistanceKm?: number | null;
-  routeDistanceKm?: number | null;
   actualPaid: number;
   expectedIncome?: number | null;
   platformCommission: number;

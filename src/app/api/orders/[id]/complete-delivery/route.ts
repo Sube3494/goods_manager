@@ -14,6 +14,23 @@ function isCancelledStatus(status?: string | null) {
   return text.includes("取消") || text.includes("退款") || text.includes("关闭");
 }
 
+function isPickupOrder(rawPayload: unknown, userAddress?: string | null) {
+  const candidates = [userAddress];
+
+  if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
+    const record = rawPayload as Record<string, unknown>;
+    candidates.push(
+      String(record.unencrypted_map_address || ""),
+      String(record.unencrypted_address || ""),
+      String(record.user_remark || ""),
+      String(record.address || ""),
+      String(record.map_address || "")
+    );
+  }
+
+  return candidates.some((item) => /到店自取|门店自取|上门自取|自提/.test(String(item || "").trim()));
+}
+
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
@@ -39,6 +56,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     if (isCancelledStatus(order.status)) {
       return NextResponse.json({ error: "Order already cancelled" }, { status: 409 });
+    }
+
+    if (isPickupOrder(order.rawPayload, order.userAddress)) {
+      return NextResponse.json({ error: "Pickup order does not require complete delivery" }, { status: 409 });
     }
 
     const result = await callAutoPickCommand(session.id, "/complete-delivery", {

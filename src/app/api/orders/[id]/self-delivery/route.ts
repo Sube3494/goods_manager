@@ -4,12 +4,6 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
-type ShippingAddress = {
-  externalId?: string;
-  longitude?: number | null;
-  latitude?: number | null;
-};
-
 export const dynamic = "force-dynamic";
 
 function isCompletedStatus(status?: string | null) {
@@ -21,14 +15,21 @@ function isCancelledStatus(status?: string | null) {
   return text.includes("取消") || text.includes("退款") || text.includes("关闭");
 }
 
-function readShopIdFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
+function isPickupOrder(rawPayload: unknown, userAddress?: string | null) {
+  const candidates = [userAddress];
+
+  if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
+    const record = rawPayload as Record<string, unknown>;
+    candidates.push(
+      String(record.unencrypted_map_address || ""),
+      String(record.unencrypted_address || ""),
+      String(record.user_remark || ""),
+      String(record.address || ""),
+      String(record.map_address || "")
+    );
   }
 
-  const record = rawPayload as Record<string, unknown>;
-  const value = String(record.shopId || record.shop_id || record.storeId || record.store_id || record.merchant_id || "").trim();
-  return value || null;
+  return candidates.some((item) => /到店自取|门店自取|上门自取|自提/.test(String(item || "").trim()));
 }
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -58,6 +59,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order already cancelled" }, { status: 409 });
     }
 
+    if (isPickupOrder(order.rawPayload, order.userAddress)) {
+      return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
+    }
+
     const result = await callAutoPickCommand(session.id, "/self-delivery", {
       platform: order.platform,
       dailyPlatformSequence: order.dailyPlatformSequence,
@@ -78,23 +83,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
 
       const schedulingOrder = refreshedOrder || order;
-      const shopExternalId = readShopIdFromRawPayload(schedulingOrder.rawPayload);
-      const userProfile = await prisma.user.findUnique({
-        where: { id: session.id },
-        select: { shippingAddresses: true },
-      });
-      const shippingAddresses = Array.isArray(userProfile?.shippingAddresses)
-        ? (userProfile.shippingAddresses as ShippingAddress[])
-        : [];
-      const matchedShippingAddress = shopExternalId
-        ? shippingAddresses.find((item) => String(item.externalId || "").trim() === shopExternalId)
-        : null;
-
-      const autoCompleteAt = getEstimatedAutoCompleteAt({
-        ...schedulingOrder,
-        shopLongitude: matchedShippingAddress?.longitude ?? null,
-        shopLatitude: matchedShippingAddress?.latitude ?? null,
-      });
+      const autoCompleteAt = getEstimatedAutoCompleteAt(schedulingOrder);
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
