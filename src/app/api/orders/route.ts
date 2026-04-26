@@ -103,7 +103,6 @@ function readShopNameFromRawPayload(rawPayload: unknown) {
     record.channel_name,
     record.shop_name,
     record.shopName,
-    record.shopAddress,
     record.storeName,
     record.merchantName,
     record.merchant_name,
@@ -195,22 +194,20 @@ function matchShopName(rawShopName: string | null, rawShopAddress: string | null
     }
   }
 
-  if (!normalizedRawShopName) {
-    return null;
-  }
+  if (normalizedRawShopName) {
+    const matchedByNormalizedShopName = shippingAddresses.find((addr) => {
+      const label = String(addr.label || "").trim();
+      const normalizedLabel = toNormalizedText(label);
+      const normalizedCoreLabel = toNormalizedText(stripShopSuffix(label));
+      return Boolean(
+        (normalizedLabel && (normalizedRawShopName.includes(normalizedLabel) || normalizedLabel.includes(normalizedRawShopName))) ||
+        (normalizedCoreLabel && (normalizedRawShopName.includes(normalizedCoreLabel) || normalizedCoreLabel.includes(normalizedRawShopName)))
+      );
+    });
 
-  const matchedByNormalizedShopName = shippingAddresses.find((addr) => {
-    const label = String(addr.label || "").trim();
-    const normalizedLabel = toNormalizedText(label);
-    const normalizedCoreLabel = toNormalizedText(stripShopSuffix(label));
-    return Boolean(
-      (normalizedLabel && (normalizedRawShopName.includes(normalizedLabel) || normalizedLabel.includes(normalizedRawShopName))) ||
-      (normalizedCoreLabel && (normalizedRawShopName.includes(normalizedCoreLabel) || normalizedCoreLabel.includes(normalizedRawShopName)))
-    );
-  });
-
-  if (matchedByNormalizedShopName?.label) {
-    return String(matchedByNormalizedShopName.label).trim();
+    if (matchedByNormalizedShopName?.label) {
+      return String(matchedByNormalizedShopName.label).trim();
+    }
   }
 
   if (!normalizedShopAddress) {
@@ -446,7 +443,7 @@ export async function GET(request: NextRequest) {
         ...order,
         shopId: order.shopId,
         shopAddress: order.shopAddress,
-        rawShopName: readShopNameFromRawPayload(order.rawPayload) || order.shopAddress || null,
+        rawShopName: readShopNameFromRawPayload(order.rawPayload) || null,
         rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isPickup: pickup,
