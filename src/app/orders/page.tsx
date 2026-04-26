@@ -324,13 +324,15 @@ function DetailStat({
   label,
   value,
   valueClassName,
+  className,
 }: {
   label: string;
   value: string;
   valueClassName?: string;
+  className?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-black/6 bg-black/[0.02] px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.03]">
+    <div className={cn("rounded-2xl border border-black/6 bg-black/[0.02] px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.03] sm:px-3 sm:py-2", className)}>
       <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
       <div className={cn("mt-1 text-sm font-semibold text-foreground", valueClassName)}>{value}</div>
     </div>
@@ -340,12 +342,14 @@ function DetailStat({
 function DetailBlock({
   label,
   value,
+  className,
 }: {
   label: string;
   value: string;
+  className?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-black/6 bg-black/[0.02] px-3 py-3 dark:border-white/8 dark:bg-white/[0.03]">
+    <div className={cn("rounded-2xl border border-black/6 bg-black/[0.02] px-3 py-3 dark:border-white/8 dark:bg-white/[0.03] sm:px-3 sm:py-2.5", className)}>
       <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
       <div className="mt-1.5 break-words text-sm font-medium leading-5 text-foreground">{value}</div>
     </div>
@@ -457,7 +461,7 @@ function OrderCard({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-2.5 sm:gap-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black/8 bg-black/[0.03] pl-2 pr-2.5 text-foreground dark:border-white/10 dark:bg-white/[0.04]">
                     <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden">
@@ -484,9 +488,7 @@ function OrderCard({
                   ) : null}
                   <StatusBadge order={order} />
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="w-full rounded-[18px] border border-black/8 bg-black/[0.02] px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03] sm:hidden">
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     <div className="min-w-0">
@@ -504,7 +506,7 @@ function OrderCard({
                   </div>
                 </div>
 
-                <div className="hidden w-full grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
+                <div className="hidden sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
                   <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03] sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
                     <span className="truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
@@ -664,29 +666,45 @@ function OrderCard({
         <div className="border-t border-black/6 bg-zinc-50/60 px-3.5 py-4 dark:border-white/6 dark:bg-white/[0.025] sm:px-5 sm:py-5">
           <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/[0.04] sm:rounded-[24px] sm:p-4">
-              <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-4">系统信息</h3>
-              <div className="grid grid-cols-2 gap-2.5">
+              <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">系统信息</h3>
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <DetailStat label="订单状态" value={getDisplayStatus(order)} />
                 <DetailStat label="履约方式" value={pickup ? "到店自取" : "配送上门"} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
                 <DetailStat label={pickup ? "取货时间" : subscribe ? "预约送达" : "最晚送达"} value={deadlineDisplay} />
               </div>
-              <div className="mt-2.5 space-y-2.5">
-                <DetailBlock label="系统门店" value={order.matchedShopName || "-"} />
-                <DetailBlock label="门店地址" value={order.rawShopAddress || order.shopAddress || "-"} />
-                <DetailBlock label="配送地址" value={pickup ? "-" : order.userAddress} />
-                <DetailBlock label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
-                <div className="space-y-2.5">
-                  <DetailStat label="订单编号" value={order.orderNo} valueClassName="break-all text-[13px] sm:text-sm" />
-                  <DetailStat label="原始 ID" value={order.sourceId} valueClassName="break-all text-[13px] sm:text-sm" />
+              <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
+                <div className="grid gap-2 sm:grid-cols-2 sm:gap-2.5">
+                  <DetailBlock label="系统门店" value={order.matchedShopName || "-"} />
+                  <DetailBlock label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
+                  <DetailBlock
+                    label="门店地址"
+                    value={order.rawShopAddress || order.shopAddress || "-"}
+                    className="sm:col-span-2"
+                  />
+                  <DetailBlock
+                    label="配送地址"
+                    value={pickup ? "-" : order.userAddress}
+                    className="sm:col-span-2"
+                  />
+                  <DetailStat
+                    label="订单编号"
+                    value={order.orderNo}
+                    valueClassName="break-all text-[13px] sm:text-sm"
+                  />
+                  <DetailStat
+                    label="原始 ID"
+                    value={order.sourceId}
+                    valueClassName="break-all text-[13px] sm:text-sm"
+                  />
                 </div>
                 {autoCompleteFailed ? (
                   <div className="rounded-2xl border border-rose-500/15 bg-rose-500/8 px-3 py-3 dark:bg-rose-500/[0.08]">
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                       <DetailStat label="自动完成任务" value="失败" />
                       <DetailStat label="失败次数" value={String(order.autoCompleteJobAttempts || 0)} />
                     </div>
-                    <div className="mt-2.5">
+                    <div className="mt-2 sm:mt-2.5">
                       <DetailBlock label="失败原因" value={order.autoCompleteJobError || "-"} />
                     </div>
                   </div>
@@ -694,10 +712,10 @@ function OrderCard({
               </div>
             </section>
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/[0.04] sm:rounded-[24px] sm:p-4">
-                <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-4">金额信息</h3>
-                <div className="grid grid-cols-2 gap-2.5">
+                <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">金额信息</h3>
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
                   <DetailStat label="预计到手" value={toCurrency(expectedIncome)} />
                   <div className="col-span-2">
@@ -706,14 +724,14 @@ function OrderCard({
                 </div>
               </section>
               <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/[0.04] sm:rounded-[24px] sm:p-4">
-                <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-4">物流信息</h3>
-                <div className="grid grid-cols-2 gap-2.5">
+                <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">物流信息</h3>
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="物流平台" value={order.delivery?.logisticName || "第三方平台"} />
                   <DetailStat label="配送人" value={order.delivery?.riderName || "-"} />
                   <DetailStat label="取餐时间" value={order.delivery?.pickupTime || "-"} />
                   <DetailStat label="配送费" value={order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"} />
                 </div>
-                <div className="mt-2.5">
+                <div className="mt-2 sm:mt-2.5">
                   <DetailBlock label="轨迹" value={order.delivery?.track || "暂无轨迹"} />
                 </div>
               </section>
@@ -863,7 +881,6 @@ export default function OrdersPage() {
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
-  const [hasDelivery, setHasDelivery] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -951,7 +968,6 @@ export default function OrdersPage() {
       if (query.trim()) params.set("query", query.trim());
       if (platform !== "all") params.set("platform", platform);
       if (status !== "all") params.set("status", status);
-      if (hasDelivery !== "all") params.set("hasDelivery", String(hasDelivery === "true"));
       if (effectiveStartDate) params.set("startDate", effectiveStartDate);
       if (effectiveEndDate) params.set("endDate", effectiveEndDate);
 
@@ -979,7 +995,7 @@ export default function OrdersPage() {
         setIsLoading(false);
       }
     }
-  }, [activeTab, currentPage, endDate, hasDelivery, pageSize, platform, query, showToast, startDate, status, todayDate]);
+  }, [activeTab, currentPage, endDate, pageSize, platform, query, showToast, startDate, status, todayDate]);
 
   useEffect(() => {
     fetchOrders();
@@ -991,7 +1007,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, endDate, hasDelivery, platform, query, shop, startDate, status]);
+  }, [activeTab, endDate, platform, query, shop, startDate, status]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],
@@ -1021,18 +1037,11 @@ export default function OrdersPage() {
     return [{ value: "all", label: "全部店铺" }, ...labels.map((label) => ({ value: label, label }))];
   }, [orders]);
 
-  const deliveryOptions = [
-    { value: "all", label: "全部配送" },
-    { value: "true", label: "已有配送" },
-    { value: "false", label: "缺少配送" },
-  ];
-
   const resetFilters = () => {
     setQuery("");
     setPlatform("all");
     setShop("all");
     setStatus("all");
-    setHasDelivery("all");
     setStartDate("");
     setEndDate("");
   };
@@ -1194,7 +1203,7 @@ export default function OrdersPage() {
   const todayPendingOrders = useMemo(() => filteredOrders.filter((item) => !isTerminalStatus(item.status)), [filteredOrders]);
   const todayCompletedOrders = useMemo(() => filteredOrders.filter((item) => isTerminalStatus(item.status)), [filteredOrders]);
   const visibleOrders = activeTab === "today" ? todayPendingOrders : filteredOrders;
-  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || hasDelivery !== "all" || startDate || endDate);
+  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || startDate || endDate);
   const hasLiveOrders = todayPendingOrders.length > 0;
   const autoRefreshIntervalMs = activeTab === "today"
     ? (hasLiveOrders ? TODAY_ACTIVE_REFRESH_MS : TODAY_IDLE_REFRESH_MS)
@@ -1354,7 +1363,7 @@ export default function OrdersPage() {
               ) : null}
             </div>
 
-            <div className={cn("grid gap-3", activeTab === "today" ? "lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]" : "lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]")}>
+            <div className={cn("grid gap-3", activeTab === "today" ? "lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]" : "lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]")}>
               <label className="flex h-11 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]">
                 <Search size={16} className="text-muted-foreground" />
                 <input
@@ -1366,6 +1375,13 @@ export default function OrdersPage() {
               </label>
 
               <CustomSelect
+                value={shop}
+                onChange={setShop}
+                options={shopOptions}
+                className="h-11"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              />
+              <CustomSelect
                 value={platform}
                 onChange={setPlatform}
                 options={platformOptions}
@@ -1376,20 +1392,6 @@ export default function OrdersPage() {
                 value={status}
                 onChange={setStatus}
                 options={statusOptions}
-                className="h-11"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
-              />
-              <CustomSelect
-                value={shop}
-                onChange={setShop}
-                options={shopOptions}
-                className="h-11"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
-              />
-              <CustomSelect
-                value={hasDelivery}
-                onChange={setHasDelivery}
-                options={deliveryOptions}
                 className="h-11"
                 triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
               />
