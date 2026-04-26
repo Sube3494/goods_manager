@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
 
@@ -49,12 +49,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       await cancelAutoCompleteJob(order.id, "order-synced-to-terminal");
     }
 
+    const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);
+
     return NextResponse.json({
       ok: true,
       id: refreshedOrder.id,
       orderNo: refreshedOrder.orderNo,
       platform: refreshedOrder.platform,
       status: refreshedOrder.status,
+      completedAt: normalized?.completedAt || null,
       lastSyncedAt: refreshedOrder.lastSyncedAt,
     });
   } catch (error) {

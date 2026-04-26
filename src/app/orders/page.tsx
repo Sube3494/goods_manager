@@ -962,6 +962,7 @@ export default function OrdersPage() {
         patchOrder(orderId, (order) => ({
           ...order,
           status: "已完成",
+          completedAt: order.completedAt || nowIso,
           autoCompleteAt: null,
           autoCompleteJobStatus: "COMPLETED",
           autoCompleteJobError: null,
@@ -971,6 +972,7 @@ export default function OrdersPage() {
         patchOrder(orderId, (order) => ({
           ...order,
           status: String(data.status),
+          completedAt: typeof data.completedAt === "string" ? data.completedAt : (String(data.status).includes("完成") ? order.completedAt : null),
           lastSyncedAt: typeof data.lastSyncedAt === "string" ? data.lastSyncedAt : nowIso,
           autoCompleteAt: (String(data.status).includes("完成") || String(data.status).includes("取消")) ? null : order.autoCompleteAt,
         }));
