@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
+import { calculateStraightLineDistanceKm } from "@/lib/autoPickSchedule";
 import { Prisma } from "../../../../prisma/generated-client";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,15 @@ type ShippingAddress = {
   label?: string;
   address?: string;
   externalId?: string;
+};
+
+type ShopLocation = {
+  id: string;
+  name: string;
+  address?: string | null;
+  externalId?: string | null;
+  longitude?: number | null;
+  latitude?: number | null;
 };
 
 function toNormalizedText(value: string | null | undefined) {
@@ -170,6 +180,58 @@ function matchShopName(shopId: string | null, shopAddress: string | null, rawSho
   return matchedByShopName?.label ? String(matchedByShopName.label).trim() : null;
 }
 
+function matchShopRecord(
+  shopId: string | null,
+  shopAddress: string | null,
+  rawShopName: string | null,
+  matchedShopName: string | null,
+  shops: ShopLocation[]
+) {
+  const normalizedShopId = String(shopId || "").trim();
+  if (normalizedShopId) {
+    const matchedById = shops.find((shop) => String(shop.externalId || "").trim() === normalizedShopId);
+    if (matchedById) {
+      return matchedById;
+    }
+  }
+
+  const normalizedMatchedShopName = toNormalizedText(matchedShopName);
+  if (normalizedMatchedShopName) {
+    const matchedByName = shops.find((shop) => toNormalizedText(shop.name) === normalizedMatchedShopName);
+    if (matchedByName) {
+      return matchedByName;
+    }
+  }
+
+  const normalizedRawShopName = toNormalizedText(rawShopName);
+  if (normalizedRawShopName) {
+    const matchedByRawName = shops.find((shop) => {
+      const normalizedName = toNormalizedText(shop.name);
+      const normalizedCoreName = toNormalizedText(stripShopSuffix(shop.name));
+      return Boolean(
+        (normalizedName && (normalizedRawShopName.includes(normalizedName) || normalizedName.includes(normalizedRawShopName))) ||
+        (normalizedCoreName && (normalizedRawShopName.includes(normalizedCoreName) || normalizedCoreName.includes(normalizedRawShopName)))
+      );
+    });
+    if (matchedByRawName) {
+      return matchedByRawName;
+    }
+  }
+
+  const normalizedShopAddress = String(shopAddress || "").trim();
+  if (normalizedShopAddress) {
+    const matchedByAddress = shops.find((shop) => {
+      const address = String(shop.address || "").trim();
+      return Boolean(address && (address.includes(normalizedShopAddress) || normalizedShopAddress.includes(address)));
+    });
+    if (matchedByAddress) {
+      return matchedByAddress;
+    }
+  }
+
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
@@ -219,7 +281,7 @@ export async function GET(request: NextRequest) {
       ...(hasDelivery === false ? { delivery: { equals: Prisma.DbNull } } : {}),
     };
 
-    const [orders, total, platformRows, statusRows, userProfile] = await Promise.all([
+    const [orders, total, platformRows, statusRows, userProfile, shops] = await Promise.all([
       prisma.autoPickOrder.findMany({
         where,
         include: {
@@ -250,6 +312,17 @@ export async function GET(request: NextRequest) {
       prisma.user.findUnique({
         where: { id: session.id },
         select: { shippingAddresses: true },
+      }),
+      prisma.shop.findMany({
+        where: { userId: session.id },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          externalId: true,
+          longitude: true,
+          latitude: true,
+        },
       }),
     ]);
 
@@ -356,19 +429,44 @@ export async function GET(request: NextRequest) {
     };
     }).map((order) => {
       const matchedShopName = matchShopName(order.shopId, order.shopAddress, order.rawShopName, shippingAddresses);
+      const matchedShop = matchShopRecord(order.shopId, order.shopAddress, order.rawShopName, matchedShopName, shops);
+      const hasUserCoord = Number.isFinite(order.longitude) && Number.isFinite(order.latitude);
+      const hasShopCoord = Number.isFinite(matchedShop?.longitude) && Number.isFinite(matchedShop?.latitude);
+      const linearDistanceKm = hasUserCoord && hasShopCoord
+        ? calculateStraightLineDistanceKm(
+            {
+              longitude: Number(matchedShop?.longitude),
+              latitude: Number(matchedShop?.latitude),
+            },
+            {
+              longitude: Number(order.longitude),
+              latitude: Number(order.latitude),
+            }
+          )
+        : order.distanceIsLinear
+          ? order.distanceKm ?? null
+          : null;
+      const routeDistanceKm = order.distanceIsLinear ? null : (order.distanceKm ?? null);
+
       return {
         ...order,
         matchedShopName,
+        shopLongitude: matchedShop?.longitude ?? null,
+        shopLatitude: matchedShop?.latitude ?? null,
+        linearDistanceKm,
+        routeDistanceKm,
         items: order.items.map((item) => {
           const normalizedProductName = toNormalizedText(item.productName);
           const matchedShopProducts = normalizedProductName
             ? (shopProductMap.get(normalizedProductName) || [])
             : [];
+          const exactShopProduct = matchedShopProducts.find(
+            (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
+          );
           const matchedProduct = !normalizedProductName
             ? null
             : (
-                matchedShopProducts.find((product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()) ||
-                matchedShopProducts[0] ||
+                exactShopProduct ||
                 productMap.get(normalizedProductName) ||
                 null
               );

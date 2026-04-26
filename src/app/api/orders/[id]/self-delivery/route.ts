@@ -15,6 +15,16 @@ function isCancelledStatus(status?: string | null) {
   return text.includes("取消") || text.includes("退款") || text.includes("关闭");
 }
 
+function readShopIdFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const record = rawPayload as Record<string, unknown>;
+  const value = String(record.shopId || record.shop_id || record.storeId || record.store_id || record.merchant_id || "").trim();
+  return value || null;
+}
+
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
@@ -61,7 +71,26 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         return null;
       });
 
-      const autoCompleteAt = getEstimatedAutoCompleteAt(refreshedOrder || order);
+      const schedulingOrder = refreshedOrder || order;
+      const shopExternalId = readShopIdFromRawPayload(schedulingOrder.rawPayload);
+      const shop = shopExternalId
+        ? await prisma.shop.findFirst({
+            where: {
+              userId: session.id,
+              externalId: shopExternalId,
+            },
+            select: {
+              longitude: true,
+              latitude: true,
+            },
+          })
+        : null;
+
+      const autoCompleteAt = getEstimatedAutoCompleteAt({
+        ...schedulingOrder,
+        shopLongitude: shop?.longitude ?? null,
+        shopLatitude: shop?.latitude ?? null,
+      });
       await prisma.autoPickOrder.update({
         where: { id },
         data: {

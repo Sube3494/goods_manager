@@ -211,20 +211,38 @@ function getOrderItemDisplay(item: AutoPickOrderItem) {
     sku: item.productNo || matchedProduct?.sku || "-",
     image: matchedProduct?.image || item.thumb || null,
     quantity: item.quantity,
-    sourceLabel: matchedProduct
-      ? matchedProduct.sourceType === "shopProduct"
-        ? matchedProduct.shopName || "门店商品"
-        : "商品库"
-      : "推单商品",
   };
 }
 
-function getOrderSourceLabel(order: AutoPickOrder, firstItem: ReturnType<typeof getOrderItemDisplay> | null) {
-  return order.matchedShopName || firstItem?.sourceLabel || "";
+function getOrderSourceLabel(order: AutoPickOrder) {
+  return order.matchedShopName || "";
 }
 
 function getItemCount(items: AutoPickOrderItem[]) {
   return items.reduce((sum, item) => sum + item.quantity, 0);
+}
+
+function formatDistanceKm(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} km` : "-";
+}
+
+function getDistanceSummary(order: AutoPickOrder) {
+  const route = formatDistanceKm(order.routeDistanceKm);
+  const linear = formatDistanceKm(order.linearDistanceKm);
+
+  if (order.routeDistanceKm != null && order.linearDistanceKm != null) {
+    return `路线 ${route} / 直线 ${linear}`;
+  }
+
+  if (order.routeDistanceKm != null) {
+    return `路线 ${route}`;
+  }
+
+  if (order.linearDistanceKm != null) {
+    return `直线 ${linear}`;
+  }
+
+  return "距离待同步";
 }
 
 function MetricCard({
@@ -290,7 +308,6 @@ function ProductStripItem({ item }: { item: AutoPickOrderItem }) {
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
           <span>{display.sku}</span>
           <span>x{display.quantity}</span>
-          <span>{display.sourceLabel}</span>
         </div>
       </div>
     </div>
@@ -344,9 +361,7 @@ function OrderCard({
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
 }) {
-  const tone = getStatusTone(order.status);
   const itemCount = getItemCount(order.items);
-  const firstItem = order.items[0] ? getOrderItemDisplay(order.items[0]) : null;
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
   const terminal = isTerminalStatus(order.status);
@@ -354,7 +369,7 @@ function OrderCard({
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
-  const sourceLabel = getOrderSourceLabel(order, firstItem);
+  const sourceLabel = getOrderSourceLabel(order);
 
   return (
     <article className="overflow-hidden rounded-[30px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04]">
@@ -407,7 +422,10 @@ function OrderCard({
                     <Clock3 size={13} />
                     {formatLocalDateTime(order.orderTime)}
                   </span>
-                  <span>{order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步"}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin size={13} />
+                    {getDistanceSummary(order)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -511,8 +529,11 @@ function OrderCard({
                 <InfoPair label="识别门店" value={order.matchedShopName || "-"} />
                 <InfoPair label="门店地址" value={order.shopAddress || "-"} />
                 <InfoPair label="配送地址" value={order.userAddress} />
-                <InfoPair label="坐标" value={order.longitude && order.latitude ? `${order.longitude}, ${order.latitude}` : "-"} />
-                <InfoPair label="距离类型" value={order.distanceIsLinear ? "直线距离" : "路面距离"} />
+                <InfoPair label="收货坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
+                <InfoPair label="门店坐标" value={order.shopLongitude != null && order.shopLatitude != null ? `${order.shopLongitude}, ${order.shopLatitude}` : "-"} />
+                <InfoPair label="直线距离" value={formatDistanceKm(order.linearDistanceKm)} />
+                <InfoPair label="路线距离" value={formatDistanceKm(order.routeDistanceKm)} />
+                <InfoPair label="同步来源" value={order.distanceIsLinear ? "插件当前是直线值" : "插件当前是路线值"} />
                 <InfoPair label="送达时限" value={order.deliveryDeadline || "-"} />
               </div>
             </section>
