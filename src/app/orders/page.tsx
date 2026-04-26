@@ -790,7 +790,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, tickAutoComplete]);
 
   useEffect(() => {
     fetchIntegrationConfig();
@@ -809,6 +809,8 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => {
+    tickAutoComplete().then(() => fetchOrders({ silent: true }));
+
     const timer = setInterval(() => {
       tickAutoComplete().then(() => fetchOrders({ silent: true }));
     }, 60 * 1000);
@@ -819,7 +821,7 @@ export default function OrdersPage() {
   useEffect(() => {
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") {
-        fetchOrders({ silent: true });
+        tickAutoComplete().then(() => fetchOrders({ silent: true }));
       }
     };
 
@@ -837,7 +839,7 @@ export default function OrdersPage() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("focus", refreshWhenVisible);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, tickAutoComplete]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],

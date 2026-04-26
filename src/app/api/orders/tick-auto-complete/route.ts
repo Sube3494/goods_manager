@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(_: NextRequest) {
+export async function POST() {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
@@ -58,11 +58,24 @@ export async function POST(_: NextRequest) {
       });
 
       if (result.ok) {
-        // 成功后清除计划时间，避免重复触发
         await prisma.autoPickOrder.update({
           where: { id: order.id },
-          data: { autoCompleteAt: null },
+          data: {
+            status: "已完成",
+            autoCompleteAt: null,
+            lastSyncedAt: new Date(),
+          },
         });
+
+        void refreshAutoPickOrderFromPlugin(session.id, {
+          id: order.sourceId,
+          platform: order.platform,
+          orderNo: order.orderNo,
+          orderTime: order.orderTime,
+        }).catch((refreshError) => {
+          console.error("Failed to refresh auto-pick order after tick auto complete:", refreshError);
+        });
+
         results.push({ id: order.id, ok: true });
       } else {
         results.push({ id: order.id, ok: false, error: JSON.stringify(result.data) });
