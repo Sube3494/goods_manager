@@ -574,7 +574,6 @@ function OrderCard({
                 <InfoPair label="订单编号" value={order.orderNo} />
                 <InfoPair label="原始 ID" value={order.sourceId} />
                 <InfoPair label="订单状态" value={getDisplayStatus(order)} />
-                <InfoPair label="原始门店名" value={order.rawShopName || "-"} />
                 <InfoPair label="系统门店" value={order.matchedShopName || "-"} />
                 <InfoPair label="门店地址" value={order.rawShopAddress || order.shopAddress || "-"} />
                 <InfoPair label="履约方式" value={pickup ? "到店自取" : "配送上门"} />
