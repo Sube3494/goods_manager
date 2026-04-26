@@ -166,6 +166,35 @@ function readIsSubscribeFromRawPayload(rawPayload: unknown) {
   return false;
 }
 
+function readCompletedAtFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const record = rawPayload as Record<string, unknown>;
+  const delivery = record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
+    ? record.delivery as Record<string, unknown>
+    : null;
+
+  const directTimestamp = Number(
+    delivery?.finished_time
+    ?? record.finished_time
+    ?? record.finishedTime
+    ?? 0
+  );
+
+  if (Number.isFinite(directTimestamp) && directTimestamp > 0) {
+    return new Date(directTimestamp * 1000).toISOString();
+  }
+
+  const directText = String(record.finished_time || record.finishedTime || "").trim();
+  if (directText && /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(directText)) {
+    return directText.replace(" ", "T");
+  }
+
+  return null;
+}
+
 function stripShopSuffix(value: string) {
   return String(value || "").trim().replace(/(店|一店|二店|三店|分店|总店)$/, "");
 }
@@ -462,7 +491,7 @@ export async function GET(request: NextRequest) {
         isSubscribe: readIsSubscribeFromRawPayload(order.rawPayload),
         expectedIncome: metrics.expectedIncome,
         platformCommission: metrics.platformCommission,
-        completedAt: order.autoCompleteJob?.completedAt?.toISOString() || null,
+        completedAt: order.autoCompleteJob?.completedAt?.toISOString() || readCompletedAtFromRawPayload(order.rawPayload),
         autoCompleteJobStatus: order.autoCompleteJob?.status || null,
         autoCompleteJobError: order.autoCompleteJob?.lastError || null,
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,

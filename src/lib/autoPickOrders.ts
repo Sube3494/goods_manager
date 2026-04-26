@@ -27,6 +27,7 @@ export type AutoPickInboundOrder = {
   shopAddress?: string;
   rawShopAddress?: string;
   isSubscribe?: boolean;
+  completedAt?: string;
   longitude?: number;
   latitude?: number;
   status?: string;
@@ -476,6 +477,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     shopAddress: String(input.shopAddress || input.rawShopAddress || input.storeAddress || input.merchantAddress || "").trim() || undefined,
     rawShopAddress: String(input.rawShopAddress || input.shopAddress || input.storeAddress || input.merchantAddress || "").trim() || undefined,
     isSubscribe: input.isSubscribe === true || input.isSubscribe === 1 || input.isSubscribe === "1" || input.is_subscribe === true || input.is_subscribe === 1 || input.is_subscribe === "1",
+    completedAt: String(input.completedAt || input.finishedTime || input.finished_time || "").trim() || undefined,
     longitude: Number.isFinite(Number(input.longitude)) ? Number(input.longitude) : undefined,
     latitude: Number.isFinite(Number(input.latitude)) ? Number(input.latitude) : undefined,
     status: String(input.status || "").trim() || undefined,

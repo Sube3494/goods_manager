@@ -494,13 +494,9 @@ function OrderCard({
             {completed ? (
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 <CheckCheck size={12} />
-                {pickup ? "已自提" : "订单已完成"}
-              </span>
-            ) : null}
-            {completed && order.completedAt ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
-                <Clock3 size={12} />
-                完成时间 {formatLocalDateTime(order.completedAt)}
+                {order.completedAt
+                  ? `${formatLocalDateTime(order.completedAt)} ${pickup ? "已自提" : "已完成"}`
+                  : pickup ? "已自提" : "订单已完成"}
               </span>
             ) : null}
             {cancelled ? (
