@@ -1,8 +1,8 @@
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 
-const PICKUP_MINUTES = 5;
+const PICKUP_MINUTES = 8;
 const MINUTES_PER_KM = 3;
-const RIDER_UPSTAIRS_MINUTES = 8;
+const RIDER_UPSTAIRS_MINUTES = 5;
 const DELIVERY_DEADLINE_LEAD_MINUTES = 5;
 
 export type SchedulableAutoPickOrder = {
@@ -105,7 +105,7 @@ export function getEstimatedAutoCompleteAt(order: SchedulableAutoPickOrder) {
     ? new Date(expectedAt.getTime() - DELIVERY_DEADLINE_LEAD_MINUTES * 60 * 1000)
     : null;
 
-  // 主逻辑仍然按 5 + 3*公里数 + 8分钟上下楼 计算，但如果会晚于预计送达前的安全时间，就向前截断。
+  // 主逻辑仍然按 8分钟到店取货 + 3*公里数 + 5分钟上楼 计算，但如果会晚于预计送达前的安全时间，就向前截断。
   if (heuristicAt && latestSafeAt) {
     return heuristicAt.getTime() <= latestSafeAt.getTime() ? heuristicAt : latestSafeAt;
   }
