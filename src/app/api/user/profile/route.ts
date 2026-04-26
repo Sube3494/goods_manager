@@ -3,7 +3,7 @@ import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { SessionUser } from "@/lib/permissions";
 import { canGeocodeAddress, geocodeAddress } from "@/lib/addressGeocode";
-import { buildAddressDisplay, getAddressDetail } from "@/lib/addressBook";
+import { buildAddressDisplay, getAddressDetail, normalizeAddressItemParts } from "@/lib/addressBook";
 
 type ShippingAddressInput = {
   id?: string;
@@ -53,14 +53,15 @@ export async function PATCH(req: Request) {
       try {
         normalizedShippingAddresses = await Promise.all(
           (shippingAddresses as ShippingAddressInput[]).map(async (item) => {
-            const detailAddress = getAddressDetail(item);
+            const normalizedParts = normalizeAddressItemParts(item);
+            const detailAddress = getAddressDetail(normalizedParts);
             const coord = await geocodeAddress(detailAddress);
             const normalizedItem = {
               ...item,
               label: String(item.label || "").trim(),
               detailAddress,
-              contactName: String(item.contactName || "").trim(),
-              contactPhone: String(item.contactPhone || "").trim(),
+              contactName: normalizedParts.contactName,
+              contactPhone: normalizedParts.contactPhone,
               externalId: String(item.externalId || "").trim(),
             };
             return {

@@ -26,7 +26,7 @@ import Link from "next/link";
 import Image from "next/image";
 import md5 from "blueimp-md5";
 import { User as UserType, AddressItem, AutoPickApiKey } from "@/lib/types";
-import { buildAddressDisplay, getAddressDetail } from "@/lib/addressBook";
+import { buildAddressDisplay, normalizeAddressItemParts } from "@/lib/addressBook";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -58,20 +58,17 @@ export default function ProfilePage() {
     if (Array.isArray(addresses)) {
       setAddressList(addresses.map((item) => ({
         ...item,
-        detailAddress: item.detailAddress || getAddressDetail(item),
-        contactName: item.contactName || "",
-        contactPhone: item.contactPhone || "",
+        ...normalizeAddressItemParts(item),
         address: item.address || buildAddressDisplay(item),
       })));
     } else if (typeof typedUser?.shippingAddress === "string" && typedUser.shippingAddress) {
+      const parsed = normalizeAddressItemParts({ address: typedUser.shippingAddress });
       setAddressList([
         {
           id: "legacy",
           label: "默认地址",
           address: typedUser.shippingAddress,
-          detailAddress: typedUser.shippingAddress,
-          contactName: "",
-          contactPhone: "",
+          ...parsed,
           isDefault: true,
           externalId: "",
         },
