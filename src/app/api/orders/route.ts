@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
-import { getAddressDetail } from "@/lib/addressBook";
 import { isAutoPickPickupOrder } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../../../prisma/generated-client";
 
@@ -28,7 +27,6 @@ type ShippingAddress = {
   label?: string;
   address?: string;
   detailAddress?: string;
-  externalId?: string;
   longitude?: number | null;
   latitude?: number | null;
 };
@@ -37,6 +35,13 @@ function toNormalizedText(value: string | null | undefined) {
   return String(value || "")
     .trim()
     .replace(/[（(].*?[)）]/g, " ")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
+function toLooseNormalizedText(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
     .replace(/\s+/g, "")
     .toLowerCase();
 }
@@ -83,24 +88,6 @@ function resolveIncomeMetrics(
   };
 }
 
-function readShopAddressFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const value = String(record.shopAddress || record.storeAddress || record.merchantAddress || "").trim();
-  return value || null;
-}
-
-function readShopIdFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const value = String(record.shopId || record.shop_id || record.storeId || record.store_id || record.merchant_id || "").trim();
-  return value || null;
-}
-
 function readShopNameFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -142,35 +129,24 @@ function stripShopSuffix(value: string) {
   return String(value || "").trim().replace(/(店|一店|二店|三店|分店|总店)$/, "");
 }
 
-function matchShopName(shopId: string | null, shopAddress: string | null, rawShopName: string | null, shippingAddresses: ShippingAddress[]) {
-  const normalizedShopId = String(shopId || "").trim();
-  const normalizedShopAddress = String(shopAddress || "").trim();
+function matchShopName(rawShopName: string | null, shippingAddresses: ShippingAddress[]) {
   const normalizedRawShopName = toNormalizedText(rawShopName);
+  const looseRawShopName = toLooseNormalizedText(rawShopName);
 
-  if (normalizedShopId) {
-    const matchedById = shippingAddresses.find((addr) => String(addr.externalId || "").trim() === normalizedShopId);
-    if (matchedById?.label) {
-      return String(matchedById.label).trim();
-    }
-  }
-
-  if (normalizedShopAddress) {
-    const directMatch = shippingAddresses.find((addr) => {
-      const address = getAddressDetail(addr);
-      if (!address) return false;
-      return address.includes(normalizedShopAddress) || normalizedShopAddress.includes(address);
-    });
-    if (directMatch?.label) {
-      return String(directMatch.label).trim();
-    }
-
-    const fallback = shippingAddresses.find((addr) => {
+  if (looseRawShopName) {
+    const matchedByShopName = shippingAddresses.find((addr) => {
       const label = String(addr.label || "").trim();
-      const coreLocation = stripShopSuffix(label);
-      return coreLocation.length >= 2 && normalizedShopAddress.includes(coreLocation);
+      const coreLabel = stripShopSuffix(label);
+      const looseLabel = toLooseNormalizedText(label);
+      const looseCoreLabel = toLooseNormalizedText(coreLabel);
+      return Boolean(
+        (looseLabel && (looseRawShopName.includes(looseLabel) || looseLabel.includes(looseRawShopName))) ||
+        (looseCoreLabel && (looseRawShopName.includes(looseCoreLabel) || looseCoreLabel.includes(looseRawShopName)))
+      );
     });
-    if (fallback?.label) {
-      return String(fallback.label).trim();
+
+    if (matchedByShopName?.label) {
+      return String(matchedByShopName.label).trim();
     }
   }
 
@@ -178,7 +154,7 @@ function matchShopName(shopId: string | null, shopAddress: string | null, rawSho
     return null;
   }
 
-  const matchedByShopName = shippingAddresses.find((addr) => {
+  const matchedByNormalizedShopName = shippingAddresses.find((addr) => {
     const label = String(addr.label || "").trim();
     const normalizedLabel = toNormalizedText(label);
     const normalizedCoreLabel = toNormalizedText(stripShopSuffix(label));
@@ -188,7 +164,7 @@ function matchShopName(shopId: string | null, shopAddress: string | null, rawSho
     );
   });
 
-  return matchedByShopName?.label ? String(matchedByShopName.label).trim() : null;
+  return matchedByNormalizedShopName?.label ? String(matchedByNormalizedShopName.label).trim() : null;
 }
 
 export async function GET(request: NextRequest) {
@@ -357,7 +333,6 @@ export async function GET(request: NextRequest) {
               shop: {
                 select: {
                   name: true,
-                  externalId: true,
                 },
               },
             },
@@ -407,8 +382,8 @@ export async function GET(request: NextRequest) {
       const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress);
       return {
         ...order,
-        shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload),
-        shopAddress: order.shopAddress || readShopAddressFromRawPayload(order.rawPayload),
+        shopId: order.shopId,
+        shopAddress: order.shopAddress,
         rawShopName: readShopNameFromRawPayload(order.rawPayload),
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isPickup: pickup,
@@ -419,7 +394,7 @@ export async function GET(request: NextRequest) {
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
       };
     }).map((order) => {
-      const matchedShopName = matchShopName(order.shopId, order.shopAddress, order.rawShopName, shippingAddresses);
+      const matchedShopName = matchShopName(order.rawShopName, shippingAddresses);
 
       return {
         ...order,

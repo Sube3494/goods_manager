@@ -70,7 +70,6 @@ export default function ProfilePage() {
           address: typedUser.shippingAddress,
           ...parsed,
           isDefault: true,
-          externalId: "",
         },
       ]);
     }
@@ -102,12 +101,6 @@ export default function ProfilePage() {
     const missingLabel = addressList.find((item) => !String(item.label || "").trim());
     if (missingLabel) {
       showToast(`有门店缺少门店简称`, "error");
-      return;
-    }
-
-    const missingExternalId = addressList.find((item) => !String(item.externalId || "").trim());
-    if (missingExternalId) {
-      showToast(`门店“${missingExternalId.label || missingExternalId.address || "未命名地址"}”缺少门店ID`, "error");
       return;
     }
 
@@ -538,7 +531,7 @@ export default function ProfilePage() {
                   <p className="mt-1 text-sm text-muted-foreground">保存时会按详细地址自动解析门店经纬度，后续订单距离和自配送预估会优先使用这组坐标。</p>
                 </div>
                 <button
-                  onClick={() => setAddressList([...addressList, { id: Math.random().toString(36).substr(2, 9), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0, externalId: "" }])}
+                  onClick={() => setAddressList([...addressList, { id: Math.random().toString(36).substr(2, 9), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0 }])}
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/6 px-4 text-sm font-black text-primary transition-all hover:bg-primary/12 active:scale-[0.98] sm:w-auto"
                 >
                   <Plus size={16} />
@@ -603,24 +596,6 @@ export default function ProfilePage() {
                                 </button>
                               </div>
                             </div>
-
-                            <input
-                              type="text"
-                              placeholder="门店ID（必填）"
-                              required
-                              value={item.externalId || ""}
-                              onChange={(e) => {
-                                const newList = [...addressList];
-                                newList[index] = { ...newList[index], externalId: e.target.value.trim() };
-                                setAddressList(newList);
-                              }}
-                              className={`h-11 w-full rounded-2xl border bg-white px-4 text-sm font-mono outline-none transition-all focus:ring-4 focus:ring-primary/10 dark:bg-white/5 ${
-                                String(item.externalId || "").trim()
-                                  ? "border-border/60 focus:border-primary/40"
-                                  : "border-destructive/35 focus:border-destructive/45"
-                              }`}
-                            />
-
                             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
                               <input
                                 type="text"

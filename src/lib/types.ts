@@ -22,7 +22,6 @@ export interface AddressItem {
   contactName?: string;
   contactPhone?: string;
   isDefault: boolean;
-  externalId?: string;
   serviceFeeRate?: number;
   longitude?: number;
   latitude?: number;

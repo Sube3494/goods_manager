@@ -13,7 +13,6 @@ type ShippingAddressInput = {
   contactName?: string;
   contactPhone?: string;
   isDefault?: boolean;
-  externalId?: string;
   serviceFeeRate?: number;
   longitude?: number;
   latitude?: number;
@@ -34,11 +33,6 @@ export async function PATCH(req: Request) {
       const missingLabel = shippingAddresses.find((item) => !String(item?.label || "").trim());
       if (missingLabel) {
         return NextResponse.json({ error: "门店简称为必填项" }, { status: 400 });
-      }
-
-      const missingExternalId = shippingAddresses.find((item) => !String(item?.externalId || "").trim());
-      if (missingExternalId) {
-        return NextResponse.json({ error: "门店ID为必填项" }, { status: 400 });
       }
 
       const missingAddress = shippingAddresses.find((item) => !getAddressDetail(item));
@@ -62,7 +56,6 @@ export async function PATCH(req: Request) {
               detailAddress,
               contactName: normalizedParts.contactName,
               contactPhone: normalizedParts.contactPhone,
-              externalId: String(item.externalId || "").trim(),
             };
             return {
               ...normalizedItem,

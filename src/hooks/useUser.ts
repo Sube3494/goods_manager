@@ -15,7 +15,6 @@ interface AddressItem {
   contactName?: string;
   contactPhone?: string;
   isDefault: boolean;
-  externalId?: string;
   longitude?: number;
   latitude?: number;
 }
