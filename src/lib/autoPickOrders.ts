@@ -928,6 +928,24 @@ export async function refreshAutoPickOrderFromPlugin(
   lookup: { id?: string; platform?: string; orderNo?: string; orderTime?: Date | string | null }
 ) {
   const baseUrl = await getAutoPickBaseUrlForUser(userId);
+
+  const sourceId = String(lookup.id || "").trim();
+  if (sourceId) {
+    const detailResponse = await fetch(`${baseUrl}/order-detail/${encodeURIComponent(sourceId)}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (detailResponse.ok) {
+      const detailOrder = await detailResponse.json().catch(() => null) as unknown;
+      const normalizedDetailOrder = normalizeAutoPickOrderPayload(detailOrder);
+      if (normalizedDetailOrder) {
+        return await upsertAutoPickOrder(userId, normalizedDetailOrder);
+      }
+      throw new Error("Auto-pick plugin returned invalid order detail data");
+    }
+  }
+
   const targetDate = lookup.orderTime ? formatLocalDate(lookup.orderTime) : formatLocalDate(new Date());
   const response = await fetch(`${baseUrl}/all-orders/${targetDate}`, {
     method: "GET",
