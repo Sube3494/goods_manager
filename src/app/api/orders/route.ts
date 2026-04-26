@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
+import { getAddressDetail } from "@/lib/addressBook";
 import { isAutoPickPickupOrder } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../../../prisma/generated-client";
 
@@ -97,6 +98,7 @@ function readShopNameFromRawPayload(rawPayload: unknown) {
     record.channel_name,
     record.shop_name,
     record.shopName,
+    record.shopAddress,
     record.storeName,
     record.merchantName,
     record.merchant_name,
@@ -129,9 +131,10 @@ function stripShopSuffix(value: string) {
   return String(value || "").trim().replace(/(店|一店|二店|三店|分店|总店)$/, "");
 }
 
-function matchShopName(rawShopName: string | null, shippingAddresses: ShippingAddress[]) {
+function matchShopName(rawShopName: string | null, shopAddress: string | null, shippingAddresses: ShippingAddress[]) {
   const normalizedRawShopName = toNormalizedText(rawShopName);
   const looseRawShopName = toLooseNormalizedText(rawShopName);
+  const normalizedShopAddress = String(shopAddress || "").trim();
 
   if (looseRawShopName) {
     const matchedByShopName = shippingAddresses.find((addr) => {
@@ -164,7 +167,23 @@ function matchShopName(rawShopName: string | null, shippingAddresses: ShippingAd
     );
   });
 
-  return matchedByNormalizedShopName?.label ? String(matchedByNormalizedShopName.label).trim() : null;
+  if (matchedByNormalizedShopName?.label) {
+    return String(matchedByNormalizedShopName.label).trim();
+  }
+
+  if (!normalizedShopAddress) {
+    return null;
+  }
+
+  const matchedByAddress = shippingAddresses.find((addr) => {
+    const detailAddress = String(getAddressDetail(addr) || "").trim();
+    if (!detailAddress) {
+      return false;
+    }
+    return detailAddress.includes(normalizedShopAddress) || normalizedShopAddress.includes(detailAddress);
+  });
+
+  return matchedByAddress?.label ? String(matchedByAddress.label).trim() : null;
 }
 
 export async function GET(request: NextRequest) {
@@ -384,7 +403,7 @@ export async function GET(request: NextRequest) {
         ...order,
         shopId: order.shopId,
         shopAddress: order.shopAddress,
-        rawShopName: readShopNameFromRawPayload(order.rawPayload),
+        rawShopName: readShopNameFromRawPayload(order.rawPayload) || order.shopAddress || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isPickup: pickup,
         expectedIncome: metrics.expectedIncome,
@@ -394,7 +413,7 @@ export async function GET(request: NextRequest) {
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
       };
     }).map((order) => {
-      const matchedShopName = matchShopName(order.rawShopName, shippingAddresses);
+      const matchedShopName = matchShopName(order.rawShopName, order.shopAddress, shippingAddresses);
 
       return {
         ...order,
