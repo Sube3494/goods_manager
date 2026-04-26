@@ -94,7 +94,11 @@ function readShopNameFromRawPayload(rawPayload: unknown) {
     return null;
   }
   const record = rawPayload as Record<string, unknown>;
+  const extend = record.extend && typeof record.extend === "object" && !Array.isArray(record.extend)
+    ? record.extend as Record<string, unknown>
+    : null;
   const candidates = [
+    extend?.channel_name,
     record.channel_name,
     record.shop_name,
     record.shopName,
@@ -131,10 +135,24 @@ function stripShopSuffix(value: string) {
   return String(value || "").trim().replace(/(店|一店|二店|三店|分店|总店)$/, "");
 }
 
+function normalizeShopAddressForMatch(value: string | null | undefined) {
+  return String(value || "")
+    .replace(/[（(][^()（）]*[)）]/g, " ")
+    .replace(/(?:必须送货上门|不然没人签收|送货上门|一定送上门|一定要送上门|请送上门)/gi, " ")
+    .replace(/贵州省|广东省|广州市|遵义市|白云区|汇川区|棠景街|香港路|祥岗东街/gi, " ")
+    .replace(/商务中心/gi, "商务中心")
+    .replace(/[栋座]/g, "座")
+    .replace(/[室房]/g, "室")
+    .replace(/号楼/g, "楼")
+    .replace(/\s+/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 function matchShopName(rawShopName: string | null, shopAddress: string | null, shippingAddresses: ShippingAddress[]) {
   const normalizedRawShopName = toNormalizedText(rawShopName);
   const looseRawShopName = toLooseNormalizedText(rawShopName);
-  const normalizedShopAddress = String(shopAddress || "").trim();
+  const normalizedShopAddress = normalizeShopAddressForMatch(shopAddress);
 
   if (looseRawShopName) {
     const matchedByShopName = shippingAddresses.find((addr) => {
@@ -176,8 +194,8 @@ function matchShopName(rawShopName: string | null, shopAddress: string | null, s
   }
 
   const matchedByAddress = shippingAddresses.find((addr) => {
-    const detailAddress = String(getAddressDetail(addr) || "").trim();
-    if (!detailAddress) {
+    const detailAddress = normalizeShopAddressForMatch(getAddressDetail(addr));
+    if (!detailAddress || !normalizedShopAddress) {
       return false;
     }
     return detailAddress.includes(normalizedShopAddress) || normalizedShopAddress.includes(detailAddress);
