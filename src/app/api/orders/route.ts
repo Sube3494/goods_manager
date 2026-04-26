@@ -154,6 +154,18 @@ function readDeliveryTimeRangeFromRawPayload(rawPayload: unknown) {
   return value || null;
 }
 
+function readIsSubscribeFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const rawValue = record.is_subscribe ?? record.isSubscribe;
+  if (rawValue === true || rawValue === 1 || rawValue === "1") {
+    return true;
+  }
+  return false;
+}
+
 function stripShopSuffix(value: string) {
   return String(value || "").trim().replace(/(店|一店|二店|三店|分店|总店)$/, "");
 }
@@ -447,6 +459,7 @@ export async function GET(request: NextRequest) {
         rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isPickup: pickup,
+        isSubscribe: readIsSubscribeFromRawPayload(order.rawPayload),
         expectedIncome: metrics.expectedIncome,
         platformCommission: metrics.platformCommission,
         completedAt: order.autoCompleteJob?.completedAt?.toISOString() || null,

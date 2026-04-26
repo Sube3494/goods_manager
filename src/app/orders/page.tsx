@@ -270,6 +270,10 @@ function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDea
   return firstTimeMatch?.[1]?.trim() || "-";
 }
 
+function isSubscribeOrder(order: Pick<AutoPickOrder, "isSubscribe" | "isPickup">) {
+  return Boolean(order.isSubscribe) && !order.isPickup;
+}
+
 function MetricCard({
   label,
   value,
@@ -393,6 +397,7 @@ function OrderCard({
   const terminal = isTerminalStatus(order.status);
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
   const pickup = Boolean(order.isPickup);
+  const subscribe = isSubscribeOrder(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
@@ -423,6 +428,11 @@ function OrderCard({
                   {sourceLabel ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-black/8 bg-black/[0.03] px-2.5 text-[13px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
                       {sourceLabel}
+                    </span>
+                  ) : null}
+                  {subscribe ? (
+                    <span className="inline-flex h-8 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2.5 text-[13px] font-medium text-violet-700 dark:text-violet-400">
+                      预约单
                     </span>
                   ) : null}
                   <StatusBadge order={order} />
@@ -514,7 +524,7 @@ function OrderCard({
             {deadlineDisplay !== "-" ? (
               <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
                 <Clock3 size={12} />
-                {pickup ? `取货时间 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
+                {pickup ? `取货时间 ${deadlineDisplay}` : subscribe ? `预约送达 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
               </span>
             ) : null}
           </div>
@@ -580,7 +590,7 @@ function OrderCard({
                 <InfoPair label="配送地址" value={pickup ? "-" : order.userAddress} />
                 <InfoPair label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
                 <InfoPair label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
-                <InfoPair label={pickup ? "取货时间区间" : "最晚送达"} value={deadlineDisplay} />
+                <InfoPair label={pickup ? "取货时间区间" : subscribe ? "预约送达" : "最晚送达"} value={deadlineDisplay} />
                 {autoCompleteFailed ? (
                   <>
                     <InfoPair label="自动完成任务" value="失败" />
