@@ -307,7 +307,6 @@ export async function GET(request: NextRequest) {
           rawPayload: true,
           lastSyncedAt: true,
           autoCompleteAt: true,
-          completedAt: true,
           createdAt: true,
           updatedAt: true,
           items: {
@@ -318,6 +317,7 @@ export async function GET(request: NextRequest) {
               status: true,
               lastError: true,
               attempts: true,
+              completedAt: true,
             },
           },
         },
@@ -452,6 +452,7 @@ export async function GET(request: NextRequest) {
         isPickup: pickup,
         expectedIncome: metrics.expectedIncome,
         platformCommission: metrics.platformCommission,
+        completedAt: order.autoCompleteJob?.completedAt?.toISOString() || null,
         autoCompleteJobStatus: order.autoCompleteJob?.status || null,
         autoCompleteJobError: order.autoCompleteJob?.lastError || null,
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
