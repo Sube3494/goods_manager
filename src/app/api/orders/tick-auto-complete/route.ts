@@ -5,6 +5,29 @@ import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoP
 
 export const dynamic = "force-dynamic";
 
+function isTerminalStatus(status?: string | null) {
+  const text = String(status || "").trim();
+  const normalized = text.toLowerCase();
+
+  const completed = text.includes("已完成")
+    || normalized === "done"
+    || normalized === "completed"
+    || normalized === "complete"
+    || normalized === "finished"
+    || normalized === "finish";
+
+  const cancelled = text.includes("取消")
+    || text.includes("退款")
+    || text.includes("关闭")
+    || normalized === "cancel"
+    || normalized === "cancelled"
+    || normalized === "canceled"
+    || normalized === "closed"
+    || normalized === "refund";
+
+  return completed || cancelled;
+}
+
 export async function POST() {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
@@ -20,15 +43,10 @@ export async function POST() {
       autoCompleteAt: {
         lte: now,
       },
-      NOT: [
-        { status: { contains: "已完成" } },
-        { status: { contains: "取消" } },
-        { status: { contains: "退款" } },
-        { status: { contains: "关闭" } },
-      ],
     },
     select: {
       id: true,
+      status: true,
       platform: true,
       dailyPlatformSequence: true,
       orderNo: true,
@@ -41,13 +59,15 @@ export async function POST() {
     },
   });
 
-  if (pendingOrders.length === 0) {
+  const filteredOrders = pendingOrders.filter((order) => !isTerminalStatus(order.status));
+
+  if (filteredOrders.length === 0) {
     return NextResponse.json({ processed: 0 });
   }
 
   const results: { id: string; ok: boolean; error?: string }[] = [];
 
-  for (const order of pendingOrders) {
+  for (const order of filteredOrders) {
     try {
       const result = await callAutoPickCommand(session.id, "/complete-delivery", {
         platform: order.platform,

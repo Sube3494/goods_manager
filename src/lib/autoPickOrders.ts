@@ -83,6 +83,60 @@ type AutoPickConfigPayload = {
   autoPickIntegration?: unknown;
 };
 
+function formatDeadlineSegment(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${month}-${day} ${hours}:${minutes}`;
+}
+
+function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
+  const directDeadline = String(input.deliveryDeadline || input.delivery_deadline || "").trim();
+  if (directDeadline) {
+    return directDeadline;
+  }
+
+  const rangeText = String(input.delivery_time_format || input.deliveryTimeFormat || "").trim();
+  if (rangeText) {
+    return rangeText;
+  }
+
+  const startTimestamp = Number(input.delivery_time || input.deliveryTime || 0);
+  const endTimestamp = Number(input.delivery_end || input.deliveryEnd || 0);
+
+  const startAt = Number.isFinite(startTimestamp) && startTimestamp > 0
+    ? new Date(startTimestamp * 1000)
+    : null;
+  const endAt = Number.isFinite(endTimestamp) && endTimestamp > 0
+    ? new Date(endTimestamp * 1000)
+    : null;
+
+  if (startAt && endAt) {
+    const sameDay = startAt.getFullYear() === endAt.getFullYear()
+      && startAt.getMonth() === endAt.getMonth()
+      && startAt.getDate() === endAt.getDate();
+
+    if (sameDay) {
+      const endHours = String(endAt.getHours()).padStart(2, "0");
+      const endMinutes = String(endAt.getMinutes()).padStart(2, "0");
+      return `${formatDeadlineSegment(startAt)}-${endHours}:${endMinutes}`;
+    }
+
+    return `${formatDeadlineSegment(startAt)} - ${formatDeadlineSegment(endAt)}`;
+  }
+
+  if (startAt) {
+    return formatDeadlineSegment(startAt);
+  }
+
+  if (endAt) {
+    return formatDeadlineSegment(endAt);
+  }
+
+  return undefined;
+}
+
 function asPrismaJsonValue<T>(value: T): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
 }
@@ -415,7 +469,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     longitude: Number.isFinite(Number(input.longitude)) ? Number(input.longitude) : undefined,
     latitude: Number.isFinite(Number(input.latitude)) ? Number(input.latitude) : undefined,
     status: String(input.status || "").trim() || undefined,
-    deliveryDeadline: String(input.deliveryDeadline || "").trim() || undefined,
+    deliveryDeadline: resolveAutoPickDeliveryDeadline(input),
     distanceKm: Number.isFinite(Number(input.distanceKm)) ? Number(input.distanceKm) : undefined,
     distanceIsLinear: Boolean(input.distanceIsLinear),
     actualPaid: Number.isFinite(Number(input.actualPaid)) ? Number(input.actualPaid) : 0,
@@ -786,11 +840,26 @@ async function ensureShopProductsForAutoPickOrder(
 
 function isCancelledStatus(status?: string | null) {
   const text = String(status || "").trim();
-  return text.includes("取消") || text.includes("退款") || text.includes("关闭");
+  const normalized = text.toLowerCase();
+  return text.includes("取消")
+    || text.includes("退款")
+    || text.includes("关闭")
+    || normalized === "cancel"
+    || normalized === "cancelled"
+    || normalized === "canceled"
+    || normalized === "closed"
+    || normalized === "refund";
 }
 
 function isCompletedStatus(status?: string | null) {
-  return String(status || "").trim().includes("已完成");
+  const text = String(status || "").trim();
+  const normalized = text.toLowerCase();
+  return text.includes("已完成")
+    || normalized === "done"
+    || normalized === "completed"
+    || normalized === "complete"
+    || normalized === "finished"
+    || normalized === "finish";
 }
 
 function isTerminalStatus(status?: string | null) {
@@ -897,7 +966,7 @@ export async function refreshAutoPickOrderFromPlugin(
   return await upsertAutoPickOrder(userId, matched);
 }
 
-export async function callAutoPickCommand(userId: string, pathname: "/self-delivery" | "/complete-delivery", payload: Record<string, unknown>) {
+export async function callAutoPickCommand(userId: string, pathname: "/self-delivery" | "/complete-delivery" | "/pickup-complete", payload: Record<string, unknown>) {
   const baseUrl = await getAutoPickBaseUrlForUser(userId);
   const response = await fetch(`${baseUrl}${pathname}`, {
     method: "POST",

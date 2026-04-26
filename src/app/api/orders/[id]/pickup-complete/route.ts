@@ -39,7 +39,11 @@ function isPickupOrder(rawPayload: unknown, userAddress?: string | null) {
       String(record.unencrypted_address || ""),
       String(record.user_remark || ""),
       String(record.address || ""),
-      String(record.map_address || "")
+      String(record.map_address || ""),
+      String(record.deliveryType || ""),
+      String(record.delivery_type || ""),
+      String(record.fulfilmentType || ""),
+      String(record.fulfilment_type || "")
     );
   }
 
@@ -73,11 +77,11 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order already cancelled" }, { status: 409 });
     }
 
-    if (isPickupOrder(order.rawPayload, order.userAddress)) {
-      return NextResponse.json({ error: "Pickup order does not require complete delivery" }, { status: 409 });
+    if (!isPickupOrder(order.rawPayload, order.userAddress)) {
+      return NextResponse.json({ error: "Non-pickup order does not require pickup complete" }, { status: 409 });
     }
 
-    const result = await callAutoPickCommand(session.id, "/complete-delivery", {
+    const result = await callAutoPickCommand(session.id, "/pickup-complete", {
       platform: order.platform,
       dailyPlatformSequence: order.dailyPlatformSequence,
       orderNo: order.orderNo,
@@ -101,15 +105,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         orderNo: order.orderNo,
         orderTime: order.orderTime,
       }).catch((refreshError) => {
-        console.error("Failed to refresh auto-pick order after complete delivery:", refreshError);
+        console.error("Failed to refresh auto-pick order after pickup complete:", refreshError);
       });
     }
 
     return NextResponse.json(result.data, { status: result.status });
   } catch (error) {
-    console.error("Failed to complete delivery:", error);
+    console.error("Failed to complete pickup:", error);
     return NextResponse.json({
-      error: error instanceof Error ? error.message : "Failed to complete delivery",
+      error: error instanceof Error ? error.message : "Failed to complete pickup",
     }, { status: 500 });
   }
 }

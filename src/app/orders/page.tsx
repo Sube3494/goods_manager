@@ -30,7 +30,7 @@ import { AutoPickIntegrationConfig, AutoPickOrder, AutoPickOrderItem } from "@/l
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
-type OrderAction = "self-delivery" | "complete-delivery" | "sync";
+type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync";
 type OrdersTab = "today" | "all";
 
 type OrderResponse = {
@@ -109,51 +109,69 @@ function getOrderActionErrorMessage(raw: unknown) {
       return "订单已取消，不需要继续处理。";
     case "Pickup order does not require self delivery":
       return "到店自取订单不需要发起自配送。";
+    case "Non-pickup order does not require pickup complete":
+      return "这不是到店自取订单，不需要完成自提。";
     default:
       return reason || "操作失败";
   }
 }
 
-function getDisplayStatus(status?: string | null) {
+function getBaseDisplayStatus(status?: string | null) {
   const text = String(status || "").trim();
+  const normalized = text.toLowerCase();
   if (!text) return "同步中";
-  if (text.includes("取消") || text.includes("退款") || text.includes("关闭")) return "已取消";
-  if (text.includes("已完成")) return "已完成";
-  if (text.includes("配送中")) return "配送中";
+  if (
+    text.includes("取消")
+    || text.includes("退款")
+    || text.includes("关闭")
+    || normalized === "cancel"
+    || normalized === "cancelled"
+    || normalized === "canceled"
+    || normalized === "closed"
+    || normalized === "refund"
+  ) return "已取消";
+  if (
+    text.includes("已完成")
+    || normalized === "done"
+    || normalized === "completed"
+    || normalized === "complete"
+    || normalized === "finished"
+    || normalized === "finish"
+  ) return "已完成";
+  if (text.includes("配送中") || normalized === "delivering") return "配送中";
   if (text.includes("已拣货") || text.includes("拣货中")) return "已拣货";
   return text.split(/[,，]/)[0].trim() || "同步中";
 }
 
+function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
+  const baseStatus = getBaseDisplayStatus(order.status);
+  if (!order.isPickup) {
+    return baseStatus;
+  }
+
+  if (baseStatus === "已取消") return "已取消";
+  if (baseStatus === "已完成") return "已自提";
+  return "待自提";
+}
+
 function isCompletedStatus(status?: string | null) {
-  return getDisplayStatus(status) === "已完成";
+  return getBaseDisplayStatus(status) === "已完成";
 }
 
 function isCancelledStatus(status?: string | null) {
-  return getDisplayStatus(status) === "已取消";
+  return getBaseDisplayStatus(status) === "已取消";
 }
 
 function isTerminalStatus(status?: string | null) {
-  const display = getDisplayStatus(status);
+  const display = getBaseDisplayStatus(status);
   return display === "已完成" || display === "已取消";
 }
 
 function isDeliveringStatus(status?: string | null) {
-  return getDisplayStatus(status) === "配送中";
+  return getBaseDisplayStatus(status) === "配送中";
 }
 
-function getFulfillmentBadge(order: AutoPickOrder) {
-  if (order.isPickup) {
-    return {
-      label: "到店自取",
-      className: "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-    };
-  }
-
-  return null;
-}
-
-function getStatusTone(status?: string | null) {
-  const display = getDisplayStatus(status);
+function getStatusTone(display: string) {
 
   if (display === "已取消") {
     return {
@@ -239,6 +257,24 @@ function formatDistanceKm(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} km` : "-";
 }
 
+function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline">) {
+  const text = String(order.deliveryDeadline || "").trim();
+  if (!text) {
+    return "-";
+  }
+
+  if (order.isPickup) {
+    return text;
+  }
+
+  const rangeMatch = text.match(/^(.+?\d{1,2}:\d{2})\s*[-~至].*$/);
+  if (rangeMatch?.[1]) {
+    return rangeMatch[1].trim();
+  }
+
+  return text;
+}
+
 function MetricCard({
   label,
   value,
@@ -257,12 +293,13 @@ function MetricCard({
   );
 }
 
-function StatusBadge({ status }: { status?: string | null }) {
-  const tone = getStatusTone(status);
+function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status"> }) {
+  const display = getDisplayStatus(order);
+  const tone = getStatusTone(display);
   return (
     <span className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black", tone.badge)}>
       <span className={cn("h-2 w-2 rounded-full", tone.dot)} />
-      {getDisplayStatus(status)}
+      {display}
     </span>
   );
 }
@@ -365,8 +402,7 @@ function OrderCard({
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
   const sourceLabel = getOrderSourceLabel(order);
-  const fulfillmentBadge = getFulfillmentBadge(order);
-
+  const deadlineDisplay = getDeadlineDisplay(order);
   return (
     <article className="overflow-hidden rounded-[30px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="border-b border-black/6 px-4 py-4 dark:border-white/6 sm:px-5">
@@ -393,12 +429,7 @@ function OrderCard({
                       {sourceLabel}
                     </span>
                   ) : null}
-                  {fulfillmentBadge ? (
-                    <span className={cn("inline-flex h-8 items-center rounded-full border px-2.5 text-[13px] font-medium", fulfillmentBadge.className)}>
-                      {fulfillmentBadge.label}
-                    </span>
-                  ) : null}
-                  <StatusBadge status={order.status} />
+                  <StatusBadge order={order} />
                 </div>
 
                 <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
@@ -457,7 +488,7 @@ function OrderCard({
             {completed ? (
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 <CheckCheck size={12} />
-                订单已完成
+                {pickup ? "已自提" : "订单已完成"}
               </span>
             ) : null}
             {cancelled ? (
@@ -472,10 +503,10 @@ function OrderCard({
                 预计自动完成 {formatLocalDateTime(order.autoCompleteAt)}
               </span>
             ) : null}
-            {order.lastSyncedAt ? (
+            {deadlineDisplay !== "-" ? (
               <span className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
-                <RefreshCw size={12} />
-                最近同步 {formatLocalDateTime(order.lastSyncedAt)}
+                <Clock3 size={12} />
+                {pickup ? `取货时间 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
               </span>
             ) : null}
           </div>
@@ -509,14 +540,14 @@ function OrderCard({
               }
             />
             <ActionButton
-              label="完成配送"
+              label={pickup ? "完成自提" : "完成配送"}
               variant="primary"
-              icon={actingId === `${order.id}:complete-delivery` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
-              onClick={() => onRunAction(order.id, "complete-delivery")}
-              disabled={Boolean(actingId) || terminal || pickup}
+              icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+              onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
+              disabled={Boolean(actingId) || terminal}
               title={
                 pickup
-                  ? "到店自取订单不需要完成配送"
+                  ? (terminal ? (cancelled ? "订单已取消，不能完成自提" : "订单已自提，不能重复完成自提") : undefined)
                   : terminal
                     ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
                     : undefined
@@ -534,14 +565,14 @@ function OrderCard({
               <div className="space-y-3">
                 <InfoPair label="订单编号" value={order.orderNo} />
                 <InfoPair label="原始 ID" value={order.sourceId} />
-                <InfoPair label="订单状态" value={getDisplayStatus(order.status)} />
+                <InfoPair label="订单状态" value={getDisplayStatus(order)} />
                 <InfoPair label="识别门店" value={order.matchedShopName || "-"} />
                 <InfoPair label="门店地址" value={order.shopAddress || "-"} />
                 <InfoPair label="履约方式" value={pickup ? "到店自取" : "配送上门"} />
                 <InfoPair label="配送地址" value={pickup ? "-" : order.userAddress} />
                 <InfoPair label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
                 <InfoPair label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
-                <InfoPair label="送达时限" value={order.deliveryDeadline || "-"} />
+                <InfoPair label={pickup ? "取货时间区间" : "最晚送达"} value={deadlineDisplay} />
               </div>
             </section>
 
@@ -930,6 +961,8 @@ export default function OrdersPage() {
       showToast(
         action === "self-delivery"
           ? "已发起自配送"
+          : action === "pickup-complete"
+            ? "已发送完成自提指令"
           : action === "complete-delivery"
             ? "已发送完成配送指令"
             : "已同步最新订单状态",

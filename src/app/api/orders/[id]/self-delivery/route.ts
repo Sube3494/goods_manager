@@ -7,12 +7,27 @@ import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 export const dynamic = "force-dynamic";
 
 function isCompletedStatus(status?: string | null) {
-  return String(status || "").includes("已完成");
+  const text = String(status || "").trim();
+  const normalized = text.toLowerCase();
+  return text.includes("已完成")
+    || normalized === "done"
+    || normalized === "completed"
+    || normalized === "complete"
+    || normalized === "finished"
+    || normalized === "finish";
 }
 
 function isCancelledStatus(status?: string | null) {
-  const text = String(status || "");
-  return text.includes("取消") || text.includes("退款") || text.includes("关闭");
+  const text = String(status || "").trim();
+  const normalized = text.toLowerCase();
+  return text.includes("取消")
+    || text.includes("退款")
+    || text.includes("关闭")
+    || normalized === "cancel"
+    || normalized === "cancelled"
+    || normalized === "canceled"
+    || normalized === "closed"
+    || normalized === "refund";
 }
 
 function isPickupOrder(rawPayload: unknown, userAddress?: string | null) {
