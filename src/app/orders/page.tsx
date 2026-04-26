@@ -866,28 +866,10 @@ export default function OrdersPage() {
     setCurrentPage(1);
   }, [activeTab, endDate, hasDelivery, platform, query, shop, startDate, status]);
 
-  const tickAutoComplete = useCallback(async () => {
-    try {
-      await fetch("/api/orders/tick-auto-complete", { method: "POST" });
-    } catch {
-      // no-op
-    }
-  }, []);
-
-  useEffect(() => {
-    tickAutoComplete().then(() => fetchOrders({ silent: true }));
-
-    const timer = setInterval(() => {
-      tickAutoComplete().then(() => fetchOrders({ silent: true }));
-    }, 60 * 1000);
-
-    return () => clearInterval(timer);
-  }, [fetchOrders, tickAutoComplete]);
-
   useEffect(() => {
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") {
-        tickAutoComplete().then(() => fetchOrders({ silent: true }));
+        fetchOrders({ silent: true });
       }
     };
 
@@ -895,7 +877,7 @@ export default function OrdersPage() {
       if (document.visibilityState === "visible") {
         fetchOrders({ silent: true });
       }
-    }, 5 * 1000);
+    }, 15 * 1000);
 
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("focus", refreshWhenVisible);
@@ -905,7 +887,7 @@ export default function OrdersPage() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("focus", refreshWhenVisible);
     };
-  }, [fetchOrders, tickAutoComplete]);
+  }, [fetchOrders]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],
