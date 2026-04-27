@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
-import { getAddressDetail } from "@/lib/addressBook";
-import { isAutoPickPickupOrder } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderCancelledStatus, isAutoPickPickupOrder } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../../../prisma/generated-client";
 
 export const dynamic = "force-dynamic";
@@ -23,37 +23,14 @@ type MatchedCatalogProduct = {
   shopName?: string | null;
 };
 
-type ShippingAddress = {
-  id?: string;
-  label?: string;
-  address?: string;
-  detailAddress?: string;
-  longitude?: number | null;
-  latitude?: number | null;
-};
-
-type AutoPickShopMappingEntry = {
-  type: "name" | "address";
-  normalizedValue: string;
-  matchedShopName: string;
-  updatedAt?: string;
-};
-
 type UserPermissionsPayload = {
-  autoPickShopMappings?: unknown;
+  autoPickIntegration?: unknown;
 };
 
 function toNormalizedText(value: string | null | undefined) {
   return String(value || "")
     .trim()
     .replace(/[（(].*?[)）]/g, " ")
-    .replace(/\s+/g, "")
-    .toLowerCase();
-}
-
-function toLooseNormalizedText(value: string | null | undefined) {
-  return String(value || "")
-    .trim()
     .replace(/\s+/g, "")
     .toLowerCase();
 }
@@ -70,111 +47,79 @@ function isJDPlatform(platform: string | null | undefined) {
   return String(platform || "").includes("京东");
 }
 
-function shouldPreferAddressMatch(platform: string | null | undefined) {
-  const text = String(platform || "").trim();
-  return text.includes("京东") || text.includes("淘宝");
+function findMappedShopNameFromIntegrationConfig(
+  maiyatianShopId: string | null,
+  rawShopName: string | null,
+  permissions: unknown
+) {
+  const record = permissions && typeof permissions === "object" && !Array.isArray(permissions)
+    ? permissions as UserPermissionsPayload
+    : {};
+  const config = normalizeAutoPickIntegrationConfig(record.autoPickIntegration);
+
+  if (config.maiyatianShopMappings.length === 0) {
+    return null;
+  }
+
+  const normalizedShopId = String(maiyatianShopId || "").trim();
+  if (normalizedShopId) {
+    const matchedById = config.maiyatianShopMappings.find((item) => String(item.maiyatianShopId || "").trim() === normalizedShopId);
+    if (matchedById?.localShopName) {
+      return matchedById.localShopName;
+    }
+  }
+
+  const exactShopName = String(rawShopName || "").trim();
+  if (!exactShopName) {
+    return null;
+  }
+
+  const matchedByName = config.maiyatianShopMappings.find((item) => String(item.maiyatianShopName || "").trim() === exactShopName);
+  return matchedByName?.localShopName || null;
 }
 
-function normalizeShopMappingEntry(input: unknown): AutoPickShopMappingEntry | null {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return null;
+function resolveMappedShopDebug(
+  maiyatianShopId: string | null,
+  rawShopName: string | null,
+  permissions: unknown
+) {
+  const record = permissions && typeof permissions === "object" && !Array.isArray(permissions)
+    ? permissions as UserPermissionsPayload
+    : {};
+  const config = normalizeAutoPickIntegrationConfig(record.autoPickIntegration);
+  const normalizedShopId = String(maiyatianShopId || "").trim();
+  const exactShopName = String(rawShopName || "").trim();
+
+  const matchedById = normalizedShopId
+    ? config.maiyatianShopMappings.find((item) => String(item.maiyatianShopId || "").trim() === normalizedShopId)
+    : null;
+  if (matchedById?.localShopName) {
+    return {
+      localShopName: matchedById.localShopName,
+      matchedBy: "shopId" as const,
+      mappingCount: config.maiyatianShopMappings.length,
+      mappingPreview: config.maiyatianShopMappings.slice(0, 10).map((item) => ({
+        maiyatianShopId: item.maiyatianShopId,
+        maiyatianShopName: item.maiyatianShopName,
+        localShopName: item.localShopName,
+      })),
+    };
   }
 
-  const record = input as Record<string, unknown>;
-  const type = record.type === "address" ? "address" : record.type === "name" ? "name" : null;
-  const normalizedValue = String(record.normalizedValue || "").trim();
-  const matchedShopName = String(record.matchedShopName || "").trim();
-  const updatedAt = String(record.updatedAt || "").trim();
-
-  if (!type || !normalizedValue || !matchedShopName) {
-    return null;
-  }
+  const matchedByName = exactShopName
+    ? config.maiyatianShopMappings.find((item) => String(item.maiyatianShopName || "").trim() === exactShopName)
+    : null;
 
   return {
-    type,
-    normalizedValue,
-    matchedShopName,
-    updatedAt: updatedAt || undefined,
+    localShopName: matchedByName?.localShopName || null,
+    matchedBy: matchedByName?.localShopName ? "shopName" as const : null,
+    mappingCount: config.maiyatianShopMappings.length,
+    mappingPreview: config.maiyatianShopMappings.slice(0, 10).map((item) => ({
+      maiyatianShopId: item.maiyatianShopId,
+      maiyatianShopName: item.maiyatianShopName,
+      localShopName: item.localShopName,
+    })),
   };
-}
-
-function getAutoPickShopMappingsFromPermissions(input: unknown) {
-  const permissions = input && typeof input === "object" && !Array.isArray(input)
-    ? input as UserPermissionsPayload
-    : {};
-
-  const rawMappings = Array.isArray(permissions.autoPickShopMappings)
-    ? permissions.autoPickShopMappings
-    : [];
-
-  return rawMappings
-    .map((item) => normalizeShopMappingEntry(item))
-    .filter((item): item is AutoPickShopMappingEntry => Boolean(item));
-}
-
-function findMappedShopNameFromCache(
-  platform: string | null | undefined,
-  rawShopName: string | null,
-  rawShopAddress: string | null,
-  mappings: AutoPickShopMappingEntry[],
-  shippingAddresses: ShippingAddress[]
-) {
-  const validShopNames = new Set(
-    shippingAddresses
-      .map((item) => String(item.label || "").trim())
-      .filter(Boolean)
-  );
-
-  const normalizedName = toNormalizedText(rawShopName);
-  const normalizedAddress = normalizeShopAddressForMatch(rawShopAddress);
-  const preferAddressMatch = shouldPreferAddressMatch(platform);
-
-  const findByType = (type: "name" | "address", normalizedValue: string) => {
-    if (!normalizedValue) {
-      return null;
-    }
-
-    const matched = mappings.find((item) => item.type === type && item.normalizedValue === normalizedValue);
-    if (!matched) {
-      return null;
-    }
-
-    return validShopNames.has(matched.matchedShopName) ? matched.matchedShopName : null;
-  };
-
-  return preferAddressMatch
-    ? (findByType("address", normalizedAddress) || findByType("name", normalizedName))
-    : (findByType("name", normalizedName) || findByType("address", normalizedAddress));
-}
-
-function buildShopMappingEntries(rawShopName: string | null, rawShopAddress: string | null, matchedShopName: string | null) {
-  const normalizedName = toNormalizedText(rawShopName);
-  const normalizedAddress = normalizeShopAddressForMatch(rawShopAddress);
-  const shopName = String(matchedShopName || "").trim();
-
-  if (!shopName) {
-    return [];
-  }
-
-  const entries: AutoPickShopMappingEntry[] = [];
-  if (normalizedName) {
-    entries.push({
-      type: "name",
-      normalizedValue: normalizedName,
-      matchedShopName: shopName,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-  if (normalizedAddress) {
-    entries.push({
-      type: "address",
-      normalizedValue: normalizedAddress,
-      matchedShopName: shopName,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  return entries;
 }
 
 function resolveIncomeMetrics(
@@ -241,12 +186,32 @@ function readShopAddressFromRawPayload(rawPayload: unknown) {
   const record = rawPayload as Record<string, unknown>;
   const candidates = [
     record.rawShopAddress,
-    record.shop_name,
     record.shopAddress,
     record.storeAddress,
     record.merchantAddress,
     record.store_address,
     record.merchant_address,
+  ];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function readShopIdFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const delivery = record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
+    ? record.delivery as Record<string, unknown>
+    : null;
+  const candidates = [
+    record.shop_id,
+    delivery?.shop_id,
   ];
   for (const item of candidates) {
     const value = String(item || "").trim();
@@ -314,140 +279,12 @@ function readCompletedAtFromRawPayload(rawPayload: unknown) {
   return null;
 }
 
-function stripShopSuffix(value: string) {
-  return String(value || "").trim().replace(/(店|一店|二店|三店|分店|总店)$/, "");
-}
-
-function normalizeShopAddressForMatch(value: string | null | undefined) {
-  return String(value || "")
-    .replace(/[（(][^()（）]*[)）]/g, " ")
-    .replace(/(?:必须送货上门|不然没人签收|送货上门|一定送上门|一定要送上门|请送上门)/gi, " ")
-    .replace(/贵州省|广东省|广州市|遵义市|白云区|汇川区|棠景街|香港路|祥岗东街/gi, " ")
-    .replace(/商务中心/gi, "商务中心")
-    .replace(/[栋座]/g, "座")
-    .replace(/[室房]/g, "室")
-    .replace(/号楼/g, "楼")
-    .replace(/\s+/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-function extractShopAddressAnchors(value: string | null | undefined) {
-  const normalized = normalizeShopAddressForMatch(value);
-  if (!normalized) {
-    return [];
+function readDeliveryFee(delivery: unknown) {
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return 0;
   }
-
-  const anchors = new Set<string>();
-
-  const patterns = [
-    /[a-z]\d{1,4}室/gi,
-    /\d{1,3}楼/gi,
-    /[a-z]座/gi,
-    /[a-z]栋/gi,
-    /[\u4e00-\u9fa5a-z0-9]{2,20}(?:商务中心|广场|大厦|中心|花园|御景|天际|花城|帝标)/gi,
-  ];
-
-  for (const pattern of patterns) {
-    const matches = normalized.match(pattern) || [];
-    for (const item of matches) {
-      anchors.add(String(item).toLowerCase());
-    }
-  }
-
-  return Array.from(anchors);
-}
-
-function isShopAddressAnchorMatch(left: string | null | undefined, right: string | null | undefined) {
-  const leftNormalized = normalizeShopAddressForMatch(left);
-  const rightNormalized = normalizeShopAddressForMatch(right);
-  if (!leftNormalized || !rightNormalized) {
-    return false;
-  }
-
-  if (leftNormalized.includes(rightNormalized) || rightNormalized.includes(leftNormalized)) {
-    return true;
-  }
-
-  const leftAnchors = extractShopAddressAnchors(leftNormalized);
-  const rightAnchors = extractShopAddressAnchors(rightNormalized);
-  if (leftAnchors.length === 0 || rightAnchors.length === 0) {
-    return false;
-  }
-
-  const overlap = leftAnchors.filter((item) => rightAnchors.includes(item));
-  if (overlap.length >= 2) {
-    return true;
-  }
-
-  const hasStrongLandmark = overlap.some((item) => /(?:商务中心|广场|大厦|中心|花园|御景|天际|花城|帝标)/i.test(item));
-  const hasUnitAnchor = overlap.some((item) => /(?:座|栋|\d+楼|[a-z]\d{1,4}室)/i.test(item));
-  return hasStrongLandmark && hasUnitAnchor;
-}
-
-function matchShopName(
-  platform: string | null | undefined,
-  rawShopName: string | null,
-  rawShopAddress: string | null,
-  shippingAddresses: ShippingAddress[]
-) {
-  const normalizedRawShopName = toNormalizedText(rawShopName);
-  const looseRawShopName = toLooseNormalizedText(rawShopName);
-  const normalizedShopAddress = normalizeShopAddressForMatch(rawShopAddress);
-  const preferAddressMatch = shouldPreferAddressMatch(platform);
-
-  const matchByShopName = () => {
-    if (looseRawShopName) {
-      const matchedByShopName = shippingAddresses.find((addr) => {
-        const label = String(addr.label || "").trim();
-        const coreLabel = stripShopSuffix(label);
-        const looseLabel = toLooseNormalizedText(label);
-        const looseCoreLabel = toLooseNormalizedText(coreLabel);
-        return Boolean(
-          (looseLabel && (looseRawShopName.includes(looseLabel) || looseLabel.includes(looseRawShopName))) ||
-          (looseCoreLabel && (looseRawShopName.includes(looseCoreLabel) || looseLabel.includes(looseRawShopName)))
-        );
-      });
-
-      if (matchedByShopName?.label) {
-        return String(matchedByShopName.label).trim();
-      }
-    }
-
-    if (normalizedRawShopName) {
-      const matchedByNormalizedShopName = shippingAddresses.find((addr) => {
-        const label = String(addr.label || "").trim();
-        const normalizedLabel = toNormalizedText(label);
-        const normalizedCoreLabel = toNormalizedText(stripShopSuffix(label));
-        return Boolean(
-          (normalizedLabel && (normalizedRawShopName.includes(normalizedLabel) || normalizedLabel.includes(normalizedRawShopName))) ||
-          (normalizedCoreLabel && (normalizedRawShopName.includes(normalizedCoreLabel) || normalizedCoreLabel.includes(normalizedRawShopName)))
-        );
-      });
-
-      if (matchedByNormalizedShopName?.label) {
-        return String(matchedByNormalizedShopName.label).trim();
-      }
-    }
-
-    return null;
-  };
-
-  const matchByAddress = () => {
-    if (!normalizedShopAddress) {
-      return null;
-    }
-
-    const matchedByAddress = shippingAddresses.find((addr) => {
-      return isShopAddressAnchorMatch(getAddressDetail(addr), rawShopAddress);
-    });
-
-    return matchedByAddress?.label ? String(matchedByAddress.label).trim() : null;
-  };
-
-  return preferAddressMatch
-    ? (matchByAddress() || matchByShopName())
-    : (matchByShopName() || matchByAddress());
+  const value = Number((delivery as Record<string, unknown>).sendFee || 0);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 export async function GET(request: NextRequest) {
@@ -565,25 +402,28 @@ export async function GET(request: NextRequest) {
       }),
       prisma.user.findUnique({
         where: { id: session.id },
-        select: { shippingAddresses: true, permissions: true },
+        select: { permissions: true },
       }),
     ]);
 
     const summary = orders.reduce((acc, order) => {
       const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
       const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
-      acc.actualPaid += order.actualPaid;
-      acc.platformCommission += metrics.platformCommission;
-      acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
-      if (order.delivery) {
-        acc.deliveryCount += 1;
+      const cancelled = isAutoPickOrderCancelledStatus(order.status);
+      if (!cancelled) {
+        acc.receivedAmount += Math.max(0, Number(metrics.expectedIncome || 0));
+        acc.platformCommission += metrics.platformCommission;
+        acc.validOrderCount += 1;
       }
+      acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
+      acc.totalDeliveryFee += readDeliveryFee(order.delivery);
       return acc;
     }, {
-      actualPaid: 0,
+      receivedAmount: 0,
       platformCommission: 0,
+      validOrderCount: 0,
       itemCount: 0,
-      deliveryCount: 0,
+      totalDeliveryFee: 0,
     });
 
     const productNames = Array.from(new Set(
@@ -624,11 +464,6 @@ export async function GET(request: NextRequest) {
         ])
       : [[], []];
 
-    const shippingAddresses = Array.isArray(userProfile?.shippingAddresses)
-      ? (userProfile.shippingAddresses as ShippingAddress[])
-      : [];
-    const cachedShopMappings = getAutoPickShopMappingsFromPermissions(userProfile?.permissions);
-
     const productMap = new Map<string, MatchedCatalogProduct>();
     for (const item of products) {
       const normalizedName = toNormalizedText(item.name);
@@ -659,8 +494,6 @@ export async function GET(request: NextRequest) {
       shopProductMap.set(normalizedName, current);
     }
 
-    const discoveredMappings = new Map<string, AutoPickShopMappingEntry>();
-
     const enrichedOrders = orders.map((order) => {
       const expectedIncome = typeof order.expectedIncome === "number"
         ? order.expectedIncome
@@ -669,7 +502,7 @@ export async function GET(request: NextRequest) {
       const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress);
       return {
         ...order,
-        shopId: order.shopId,
+        shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload),
         shopAddress: order.shopAddress,
         rawShopName: readShopNameFromRawPayload(order.rawPayload) || null,
         rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
@@ -684,20 +517,12 @@ export async function GET(request: NextRequest) {
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
       };
     }).map((order) => {
-      const cachedShopName = findMappedShopNameFromCache(
-        order.platform,
+      const mappingDebug = resolveMappedShopDebug(
+        order.shopId,
         order.rawShopName,
-        order.rawShopAddress,
-        cachedShopMappings,
-        shippingAddresses
+        userProfile?.permissions
       );
-      const matchedShopName = cachedShopName || matchShopName(order.platform, order.rawShopName, order.rawShopAddress, shippingAddresses);
-
-      if (!cachedShopName && matchedShopName) {
-        for (const entry of buildShopMappingEntries(order.rawShopName, order.rawShopAddress, matchedShopName)) {
-          discoveredMappings.set(`${entry.type}:${entry.normalizedValue}`, entry);
-        }
-      }
+      const matchedShopName = mappingDebug.localShopName;
 
       return {
         ...order,
@@ -724,31 +549,6 @@ export async function GET(request: NextRequest) {
         }),
       };
     });
-
-    if (discoveredMappings.size > 0) {
-      const existingMappings = cachedShopMappings.slice();
-      const existingKeys = new Set(existingMappings.map((item) => `${item.type}:${item.normalizedValue}`));
-      for (const entry of discoveredMappings.values()) {
-        if (!existingKeys.has(`${entry.type}:${entry.normalizedValue}`)) {
-          existingMappings.push(entry);
-        }
-      }
-
-      const currentPermissions = userProfile?.permissions && typeof userProfile.permissions === "object" && !Array.isArray(userProfile.permissions)
-        ? { ...(userProfile.permissions as Record<string, unknown>) }
-        : {};
-      const nextPermissions: Record<string, unknown> = {
-        ...currentPermissions,
-        autoPickShopMappings: existingMappings,
-      };
-
-      await prisma.user.update({
-        where: { id: session.id },
-        data: {
-          permissions: nextPermissions as Prisma.InputJsonValue,
-        },
-      });
-    }
 
     return NextResponse.json({
       items: enrichedOrders,

@@ -3,7 +3,7 @@ import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
-import { AutoPickIntegrationConfig } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping } from "@/lib/types";
 import { ProductService } from "@/services/productService";
 
 export type AutoPickInboundItem = {
@@ -161,12 +161,156 @@ function normalizeInboundApiKey(value: string) {
   return value.trim();
 }
 
+function normalizeMaiyatianCookie(value: string) {
+  return value.trim();
+}
+
+function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMapping | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  const maiyatianShopId = String(record.maiyatianShopId || "").trim();
+  const maiyatianShopName = String(record.maiyatianShopName || "").trim();
+  const maiyatianShopAddress = String(record.maiyatianShopAddress || "").trim();
+  const localShopName = String(record.localShopName || "").trim();
+  const cityCode = String(record.cityCode || "").trim();
+  const cityName = String(record.cityName || "").trim();
+
+  if (!maiyatianShopId || !maiyatianShopName || !maiyatianShopAddress || !localShopName) {
+    return null;
+  }
+
+  return {
+    maiyatianShopId,
+    maiyatianShopName,
+    maiyatianShopAddress,
+    localShopName,
+    cityCode: cityCode || undefined,
+    cityName: cityName || undefined,
+  };
+}
+
 export function normalizeAutoPickIntegrationConfig(input: unknown): AutoPickIntegrationConfig {
   const payload = input && typeof input === "object" ? input as Record<string, unknown> : {};
   return {
     pluginBaseUrl: normalizePluginBaseUrl(String(payload.pluginBaseUrl || "")),
     inboundApiKey: normalizeInboundApiKey(String(payload.inboundApiKey || "")),
+    maiyatianCookie: normalizeMaiyatianCookie(String(payload.maiyatianCookie || "")),
+    maiyatianShopMappings: Array.isArray(payload.maiyatianShopMappings)
+      ? payload.maiyatianShopMappings
+          .map((item) => normalizeMaiyatianShopMapping(item))
+          .filter((item): item is AutoPickMaiyatianShopMapping => Boolean(item))
+      : [],
   };
+}
+
+function decodeHtmlEntities(value: string) {
+  return String(value || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, "\"");
+}
+
+function stripHtmlTags(value: string) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseMaiyatianCityTabs(html: string) {
+  const result: Array<{ cityCode: string; cityName: string }> = [];
+  const cityPattern = /<a[^>]+href="\/shop\/\?city=([^"]+)"[^>]*>\s*<span>([^<]+)<\/span>\s*<\/a>/gi;
+  let match: RegExpExecArray | null = null;
+  while ((match = cityPattern.exec(html))) {
+    const cityCode = String(match[1] || "").trim();
+    const cityName = stripHtmlTags(match[2] || "");
+    if (!cityCode || cityCode === "all" || !cityName) {
+      continue;
+    }
+    result.push({ cityCode, cityName });
+  }
+  return result;
+}
+
+function parseMaiyatianShopRows(html: string, cityCode?: string, cityName?: string) {
+  const shops: AutoPickMaiyatianShop[] = [];
+  const rowPattern = /<tr>\s*<td class="multi">([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>[\s\S]*?\/shop\/edit\/\?id=(\d+)/gi;
+  let match: RegExpExecArray | null = null;
+
+  while ((match = rowPattern.exec(html))) {
+    const multiCell = String(match[1] || "");
+    const phone = stripHtmlTags(match[2] || "");
+    const id = String(match[3] || "").trim();
+    const labelMatch = multiCell.match(/<label>([\s\S]*?)<\/label>/i);
+    const address = stripHtmlTags(labelMatch?.[1] || "");
+    const name = stripHtmlTags(multiCell.replace(/<label>[\s\S]*?<\/label>/i, ""));
+
+    if (!id || !name || !address) {
+      continue;
+    }
+
+    shops.push({
+      id,
+      name,
+      address,
+      phone: phone || undefined,
+      cityCode: cityCode || undefined,
+      cityName: cityName || undefined,
+    });
+  }
+
+  return shops;
+}
+
+async function fetchMaiyatianHtml(pathname: string, cookie: string) {
+  const response = await fetch(`https://saas.maiyatian.com${pathname}`, {
+    method: "GET",
+    headers: {
+      Cookie: cookie,
+      "User-Agent": "Mozilla/5.0",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text.trim().slice(0, 200) || `麦芽田请求失败 ${response.status}`);
+  }
+
+  return await response.text();
+}
+
+export async function fetchMaiyatianShippingShopsByCookie(cookie: string) {
+  const normalizedCookie = normalizeMaiyatianCookie(cookie);
+  if (!normalizedCookie) {
+    throw new Error("请先填写麦芽田 Cookie");
+  }
+
+  const entryHtml = await fetchMaiyatianHtml("/shop/", normalizedCookie);
+  const cityTabs = parseMaiyatianCityTabs(entryHtml);
+  const deduped = new Map<string, AutoPickMaiyatianShop>();
+
+  for (const shop of parseMaiyatianShopRows(entryHtml)) {
+    deduped.set(shop.id, shop);
+  }
+
+  for (const city of cityTabs) {
+    const cityHtml = await fetchMaiyatianHtml(`/shop/?city=${encodeURIComponent(city.cityCode)}`, normalizedCookie);
+    for (const shop of parseMaiyatianShopRows(cityHtml, city.cityCode, city.cityName)) {
+      deduped.set(shop.id, shop);
+    }
+  }
+
+  return Array.from(deduped.values()).sort((left, right) => {
+    const cityCompare = String(left.cityCode || "").localeCompare(String(right.cityCode || ""));
+    if (cityCompare !== 0) return cityCompare;
+    return left.name.localeCompare(right.name, "zh-CN");
+  });
 }
 
 export async function getAutoPickIntegrationConfigByUserId(userId: string) {
@@ -461,11 +605,23 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
   }
 
   const input = payload as Record<string, unknown>;
+  const extend = input.extend && typeof input.extend === "object" && !Array.isArray(input.extend)
+    ? input.extend as Record<string, unknown>
+    : null;
   const items = Array.isArray(input.items) ? input.items : [];
 
   const normalized: AutoPickInboundOrder = {
     id: String(input.id || "").trim(),
-    shopId: String(input.shopId || input.shop_id || input.storeId || input.store_id || input.merchant_id || "").trim() || undefined,
+    shopId: String(
+      input.shop_id
+      || (
+        input.delivery
+        && typeof input.delivery === "object"
+        && !Array.isArray(input.delivery)
+        && (input.delivery as Record<string, unknown>).shop_id
+      )
+      || ""
+    ).trim() || undefined,
     logisticId: String(input.logisticId || "").trim(),
     city: Number.isFinite(Number(input.city)) ? Number(input.city) : undefined,
     platform: String(input.platform || "").trim(),
@@ -473,9 +629,35 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     orderNo: String(input.orderNo || "").trim(),
     orderTime: String(input.orderTime || "").trim(),
     userAddress: String(input.userAddress || "").trim(),
-    rawShopName: String(input.rawShopName || input.shopName || "").trim() || undefined,
-    shopAddress: String(input.shopAddress || input.rawShopAddress || input.storeAddress || input.merchantAddress || "").trim() || undefined,
-    rawShopAddress: String(input.rawShopAddress || input.shopAddress || input.storeAddress || input.merchantAddress || "").trim() || undefined,
+    rawShopName: String(
+      input.rawShopName
+      || extend?.channel_name
+      || input.channel_name
+      || input.shop_name
+      || input.shopName
+      || input.storeName
+      || input.merchantName
+      || input.merchant_name
+      || ""
+    ).trim() || undefined,
+    shopAddress: String(
+      input.shopAddress
+      || input.rawShopAddress
+      || input.storeAddress
+      || input.merchantAddress
+      || input.store_address
+      || input.merchant_address
+      || ""
+    ).trim() || undefined,
+    rawShopAddress: String(
+      input.rawShopAddress
+      || input.shopAddress
+      || input.storeAddress
+      || input.merchantAddress
+      || input.store_address
+      || input.merchant_address
+      || ""
+    ).trim() || undefined,
     isSubscribe: input.isSubscribe === true || input.isSubscribe === 1 || input.isSubscribe === "1" || input.is_subscribe === true || input.is_subscribe === 1 || input.is_subscribe === "1",
     completedAt: String(input.completedAt || input.finishedTime || input.finished_time || "").trim() || undefined,
     longitude: Number.isFinite(Number(input.longitude)) ? Number(input.longitude) : undefined,

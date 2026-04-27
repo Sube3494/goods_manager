@@ -190,6 +190,26 @@ export interface AutoPickApiKey {
 export interface AutoPickIntegrationConfig {
   pluginBaseUrl: string;
   inboundApiKey: string;
+  maiyatianCookie: string;
+  maiyatianShopMappings: AutoPickMaiyatianShopMapping[];
+}
+
+export interface AutoPickMaiyatianShop {
+  id: string;
+  name: string;
+  address: string;
+  phone?: string | null;
+  cityCode?: string | null;
+  cityName?: string | null;
+}
+
+export interface AutoPickMaiyatianShopMapping {
+  maiyatianShopId: string;
+  maiyatianShopName: string;
+  maiyatianShopAddress: string;
+  localShopName: string;
+  cityCode?: string | null;
+  cityName?: string | null;
 }
 
 export interface BrushProduct {

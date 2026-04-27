@@ -11,6 +11,8 @@ import {
   ChevronUp,
   Clock3,
   Copy,
+  Eye,
+  EyeOff,
   Loader2,
   MapPin,
   Package2,
@@ -33,7 +35,7 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderTerminalStatus,
 } from "@/lib/autoPickOrderStatus";
-import { AutoPickIntegrationConfig, AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
@@ -53,12 +55,33 @@ type OrderResponse = {
     statuses: string[];
   };
   summary?: {
-    actualPaid: number;
+    receivedAmount: number;
     platformCommission: number;
+    validOrderCount: number;
     itemCount: number;
-    deliveryCount: number;
+    totalDeliveryFee: number;
   };
 };
+
+type LocalShopOption = {
+  id: string;
+  name: string;
+  address: string;
+  isDefault?: boolean;
+};
+
+function serializeIntegrationConfig(config: AutoPickIntegrationConfig) {
+  return JSON.stringify({
+    pluginBaseUrl: String(config.pluginBaseUrl || ""),
+    inboundApiKey: String(config.inboundApiKey || ""),
+    maiyatianCookie: String(config.maiyatianCookie || ""),
+    maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : [],
+  });
+}
+
+function serializeMaiyatianMappings(config: AutoPickIntegrationConfig) {
+  return JSON.stringify(Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : []);
+}
 
 const MIN_REFRESH_GAP_MS = 10 * 1000;
 const TODAY_ACTIVE_REFRESH_MS = 30 * 1000;
@@ -744,38 +767,142 @@ function OrderCard({
   );
 }
 
+function MappingSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: Array<{ value: string; label: string; hint?: string }>;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selected = options.find((item) => item.value === value);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isOpen]);
+
+  return (
+    <div ref={containerRef} className="relative mt-2.5">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className={cn(
+          "flex h-10 w-full items-center justify-between rounded-xl border px-3 text-left text-sm font-medium outline-none transition-all",
+          "border-black/8 bg-white/90 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] hover:bg-white focus:border-primary/30 focus:ring-2 focus:ring-primary/10",
+          "dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:bg-white/[0.06]"
+        )}
+      >
+        <span className={cn("truncate", !value && "text-muted-foreground")}>
+          {selected?.label || "暂不映射"}
+        </span>
+        <ChevronDown size={15} className={cn("shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-xl border border-black/8 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur dark:border-white/10 dark:bg-[#111827]/96">
+          <div className="max-h-64 overflow-y-auto p-1.5">
+            {options.map((option) => {
+              const active = option.value === value;
+              return (
+                <button
+                  key={option.value || "__empty__"}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                    active
+                      ? "bg-primary/12 text-foreground"
+                      : "text-foreground hover:bg-black/[0.035] dark:hover:bg-white/[0.05]"
+                  )}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{option.label}</div>
+                    {option.hint ? (
+                      <div className={cn("mt-1 line-clamp-2 text-[11px] leading-4", active ? "text-foreground/70" : "text-muted-foreground")}>
+                        {option.hint}
+                      </div>
+                    ) : null}
+                  </div>
+                  {active ? <Check size={14} className="mt-0.5 shrink-0 text-primary" /> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function IntegrationModal({
   integrationConfig,
+  maiyatianShops,
+  localShops,
   callbackUrl,
-  isSavingIntegration,
+  isFetchingMaiyatianShops,
   isTestingIntegration,
   modalRef,
   onClose,
   onChange,
   onCopyCallback,
-  onSave,
+  onFetchMaiyatianShops,
   onTest,
 }: {
   integrationConfig: AutoPickIntegrationConfig;
+  maiyatianShops: AutoPickMaiyatianShop[];
+  localShops: LocalShopOption[];
   callbackUrl: string;
-  isSavingIntegration: boolean;
+  isFetchingMaiyatianShops: boolean;
   isTestingIntegration: boolean;
   modalRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onChange: (value: AutoPickIntegrationConfig) => void;
   onCopyCallback: () => void;
-  onSave: () => void;
+  onFetchMaiyatianShops: () => void;
   onTest: () => void;
 }) {
+  const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
+  const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
+  const [showInboundApiKey, setShowInboundApiKey] = useState(false);
+  const pillButtonClass = "inline-flex items-center gap-1 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
+  const localShopOptions = localShops.map((item) => ({
+    value: item.name,
+    label: `${item.name}${item.isDefault ? "（默认）" : ""}`,
+    hint: item.address,
+  }));
+
+  useEffect(() => {
+    if (!integrationConfig.maiyatianCookie.trim()) {
+      setIsEditingCookie(true);
+      return;
+    }
+    setIsEditingCookie(false);
+  }, [integrationConfig.maiyatianCookie]);
+
   return (
     <div className="fixed inset-0 z-100000 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={modalRef}
-        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-black/8 bg-white/95 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:p-7"
+        className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-[1120px] flex-col overflow-hidden rounded-[28px] border border-black/8 bg-white/95 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:rounded-[32px]"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex items-start justify-between gap-4 px-5 pb-0 pt-5 sm:px-7 sm:pt-7">
+          <div className="min-w-0">
             <div className="inline-flex items-center rounded-full border border-black/8 bg-black/[0.03] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
               Auto Pick
             </div>
@@ -785,67 +912,240 @@ function IntegrationModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground dark:border-white/10 dark:bg-white/[0.04]"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground dark:border-white/10 dark:bg-white/[0.04]"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="mt-6 space-y-5">
-          <label className="block space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">插件地址</span>
-            <input
-              value={integrationConfig.pluginBaseUrl}
-              onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
-              placeholder="http://127.0.0.1:22800"
-              className="h-12 w-full rounded-2xl border border-black/8 bg-black/[0.02] px-4 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]"
-            />
-          </label>
+        <div className="mt-6 flex-1 overflow-y-auto px-5 pb-5 sm:px-7 sm:pb-7">
+          <div className="grid gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
+            <div className="space-y-4">
+              <label className="block space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">插件地址</span>
+                <input
+                  value={integrationConfig.pluginBaseUrl}
+                  onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
+                  placeholder="http://127.0.0.1:22800"
+                  className="h-11 w-full rounded-xl border border-black/8 bg-black/[0.02] px-4 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]"
+                />
+              </label>
 
-          <label className="block space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">对接密钥</span>
-            <input
-              value={integrationConfig.inboundApiKey}
-              onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
-              placeholder="输入 auto-pick inbound API key"
-              className="h-12 w-full rounded-2xl border border-black/8 bg-black/[0.02] px-4 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]"
-            />
-          </label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">对接密钥</span>
+                  <div className="flex items-center gap-2">
+                    {integrationConfig.inboundApiKey.trim() ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(integrationConfig.inboundApiKey);
+                        }}
+                        className={pillButtonClass}
+                      >
+                        <Copy size={12} />
+                        复制
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setShowInboundApiKey((current) => !current)}
+                      className={pillButtonClass}
+                    >
+                      {showInboundApiKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                      {showInboundApiKey ? "隐藏" : "查看"}
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type={showInboundApiKey ? "text" : "password"}
+                  value={integrationConfig.inboundApiKey}
+                  onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
+                  placeholder="输入 auto-pick inbound API key"
+                  className="h-11 w-full rounded-xl border border-black/8 bg-black/[0.02] px-4 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]"
+                />
+              </div>
 
-          <div className="rounded-[24px] border border-black/8 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="flex items-center justify-between gap-3">
+              <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
+                    <p className="mt-1 text-xs text-muted-foreground">填写后用于读取发货门店</p>
+                  </div>
+                  {hasCookie ? (
+                    <button
+                      type="button"
+                      onClick={() => onChange({ ...integrationConfig, maiyatianCookie: "" })}
+                      className={pillButtonClass}
+                    >
+                      删除
+                    </button>
+                  ) : null}
+                </div>
+
+                {isEditingCookie ? (
+                  <textarea
+                    value={integrationConfig.maiyatianCookie}
+                    onChange={(event) => onChange({ ...integrationConfig, maiyatianCookie: event.target.value })}
+                    placeholder="粘贴麦芽田 cookie，用于读取发货门店"
+                    className="mt-3 min-h-[92px] w-full rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                  />
+                ) : (
+                  <div
+                    onCopy={(event) => event.preventDefault()}
+                    onCut={(event) => event.preventDefault()}
+                    className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827]"
+                  >
+                    <div className="text-sm font-medium text-foreground">已保存 Cookie</div>
+                    <div className="mt-1 text-xs text-muted-foreground">默认隐藏，且当前不可复制。</div>
+                    <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
+                      {"•".repeat(28)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调地址</div>
+                    <p className="mt-1 text-xs text-muted-foreground">插件把来单上报到这里。</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onCopyCallback}
+                    className={cn(pillButtonClass, "h-9")}
+                  >
+                    <Copy size={12} />
+                    复制
+                  </button>
+                </div>
+                <code className="mt-3 block break-all rounded-xl bg-white/80 px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground dark:bg-[#111827]">
+                  {callbackUrl}
+                </code>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <ActionButton
+                  label={isTestingIntegration ? "测试中..." : "测试连接"}
+                  icon={isTestingIntegration ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
+                  onClick={() => onTest()}
+                  disabled={isTestingIntegration}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-[20px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03] sm:p-4">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调地址</div>
-                <p className="mt-1 text-xs text-muted-foreground">插件把来单上报到这里。</p>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田门店绑定</div>
+                <p className="mt-1 text-xs text-muted-foreground">读取麦芽田发货门店后，在这里手动映射到系统门店。</p>
               </div>
               <button
                 type="button"
-                onClick={onCopyCallback}
-                className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-[11px] font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/[0.05]"
+                onClick={onFetchMaiyatianShops}
+                disabled={isFetchingMaiyatianShops}
+                className={cn(
+                  pillButtonClass,
+                  "bg-white/88 dark:bg-white/[0.05]",
+                  "disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-black/6 disabled:bg-black/[0.04] disabled:text-muted-foreground disabled:shadow-none",
+                  "dark:disabled:border-white/10 dark:disabled:bg-white/[0.04] dark:disabled:text-white/45"
+                )}
               >
-                <Copy size={12} />
-                复制
+                {isFetchingMaiyatianShops ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                读取门店
               </button>
             </div>
-            <code className="mt-3 block break-all rounded-2xl bg-white/80 px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground dark:bg-[#111827]">
-              {callbackUrl}
-            </code>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <ActionButton
-              label={isTestingIntegration ? "测试中..." : "测试连接"}
-              icon={isTestingIntegration ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
-              onClick={onTest}
-              disabled={isTestingIntegration}
-            />
-            <ActionButton
-              label={isSavingIntegration ? "保存中..." : "保存配置"}
-              variant="primary"
-              icon={isSavingIntegration ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              onClick={onSave}
-              disabled={isSavingIntegration}
-            />
+            {localShops.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-dashed border-black/8 bg-white/65 px-3 py-2.5 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.03]">
+                还没有读取到系统发货地址，请先去个人资料里维护地址。
+              </div>
+            ) : null}
+
+            <div className="mt-3 space-y-2.5">
+              {maiyatianShops.length > 0 ? maiyatianShops.map((shop) => {
+                const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
+                const selectedLocalShop = localShops.find((item) => item.name === mapped?.localShopName);
+                return (
+                  <div key={shop.id} className="rounded-2xl border border-black/8 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
+                      <div className="min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold leading-5 text-foreground">{shop.name}</div>
+                            <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                              {shop.address}
+                            </div>
+                            <div className="mt-1.5 text-[11px] text-muted-foreground">
+                              {shop.cityName ? `${shop.cityName} · ` : ""}ID {shop.id}
+                            </div>
+                          </div>
+                          <span className={cn(
+                            "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
+                            mapped
+                              ? "border border-emerald-500/20 bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                              : "border border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+                          )}>
+                            {mapped ? "已映射" : "待映射"}
+                          </span>
+                        </div>
+                        {mapped?.localShopName ? (
+                          <div className="mt-2.5 inline-flex max-w-full items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            当前映射到 {mapped.localShopName}
+                          </div>
+                        ) : (
+                          <div className="mt-2.5 text-[11px] text-muted-foreground">还没绑定系统门店。</div>
+                        )}
+                      </div>
+
+                      <div className="rounded-[16px] border border-black/8 bg-black/[0.02] p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
+                        <MappingSelect
+                          value={mapped?.localShopName || ""}
+                          options={[{ value: "", label: "暂不映射" }, ...localShopOptions]}
+                          onChange={(localShopName) => {
+                            const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
+                            if (localShopName) {
+                              nextMappings.push({
+                                maiyatianShopId: shop.id,
+                                maiyatianShopName: shop.name,
+                                maiyatianShopAddress: shop.address,
+                                localShopName,
+                                cityCode: shop.cityCode || undefined,
+                                cityName: shop.cityName || undefined,
+                              });
+                            }
+                            onChange({
+                              ...integrationConfig,
+                              maiyatianShopMappings: nextMappings,
+                            });
+                          }}
+                        />
+                        {mapped?.localShopName ? (
+                          <div className="mt-2 rounded-xl border border-emerald-500/18 bg-emerald-500/8 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+                            <div className="font-medium">{mapped.localShopName}</div>
+                            {selectedLocalShop?.address ? (
+                              <div className="mt-1 line-clamp-2 text-[11px] leading-5 text-emerald-700/80 dark:text-emerald-400/80">
+                                {selectedLocalShop.address}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {!mapped?.localShopName ? (
+                          <div className="mt-2 text-[11px] text-muted-foreground">选择后会固定这条映射。</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="rounded-[18px] border border-dashed border-black/8 bg-white/60 px-4 py-5 text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                  读取后会在这里列出麦芽田发货门店，你可以逐条绑定到系统门店。
+                </div>
+              )}
+            </div>
+            </div>
           </div>
         </div>
       </div>
@@ -859,6 +1159,7 @@ export default function OrdersPage() {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const isFetchingRef = useRef(false);
   const lastRefreshAtRef = useRef(0);
+  const hasLoadedIntegrationRef = useRef(false);
 
   const [isMounted, setIsMounted] = useState(false);
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -869,10 +1170,11 @@ export default function OrdersPage() {
     totalPages: 1,
   });
   const [summary, setSummary] = useState<NonNullable<OrderResponse["summary"]>>({
-    actualPaid: 0,
+    receivedAmount: 0,
     platformCommission: 0,
+    validOrderCount: 0,
     itemCount: 0,
-    deliveryCount: 0,
+    totalDeliveryFee: 0,
   });
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
@@ -894,12 +1196,28 @@ export default function OrdersPage() {
   const [integrationConfig, setIntegrationConfig] = useState<AutoPickIntegrationConfig>({
     pluginBaseUrl: "",
     inboundApiKey: "",
+    maiyatianCookie: "",
+    maiyatianShopMappings: [],
   });
+  const [maiyatianShops, setMaiyatianShops] = useState<AutoPickMaiyatianShop[]>([]);
+  const [localShops, setLocalShops] = useState<LocalShopOption[]>([]);
   const [callbackUrl, setCallbackUrl] = useState("");
   const [isIntegrationOpen, setIsIntegrationOpen] = useState(false);
-  const [isSavingIntegration, setIsSavingIntegration] = useState(false);
   const [isTestingIntegration, setIsTestingIntegration] = useState(false);
+  const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+  const [savedIntegrationDigest, setSavedIntegrationDigest] = useState(() => serializeIntegrationConfig({
+    pluginBaseUrl: "",
+    inboundApiKey: "",
+    maiyatianCookie: "",
+    maiyatianShopMappings: [],
+  }));
+  const [savedMappingsDigest, setSavedMappingsDigest] = useState(() => serializeMaiyatianMappings({
+    pluginBaseUrl: "",
+    inboundApiKey: "",
+    maiyatianCookie: "",
+    maiyatianShopMappings: [],
+  }));
 
   useEffect(() => {
     setIsMounted(true);
@@ -922,6 +1240,24 @@ export default function OrdersPage() {
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [isIntegrationOpen]);
 
+  useEffect(() => {
+    if (!isIntegrationOpen) {
+      return;
+    }
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = documentElement.style.overflow;
+
+    body.style.overflow = "hidden";
+    documentElement.style.overflow = "hidden";
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isIntegrationOpen]);
+
   const fetchIntegrationConfig = useCallback(async () => {
     try {
       const response = await fetch("/api/orders/integration", { cache: "no-store" });
@@ -933,7 +1269,22 @@ export default function OrdersPage() {
       setIntegrationConfig({
         pluginBaseUrl: String(data.pluginBaseUrl || ""),
         inboundApiKey: String(data.inboundApiKey || ""),
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       });
+      setSavedIntegrationDigest(serializeIntegrationConfig({
+        pluginBaseUrl: String(data.pluginBaseUrl || ""),
+        inboundApiKey: String(data.inboundApiKey || ""),
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+      }));
+      setSavedMappingsDigest(serializeMaiyatianMappings({
+        pluginBaseUrl: String(data.pluginBaseUrl || ""),
+        inboundApiKey: String(data.inboundApiKey || ""),
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+      }));
+      hasLoadedIntegrationRef.current = true;
     } catch (error) {
       console.error("Failed to fetch order integration config:", error);
       showToast(error instanceof Error ? error.message : "加载对接配置失败", "error");
@@ -983,7 +1334,7 @@ export default function OrdersPage() {
       setMeta(payload.meta || { total: 0, page: 1, pageSize, totalPages: 1 });
       setPlatforms(Array.isArray(payload.filters?.platforms) ? payload.filters.platforms : []);
       setStatuses(Array.isArray(payload.filters?.statuses) ? payload.filters.statuses : []);
-      setSummary(payload.summary || { actualPaid: 0, platformCommission: 0, itemCount: 0, deliveryCount: 0 });
+      setSummary(payload.summary || { receivedAmount: 0, platformCommission: 0, validOrderCount: 0, itemCount: 0, totalDeliveryFee: 0 });
     } catch (error) {
       console.error("Failed to fetch orders:", error);
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
@@ -1107,13 +1458,19 @@ export default function OrdersPage() {
     }
   };
 
-  const saveIntegrationConfig = async () => {
-    setIsSavingIntegration(true);
+  const saveIntegrationConfig = useCallback(async (
+    nextConfig?: AutoPickIntegrationConfig,
+    options?: { silent?: boolean }
+  ) => {
     try {
+      const payload = nextConfig && typeof nextConfig === "object" && !("nativeEvent" in (nextConfig as object))
+        ? nextConfig
+        : integrationConfig;
+      const shouldRefreshOrders = serializeMaiyatianMappings(payload) !== savedMappingsDigest;
       const response = await fetch("/api/orders/integration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(integrationConfig),
+        body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -1124,15 +1481,34 @@ export default function OrdersPage() {
       setIntegrationConfig({
         pluginBaseUrl: String(data.pluginBaseUrl || ""),
         inboundApiKey: String(data.inboundApiKey || ""),
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       });
-      showToast("自动推单对接配置已保存", "success");
+      setSavedIntegrationDigest(serializeIntegrationConfig({
+        pluginBaseUrl: String(data.pluginBaseUrl || ""),
+        inboundApiKey: String(data.inboundApiKey || ""),
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+      }));
+      setSavedMappingsDigest(serializeMaiyatianMappings({
+        pluginBaseUrl: String(data.pluginBaseUrl || ""),
+        inboundApiKey: String(data.inboundApiKey || ""),
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+      }));
+      if (!options?.silent) {
+        showToast("自动推单对接配置已保存", "success");
+      }
+      if (shouldRefreshOrders) {
+        void fetchOrders({ silent: true });
+      }
     } catch (error) {
       console.error("Failed to save order integration config:", error);
-      showToast(error instanceof Error ? error.message : "保存对接配置失败", "error");
-    } finally {
-      setIsSavingIntegration(false);
+      if (!options?.silent) {
+        showToast(error instanceof Error ? error.message : "保存对接配置失败", "error");
+      }
     }
-  };
+  }, [fetchOrders, integrationConfig, savedMappingsDigest, showToast]);
 
   const testIntegrationConfig = async () => {
     setIsTestingIntegration(true);
@@ -1157,9 +1533,123 @@ export default function OrdersPage() {
     }
   };
 
+  const fetchLocalShops = useCallback(async (options?: { silent?: boolean }) => {
+    try {
+      const response = await fetch("/api/orders/integration/local-shops", { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || "读取系统地址失败");
+      }
+
+      const nextLocalShops = Array.isArray(data?.shops)
+        ? data.shops
+            .map((item: Record<string, unknown>) => ({
+              id: String(item?.id || ""),
+              name: String(item?.name || "").trim(),
+              address: String(item?.address || "").trim(),
+              isDefault: Boolean(item?.isDefault),
+            }))
+            .filter((item: LocalShopOption) => item.id && item.name)
+        : [];
+
+      setLocalShops(nextLocalShops);
+
+      if (!options?.silent && nextLocalShops.length === 0) {
+        showToast("还没有读取到系统发货地址，请先去个人资料里维护地址", "error");
+      }
+    } catch (error) {
+      console.error("Failed to fetch local shops:", error);
+      if (!options?.silent) {
+        showToast(error instanceof Error ? error.message : "读取系统地址失败", "error");
+      }
+    }
+  }, [showToast]);
+
+  const fetchMaiyatianShops = useCallback(async () => {
+    const cookie = integrationConfig.maiyatianCookie.trim();
+    if (!cookie) {
+      showToast("请先填写麦芽田 Cookie", "error");
+      return;
+    }
+
+    setIsFetchingMaiyatianShops(true);
+    try {
+      const response = await fetch("/api/orders/integration/maiyatian-shops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maiyatianCookie: cookie }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || "读取麦芽田门店失败");
+      }
+
+      setMaiyatianShops(Array.isArray(data.shops) ? data.shops : []);
+      if (Array.isArray(data.localShops)) {
+        setLocalShops(
+          data.localShops
+            .map((item: Record<string, unknown>) => ({
+              id: String(item?.id || ""),
+              name: String(item?.name || "").trim(),
+              address: String(item?.address || "").trim(),
+              isDefault: Boolean(item?.isDefault),
+            }))
+            .filter((item: LocalShopOption) => item.id && item.name)
+        );
+      }
+      showToast(`已读取 ${Array.isArray(data.shops) ? data.shops.length : 0} 家麦芽田门店`, "success");
+    } catch (error) {
+      console.error("Failed to fetch Maiyatian shops:", error);
+      showToast(error instanceof Error ? error.message : "读取麦芽田门店失败", "error");
+    } finally {
+      setIsFetchingMaiyatianShops(false);
+    }
+  }, [integrationConfig.maiyatianCookie, showToast]);
+
+  useEffect(() => {
+    if (integrationConfig.maiyatianCookie.trim()) {
+      return;
+    }
+    setMaiyatianShops([]);
+  }, [integrationConfig.maiyatianCookie]);
+
+  useEffect(() => {
+    if (!hasLoadedIntegrationRef.current) return;
+    if (!isIntegrationOpen) return;
+
+    const currentDigest = serializeIntegrationConfig(integrationConfig);
+    if (currentDigest === savedIntegrationDigest) return;
+
+    const timer = window.setTimeout(() => {
+      void saveIntegrationConfig(integrationConfig, { silent: true });
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [integrationConfig, isIntegrationOpen, saveIntegrationConfig, savedIntegrationDigest]);
+
+  useEffect(() => {
+    if (!isIntegrationOpen) return;
+    if (localShops.length > 0) return;
+    void fetchLocalShops();
+  }, [fetchLocalShops, isIntegrationOpen, localShops.length]);
+
+  useEffect(() => {
+    if (!isIntegrationOpen) return;
+    if (!integrationConfig.maiyatianCookie.trim()) return;
+    if (maiyatianShops.length > 0) return;
+    void fetchMaiyatianShops();
+  }, [fetchMaiyatianShops, integrationConfig.maiyatianCookie, isIntegrationOpen, maiyatianShops.length]);
+
   const syncOrders = async () => {
     setIsBulkSyncing(true);
     try {
+      const currentIntegrationDigest = serializeIntegrationConfig(integrationConfig);
+      if (currentIntegrationDigest !== savedIntegrationDigest) {
+        await saveIntegrationConfig(integrationConfig, { silent: true });
+      }
+
       const targetDate = activeTab === "today"
         ? todayDate
         : (endDate || startDate || todayDate);
@@ -1203,6 +1693,24 @@ export default function OrdersPage() {
   const todayPendingOrders = useMemo(() => filteredOrders.filter((item) => !isTerminalStatus(item.status)), [filteredOrders]);
   const todayCompletedOrders = useMemo(() => filteredOrders.filter((item) => isTerminalStatus(item.status)), [filteredOrders]);
   const visibleOrders = activeTab === "today" ? todayPendingOrders : filteredOrders;
+  const ordersForOverview = activeTab === "today" ? filteredOrders : visibleOrders;
+  const orderStatusPills = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const order of ordersForOverview) {
+      const label = getDisplayStatus(order);
+      counts.set(label, (counts.get(label) || 0) + 1);
+    }
+
+    const preferredOrder = ["待处理", "待自提", "配送中", "已完成", "已自提", "已取消"];
+    const known = preferredOrder
+      .filter((label) => counts.has(label))
+      .map((label) => ({ label, count: counts.get(label) || 0 }));
+    const extras = Array.from(counts.entries())
+      .filter(([label]) => !preferredOrder.includes(label))
+      .map(([label, count]) => ({ label, count }));
+
+    return [...known, ...extras];
+  }, [ordersForOverview]);
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || startDate || endDate);
   const hasLiveOrders = todayPendingOrders.length > 0;
   const autoRefreshIntervalMs = activeTab === "today"
@@ -1267,12 +1775,12 @@ export default function OrdersPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 <button
                   type="button"
                   onClick={syncOrders}
                   disabled={isBulkSyncing || isLoading}
-                  className="inline-flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   {isBulkSyncing ? <Loader2 size={15} className="animate-spin" /> : <ArrowUpRight size={15} />}
                   一键同步
@@ -1281,7 +1789,7 @@ export default function OrdersPage() {
                   type="button"
                   onClick={() => fetchOrders()}
                   disabled={isLoading || isRefreshing}
-                  className="inline-flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   {isLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
                   刷新订单
@@ -1289,7 +1797,7 @@ export default function OrdersPage() {
                 <button
                   type="button"
                   onClick={() => setIsIntegrationOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="col-span-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:col-span-1 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   <Settings2 size={15} />
                   对接配置
@@ -1324,21 +1832,36 @@ export default function OrdersPage() {
               </button>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid items-start gap-3 lg:grid-cols-3">
+              <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/[0.05]">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
+                    <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{ordersForOverview.length}</div>
+                    <p className="mt-2 text-xs text-muted-foreground">{activeTab === "today" ? "今日订单分布" : "当前结果页分布"}</p>
+                  </div>
+                  <div className="flex min-w-[92px] max-w-[118px] flex-col items-stretch gap-1">
+                    {orderStatusPills.map((item) => (
+                      <div
+                        key={item.label}
+                        className="inline-flex items-center justify-between rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[10px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.05] dark:text-white/72"
+                      >
+                        <span className="truncate pr-2">{item.label}</span>
+                        <span className="shrink-0">{item.count} 单</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
               <MetricCard
-                label="当前订单"
-                value={activeTab === "today" ? todayPendingOrders.length : visibleOrders.length}
-                hint={activeTab === "today" ? "今日待处理" : "当前页筛选结果"}
+                label="商家实收"
+                value={toCurrency(summary.receivedAmount)}
+                hint={`有效订单 ${summary.validOrderCount} 单`}
               />
               <MetricCard
-                label="用户实付"
-                value={toCurrency(summary.actualPaid)}
+                label="总配送费"
+                value={toCurrency(summary.totalDeliveryFee)}
                 hint="当前结果页汇总"
-              />
-              <MetricCard
-                label="配送覆盖"
-                value={summary.deliveryCount}
-                hint={`商品共 ${summary.itemCount} 件`}
               />
             </div>
           </div>
@@ -1499,21 +2022,23 @@ export default function OrdersPage() {
 
       {isMounted && isIntegrationOpen
         ? createPortal(
-            <IntegrationModal
-              integrationConfig={integrationConfig}
-              callbackUrl={callbackUrl}
-              isSavingIntegration={isSavingIntegration}
-              isTestingIntegration={isTestingIntegration}
-              modalRef={modalRef}
-              onClose={() => setIsIntegrationOpen(false)}
-              onChange={setIntegrationConfig}
-              onCopyCallback={() => {
-                navigator.clipboard.writeText(callbackUrl);
-                showToast("地址已复制", "success");
-              }}
-              onSave={saveIntegrationConfig}
-              onTest={testIntegrationConfig}
-            />,
+              <IntegrationModal
+                integrationConfig={integrationConfig}
+                maiyatianShops={maiyatianShops}
+                localShops={localShops}
+                callbackUrl={callbackUrl}
+                isFetchingMaiyatianShops={isFetchingMaiyatianShops}
+                isTestingIntegration={isTestingIntegration}
+                modalRef={modalRef}
+                onClose={() => setIsIntegrationOpen(false)}
+                onChange={setIntegrationConfig}
+                onCopyCallback={() => {
+                  navigator.clipboard.writeText(callbackUrl);
+                  showToast("地址已复制", "success");
+                }}
+                onFetchMaiyatianShops={fetchMaiyatianShops}
+                onTest={testIntegrationConfig}
+              />,
             document.body
           )
         : null}
