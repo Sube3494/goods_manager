@@ -32,8 +32,34 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     return "配送中";
   }
 
+  if (
+    text.includes("待配送")
+    || text.includes("待发货")
+    || text.includes("待送达")
+    || text.includes("待骑手")
+    || text.includes("立即送达")
+    || text.includes("尽快送达")
+    || text.includes("立即配送")
+    || text.includes("商家自配")
+    || normalized === "pending_delivery"
+    || normalized === "pendingdelivery"
+  ) {
+    return "待配送";
+  }
+
   if (text.includes("已拣货") || text.includes("拣货中")) {
     return "已拣货";
+  }
+
+  if (
+    text.includes("待处理")
+    || text.includes("新订单")
+    || text.includes("待接单")
+    || text.includes("商家处理中")
+    || normalized === "pending"
+    || normalized === "processing"
+  ) {
+    return "待处理";
   }
 
   return text.split(/[,，]/)[0].trim() || "同步中";

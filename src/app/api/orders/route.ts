@@ -14,6 +14,87 @@ function toBooleanFilter(value: string | null) {
   return null;
 }
 
+function buildStatusWhere(status: string): Prisma.AutoPickOrderWhereInput | undefined {
+  const value = String(status || "").trim();
+  if (!value) return undefined;
+
+  switch (value) {
+    case "已取消":
+      return {
+        OR: [
+          { status: { contains: "取消", mode: "insensitive" } },
+          { status: { contains: "退款", mode: "insensitive" } },
+          { status: { contains: "关闭", mode: "insensitive" } },
+          { status: { equals: "cancel", mode: "insensitive" } },
+          { status: { equals: "cancelled", mode: "insensitive" } },
+          { status: { equals: "canceled", mode: "insensitive" } },
+          { status: { equals: "closed", mode: "insensitive" } },
+          { status: { equals: "refund", mode: "insensitive" } },
+        ],
+      };
+    case "已完成":
+      return {
+        OR: [
+          { status: { contains: "已完成", mode: "insensitive" } },
+          { status: { equals: "done", mode: "insensitive" } },
+          { status: { equals: "completed", mode: "insensitive" } },
+          { status: { equals: "complete", mode: "insensitive" } },
+          { status: { equals: "finished", mode: "insensitive" } },
+          { status: { equals: "finish", mode: "insensitive" } },
+        ],
+      };
+    case "配送中":
+      return {
+        OR: [
+          { status: { contains: "配送中", mode: "insensitive" } },
+          { status: { equals: "delivering", mode: "insensitive" } },
+        ],
+      };
+    case "待配送":
+      return {
+        OR: [
+          { status: { contains: "待配送", mode: "insensitive" } },
+          { status: { contains: "待发货", mode: "insensitive" } },
+          { status: { contains: "待送达", mode: "insensitive" } },
+          { status: { contains: "待骑手", mode: "insensitive" } },
+          { status: { contains: "立即送达", mode: "insensitive" } },
+          { status: { contains: "尽快送达", mode: "insensitive" } },
+          { status: { contains: "立即配送", mode: "insensitive" } },
+          { status: { contains: "商家自配", mode: "insensitive" } },
+          { status: { equals: "pending_delivery", mode: "insensitive" } },
+          { status: { equals: "pendingdelivery", mode: "insensitive" } },
+        ],
+      };
+    case "已拣货":
+      return {
+        OR: [
+          { status: { contains: "已拣货", mode: "insensitive" } },
+          { status: { contains: "拣货中", mode: "insensitive" } },
+        ],
+      };
+    case "待处理":
+      return {
+        OR: [
+          { status: { contains: "待处理", mode: "insensitive" } },
+          { status: { contains: "新订单", mode: "insensitive" } },
+          { status: { contains: "待接单", mode: "insensitive" } },
+          { status: { contains: "商家处理中", mode: "insensitive" } },
+          { status: { equals: "pending", mode: "insensitive" } },
+          { status: { equals: "processing", mode: "insensitive" } },
+        ],
+      };
+    case "同步中":
+      return {
+        OR: [
+          { status: null },
+          { status: "" },
+        ],
+      };
+    default:
+      return { status: value };
+  }
+}
+
 type MatchedCatalogProduct = {
   id: string;
   name: string;
@@ -307,7 +388,7 @@ export async function GET(request: NextRequest) {
     const where: Prisma.AutoPickOrderWhereInput = {
       userId: session.id,
       ...(platform ? { platform } : {}),
-      ...(status ? { status } : {}),
+      ...(buildStatusWhere(status) || {}),
       ...(startDate || endDate ? {
         orderTime: {
           ...(startDate ? { gte: parseAsShanghaiTime(startDate) } : {}),

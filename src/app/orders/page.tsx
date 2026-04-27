@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import {
+  ArrowUp,
   ArrowUpRight,
   Check,
   CheckCheck,
@@ -23,11 +24,11 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Pagination } from "@/components/ui/Pagination";
 import {
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderCancelledStatus,
@@ -86,6 +87,8 @@ function serializeMaiyatianMappings(config: AutoPickIntegrationConfig) {
 const MIN_REFRESH_GAP_MS = 10 * 1000;
 const TODAY_ACTIVE_REFRESH_MS = 30 * 1000;
 const TODAY_IDLE_REFRESH_MS = 90 * 1000;
+const TODAY_TAB_PAGE_SIZE = 9999;
+const ALL_ORDERS_BATCH_SIZE = 50;
 
 function toCurrency(value: number | null | undefined) {
   const amount = Number(value || 0) / 100;
@@ -1186,9 +1189,10 @@ export default function OrdersPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [showCompletedToday, setShowCompletedToday] = useState(false);
   const [actingId, setActingId] = useState("");
@@ -1295,22 +1299,27 @@ export default function OrdersPage() {
     setOrders((current) => current.map((order) => (order.id === orderId ? updater(order) : order)));
   }, []);
 
-  const fetchOrders = useCallback(async (options?: { silent?: boolean }) => {
+  const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number }) => {
     if (isFetchingRef.current) {
       return;
     }
 
     const silent = Boolean(options?.silent);
+    const append = Boolean(options?.append) && activeTab === "all";
     isFetchingRef.current = true;
-    if (silent) {
+    if (append) {
+      setIsLoadingMore(true);
+    } else if (silent) {
       setIsRefreshing(true);
     } else {
       setIsLoading(true);
     }
     try {
+      const effectivePage = activeTab === "today" ? 1 : (options?.targetPage || 1);
+      const effectivePageSize = activeTab === "today" ? TODAY_TAB_PAGE_SIZE : ALL_ORDERS_BATCH_SIZE;
       const params = new URLSearchParams({
-        page: String(currentPage),
-        pageSize: String(pageSize),
+        page: String(effectivePage),
+        pageSize: String(effectivePageSize),
       });
 
       const effectiveStartDate = activeTab === "today" ? todayDate : startDate;
@@ -1330,8 +1339,22 @@ export default function OrdersPage() {
       }
 
       const payload = data as OrderResponse;
-      setOrders(Array.isArray(payload.items) ? payload.items : []);
-      setMeta(payload.meta || { total: 0, page: 1, pageSize, totalPages: 1 });
+      const nextItems = Array.isArray(payload.items) ? payload.items : [];
+      setOrders((current) => {
+        if (!append) {
+          return nextItems;
+        }
+        const seen = new Set(current.map((item) => item.id));
+        const merged = [...current];
+        for (const item of nextItems) {
+          if (!seen.has(item.id)) {
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      setMeta(payload.meta || { total: 0, page: 1, pageSize: effectivePageSize, totalPages: 1 });
+      setCurrentPage(effectivePage);
       setPlatforms(Array.isArray(payload.filters?.platforms) ? payload.filters.platforms : []);
       setStatuses(Array.isArray(payload.filters?.statuses) ? payload.filters.statuses : []);
       setSummary(payload.summary || { receivedAmount: 0, platformCommission: 0, validOrderCount: 0, itemCount: 0, totalDeliveryFee: 0 });
@@ -1340,25 +1363,24 @@ export default function OrdersPage() {
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
     } finally {
       isFetchingRef.current = false;
-      if (silent) {
+      if (append) {
+        setIsLoadingMore(false);
+      } else if (silent) {
         setIsRefreshing(false);
       } else {
         setIsLoading(false);
       }
     }
-  }, [activeTab, currentPage, endDate, pageSize, platform, query, showToast, startDate, status, todayDate]);
+  }, [activeTab, endDate, platform, query, showToast, startDate, status, todayDate]);
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchOrders();
-  }, [fetchOrders]);
+  }, [activeTab, endDate, fetchOrders, platform, query, shop, startDate, status]);
 
   useEffect(() => {
     fetchIntegrationConfig();
   }, [fetchIntegrationConfig]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab, endDate, platform, query, shop, startDate, status]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],
@@ -1366,18 +1388,24 @@ export default function OrdersPage() {
   );
 
   const statusOptions = useMemo(() => {
+    const preferredOrder = ["同步中", "待处理", "已拣货", "待配送", "配送中", "已完成", "已取消"];
     const labels = Array.from(
       new Set(
         statuses
-          .map((item) => item.split(/[,，\s]/)[0].trim())
+          .map((item) => getBaseAutoPickStatusDisplay(item))
           .filter(Boolean)
       )
     );
 
+    const sortedLabels = [
+      ...preferredOrder.filter((label) => labels.includes(label)),
+      ...labels.filter((label) => !preferredOrder.includes(label)),
+    ];
+
     return [
       { value: "all", label: "全部状态" },
-      ...labels.map((label) => ({
-        value: statuses.find((item) => item.split(/[,，\s]/)[0].trim() === label) || label,
+      ...sortedLabels.map((label) => ({
+        value: label,
         label,
       })),
     ];
@@ -1694,22 +1722,12 @@ export default function OrdersPage() {
   const todayCompletedOrders = useMemo(() => filteredOrders.filter((item) => isTerminalStatus(item.status)), [filteredOrders]);
   const visibleOrders = activeTab === "today" ? todayPendingOrders : filteredOrders;
   const ordersForOverview = activeTab === "today" ? filteredOrders : visibleOrders;
-  const orderStatusPills = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const order of ordersForOverview) {
-      const label = getDisplayStatus(order);
-      counts.set(label, (counts.get(label) || 0) + 1);
-    }
-
-    const preferredOrder = ["待处理", "待自提", "配送中", "已完成", "已自提", "已取消"];
-    const known = preferredOrder
-      .filter((label) => counts.has(label))
-      .map((label) => ({ label, count: counts.get(label) || 0 }));
-    const extras = Array.from(counts.entries())
-      .filter(([label]) => !preferredOrder.includes(label))
-      .map(([label, count]) => ({ label, count }));
-
-    return [...known, ...extras];
+  const orderOverviewCounts = useMemo(() => {
+    const cancelledCount = ordersForOverview.filter((item) => isCancelledStatus(item.status)).length;
+    return {
+      validCount: Math.max(0, ordersForOverview.length - cancelledCount),
+      cancelledCount,
+    };
   }, [ordersForOverview]);
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || startDate || endDate);
   const hasLiveOrders = todayPendingOrders.length > 0;
@@ -1761,6 +1779,29 @@ export default function OrdersPage() {
       window.removeEventListener("focus", refreshWhenVisible);
     };
   }, [autoRefreshIntervalMs, fetchOrders]);
+
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const st = window.pageYOffset || document.documentElement.scrollTop || 0;
+          setShowScrollTop(st > 10);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="relative px-2 sm:px-1">
@@ -1841,15 +1882,14 @@ export default function OrdersPage() {
                     <p className="mt-2 text-xs text-muted-foreground">{activeTab === "today" ? "今日订单分布" : "当前结果页分布"}</p>
                   </div>
                   <div className="flex min-w-[92px] max-w-[118px] flex-col items-stretch gap-1">
-                    {orderStatusPills.map((item) => (
-                      <div
-                        key={item.label}
-                        className="inline-flex items-center justify-between rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[10px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.05] dark:text-white/72"
-                      >
-                        <span className="truncate pr-2">{item.label}</span>
-                        <span className="shrink-0">{item.count} 单</span>
-                      </div>
-                    ))}
+                    <div className="inline-flex items-center justify-between rounded-full border border-emerald-500/18 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                      <span className="truncate pr-2">有效</span>
+                      <span className="shrink-0">{orderOverviewCounts.validCount} 单</span>
+                    </div>
+                    <div className="inline-flex items-center justify-between rounded-full border border-slate-500/18 bg-slate-500/10 px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                      <span className="truncate pr-2">取消</span>
+                      <span className="shrink-0">{orderOverviewCounts.cancelledCount} 单</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1938,6 +1978,18 @@ export default function OrdersPage() {
                 </>
               )}
             </div>
+
+            {activeTab === "today" ? null : (
+              <div className="flex flex-col gap-3 rounded-[20px] border border-black/8 bg-white/70 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">连续浏览</div>
+                  <p className="mt-1 text-xs text-muted-foreground">全部订单不再分页截断，向下浏览时按批次继续加载。</p>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  已加载 <span className="font-semibold text-foreground">{visibleOrders.length}</span> / {meta.total}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -2008,16 +2060,25 @@ export default function OrdersPage() {
               />
             </div>
           ) : null}
-        </main>
 
-        <Pagination
-          currentPage={currentPage}
-          totalPages={meta.totalPages}
-          totalItems={meta.total}
-          pageSize={pageSize}
-          onPageChange={setCurrentPage}
-          onPageSizeChange={setPageSize}
-        />
+          {!isLoading && activeTab === "all" && visibleOrders.length > 0 ? (
+            <div className="flex justify-center pt-2">
+              {meta.page < meta.totalPages ? (
+                <button
+                  type="button"
+                  onClick={() => void fetchOrders({ append: true, targetPage: currentPage + 1 })}
+                  disabled={isLoadingMore}
+                  className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-5 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                >
+                  {isLoadingMore ? <Loader2 size={15} className="animate-spin" /> : <ChevronDown size={15} />}
+                  {isLoadingMore ? "加载中..." : "加载更多"}
+                </button>
+              ) : (
+                <div className="text-sm text-muted-foreground">全部订单已加载完成</div>
+              )}
+            </div>
+          ) : null}
+        </main>
       </div>
 
       {isMounted && isIntegrationOpen
@@ -2042,6 +2103,23 @@ export default function OrdersPage() {
             document.body
           )
         : null}
+
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: 20 }}
+              onClick={scrollToTop}
+              className="fixed bottom-24 right-6 z-9999 rounded-full border border-black/10 bg-white p-3 text-foreground shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all hover:scale-110 active:scale-95 group sm:bottom-12 sm:right-12 sm:p-4 dark:border-white/10 dark:bg-white/10"
+            >
+              <ArrowUp size={24} className="transition-transform group-hover:-translate-y-1" />
+            </motion.button>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
