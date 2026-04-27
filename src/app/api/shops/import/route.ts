@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopName } from "@/lib/shopIdentity";
 
 type RawShopRow = Record<string, unknown>;
-
-function normalizeExternalId(value: unknown) {
-  return String(value || "").replace(/\s+/g, "").trim();
-}
 
 function normalizeColumnKey(value: string) {
   return value
@@ -43,25 +40,6 @@ function getStringValue(row: RawShopRow, keys: string[]) {
   return "";
 }
 
-function normalizeText(value: string) {
-  return value.replace(/\s+/g, "").trim().toLowerCase();
-}
-
-function simplifyShopName(name: string) {
-  if (!name) return "";
-  const match = name.match(/[\(（](.*)[\)）]$/);
-  if (match && match[1]) return match[1];
-  const parts = name
-    .replace(/^私人订制轻奢礼品店/, "")
-    .split(/[^\u4e00-\u9fa5a-zA-Z0-9]+/)
-    .filter(Boolean);
-  const lastPart = parts.pop() || "";
-  if (lastPart === "店" && parts.length > 0) {
-    return parts.pop() + lastPart;
-  }
-  return lastPart.replace(/(生日礼物|儿童玩具|滋补燕窝|礼品店)/g, "").trim() || name;
-}
-
 export async function POST(request: Request) {
   try {
     const user = await getAuthorizedUser("logistics:manage");
@@ -76,15 +54,8 @@ export async function POST(request: Request) {
 
     const existingShops = await prisma.shop.findMany({
       where: { userId: user.id },
-      select: { name: true, address: true, externalId: true },
+      select: { id: true, name: true, address: true, externalId: true },
     });
-
-    const existingExternalIds = new Set(
-      existingShops.map((s) => normalizeExternalId(s.externalId)).filter(Boolean)
-    );
-    const existingKeys = new Set(
-      existingShops.map((shop) => `${normalizeText(shop.name)}::${normalizeText(shop.address || "")}`)
-    );
 
     let created = 0;
     let skipped = 0;
@@ -118,24 +89,23 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const cleanedName = simplifyShopName(name);
-
-      // 优先用 POI_ID 做去重，更精准
-      if (existingExternalIds.has(poiId)) {
+      const cleanedName = normalizeShopName(name);
+      const cleanedAddress = normalizeShopAddress(address);
+      const existing = findMatchingShopRecord(existingShops, {
+        externalId: poiId,
+        name: cleanedName,
+        address: cleanedAddress,
+      });
+      if (existing) {
         skipped += 1;
         continue;
       }
-      const dedupeKey = `${normalizeText(cleanedName)}::${normalizeText(address)}`;
-      if (existingKeys.has(dedupeKey)) {
-        skipped += 1;
-        continue;
-      }
-      existingKeys.add(dedupeKey);
 
       const createdShop = await prisma.shop.create({
         data: {
           name: cleanedName,
-          address,
+          address: cleanedAddress,
+          dedupeKey: buildShopDedupeKey({ name: cleanedName, address: cleanedAddress }) || null,
           province,
           city,
           latitude: null,
@@ -147,12 +117,12 @@ export async function POST(request: Request) {
         },
       });
 
-      existingExternalIds.add(poiId);
+      existingShops.unshift(createdShop);
       created += 1;
       createdShops.push({
         id: createdShop.id,
         name: createdShop.name,
-        address: createdShop.address || address,
+        address: createdShop.address || cleanedAddress,
         externalId: createdShop.externalId || poiId,
       });
     }

@@ -75,6 +75,7 @@ RUN npm install -g prisma@5.22.0 --registry=https://registry.npmmirror.com && \
 # 自动建库脚本（shell 脚本，不依赖 npm 包）
 COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
 COPY scripts/fix_shop_external_id_duplicates.js ./scripts/fix_shop_external_id_duplicates.js
+COPY scripts/fix_shop_dedupe_keys.js ./scripts/fix_shop_dedupe_keys.js
 
 # 上传文件持久化目录（chmod 777 确保 volume 挂载时也能正常写入）
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
@@ -85,5 +86,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# 启动顺序：自动建库 → 清理重复 POI_ID → 数据库同步 → 启动应用
-CMD ["sh", "-c", "sh scripts/init-db.sh && node scripts/fix_shop_external_id_duplicates.js && prisma db push --skip-generate --accept-data-loss && node server.js"]
+# 启动顺序：自动建库 → 清理重复 POI_ID → 数据库同步 → 回填 dedupeKey → 启动应用
+CMD ["sh", "-c", "sh scripts/init-db.sh && node scripts/fix_shop_external_id_duplicates.js && prisma db push --skip-generate --accept-data-loss && node scripts/fix_shop_dedupe_keys.js && node server.js"]

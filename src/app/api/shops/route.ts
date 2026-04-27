@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getAddressDetail } from "@/lib/addressBook";
-
-function normalizeExternalId(value: unknown) {
-  return String(value || "").replace(/\s+/g, "").trim();
-}
+import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopName } from "@/lib/shopIdentity";
 
 function sameNullableNumber(left: number | null | undefined, right: number | null | undefined) {
   const normalizedLeft = Number.isFinite(Number(left)) ? Number(left) : null;
@@ -56,8 +53,8 @@ export async function GET(request: NextRequest) {
     const normalizedAddresses = shippingAddresses
       .map((item, index) => ({
         id: String(item?.id || `address-${index}`),
-        name: String(item?.label || "").trim(),
-        address: getAddressDetail(item),
+        name: normalizeShopName(item?.label),
+        address: normalizeShopAddress(getAddressDetail(item)),
         isDefault: Boolean(item?.isDefault),
         externalId: normalizeExternalId(item?.externalId),
         longitude: Number.isFinite(Number(item?.longitude)) ? Number(item?.longitude) : null,
@@ -74,16 +71,11 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    const existingByName = new Map(existingShops.map((shop) => [shop.name.trim(), shop]));
-    const existingByExternalId = new Map(
-      existingShops
-        .map((shop) => [normalizeExternalId(shop.externalId), shop] as const)
-        .filter(([externalId]) => Boolean(externalId))
-    );
     const createdShops: typeof existingShops = [];
+    const touchedShopIds = new Set<string>();
 
     for (const addr of normalizedAddresses) {
-      const existing = (addr.externalId ? existingByExternalId.get(addr.externalId) : null) || existingByName.get(addr.name);
+      const existing = findMatchingShopRecord(existingShops, addr);
       if (existing) {
         const shouldUpdate =
           String(existing.name || "").trim() !== addr.name ||
@@ -98,16 +90,18 @@ export async function GET(request: NextRequest) {
             data: {
               name: addr.name,
               address: addr.address,
+              dedupeKey: buildShopDedupeKey(addr) || null,
               externalId: addr.externalId || null,
               longitude: addr.longitude,
               latitude: addr.latitude,
             },
           });
-          existingByName.set(updated.name.trim(), updated);
-          if (addr.externalId) {
-            existingByExternalId.set(addr.externalId, updated);
+          const index = existingShops.findIndex((shop) => shop.id === updated.id);
+          if (index >= 0) {
+            existingShops[index] = updated;
           }
         }
+        touchedShopIds.add(existing.id);
         continue;
       }
 
@@ -116,6 +110,7 @@ export async function GET(request: NextRequest) {
           userId: user.id,
           name: addr.name,
           address: addr.address,
+          dedupeKey: buildShopDedupeKey(addr) || null,
           externalId: addr.externalId || null,
           longitude: addr.longitude,
           latitude: addr.latitude,
@@ -124,22 +119,19 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      existingByName.set(created.name.trim(), created);
-      if (addr.externalId) {
-        existingByExternalId.set(addr.externalId, created);
-      }
+      existingShops.unshift(created);
       createdShops.push(created);
+      touchedShopIds.add(created.id);
     }
 
-    const shops = await prisma.shop.findMany({
-      where: source === "shipping-addresses"
-        ? {
-            userId: user.id,
-            name: { in: normalizedAddresses.map((item) => item.name) },
-          }
-        : { userId: user.id },
-      orderBy: { createdAt: "desc" },
-    });
+    const shops = source === "shipping-addresses"
+      ? existingShops
+          .filter((shop) => touchedShopIds.has(shop.id))
+          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      : await prisma.shop.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+        });
 
     return NextResponse.json({
       shops,
@@ -164,28 +156,36 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
     const normalizedExternalId = normalizeExternalId(externalId);
+    const normalizedName = normalizeShopName(name);
+    const normalizedAddress = normalizeShopAddress(address);
 
-    if (!name || !normalizedExternalId || !address) {
+    if (!normalizedName || !normalizedExternalId || !normalizedAddress) {
       return NextResponse.json({ error: "Missing required shop fields" }, { status: 400 });
     }
 
-    const duplicateShop = await prisma.shop.findFirst({
-      where: {
-        userId: user.id,
-        externalId: normalizedExternalId,
-      },
-      select: { id: true, name: true },
+    const existingShops = await prisma.shop.findMany({
+      where: { userId: user.id },
+      select: { id: true, name: true, address: true, externalId: true },
+    });
+    const duplicateShop = findMatchingShopRecord(existingShops, {
+      externalId: normalizedExternalId,
+      name: normalizedName,
+      address: normalizedAddress,
     });
 
     if (duplicateShop) {
-      return NextResponse.json({ error: `POI_ID 已存在：${duplicateShop.name}` }, { status: 409 });
+      const duplicateReason = normalizeExternalId(duplicateShop.externalId) === normalizedExternalId
+        ? "POI_ID"
+        : "店铺名称+地址";
+      return NextResponse.json({ error: `${duplicateReason} 已存在：${duplicateShop.name}` }, { status: 409 });
     }
 
     const newShop = await prisma.shop.create({
       data: {
-        name,
+        name: normalizedName,
+        dedupeKey: buildShopDedupeKey({ name: normalizedName, address: normalizedAddress }) || null,
         externalId: normalizedExternalId,
-        address,
+        address: normalizedAddress,
         province,
         city,
         latitude: latitude ? parseFloat(latitude) : null,

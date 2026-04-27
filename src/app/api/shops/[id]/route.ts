@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-
-function normalizeExternalId(value: unknown) {
-  return String(value || "").replace(/\s+/g, "").trim();
-}
+import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopName } from "@/lib/shopIdentity";
 
 export async function PUT(request: Request, context: { params: { id: string } }) {
   try {
@@ -17,8 +14,10 @@ export async function PUT(request: Request, context: { params: { id: string } })
     const body = await request.json();
     const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
     const normalizedExternalId = normalizeExternalId(externalId);
+    const normalizedName = normalizeShopName(name);
+    const normalizedAddress = normalizeShopAddress(address);
 
-    if (!name || !normalizedExternalId || !address) {
+    if (!normalizedName || !normalizedExternalId || !normalizedAddress) {
       return NextResponse.json({ error: "Missing required shop fields" }, { status: 400 });
     }
 
@@ -34,25 +33,33 @@ export async function PUT(request: Request, context: { params: { id: string } })
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const duplicateShop = await prisma.shop.findFirst({
+    const siblingShops = await prisma.shop.findMany({
       where: {
         id: { not: id },
         userId: existingShop.userId,
-        externalId: normalizedExternalId,
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, address: true, externalId: true },
+    });
+    const duplicateShop = findMatchingShopRecord(siblingShops, {
+      externalId: normalizedExternalId,
+      name: normalizedName,
+      address: normalizedAddress,
     });
 
     if (duplicateShop) {
-      return NextResponse.json({ error: `POI_ID 已存在：${duplicateShop.name}` }, { status: 409 });
+      const duplicateReason = normalizeExternalId(duplicateShop.externalId) === normalizedExternalId
+        ? "POI_ID"
+        : "店铺名称+地址";
+      return NextResponse.json({ error: `${duplicateReason} 已存在：${duplicateShop.name}` }, { status: 409 });
     }
 
     const updatedShop = await prisma.shop.update({
       where: { id },
       data: {
-        name,
+        name: normalizedName,
+        dedupeKey: buildShopDedupeKey({ name: normalizedName, address: normalizedAddress }) || null,
         externalId: normalizedExternalId,
-        address,
+        address: normalizedAddress,
         province,
         city,
         latitude: latitude ? parseFloat(latitude) : null,

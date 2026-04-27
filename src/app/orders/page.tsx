@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Search,
   Settings2,
+  TriangleAlert,
   TimerReset,
   Truck,
   X,
@@ -145,12 +146,46 @@ function getOrderActionErrorMessage(raw: unknown) {
       return "订单已删除，不需要继续处理。";
     case "Pickup order does not require self delivery":
       return "到店自取订单不需要发起自配送。";
+    case "该订单已生成出库单":
+      return "这张订单已经生成过出库单了。";
+    case "已删除订单不能生成出库":
+      return "已删除订单不能生成出库。";
+    case "已取消订单不能生成出库":
+      return "已取消订单不能生成出库。";
     case "Non-pickup order does not require pickup complete":
       return "这不是到店自取订单，不需要完成自提。";
+    case "订单未完成，暂时不能同步刷单":
+      return "订单还没完成，暂时不能同步刷单。";
+    case "订单商品还没匹配到系统商品，暂时不能同步刷单":
+      return "订单商品还没匹配到系统商品，暂时不能同步刷单。";
+    case "这不是自配送订单，不能同步刷单":
+      return "这不是自配送订单，不能同步刷单。";
+    case "当前订单不符合刷单同步条件":
+      return "当前订单不符合刷单同步条件。";
     default:
       return reason || "操作失败";
   }
 }
+
+function getBrushSyncSkippedReasonText(raw: unknown) {
+  const reason = String(raw || "").trim();
+
+  switch (reason) {
+    case "not-self-delivery":
+      return "非自配送";
+    case "not-main-system-self-delivery":
+      return "未标记刷单";
+    case "order-not-completed":
+      return "订单未完成";
+    case "missing-matched-products":
+      return "商品未匹配";
+    case "order-not-found":
+      return "订单不存在";
+    default:
+      return reason || "";
+  }
+}
+
 
 function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
   const baseStatus = getBaseAutoPickStatusDisplay(order.status);
@@ -224,6 +259,13 @@ function getStatusTone(display: string) {
 function hasAutoCompleteFailure(order: Pick<AutoPickOrder, "autoCompleteJobStatus">) {
   return String(order.autoCompleteJobStatus || "").trim().toLowerCase() === "failed"
     || String(order.autoCompleteJobStatus || "").trim().toUpperCase() === "FAILED";
+}
+
+function hasAutoOutboundFailure(order: Pick<AutoPickOrder, "autoOutboundStatus" | "hasOutbound">) {
+  if (order.hasOutbound) {
+    return false;
+  }
+  return String(order.autoOutboundStatus || "").trim().toLowerCase() === "failed";
 }
 
 function getPlatformBadgeMeta(platform?: string | null) {
@@ -492,6 +534,7 @@ function OrderCard({
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
   const pickup = Boolean(order.isPickup);
   const subscribe = isSubscribeOrder(order);
+  const hasOutbound = Boolean(order.hasOutbound);
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
@@ -499,6 +542,7 @@ function OrderCard({
   const sourceLabel = getOrderSourceLabel(order);
   const deadlineDisplay = getDeadlineDisplay(order);
   const autoCompleteFailed = hasAutoCompleteFailure(order);
+  const autoOutboundFailed = hasAutoOutboundFailure(order);
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
   return (
@@ -530,6 +574,11 @@ function OrderCard({
                   {orderTypeLabel ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2.5 text-[13px] font-medium leading-none text-violet-700 dark:text-violet-400">
                       {orderTypeLabel}
+                    </span>
+                  ) : null}
+                  {order.isMainSystemSelfDelivery ? (
+                    <span className="inline-flex h-8 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 text-[13px] font-medium leading-none text-rose-700 dark:text-rose-400">
+                      刷单
                     </span>
                   ) : null}
                   <StatusBadge order={order} />
@@ -650,6 +699,12 @@ function OrderCard({
                 自动完成失败
               </span>
             ) : null}
+            {autoOutboundFailed ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-700 dark:text-rose-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+                <TriangleAlert size={12} />
+                出库待处理
+              </span>
+            ) : null}
             {deadlineDisplay !== "-" ? (
               <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-black/8 bg-white/85 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <Clock3 size={12} />
@@ -722,6 +777,8 @@ function OrderCard({
               <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <DetailStat label="订单状态" value={getDisplayStatus(order)} />
                 <DetailStat label="订单类型" value={orderTypeLabel || "普通单"} />
+                <DetailStat label="刷单标记" value={order.isMainSystemSelfDelivery ? "主系统自配" : "否"} />
+                <DetailStat label="出库状态" value={hasOutbound ? "已出库" : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
                 <DetailStat label={pickup ? "取货时间" : subscribe ? "预约送达" : "最晚送达"} value={deadlineDisplay} />
@@ -759,6 +816,17 @@ function OrderCard({
                     </div>
                     <div className="mt-2 sm:mt-2.5">
                       <DetailBlock label="失败原因" value={order.autoCompleteJobError || "-"} />
+                    </div>
+                  </div>
+                ) : null}
+                {autoOutboundFailed ? (
+                  <div className="rounded-2xl border border-rose-500/15 bg-rose-500/8 px-3 py-3 dark:bg-rose-500/[0.08]">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+                      <DetailStat label="自动出库" value="失败" />
+                      <DetailStat label="尝试时间" value={order.autoOutboundAttemptedAt ? formatLocalDateTime(order.autoOutboundAttemptedAt) : "-"} />
+                    </div>
+                    <div className="mt-2 sm:mt-2.5">
+                      <DetailBlock label="失败原因" value={order.autoOutboundError || "-"} />
                     </div>
                   </div>
                 ) : null}
@@ -1159,6 +1227,7 @@ export default function OrdersPage() {
   const [isTestingIntegration, setIsTestingIntegration] = useState(false);
   const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+  const [isBulkBrushSyncing, setIsBulkBrushSyncing] = useState(false);
   const [savedIntegrationDigest, setSavedIntegrationDigest] = useState(() => serializeIntegrationConfig({
     maiyatianCookie: "",
     maiyatianShopMappings: [],
@@ -1368,7 +1437,9 @@ export default function OrdersPage() {
   const runAction = async (orderId: string, action: OrderAction) => {
     setActingId(`${orderId}:${action}`);
     try {
-      const response = await fetch(`/api/orders/${orderId}/${action}`, { method: "POST" });
+      const requestInit: RequestInit = { method: "POST" };
+
+      const response = await fetch(`/api/orders/${orderId}/${action}`, requestInit);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         showToast(getOrderActionErrorMessage(data?.error || data?.reason), "error");
@@ -1652,6 +1723,65 @@ export default function OrdersPage() {
     }
   };
 
+  const syncBrushOrders = async () => {
+    const targetOrders = eligibleBrushSyncOrders
+      .map((item) => ({
+        id: item.id,
+        matchedShopName: item.matchedShopName || null,
+      }))
+      .filter((item) => item.id);
+    if (targetOrders.length === 0) {
+      showToast("当前筛选范围没有可同步刷单的已完成配送单", "error");
+      return;
+    }
+
+    setIsBulkBrushSyncing(true);
+    try {
+      const response = await fetch("/api/orders/sync-brush", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: targetOrders }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || "批量同步刷单失败");
+      }
+
+      const syncedCount = Number(data?.synced || 0);
+      const updatedCount = Number(data?.updated || 0);
+      const skippedCount = Number(data?.skipped || 0);
+      const skippedOrders = Array.isArray(data?.skippedOrders) ? data.skippedOrders : [];
+      const skippedReasonCounts = new Map<string, number>();
+      for (const item of skippedOrders) {
+        const reason = item && typeof item === "object"
+          ? getBrushSyncSkippedReasonText((item as { reason?: unknown }).reason)
+          : "";
+        if (!reason) {
+          continue;
+        }
+        skippedReasonCounts.set(reason, (skippedReasonCounts.get(reason) || 0) + 1);
+      }
+      const skippedReasonSummary = Array.from(skippedReasonCounts.entries())
+        .slice(0, 2)
+        .map(([reason, count]) => `${reason} ${count} 单`)
+        .join("，");
+
+      showToast(
+        skippedCount > 0
+          ? `已同步 ${syncedCount} 单，已更新 ${updatedCount} 单，不符合条件 ${skippedCount} 单${skippedReasonSummary ? `（${skippedReasonSummary}）` : ""}`
+          : `已同步 ${syncedCount} 单，已更新 ${updatedCount} 单`,
+        "success"
+      );
+      await fetchOrders({ silent: true });
+    } catch (error) {
+      console.error("Failed to sync brush orders:", error);
+      showToast(error instanceof Error ? error.message : "批量同步刷单失败", "error");
+    } finally {
+      setIsBulkBrushSyncing(false);
+    }
+  };
+
   const filteredOrders = useMemo(() => {
     if (shop === "all") {
       return orders;
@@ -1661,6 +1791,12 @@ export default function OrdersPage() {
   const todayPendingOrders = useMemo(() => filteredOrders.filter((item) => !isTerminalStatus(item.status)), [filteredOrders]);
   const todayCompletedOrders = useMemo(() => filteredOrders.filter((item) => isTerminalStatus(item.status)), [filteredOrders]);
   const visibleOrders = activeTab === "today" ? todayPendingOrders : filteredOrders;
+  const eligibleBrushSyncOrders = useMemo(
+    () => (activeTab === "today" ? todayCompletedOrders : filteredOrders).filter(
+      (item) => isCompletedStatus(item.status) && !item.isPickup && !item.isMainSystemSelfDelivery
+    ),
+    [activeTab, filteredOrders, todayCompletedOrders]
+  );
   const ordersForOverview = activeTab === "today" ? filteredOrders : visibleOrders;
   const orderOverviewCounts = useMemo(() => {
     const cancelledCount = ordersForOverview.filter((item) => isCancelledStatus(item.status)).length;
@@ -1777,8 +1913,17 @@ export default function OrdersPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={syncBrushOrders}
+                  disabled={isBulkBrushSyncing || isLoading}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                >
+                  {isBulkBrushSyncing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                  同步刷单
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsIntegrationOpen(true)}
-                  className="col-span-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:col-span-1 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="col-span-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:col-span-2 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   <Settings2 size={15} />
                   对接配置
@@ -1844,6 +1989,7 @@ export default function OrdersPage() {
                 hint="当前结果页汇总"
               />
             </div>
+
           </div>
         </section>
 
@@ -1851,8 +1997,7 @@ export default function OrdersPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">筛选面板</div>
-                <p className="mt-1 text-sm text-muted-foreground">沿用系统现有过滤区布局，不再做订单页专属的重型头部筛选。</p>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">筛选</div>
               </div>
               {hasActiveFilters ? (
                 <button
@@ -1967,7 +2112,6 @@ export default function OrdersPage() {
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">今日已完成</div>
                   <div className="mt-1 text-lg font-black text-foreground">{todayCompletedOrders.length} 单</div>
-                  <div className="mt-1 text-xs text-muted-foreground">按你现在的工作流，已完成订单默认折叠，避免打断处理中列表。</div>
                 </div>
                 <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/85 dark:border-white/10 dark:bg-white/[0.04]">
                   {showCompletedToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}

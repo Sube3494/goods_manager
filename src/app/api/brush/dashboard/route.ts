@@ -26,7 +26,10 @@ export async function GET() {
   try {
     const [brushProductCount, plans, orders] = await Promise.all([
       prisma.brushProduct.count({
-        where: { userId: session.id },
+        where: {
+          userId: session.id,
+          isActive: true,
+        },
       }),
       prisma.brushOrderPlan.findMany({
         where: { userId: session.id },

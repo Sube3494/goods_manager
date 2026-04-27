@@ -46,6 +46,7 @@ export default function ShopGoodsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState("");
   const [editingShopId, setEditingShopId] = useState("");
@@ -269,15 +270,57 @@ export default function ShopGoodsPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        showToast(data?.error || "加入店铺失败", "error");
+        showToast(data?.error || "复制商品失败", "error");
         return;
       }
-      showToast(data?.message || `已加入 ${selectedShop.name}`, "success");
+      showToast(data?.message || `已复制到 ${selectedShop.name}`, "success");
       setIsPickerOpen(false);
       void fetchShopProducts(true);
     } catch (error) {
       console.error("Failed to assign products:", error);
-      showToast("加入店铺失败", "error");
+      showToast("复制商品失败", "error");
+    }
+  }, [fetchShopProducts, selectedShop, showToast]);
+
+  const handleCreateStandaloneProduct = useCallback(async (formData: Omit<Product, "id"> & { id?: string }) => {
+    if (!selectedShop) {
+      showToast("请先选择店铺", "error");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: formData.sku?.trim() || "",
+          name: formData.name.trim(),
+          categoryId: formData.categoryId || "",
+          supplierId: formData.supplierId || "",
+          image: formData.image?.trim() || "",
+          costPrice: formData.costPrice ?? 0,
+          stock: formData.stock ?? 0,
+          isPublic: formData.isPublic ?? true,
+          isDiscontinued: formData.isDiscontinued ?? false,
+          remark: formData.remark?.trim() || "",
+          specs: {},
+          shopId: selectedShop.id,
+          isShopOnly: true,
+        }),
+      });
+
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || "创建店铺商品失败");
+      }
+
+      setIsCreateOpen(false);
+      showToast(`已在 ${selectedShop.name} 新建商品`, "success");
+      await fetchShopProducts(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "创建店铺商品失败";
+      showToast(message, "error");
+      throw error;
     }
   }, [fetchShopProducts, selectedShop, showToast]);
 
@@ -311,7 +354,7 @@ export default function ShopGoodsPage() {
     }, {});
     const shopIds = Object.keys(grouped);
     if (shopIds.length === 0) {
-      showToast("未找到可移出的店铺商品", "error");
+      showToast("未找到可删除的店铺商品", "error");
       return;
     }
     try {
@@ -322,16 +365,16 @@ export default function ShopGoodsPage() {
           body: JSON.stringify({ productIds: grouped[shopId] }),
         });
         const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.error || "移出店铺失败");
+        if (!res.ok) throw new Error(data?.error || "删除商品失败");
         return data;
       }));
       const removedCount = results.reduce((sum, result) => sum + Number(result?.count || 0), 0);
-      showToast(`已移出 ${removedCount} 个店铺商品`, "success");
+      showToast(`已删除 ${removedCount} 个店铺商品`, "success");
       setSelectedIds([]);
       void fetchShopProducts(true);
     } catch (error) {
       console.error("Failed to remove products from shops:", error);
-      showToast(error instanceof Error ? error.message : "移出店铺失败", "error");
+      showToast(error instanceof Error ? error.message : "删除商品失败", "error");
     }
   }, [fetchSelectedItems, fetchShopProducts, selectedIds, showToast]);
 
@@ -565,7 +608,8 @@ export default function ShopGoodsPage() {
           <div className="flex items-center gap-2">
             <button onClick={() => selectedShop ? setIsImportOpen(true) : showToast("先选择一个目标店铺再导入", "error")} className={cn("flex items-center gap-2 rounded-full border border-border/60 px-4 h-10 sm:h-11 text-sm font-bold transition-all whitespace-nowrap", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><span>导入</span></button>
             <button onClick={handleExport} className="flex items-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 px-4 h-10 sm:h-11 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all whitespace-nowrap"><span>导出</span></button>
-            <button onClick={() => selectedShop ? setIsPickerOpen(true) : showToast("先选择一个目标店铺再从模板库添加", "error")} className={cn("flex items-center gap-2 rounded-full border border-border/60 px-4 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all whitespace-nowrap", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} /><span>从模板库添加</span></button>
+            <button onClick={() => selectedShop ? setIsCreateOpen(true) : showToast("先选择一个目标店铺再新建商品", "error")} className={cn("flex items-center gap-2 rounded-full border border-border/60 px-4 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all whitespace-nowrap", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} /><span>新建店铺商品</span></button>
+            <button onClick={() => selectedShop ? setIsPickerOpen(true) : showToast("先选择一个目标店铺再从主库复制", "error")} className={cn("flex items-center gap-2 rounded-full border border-border/60 px-4 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all whitespace-nowrap", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} /><span>从主库复制</span></button>
           </div>
         )}
       </div>
@@ -617,13 +661,14 @@ export default function ShopGoodsPage() {
             ))}
           </div>
           {displayedItems.length > 0 && <div ref={observerTarget} className="flex justify-center mt-8 mb-12 py-4">{isNextPageLoading ? <div className="flex items-center gap-3 text-muted-foreground bg-white/5 px-6 py-2 rounded-full border border-white/10 animate-pulse"><div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" /><span className="text-sm font-medium">正在拉取更多记录...</span></div> : hasMore ? <div className="h-10 invisible" /> : <div className="text-muted-foreground text-sm font-medium flex items-center gap-2 opacity-50"><div className="w-1.5 h-1.5 rounded-full bg-current" />当前店铺商品已全部展示<div className="w-1.5 h-1.5 rounded-full bg-current" /></div>}</div>}
-          {!isLoading && displayedItems.length === 0 && <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center"><div className="rounded-full bg-muted/50 p-4 mb-4"><Store size={32} className="text-muted-foreground" /></div><h3 className="text-lg font-semibold">还没有店铺商品</h3><p className="text-sm text-muted-foreground">{selectedShop ? `当前店铺是 ${selectedShop.name}，可以从右上角模板库添加。` : "请先选择一个店铺。"}</p></div>}
+          {!isLoading && displayedItems.length === 0 && <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center"><div className="rounded-full bg-muted/50 p-4 mb-4"><Store size={32} className="text-muted-foreground" /></div><h3 className="text-lg font-semibold">还没有店铺商品</h3><p className="text-sm text-muted-foreground">{selectedShop ? `当前店铺是 ${selectedShop.name}，可以从右上角主库复制。` : "请先选择一个店铺。"}</p></div>}
         </>
       ) : null}
 
-      <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: selectedShop ? `移出 ${selectedShop.name}` : "移出所属店铺", onClick: handleRemoveSelected, variant: "danger" }]} />
-      <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="已在当前店铺" title={selectedShop ? `添加到 ${selectedShop.name}` : "选择商品"} allowCreate={false} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="模板库里还没有商品" />
+      <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: selectedShop ? `删除 ${selectedShop.name} 商品` : "删除所选商品", onClick: handleRemoveSelected, variant: "danger" }]} />
+      <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} allowCreate={false} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
+      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
       <ProductFormModal isOpen={isEditOpen} onClose={() => { setIsEditOpen(false); setEditingProduct(null); setEditingItemId(""); setEditingShopId(""); }} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
 

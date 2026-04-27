@@ -5,6 +5,7 @@ import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../../../prisma/generated-client";
+import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
 
 export const dynamic = "force-dynamic";
 
@@ -139,6 +140,7 @@ function isJDPlatform(platform: string | null | undefined) {
 function findMappedShopNameFromIntegrationConfig(
   maiyatianShopId: string | null,
   rawShopName: string | null,
+  rawShopAddress: string | null,
   permissions: unknown
 ) {
   const record = permissions && typeof permissions === "object" && !Array.isArray(permissions)
@@ -150,7 +152,7 @@ function findMappedShopNameFromIntegrationConfig(
     return null;
   }
 
-  const normalizedShopId = String(maiyatianShopId || "").trim();
+  const normalizedShopId = normalizeExternalId(maiyatianShopId);
   if (normalizedShopId) {
     const matchedById = config.maiyatianShopMappings.find((item) => String(item.maiyatianShopId || "").trim() === normalizedShopId);
     if (matchedById?.localShopName) {
@@ -158,26 +160,38 @@ function findMappedShopNameFromIntegrationConfig(
     }
   }
 
-  const exactShopName = String(rawShopName || "").trim();
-  if (!exactShopName) {
-    return null;
-  }
-
-  const matchedByName = config.maiyatianShopMappings.find((item) => String(item.maiyatianShopName || "").trim() === exactShopName);
-  return matchedByName?.localShopName || null;
+  const matchedByIdentity = config.maiyatianShopMappings.find((item) => {
+    const mappingKey = buildShopDedupeKey({
+      name: item.maiyatianShopName,
+      address: item.maiyatianShopAddress,
+    });
+    const targetKey = buildShopDedupeKey({
+      name: rawShopName,
+      address: rawShopAddress,
+    });
+    if (mappingKey && mappingKey === targetKey) {
+      return true;
+    }
+    return normalizeShopNameKey(item.maiyatianShopName) === normalizeShopNameKey(rawShopName);
+  });
+  return matchedByIdentity?.localShopName || null;
 }
 
 function resolveMappedShopDebug(
   maiyatianShopId: string | null,
   rawShopName: string | null,
+  rawShopAddress: string | null,
   permissions: unknown
 ) {
   const record = permissions && typeof permissions === "object" && !Array.isArray(permissions)
     ? permissions as UserPermissionsPayload
     : {};
   const config = normalizeAutoPickIntegrationConfig(record.autoPickIntegration);
-  const normalizedShopId = String(maiyatianShopId || "").trim();
-  const exactShopName = String(rawShopName || "").trim();
+  const normalizedShopId = normalizeExternalId(maiyatianShopId);
+  const targetKey = buildShopDedupeKey({
+    name: rawShopName,
+    address: rawShopAddress,
+  });
 
   const matchedById = normalizedShopId
     ? config.maiyatianShopMappings.find((item) => String(item.maiyatianShopId || "").trim() === normalizedShopId)
@@ -195,13 +209,25 @@ function resolveMappedShopDebug(
     };
   }
 
-  const matchedByName = exactShopName
-    ? config.maiyatianShopMappings.find((item) => String(item.maiyatianShopName || "").trim() === exactShopName)
-    : null;
+  const matchedByIdentity = config.maiyatianShopMappings.find((item) => {
+    const mappingKey = buildShopDedupeKey({
+      name: item.maiyatianShopName,
+      address: item.maiyatianShopAddress,
+    });
+    if (mappingKey && mappingKey === targetKey) {
+      return true;
+    }
+    return normalizeShopNameKey(item.maiyatianShopName) === normalizeShopNameKey(rawShopName);
+  });
 
   return {
-    localShopName: matchedByName?.localShopName || null,
-    matchedBy: matchedByName?.localShopName ? "shopName" as const : null,
+    localShopName: matchedByIdentity?.localShopName || null,
+    matchedBy: matchedByIdentity?.localShopName
+      ? (buildShopDedupeKey({
+          name: matchedByIdentity.maiyatianShopName,
+          address: matchedByIdentity.maiyatianShopAddress,
+        }) === targetKey ? "shopDedupeKey" as const : "shopName" as const)
+      : null,
     mappingCount: config.maiyatianShopMappings.length,
     mappingPreview: config.maiyatianShopMappings.slice(0, 10).map((item) => ({
       maiyatianShopId: item.maiyatianShopId,
@@ -368,6 +394,62 @@ function readCompletedAtFromRawPayload(rawPayload: unknown) {
   return null;
 }
 
+function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+
+  const systemMeta = (rawPayload as Record<string, unknown>).systemMeta;
+  if (!systemMeta || typeof systemMeta !== "object" || Array.isArray(systemMeta)) {
+    return false;
+  }
+
+  const marker = (systemMeta as Record<string, unknown>).mainSystemSelfDelivery;
+  if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
+    return false;
+  }
+
+  return Boolean((marker as Record<string, unknown>).triggered);
+}
+
+function readAutoOutboundMeta(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return {
+      status: null,
+      error: null,
+      attemptedAt: null,
+      resolvedAt: null,
+    };
+  }
+
+  const systemMeta = (rawPayload as Record<string, unknown>).systemMeta;
+  if (!systemMeta || typeof systemMeta !== "object" || Array.isArray(systemMeta)) {
+    return {
+      status: null,
+      error: null,
+      attemptedAt: null,
+      resolvedAt: null,
+    };
+  }
+
+  const autoOutbound = (systemMeta as Record<string, unknown>).autoOutbound;
+  if (!autoOutbound || typeof autoOutbound !== "object" || Array.isArray(autoOutbound)) {
+    return {
+      status: null,
+      error: null,
+      attemptedAt: null,
+      resolvedAt: null,
+    };
+  }
+
+  return {
+    status: String((autoOutbound as Record<string, unknown>).status || "").trim() || null,
+    error: String((autoOutbound as Record<string, unknown>).error || "").trim() || null,
+    attemptedAt: String((autoOutbound as Record<string, unknown>).attemptedAt || "").trim() || null,
+    resolvedAt: String((autoOutbound as Record<string, unknown>).resolvedAt || "").trim() || null,
+  };
+}
+
 function readDeliveryFee(delivery: unknown) {
   if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
     return 0;
@@ -392,6 +474,7 @@ export async function GET(request: NextRequest) {
     const startDate = String(searchParams.get("startDate") || "").trim();
     const endDate = String(searchParams.get("endDate") || "").trim();
     const hasDelivery = toBooleanFilter(searchParams.get("hasDelivery"));
+    const mainSystemSelfDelivery = toBooleanFilter(searchParams.get("mainSystemSelfDelivery"));
 
     const where: Prisma.AutoPickOrderWhereInput = {
       userId: session.id,
@@ -423,6 +506,12 @@ export async function GET(request: NextRequest) {
       } : {}),
       ...(hasDelivery === true ? { delivery: { not: Prisma.AnyNull } } : {}),
       ...(hasDelivery === false ? { delivery: { equals: Prisma.DbNull } } : {}),
+      ...(mainSystemSelfDelivery === true ? { rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true } } : {}),
+      ...(mainSystemSelfDelivery === false ? {
+        NOT: {
+          rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true },
+        },
+      } : {}),
     };
 
     const [orders, total, platformRows, statusRows, userProfile] = await Promise.all([
@@ -495,6 +584,39 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    const outboundNoteNeedles = orders
+      .map((order) => String(order.orderNo || "").trim())
+      .filter(Boolean)
+      .map((orderNo) => `平台单号: ${orderNo}`);
+
+    const outboundRows = outboundNoteNeedles.length > 0
+      ? await prisma.outboundOrder.findMany({
+          where: {
+            userId: session.id,
+            OR: outboundNoteNeedles.map((needle) => ({
+              note: { contains: needle, mode: "insensitive" as const },
+            })),
+          },
+          select: {
+            id: true,
+            note: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        })
+      : [];
+
+    const outboundByOrderNo = new Map<string, { id: string }>();
+    for (const outbound of outboundRows) {
+      const note = String(outbound.note || "");
+      const match = note.match(/平台单号:\s*([^\s|]+)/);
+      const orderNo = String(match?.[1] || "").trim();
+      if (orderNo && !outboundByOrderNo.has(orderNo)) {
+        outboundByOrderNo.set(orderNo, { id: outbound.id });
+      }
+    }
+
     const summary = orders.reduce((acc, order) => {
       const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
       const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
@@ -519,21 +641,8 @@ export async function GET(request: NextRequest) {
       orders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
     ));
 
-    const [products, shopProducts] = productNames.length > 0
-      ? await Promise.all([
-          prisma.product.findMany({
-            where: {
-              userId: session.id,
-              name: { in: productNames },
-            },
-            select: {
-              id: true,
-              sku: true,
-              name: true,
-              image: true,
-            },
-          }),
-          prisma.shopProduct.findMany({
+    const shopProducts = productNames.length > 0
+      ? await prisma.shopProduct.findMany({
             where: {
               shop: { userId: session.id },
               productName: { in: productNames },
@@ -549,22 +658,8 @@ export async function GET(request: NextRequest) {
                 },
               },
             },
-          }),
-        ])
-      : [[], []];
-
-    const productMap = new Map<string, MatchedCatalogProduct>();
-    for (const item of products) {
-      const normalizedName = toNormalizedText(item.name);
-      if (!normalizedName || productMap.has(normalizedName)) continue;
-      productMap.set(normalizedName, {
-        id: item.id,
-        name: item.name,
-        sku: item.sku,
-        image: item.image,
-        sourceType: "product",
-      });
-    }
+          })
+      : [];
 
     const shopProductMap = new Map<string, MatchedCatalogProduct[]>();
     for (const item of shopProducts) {
@@ -599,6 +694,7 @@ export async function GET(request: NextRequest) {
         rawShopName: readShopNameFromRawPayload(order.rawPayload) || null,
         rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
+        isMainSystemSelfDelivery: readMainSystemSelfDeliveryFlag(order.rawPayload),
         isPickup: pickup,
         isOtherPickup: otherPickup,
         isDeleted: deleted,
@@ -610,18 +706,26 @@ export async function GET(request: NextRequest) {
         autoCompleteJobStatus: order.autoCompleteJob?.status || null,
         autoCompleteJobError: order.autoCompleteJob?.lastError || null,
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
+        hasOutbound: outboundByOrderNo.has(order.orderNo),
+        outboundOrderId: outboundByOrderNo.get(order.orderNo)?.id || null,
       };
     }).map((order) => {
       const mappingDebug = resolveMappedShopDebug(
         order.shopId,
         order.rawShopName,
+        order.rawShopAddress,
         userProfile?.permissions
       );
       const matchedShopName = mappingDebug.localShopName;
+      const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
 
       return {
         ...order,
         matchedShopName,
+        autoOutboundStatus: autoOutboundMeta.status,
+        autoOutboundError: autoOutboundMeta.error,
+        autoOutboundAttemptedAt: autoOutboundMeta.attemptedAt,
+        autoOutboundResolvedAt: autoOutboundMeta.resolvedAt,
         items: order.items.map((item) => {
           const normalizedProductName = toNormalizedText(item.productName);
           const matchedShopProducts = normalizedProductName
@@ -632,11 +736,7 @@ export async function GET(request: NextRequest) {
           );
           const matchedProduct = !normalizedProductName
             ? null
-            : (
-                exactShopProduct ||
-                productMap.get(normalizedProductName) ||
-                null
-              );
+            : (exactShopProduct || null);
           return {
             ...item,
             matchedProduct,

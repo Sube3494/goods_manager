@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
   isAutoPickOrderCancelledStatus,
@@ -72,6 +72,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           autoCompleteAt: autoCompleteAt || null,
         },
       });
+      await markAutoPickOrderMainSystemSelfDelivery(session.id, id);
 
       if (autoCompleteAt) {
         await ensureAutoCompleteJob({

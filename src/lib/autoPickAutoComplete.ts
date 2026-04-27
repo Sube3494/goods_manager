@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { AutoPickAutoCompleteJobStatus } from "../../prisma/generated-client";
 
@@ -98,6 +98,12 @@ async function markJobSuccess(jobId: string, orderId: string, userId: string, so
       },
     }),
   ]);
+  await syncBrushOrderFromCompletedAutoPickOrder(userId, orderId).catch((brushError) => {
+    console.error("Failed to sync brush order after auto complete:", brushError);
+  });
+  await syncAutoOutboundFromCompletedAutoPickOrder(userId, orderId).catch((outboundError) => {
+    console.error("Failed to auto-create outbound after auto complete:", outboundError);
+  });
 
   void refreshAutoPickOrderFromPlugin(userId, {
     id: sourceId,

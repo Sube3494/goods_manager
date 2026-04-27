@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
   isAutoPickOrderCancelledStatus,
@@ -60,6 +60,12 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         },
       });
       await cancelAutoCompleteJob(order.id, "manual-pickup-complete");
+      await syncBrushOrderFromCompletedAutoPickOrder(session.id, order.id).catch((brushError) => {
+        console.error("Failed to sync brush order after pickup complete:", brushError);
+      });
+      await syncAutoOutboundFromCompletedAutoPickOrder(session.id, order.id).catch((outboundError) => {
+        console.error("Failed to auto-create outbound after pickup complete:", outboundError);
+      });
 
       void refreshAutoPickOrderFromPlugin(session.id, {
         id: order.sourceId,

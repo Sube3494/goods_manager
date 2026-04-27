@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
 
@@ -59,6 +59,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     if (isAutoPickOrderCompletedStatus(refreshedOrder.status) || isAutoPickOrderCancelledStatus(refreshedOrder.status)) {
       await cancelAutoCompleteJob(order.id, "order-synced-to-terminal");
+    }
+    if (isAutoPickOrderCompletedStatus(refreshedOrder.status)) {
+      await syncBrushOrderFromCompletedAutoPickOrder(session.id, refreshedOrder.id).catch((brushError) => {
+        console.error("Failed to sync brush order after order sync:", brushError);
+      });
+      await syncAutoOutboundFromCompletedAutoPickOrder(session.id, refreshedOrder.id).catch((outboundError) => {
+        console.error("Failed to auto-create outbound after order sync:", outboundError);
+      });
     }
 
     const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);

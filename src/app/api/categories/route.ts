@@ -11,21 +11,39 @@ export async function GET() {
       where: session ? {
         userId: session.id
       } : {},
-      include: {
-        _count: {
-          select: { products: true }
-        }
+      select: {
+        id: true,
+        name: true,
+        description: true,
       },
       orderBy: { name: 'asc' }
     });
+
+    const products = await prisma.product.findMany({
+      where: session ? {
+        userId: session.id,
+        isShopOnly: false,
+      } : {
+        isPublic: true,
+        isShopOnly: false,
+      },
+      select: {
+        categoryId: true,
+      },
+    });
+
+    const countMap = new Map<string, number>();
+    for (const product of products) {
+      const current = countMap.get(product.categoryId) || 0;
+      countMap.set(product.categoryId, current + 1);
+    }
     
     // 映射回前端需要的结构
     const formatted = categories.map(c => ({
       id: c.id,
       name: c.name,
       description: c.description || "",
-
-      count: c._count.products
+      count: countMap.get(c.id) || 0,
     }));
 
     return NextResponse.json(formatted);

@@ -80,6 +80,7 @@ export interface Shop {
   id: string;
   name: string;
   address?: string | null;
+  dedupeKey?: string | null;
   province?: string | null;
   city?: string | null;
   externalId?: string | null;
@@ -137,6 +138,15 @@ export interface AutoPickOrderItem {
   updatedAt?: string;
 }
 
+export interface AutoPickMatchedProductRef {
+  id: string;
+  name: string;
+  sku?: string | null;
+  image?: string | null;
+  sourceType: "product" | "shopProduct";
+  shopName?: string | null;
+}
+
 export interface AutoPickOrder {
   id: string;
   userId: string;
@@ -153,6 +163,7 @@ export interface AutoPickOrder {
   rawShopName?: string | null;
   rawShopAddress?: string | null;
   matchedShopName?: string | null;
+  isMainSystemSelfDelivery?: boolean;
   isPickup?: boolean;
   isOtherPickup?: boolean;
   isDeleted?: boolean;
@@ -174,6 +185,12 @@ export interface AutoPickOrder {
   autoCompleteJobStatus?: string | null;
   autoCompleteJobError?: string | null;
   autoCompleteJobAttempts?: number | null;
+  autoOutboundStatus?: string | null;
+  autoOutboundError?: string | null;
+  autoOutboundAttemptedAt?: string | null;
+  autoOutboundResolvedAt?: string | null;
+  hasOutbound?: boolean;
+  outboundOrderId?: string | null;
   lastSyncedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;

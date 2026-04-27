@@ -489,6 +489,7 @@ model Shop {
   id          String   @id @default(cuid())
   name        String
   address     String?
+  dedupeKey   String?
   province    String?
   city        String?
   latitude    Float?
@@ -507,6 +508,7 @@ model Shop {
   @@index([userId])
   @@index([province, city])
   @@unique([userId, externalId])
+  @@unique([userId, dedupeKey])
 }
 
 model ShopProduct {
