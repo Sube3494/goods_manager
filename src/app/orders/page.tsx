@@ -11,9 +11,6 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
-  Copy,
-  Eye,
-  EyeOff,
   Loader2,
   MapPin,
   Package2,
@@ -71,16 +68,14 @@ type LocalShopOption = {
   isDefault?: boolean;
 };
 
-function serializeIntegrationConfig(config: AutoPickIntegrationConfig) {
+function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "maiyatianCookie" | "maiyatianShopMappings">) {
   return JSON.stringify({
-    pluginBaseUrl: String(config.pluginBaseUrl || ""),
-    inboundApiKey: String(config.inboundApiKey || ""),
     maiyatianCookie: String(config.maiyatianCookie || ""),
     maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : [],
   });
 }
 
-function serializeMaiyatianMappings(config: AutoPickIntegrationConfig) {
+function serializeMaiyatianMappings(config: Pick<AutoPickIntegrationConfig, "maiyatianShopMappings">) {
   return JSON.stringify(Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : []);
 }
 
@@ -126,24 +121,28 @@ function getOrderActionErrorMessage(raw: unknown) {
   switch (reason) {
     case "target-order-card-not-found":
     case "target-order-container-not-found":
-      return "插件当前页面里没有找到这张订单，请先确认订单仍在可操作列表中。";
+      return "当前没有找到这张订单，请先确认订单仍在可操作列表中。";
     case "target-order-not-in-detail":
-      return "插件打开的订单详情和当前订单不一致，请刷新后重试。";
+      return "当前读取到的订单详情和目标订单不一致，请刷新后重试。";
     case "maiyatian-confirm-page-not-found":
     case "not-confirm-page":
-      return "插件当前不在新订单页面，请先切回麦芽田新订单页。";
+      return "当前不在可操作状态，请先确认麦芽田订单页状态。";
     case "self-delivery-option-not-found":
       return "当前订单没有找到自配送入口。";
     case "complete-delivery-button-not-found":
       return "当前订单没有找到完成配送按钮。";
     case "command-already-running":
-      return "插件当前有其他命令正在执行，请稍后再试。";
+      return "当前有其他命令正在执行，请稍后再试。";
+    case "complete-delivery-api-not-implemented":
+      return "完成配送接口还没完全迁进主系统，这一步我还在补。";
     case "picking-not-completed":
       return "当前订单还没完成拣货，暂时不能执行这个操作。";
     case "Order already completed":
       return "订单已完成，不需要重复操作。";
     case "Order already cancelled":
       return "订单已取消，不需要继续处理。";
+    case "Order already deleted":
+      return "订单已删除，不需要继续处理。";
     case "Pickup order does not require self delivery":
       return "到店自取订单不需要发起自配送。";
     case "Non-pickup order does not require pickup complete":
@@ -160,6 +159,7 @@ function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
   }
 
   if (baseStatus === "已取消") return "已取消";
+  if (baseStatus === "已删除") return "已删除";
   if (baseStatus === "已完成") return "已自提";
   return "待自提";
 }
@@ -187,6 +187,14 @@ function getStatusTone(display: string) {
       badge: "border-slate-500/15 bg-slate-500/10 text-slate-600 dark:text-slate-400",
       dot: "bg-slate-500",
       soft: "bg-slate-500/8 text-slate-600 dark:text-slate-300",
+    };
+  }
+
+  if (display === "已删除") {
+    return {
+      badge: "border-zinc-500/15 bg-zinc-500/10 text-zinc-700 dark:text-zinc-400",
+      dot: "bg-zinc-500",
+      soft: "bg-zinc-500/8 text-zinc-700 dark:text-zinc-300",
     };
   }
 
@@ -261,6 +269,16 @@ function getOrderItemDisplay(item: AutoPickOrderItem) {
 
 function getOrderSourceLabel(order: AutoPickOrder) {
   return order.matchedShopName || "";
+}
+
+function getFulfillmentLabel(order: Pick<AutoPickOrder, "isPickup">) {
+  if (order.isPickup) return "到店自取";
+  return "配送上门";
+}
+
+function getOrderTypeLabel(order: Pick<AutoPickOrder, "isSubscribe">) {
+  if (order.isSubscribe) return "预约单";
+  return "";
 }
 
 function getItemCount(items: AutoPickOrderItem[]) {
@@ -469,10 +487,12 @@ function OrderCard({
   const itemCount = getItemCount(order.items);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
+  const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
   const pickup = Boolean(order.isPickup);
   const subscribe = isSubscribeOrder(order);
+  const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
@@ -507,9 +527,9 @@ function OrderCard({
                       <span className="truncate">{sourceLabel}</span>
                     </span>
                   ) : null}
-                  {subscribe ? (
+                  {orderTypeLabel ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2.5 text-[13px] font-medium leading-none text-violet-700 dark:text-violet-400">
-                      预约单
+                      {orderTypeLabel}
                     </span>
                   ) : null}
                   <StatusBadge order={order} />
@@ -556,7 +576,7 @@ function OrderCard({
                   </span>
                   <span className="inline-flex min-w-0 items-center justify-end gap-1.5 text-right">
                     <MapPin size={12} className="shrink-0" />
-                    <span className="truncate">{pickup ? "到店自取" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
+                    <span className="truncate">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
                   </span>
                 </div>
                 <div className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
@@ -566,7 +586,7 @@ function OrderCard({
                   </span>
                   <span className="hidden sm:inline-flex sm:items-center sm:gap-1.5">
                     <MapPin size={13} />
-                    {pickup ? "到店自取" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}
+                    {pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}
                   </span>
                 </div>
               </div>
@@ -610,6 +630,12 @@ function OrderCard({
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-500/15 bg-slate-500/10 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <X size={12} />
                 订单已取消
+              </span>
+            ) : null}
+            {deleted ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-500/15 bg-zinc-500/10 px-2.5 py-1 text-[11px] font-medium text-zinc-700 dark:text-zinc-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+                <X size={12} />
+                订单已删除
               </span>
             ) : null}
             {!terminal && order.autoCompleteAt ? (
@@ -695,7 +721,8 @@ function OrderCard({
               <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">系统信息</h3>
               <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <DetailStat label="订单状态" value={getDisplayStatus(order)} />
-                <DetailStat label="履约方式" value={pickup ? "到店自取" : "配送上门"} />
+                <DetailStat label="订单类型" value={orderTypeLabel || "普通单"} />
+                <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
                 <DetailStat label={pickup ? "取货时间" : subscribe ? "预约送达" : "最晚送达"} value={deadlineDisplay} />
               </div>
@@ -856,32 +883,27 @@ function IntegrationModal({
   integrationConfig,
   maiyatianShops,
   localShops,
-  callbackUrl,
   isFetchingMaiyatianShops,
   isTestingIntegration,
   modalRef,
   onClose,
   onChange,
-  onCopyCallback,
   onFetchMaiyatianShops,
   onTest,
 }: {
   integrationConfig: AutoPickIntegrationConfig;
   maiyatianShops: AutoPickMaiyatianShop[];
   localShops: LocalShopOption[];
-  callbackUrl: string;
   isFetchingMaiyatianShops: boolean;
   isTestingIntegration: boolean;
   modalRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onChange: (value: AutoPickIntegrationConfig) => void;
-  onCopyCallback: () => void;
   onFetchMaiyatianShops: () => void;
   onTest: () => void;
 }) {
   const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
-  const [showInboundApiKey, setShowInboundApiKey] = useState(false);
   const pillButtonClass = "inline-flex items-center gap-1 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
     value: item.name,
@@ -910,7 +932,7 @@ function IntegrationModal({
               Auto Pick
             </div>
             <h2 className="mt-3 text-2xl font-black tracking-tight text-foreground">订单对接配置</h2>
-            <p className="mt-2 text-sm text-muted-foreground">这里保留原有接入逻辑，只把信息组织成系统统一的配置面板样式。</p>
+            <p className="mt-2 text-sm text-muted-foreground">主系统直接使用麦芽田 Cookie 拉单、查详情和执行履约动作。</p>
           </div>
           <button
             type="button"
@@ -924,56 +946,11 @@ function IntegrationModal({
         <div className="mt-6 flex-1 overflow-y-auto px-5 pb-5 sm:px-7 sm:pb-7">
           <div className="grid gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
             <div className="space-y-4">
-              <label className="block space-y-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">插件地址</span>
-                <input
-                  value={integrationConfig.pluginBaseUrl}
-                  onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
-                  placeholder="http://127.0.0.1:22800"
-                  className="h-11 w-full rounded-xl border border-black/8 bg-black/[0.02] px-4 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]"
-                />
-              </label>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">对接密钥</span>
-                  <div className="flex items-center gap-2">
-                    {integrationConfig.inboundApiKey.trim() ? (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(integrationConfig.inboundApiKey);
-                        }}
-                        className={pillButtonClass}
-                      >
-                        <Copy size={12} />
-                        复制
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => setShowInboundApiKey((current) => !current)}
-                      className={pillButtonClass}
-                    >
-                      {showInboundApiKey ? <EyeOff size={12} /> : <Eye size={12} />}
-                      {showInboundApiKey ? "隐藏" : "查看"}
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type={showInboundApiKey ? "text" : "password"}
-                  value={integrationConfig.inboundApiKey}
-                  onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
-                  placeholder="输入 auto-pick inbound API key"
-                  className="h-11 w-full rounded-xl border border-black/8 bg-black/[0.02] px-4 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.03]"
-                />
-              </div>
-
               <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
-                    <p className="mt-1 text-xs text-muted-foreground">填写后用于读取发货门店</p>
+                    <p className="mt-1 text-xs text-muted-foreground">填写后主系统会直接读取订单、门店和履约状态。</p>
                   </div>
                   {hasCookie ? (
                     <button
@@ -1000,7 +977,7 @@ function IntegrationModal({
                     className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827]"
                   >
                     <div className="text-sm font-medium text-foreground">已保存 Cookie</div>
-                    <div className="mt-1 text-xs text-muted-foreground">默认隐藏，且当前不可复制。</div>
+                    <div className="mt-1 text-xs text-muted-foreground">默认隐藏，当前界面不展示明文。</div>
                     <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
                       {"•".repeat(28)}
                     </div>
@@ -1009,29 +986,17 @@ function IntegrationModal({
               </div>
 
               <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03]">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调地址</div>
-                    <p className="mt-1 text-xs text-muted-foreground">插件把来单上报到这里。</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onCopyCallback}
-                    className={cn(pillButtonClass, "h-9")}
-                  >
-                    <Copy size={12} />
-                    复制
-                  </button>
-                </div>
-                <code className="mt-3 block break-all rounded-xl bg-white/80 px-3 py-3 font-mono text-[11px] leading-relaxed text-foreground dark:bg-[#111827]">
-                  {callbackUrl}
-                </code>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">当前模式</div>
+                <p className="mt-2 text-sm font-medium text-foreground">已切换为系统直连麦芽田</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  不再依赖来单回调。同步时由主系统直接使用 Cookie 拉取麦芽田订单和详情。
+                </p>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
                 <ActionButton
                   label={isTestingIntegration ? "测试中..." : "测试连接"}
-                  icon={isTestingIntegration ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
+                  icon={isTestingIntegration ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                   onClick={() => onTest()}
                   disabled={isTestingIntegration}
                 />
@@ -1069,7 +1034,6 @@ function IntegrationModal({
             <div className="mt-3 space-y-2.5">
               {maiyatianShops.length > 0 ? maiyatianShops.map((shop) => {
                 const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
-                const selectedLocalShop = localShops.find((item) => item.name === mapped?.localShopName);
                 return (
                   <div key={shop.id} className="rounded-2xl border border-black/8 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.04]">
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
@@ -1093,13 +1057,9 @@ function IntegrationModal({
                             {mapped ? "已映射" : "待映射"}
                           </span>
                         </div>
-                        {mapped?.localShopName ? (
-                          <div className="mt-2.5 inline-flex max-w-full items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            当前映射到 {mapped.localShopName}
-                          </div>
-                        ) : (
+                        {!mapped?.localShopName ? (
                           <div className="mt-2.5 text-[11px] text-muted-foreground">还没绑定系统门店。</div>
-                        )}
+                        ) : null}
                       </div>
 
                       <div className="rounded-[16px] border border-black/8 bg-black/[0.02] p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
@@ -1125,16 +1085,6 @@ function IntegrationModal({
                             });
                           }}
                         />
-                        {mapped?.localShopName ? (
-                          <div className="mt-2 rounded-xl border border-emerald-500/18 bg-emerald-500/8 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
-                            <div className="font-medium">{mapped.localShopName}</div>
-                            {selectedLocalShop?.address ? (
-                              <div className="mt-1 line-clamp-2 text-[11px] leading-5 text-emerald-700/80 dark:text-emerald-400/80">
-                                {selectedLocalShop.address}
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : null}
                         {!mapped?.localShopName ? (
                           <div className="mt-2 text-[11px] text-muted-foreground">选择后会固定这条映射。</div>
                         ) : null}
@@ -1205,29 +1155,20 @@ export default function OrdersPage() {
   });
   const [maiyatianShops, setMaiyatianShops] = useState<AutoPickMaiyatianShop[]>([]);
   const [localShops, setLocalShops] = useState<LocalShopOption[]>([]);
-  const [callbackUrl, setCallbackUrl] = useState("");
   const [isIntegrationOpen, setIsIntegrationOpen] = useState(false);
   const [isTestingIntegration, setIsTestingIntegration] = useState(false);
   const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const [savedIntegrationDigest, setSavedIntegrationDigest] = useState(() => serializeIntegrationConfig({
-    pluginBaseUrl: "",
-    inboundApiKey: "",
     maiyatianCookie: "",
     maiyatianShopMappings: [],
   }));
   const [savedMappingsDigest, setSavedMappingsDigest] = useState(() => serializeMaiyatianMappings({
-    pluginBaseUrl: "",
-    inboundApiKey: "",
-    maiyatianCookie: "",
     maiyatianShopMappings: [],
   }));
 
   useEffect(() => {
     setIsMounted(true);
-    if (typeof window !== "undefined") {
-      setCallbackUrl(`${window.location.origin}/api/v1/api-key/listened-orders`);
-    }
   }, []);
 
   useEffect(() => {
@@ -1277,15 +1218,10 @@ export default function OrdersPage() {
         maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       });
       setSavedIntegrationDigest(serializeIntegrationConfig({
-        pluginBaseUrl: String(data.pluginBaseUrl || ""),
-        inboundApiKey: String(data.inboundApiKey || ""),
         maiyatianCookie: String(data.maiyatianCookie || ""),
         maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       }));
       setSavedMappingsDigest(serializeMaiyatianMappings({
-        pluginBaseUrl: String(data.pluginBaseUrl || ""),
-        inboundApiKey: String(data.inboundApiKey || ""),
-        maiyatianCookie: String(data.maiyatianCookie || ""),
         maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       }));
       hasLoadedIntegrationRef.current = true;
@@ -1388,7 +1324,7 @@ export default function OrdersPage() {
   );
 
   const statusOptions = useMemo(() => {
-    const preferredOrder = ["同步中", "待处理", "已拣货", "待配送", "配送中", "已完成", "已取消"];
+    const preferredOrder = ["同步中", "待处理", "已拣货", "待配送", "配送中", "已完成", "已取消", "已删除"];
     const labels = Array.from(
       new Set(
         statuses
@@ -1513,15 +1449,10 @@ export default function OrdersPage() {
         maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       });
       setSavedIntegrationDigest(serializeIntegrationConfig({
-        pluginBaseUrl: String(data.pluginBaseUrl || ""),
-        inboundApiKey: String(data.inboundApiKey || ""),
         maiyatianCookie: String(data.maiyatianCookie || ""),
         maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       }));
       setSavedMappingsDigest(serializeMaiyatianMappings({
-        pluginBaseUrl: String(data.pluginBaseUrl || ""),
-        inboundApiKey: String(data.inboundApiKey || ""),
-        maiyatianCookie: String(data.maiyatianCookie || ""),
         maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
       }));
       if (!options?.silent) {
@@ -1696,11 +1627,20 @@ export default function OrdersPage() {
       }
 
       const syncedCount = Number(data?.synced || 0);
+      const skippedCount = Number(data?.skipped || 0);
       const backfilledCount = Number(data?.backfilled || 0);
+      const skippedOrders = Array.isArray(data?.skippedOrders) ? data.skippedOrders : [];
+      const firstSkippedReason = skippedOrders[0] && typeof skippedOrders[0] === "object"
+        ? String((skippedOrders[0] as { reason?: unknown }).reason || "").trim()
+        : "";
       showToast(
         backfilledCount > 0
-          ? `已同步 ${syncedCount} 单，补齐 ${backfilledCount} 单`
-          : `已同步 ${syncedCount} 单`,
+          ? skippedCount > 0
+            ? `已同步 ${syncedCount} 单，补齐 ${backfilledCount} 单，跳过 ${skippedCount} 单${firstSkippedReason ? `：${firstSkippedReason}` : ""}`
+            : `已同步 ${syncedCount} 单，补齐 ${backfilledCount} 单`
+          : skippedCount > 0
+            ? `已同步 ${syncedCount} 单，跳过 ${skippedCount} 单${firstSkippedReason ? `：${firstSkippedReason}` : ""}`
+            : `已同步 ${syncedCount} 单`,
         "success"
       );
       await fetchOrders({ silent: true });
@@ -2087,16 +2027,11 @@ export default function OrdersPage() {
                 integrationConfig={integrationConfig}
                 maiyatianShops={maiyatianShops}
                 localShops={localShops}
-                callbackUrl={callbackUrl}
                 isFetchingMaiyatianShops={isFetchingMaiyatianShops}
                 isTestingIntegration={isTestingIntegration}
                 modalRef={modalRef}
                 onClose={() => setIsIntegrationOpen(false)}
                 onChange={setIntegrationConfig}
-                onCopyCallback={() => {
-                  navigator.clipboard.writeText(callbackUrl);
-                  showToast("地址已复制", "success");
-                }}
                 onFetchMaiyatianShops={fetchMaiyatianShops}
                 onTest={testIntegrationConfig}
               />,

@@ -5,6 +5,14 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
   if (!text) return "同步中";
 
   if (
+    text.includes("删除")
+    || normalized === "delete"
+    || normalized === "deleted"
+  ) {
+    return "已删除";
+  }
+
+  if (
     text.includes("取消")
     || text.includes("退款")
     || text.includes("关闭")
@@ -73,9 +81,13 @@ export function isAutoPickOrderCancelledStatus(status?: string | null) {
   return getBaseAutoPickStatusDisplay(status) === "已取消";
 }
 
+export function isAutoPickOrderDeletedStatus(status?: string | null) {
+  return getBaseAutoPickStatusDisplay(status) === "已删除";
+}
+
 export function isAutoPickOrderTerminalStatus(status?: string | null) {
   const display = getBaseAutoPickStatusDisplay(status);
-  return display === "已完成" || display === "已取消";
+  return display === "已完成" || display === "已取消" || display === "已删除";
 }
 
 export function isAutoPickOrderDeliveringStatus(status?: string | null) {
@@ -101,4 +113,30 @@ export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string 
   }
 
   return candidates.some((item) => /到店自取|门店自取|上门自取|自提/.test(String(item || "").trim()));
+}
+
+export function isAutoPickOtherPickupOrder(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+
+  const record = rawPayload as Record<string, unknown>;
+  const channelTag = String(record.channelTag || record.channel_tag || "").trim().toLowerCase();
+  return channelTag === "other";
+}
+
+export function resolveAutoPickBusinessStatus(
+  status: string | null | undefined,
+  rawPayload: unknown,
+  userAddress?: string | null,
+) {
+  const baseStatus = getBaseAutoPickStatusDisplay(status);
+
+  if (isAutoPickOtherPickupOrder(rawPayload) && !isAutoPickPickupOrder(rawPayload, userAddress)) {
+    if (baseStatus === "同步中" || baseStatus === "待处理" || baseStatus === "已拣货") {
+      return "待配送";
+    }
+  }
+
+  return String(status || "").trim() || undefined;
 }

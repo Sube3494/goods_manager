@@ -35,10 +35,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const config = normalizeAutoPickIntegrationConfig(body);
 
-    if (config.pluginBaseUrl && !/^https?:\/\//i.test(config.pluginBaseUrl)) {
-      return NextResponse.json({ error: "插件地址必须以 http:// 或 https:// 开头" }, { status: 400 });
-    }
-
     const saved = await updateAutoPickIntegrationConfigByUserId(session.id, config);
     return NextResponse.json(saved);
   } catch (error) {

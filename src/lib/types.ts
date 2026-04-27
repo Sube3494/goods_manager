@@ -154,6 +154,8 @@ export interface AutoPickOrder {
   rawShopAddress?: string | null;
   matchedShopName?: string | null;
   isPickup?: boolean;
+  isOtherPickup?: boolean;
+  isDeleted?: boolean;
   isSubscribe?: boolean;
   longitude?: number | null;
   latitude?: number | null;

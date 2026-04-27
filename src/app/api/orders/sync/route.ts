@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
         ok: true,
         mode,
         synced: result.count,
+        skipped: result.skipped || 0,
+        skippedOrders: result.skippedOrders || [],
         backfilled: backfill.count,
       });
     }
@@ -50,6 +52,8 @@ export async function POST(request: NextRequest) {
       ok: true,
       mode,
       synced: result.count,
+      skipped: result.skipped || 0,
+      skippedOrders: result.skippedOrders || [],
       backfilled: backfill.count,
       status,
     });

@@ -40,9 +40,21 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     });
 
     if (!refreshedOrder) {
+      await cancelAutoCompleteJob(order.id, "order-removed-from-maiyatian");
+      await prisma.autoPickOrder.deleteMany({
+        where: {
+          id: order.id,
+          userId: session.id,
+        },
+      });
+
       return NextResponse.json({
-        error: "插件中未找到该订单的最新状态",
-      }, { status: 404 });
+        ok: true,
+        id: order.id,
+        orderNo: order.orderNo,
+        platform: order.platform,
+        removed: true,
+      });
     }
 
     if (isAutoPickOrderCompletedStatus(refreshedOrder.status) || isAutoPickOrderCancelledStatus(refreshedOrder.status)) {

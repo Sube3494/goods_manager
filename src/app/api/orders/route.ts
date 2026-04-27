@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
-import { isAutoPickOrderCancelledStatus, isAutoPickPickupOrder } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../../../prisma/generated-client";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +30,14 @@ function buildStatusWhere(status: string): Prisma.AutoPickOrderWhereInput | unde
           { status: { equals: "canceled", mode: "insensitive" } },
           { status: { equals: "closed", mode: "insensitive" } },
           { status: { equals: "refund", mode: "insensitive" } },
+        ],
+      };
+    case "已删除":
+      return {
+        OR: [
+          { status: { contains: "删除", mode: "insensitive" } },
+          { status: { equals: "delete", mode: "insensitive" } },
+          { status: { equals: "deleted", mode: "insensitive" } },
         ],
       };
     case "已完成":
@@ -580,7 +588,10 @@ export async function GET(request: NextRequest) {
         ? order.expectedIncome
         : readExpectedIncomeFromRawPayload(order.rawPayload);
       const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
+      const deleted = isAutoPickOrderDeletedStatus(order.status);
       const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress);
+      const otherPickup = isAutoPickOtherPickupOrder(order.rawPayload);
+      const businessStatus = resolveAutoPickBusinessStatus(order.status, order.rawPayload, order.userAddress);
       return {
         ...order,
         shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload),
@@ -589,7 +600,10 @@ export async function GET(request: NextRequest) {
         rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isPickup: pickup,
+        isOtherPickup: otherPickup,
+        isDeleted: deleted,
         isSubscribe: readIsSubscribeFromRawPayload(order.rawPayload),
+        status: businessStatus || order.status,
         expectedIncome: metrics.expectedIncome,
         platformCommission: metrics.platformCommission,
         completedAt: order.autoCompleteJob?.completedAt?.toISOString() || readCompletedAtFromRawPayload(order.rawPayload),
