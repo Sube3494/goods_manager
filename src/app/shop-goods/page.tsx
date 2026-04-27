@@ -55,6 +55,7 @@ export default function ShopGoodsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const editScrollTopRef = useRef<number | null>(null);
 
   const selectedShop = useMemo(
     () => shops.find((shop) => shop.id === selectedShopId) || null,
@@ -379,6 +380,10 @@ export default function ShopGoodsPage() {
   }, [fetchSelectedItems, fetchShopProducts, selectedIds, showToast]);
 
   const openEditModal = useCallback((item: ShopCatalogItem) => {
+    editScrollTopRef.current = window.scrollY;
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setEditingItemId(item.id);
     setEditingShopId(item.shopId || "");
     setEditingProduct({
@@ -397,6 +402,32 @@ export default function ShopGoodsPage() {
     });
     setIsEditOpen(true);
   }, []);
+
+  const restoreEditScrollPosition = useCallback(() => {
+    const scrollTop = editScrollTopRef.current;
+    if (scrollTop === null) return;
+
+    const restore = () => {
+      window.scrollTo({ top: scrollTop, behavior: "auto" });
+      document.documentElement.scrollTo({ top: scrollTop, behavior: "auto" });
+      document.body.scrollTo({ top: scrollTop, behavior: "auto" });
+    };
+
+    restore();
+    requestAnimationFrame(() => {
+      restore();
+      window.setTimeout(restore, 0);
+    });
+    editScrollTopRef.current = null;
+  }, []);
+
+  const closeEditModal = useCallback(() => {
+    setIsEditOpen(false);
+    setEditingProduct(null);
+    setEditingItemId("");
+    setEditingShopId("");
+    restoreEditScrollPosition();
+  }, [restoreEditScrollPosition]);
 
   const handleEditSelected = useCallback(() => {
     if (selectedIds.length !== 1) {
@@ -458,16 +489,13 @@ export default function ShopGoodsPage() {
         return;
       }
       setItems((prev) => prev.map((item) => (item.id === responseData.id ? { ...item, ...responseData, shopId: item.shopId, shopName: item.shopName } : item)));
-      setIsEditOpen(false);
-      setEditingProduct(null);
-      setEditingItemId("");
-      setEditingShopId("");
+      closeEditModal();
       showToast("店铺商品已更新", "success");
     } catch (error) {
       console.error("Failed to update shop product:", error);
       showToast("保存失败", "error");
     }
-  }, [categories, editingItemId, editingShopId, showToast]);
+  }, [categories, closeEditModal, editingItemId, editingShopId, showToast]);
 
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -669,7 +697,7 @@ export default function ShopGoodsPage() {
       <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} allowCreate={false} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
       <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
-      <ProductFormModal isOpen={isEditOpen} onClose={() => { setIsEditOpen(false); setEditingProduct(null); setEditingItemId(""); setEditingShopId(""); }} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
+      <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
 
       {typeof document !== "undefined" && createPortal(<AnimatePresence>{showScrollTop && <motion.button initial={{ opacity: 0, scale: 0.5, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.5, y: 20 }} onClick={scrollToTop} className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"><ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" /></motion.button>}</AnimatePresence>, document.body)}
