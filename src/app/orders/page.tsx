@@ -80,9 +80,6 @@ function serializeMaiyatianMappings(config: Pick<AutoPickIntegrationConfig, "mai
   return JSON.stringify(Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : []);
 }
 
-const MIN_REFRESH_GAP_MS = 10 * 1000;
-const TODAY_ACTIVE_REFRESH_MS = 30 * 1000;
-const TODAY_IDLE_REFRESH_MS = 90 * 1000;
 const TODAY_TAB_PAGE_SIZE = 9999;
 const ALL_ORDERS_BATCH_SIZE = 50;
 
@@ -1179,8 +1176,8 @@ export default function OrdersPage() {
   const todayDate = formatLocalDate(new Date());
   const modalRef = useRef<HTMLDivElement | null>(null);
   const isFetchingRef = useRef(false);
-  const lastRefreshAtRef = useRef(0);
   const hasLoadedIntegrationRef = useRef(false);
+  const realtimeRefreshTimerRef = useRef<number | null>(null);
 
   const [isMounted, setIsMounted] = useState(false);
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -1806,55 +1803,38 @@ export default function OrdersPage() {
     };
   }, [ordersForOverview]);
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || startDate || endDate);
-  const hasLiveOrders = todayPendingOrders.length > 0;
-  const autoRefreshIntervalMs = activeTab === "today"
-    ? (hasLiveOrders ? TODAY_ACTIVE_REFRESH_MS : TODAY_IDLE_REFRESH_MS)
-    : 0;
-
   useEffect(() => {
-    const triggerRefresh = () => {
+    if (!isMounted) {
+      return;
+    }
+
+    const source = new EventSource("/api/orders/events");
+
+    const queueRefresh = () => {
       if (document.visibilityState !== "visible") {
         return;
       }
-
-      const now = Date.now();
-      if (now - lastRefreshAtRef.current < MIN_REFRESH_GAP_MS) {
-        return;
+      if (realtimeRefreshTimerRef.current) {
+        window.clearTimeout(realtimeRefreshTimerRef.current);
       }
-
-      lastRefreshAtRef.current = now;
-      void fetchOrders({ silent: true });
+      realtimeRefreshTimerRef.current = window.setTimeout(() => {
+        realtimeRefreshTimerRef.current = null;
+        void fetchOrders({ silent: true });
+      }, 250);
     };
 
-    const refreshWhenVisible = () => {
-      triggerRefresh();
-    };
-
-    let timer: number | null = null;
-
-    const scheduleNext = () => {
-      if (!autoRefreshIntervalMs) {
-        return;
-      }
-
-      timer = window.setTimeout(() => {
-        triggerRefresh();
-        scheduleNext();
-      }, autoRefreshIntervalMs);
-    };
-
-    scheduleNext();
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    window.addEventListener("focus", refreshWhenVisible);
+    source.addEventListener("order-update", queueRefresh);
+    source.addEventListener("ready", () => undefined);
+    source.onerror = () => undefined;
 
     return () => {
-      if (timer) {
-        clearTimeout(timer);
+      if (realtimeRefreshTimerRef.current) {
+        window.clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
       }
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.removeEventListener("focus", refreshWhenVisible);
+      source.close();
     };
-  }, [autoRefreshIntervalMs, fetchOrders]);
+  }, [fetchOrders, isMounted]);
 
   useEffect(() => {
     let ticking = false;

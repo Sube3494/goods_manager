@@ -6,6 +6,7 @@ import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping } from "@/lib/types";
 import { ProductService } from "@/services/productService";
 import { InventoryService } from "@/services/inventoryService";
+import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopNameKey } from "@/lib/shopIdentity";
 
@@ -1613,6 +1614,15 @@ export async function deleteAutoPickOrderByIdentity(userId: string, lookup: { pl
     where: { id: existing.id },
   });
 
+  emitAutoPickOrderEvent({
+    type: "delete",
+    userId,
+    orderId: existing.id,
+    orderNo: lookup.orderNo,
+    platform: lookup.platform,
+    at: new Date().toISOString(),
+  });
+
   return { deleted: true, id: existing.id };
 }
 
@@ -1783,7 +1793,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     throw new Error("Order items are required");
   }
 
-  return await prisma.$transaction(async (tx) => {
+  const order = await prisma.$transaction(async (tx) => {
     await ensureShopProductsForAutoPickOrder(tx, userId, normalized, items);
 
     const existingCandidates = await tx.autoPickOrder.findMany({
@@ -1948,6 +1958,17 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       },
     });
   });
+
+  emitAutoPickOrderEvent({
+    type: "upsert",
+    userId,
+    orderId: order.id,
+    orderNo: order.orderNo,
+    platform: order.platform,
+    at: new Date().toISOString(),
+  });
+
+  return order;
 }
 
 export async function syncAutoPickOrdersFromPlugin(userId: string, options: { status?: AutoPickSyncStatus; date?: string }) {
@@ -2337,7 +2358,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
   }
 
   if (isAutoPickOrderTerminalStatus(order.status)) {
-    return await prisma.autoPickOrder.findUniqueOrThrow({
+    const existingOrder = await prisma.autoPickOrder.findUniqueOrThrow({
       where: { id: order.id },
       include: {
         items: {
@@ -2345,6 +2366,15 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
         },
       },
     });
+    emitAutoPickOrderEvent({
+      type: "progress",
+      userId,
+      orderId: existingOrder.id,
+      orderNo: existingOrder.orderNo,
+      platform: existingOrder.platform,
+      at: new Date().toISOString(),
+    });
+    return existingOrder;
   }
 
   const nextRawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
@@ -2364,7 +2394,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
         },
       };
 
-  return await prisma.autoPickOrder.update({
+  const updatedOrder = await prisma.autoPickOrder.update({
     where: { id: order.id },
     data: {
       status: buildProgressStatus(progress, order.status),
@@ -2377,6 +2407,17 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
       },
     },
   });
+
+  emitAutoPickOrderEvent({
+    type: "progress",
+    userId,
+    orderId: updatedOrder.id,
+    orderNo: updatedOrder.orderNo,
+    platform: updatedOrder.platform,
+    at: new Date().toISOString(),
+  });
+
+  return updatedOrder;
 }
 
 export async function refreshAutoPickOrderFromPlugin(
