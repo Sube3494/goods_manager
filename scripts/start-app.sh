@@ -14,6 +14,12 @@ if prisma db push --skip-generate --accept-data-loss; then
   echo "→ Backfilling brush product shop product links..."
   if node scripts/backfill_brush_product_shop_ids.js; then
     echo "✓ brush product backfill completed."
+    echo "→ Cleaning legacy brush product rows..."
+    if node scripts/cleanup_legacy_brush_products.js; then
+      echo "✓ legacy brush products cleanup completed."
+    else
+      echo "! legacy brush products cleanup failed, but service will continue to start."
+    fi
   else
     echo "! brush product backfill failed, but service will continue to start."
   fi
