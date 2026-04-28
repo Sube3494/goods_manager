@@ -40,6 +40,11 @@ export async function GET() {
           shopId: true,
           productId: true,
           shopProductId: true,
+          product: {
+            select: {
+              sku: true,
+            },
+          },
           shop: {
             select: {
               id: true,
@@ -52,6 +57,7 @@ export async function GET() {
               shopId: true,
               productId: true,
               sourceProductId: true,
+              sku: true,
               shop: {
                 select: {
                   id: true,
@@ -88,6 +94,7 @@ export async function GET() {
     ]);
     const resolveBrushProductKey = (item: (typeof brushProducts)[number]) => {
       const resolvedShopId = String(item.shopProduct?.shopId || item.shop?.id || item.shopId || "").trim();
+      const resolvedSku = String(item.shopProduct?.sku || item.product?.sku || "").trim().toLowerCase();
       const resolvedProductId = String(
         item.shopProduct?.sourceProductId ||
         item.shopProduct?.productId ||
@@ -97,7 +104,11 @@ export async function GET() {
         item.id
       ).trim();
 
-      return `${resolvedShopId || "unknown"}:${resolvedProductId || "unknown"}`;
+      if (resolvedShopId && resolvedSku) {
+        return `${resolvedShopId}:sku:${resolvedSku}`;
+      }
+
+      return `${resolvedShopId || "unknown"}:product:${resolvedProductId || "unknown"}`;
     };
 
     const brushProductCount = new Set(brushProducts.map(resolveBrushProductKey)).size;
