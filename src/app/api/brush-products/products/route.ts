@@ -39,19 +39,35 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchKeyword = search.trim();
+    const andWhere: Prisma.BrushProductWhereInput[] = [];
+    if (shopId) {
+      andWhere.push({
+        OR: [
+          { shopProduct: { shopId } },
+          { shopProductId: null, shopId },
+        ],
+      });
+    }
+    if (shopName) {
+      andWhere.push({
+        OR: [
+          { shopProduct: { shop: { name: shopName } } },
+          { shopProductId: null, shop: { name: shopName } },
+        ],
+      });
+    }
+    if (searchKeyword) {
+      andWhere.push({
+        OR: [
+          { brushKeyword: { contains: searchKeyword, mode: "insensitive" } },
+          { product: buildSearchWhere(search) },
+        ],
+      });
+    }
     const where: Prisma.BrushProductWhereInput = {
       userId: user.id,
       isActive: true,
-      ...(shopId ? { shopId } : {}),
-      ...(shopName ? { shop: { name: shopName } } : {}),
-      ...(searchKeyword
-        ? {
-            OR: [
-              { brushKeyword: { contains: searchKeyword, mode: "insensitive" } },
-              { product: buildSearchWhere(search) },
-            ],
-          }
-        : {}),
+      ...(andWhere.length > 0 ? { AND: andWhere } : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -70,6 +86,16 @@ export async function GET(request: NextRequest) {
               name: true,
             },
           },
+          shopProduct: {
+            include: {
+              shop: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip,
@@ -79,8 +105,9 @@ export async function GET(request: NextRequest) {
     ]);
 
     const storage = await getStorageStrategy();
-    const shopIds = Array.from(new Set(items.map((item) => item.shopId).filter((value): value is string => Boolean(value))));
-    const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean)));
+    const fallbackItems = items.filter((item) => !item.shopProduct);
+    const shopIds = Array.from(new Set(fallbackItems.map((item) => item.shopId).filter((value): value is string => Boolean(value))));
+    const productIds = Array.from(new Set(fallbackItems.map((item) => item.productId).filter(Boolean)));
     const shopProducts = shopIds.length > 0 && productIds.length > 0
       ? await prisma.shopProduct.findMany({
           where: {
@@ -111,9 +138,11 @@ export async function GET(request: NextRequest) {
     });
 
     const products = items.map((item) => {
-      const matchedShopProduct = item.shopId
-        ? shopProductMap.get(`${item.shopId}:${item.productId}`) || null
-        : null;
+      const matchedShopProduct = item.shopProduct || (
+        item.shopId
+          ? shopProductMap.get(`${item.shopId}:${item.productId}`) || null
+          : null
+      );
       const resolvedImage = matchedShopProduct?.productImage || item.product.image;
 
       return {

@@ -5,13 +5,14 @@ const prisma = new PrismaClient();
 async function main() {
   const rows = await prisma.brushProduct.findMany({
     where: {
-      shopId: null,
+      shopProductId: null,
       isActive: true,
     },
     select: {
       id: true,
       userId: true,
       productId: true,
+      shopId: true,
       brushKeyword: true,
       product: {
         select: {
@@ -23,11 +24,12 @@ async function main() {
   });
 
   if (rows.length === 0) {
-    console.log("没有待回填店铺的刷单商品。");
+    console.log("没有待回填店铺商品关联的刷单商品。");
     return;
   }
 
   let migrated = 0;
+  let updated = 0;
   let created = 0;
   let reused = 0;
   let missing = 0;
@@ -35,7 +37,10 @@ async function main() {
   for (const row of rows) {
     const matches = await prisma.shopProduct.findMany({
       where: {
-        shop: row.userId ? { userId: row.userId } : undefined,
+        shop: {
+          ...(row.userId ? { userId: row.userId } : {}),
+          ...(row.shopId ? { id: row.shopId } : {}),
+        },
         OR: [
           { productId: row.productId },
           { sourceProductId: row.productId },
@@ -73,6 +78,7 @@ async function main() {
           shopId: item.shopId,
           shopName: item.shop?.name || "",
           productId: resolvedProductId,
+          shopProductId: item.id,
         });
       }
     }
@@ -84,13 +90,28 @@ async function main() {
       continue;
     }
 
+    if (row.shopId && targetEntries.length === 1 && targetEntries[0].shopId === row.shopId) {
+      await prisma.brushProduct.update({
+        where: { id: row.id },
+        data: {
+          productId: targetEntries[0].productId,
+          shopProductId: targetEntries[0].shopProductId,
+        },
+      });
+      updated += 1;
+      console.log(`已补关联: ${row.id} | ${row.product?.sku || "-"} | ${row.product?.name || "-"} -> ${targetEntries[0].shopName || targetEntries[0].shopId}`);
+      continue;
+    }
+
     await prisma.$transaction(async (tx) => {
       for (const entry of targetEntries) {
         const existing = await tx.brushProduct.findFirst({
           where: {
             userId: row.userId,
-            shopId: entry.shopId,
-            productId: entry.productId,
+            OR: [
+              { shopProductId: entry.shopProductId },
+              { shopProductId: null, shopId: entry.shopId, productId: entry.productId },
+            ],
           },
           select: { id: true },
         });
@@ -105,6 +126,7 @@ async function main() {
             userId: row.userId,
             productId: entry.productId,
             shopId: entry.shopId,
+            shopProductId: entry.shopProductId,
             isActive: true,
             brushKeyword: row.brushKeyword || null,
           },
@@ -125,7 +147,7 @@ async function main() {
     );
   }
 
-  console.log(`回填完成：迁移 ${migrated} 条，无匹配 ${missing} 条，新建 ${created} 条，复用已存在 ${reused} 条。`);
+  console.log(`回填完成：直接补关联 ${updated} 条，迁移铺店 ${migrated} 条，无匹配 ${missing} 条，新建 ${created} 条，复用已存在 ${reused} 条。`);
 }
 
 main()

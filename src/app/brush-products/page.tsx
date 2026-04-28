@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Plus, Search, Tags, Package, RotateCcw, Store, Download, Check, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -66,8 +66,9 @@ export default function BrushProductsPage() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingKeywords, setEditingKeywords] = useState<Record<string, string>>({});
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [selectedBrushProductIds, setSelectedBrushProductIds] = useState<string[]>([]);
   const [savingProductId, setSavingProductId] = useState<string | null>(null);
+  const latestFetchIdRef = useRef(0);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -85,25 +86,41 @@ export default function BrushProductsPage() {
   }, []);
 
   const fetchBrushProducts = useCallback(async () => {
+    if (!selectedShopId) {
+      latestFetchIdRef.current += 1;
+      setItems([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchId = latestFetchIdRef.current + 1;
+    latestFetchIdRef.current = fetchId;
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
         page: "1",
         pageSize: "500",
         search: searchQuery,
+        shopId: selectedShopId,
       });
       if (supplierFilter) params.set("supplierId", supplierFilter);
-      if (selectedShopId) params.set("shopId", selectedShopId);
 
-      const res = await fetch(`/api/brush-products?${params.toString()}`);
+      const res = await fetch(`/api/brush-products?${params.toString()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("Fetch failed");
       const data = await res.json();
+      if (latestFetchIdRef.current !== fetchId) {
+        return;
+      }
       setItems(Array.isArray(data.items) ? data.items : []);
     } catch (error) {
       console.error("Failed to fetch brush products:", error);
       showToast("加载刷单商品库失败", "error");
     } finally {
-      setIsLoading(false);
+      if (latestFetchIdRef.current === fetchId) {
+        setIsLoading(false);
+      }
     }
   }, [searchQuery, selectedShopId, showToast, supplierFilter]);
 
@@ -166,11 +183,11 @@ export default function BrushProductsPage() {
       return matchesSearch && matchesSupplier;
     });
   }, [items, searchQuery, supplierFilter]);
-  const anySelected = selectedProductIds.length > 0;
+  const anySelected = selectedBrushProductIds.length > 0;
 
   useEffect(() => {
-    setSelectedProductIds((prev) => prev.filter((id) => items.some((item) => getBrushSelectionKey(item) === id)));
-  }, [items, getBrushSelectionKey]);
+    setSelectedBrushProductIds((prev) => prev.filter((id) => items.some((item) => item.id === id)));
+  }, [items]);
 
   const handleAddProducts = async (products: Product[]) => {
     if (!selectedShopId) {
@@ -185,12 +202,14 @@ export default function BrushProductsPage() {
             .map((product) => {
               const productId = String(product.sourceProductId || product.id || "").trim();
               const shopId = String(selectedShopId).trim();
-              if (!productId) {
+              const shopProductId = String(product.shopProductId || "").trim();
+              if (!productId && !shopProductId) {
                 return null;
               }
-              return [`${productId}:${shopId}`, { productId, shopId: shopId || null }];
+              const dedupeKey = shopProductId || `${productId}:${shopId}`;
+              return [dedupeKey, { productId, shopId: shopId || null, shopProductId: shopProductId || null }];
             })
-            .filter((entry): entry is [string, { productId: string; shopId: string | null }] => Boolean(entry))
+            .filter((entry): entry is [string, { productId: string; shopId: string | null; shopProductId: string | null }] => Boolean(entry))
         ).values()
       );
       const res = await fetch("/api/brush-products", {
@@ -214,17 +233,17 @@ export default function BrushProductsPage() {
     setEditingKeywords((prev) => ({ ...prev, [productId]: value }));
   };
 
-  const toggleSelectProduct = (productId: string) => {
-    setSelectedProductIds((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+  const toggleSelectProduct = (brushProductId: string) => {
+    setSelectedBrushProductIds((prev) =>
+      prev.includes(brushProductId) ? prev.filter((id) => id !== brushProductId) : [...prev, brushProductId]
     );
   };
 
   const toggleSelectAllFiltered = () => {
-    const filteredIds = filteredItems.map((item) => getBrushSelectionKey(item));
-    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedProductIds.includes(id));
+    const filteredIds = filteredItems.map((item) => item.id);
+    const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedBrushProductIds.includes(id));
 
-    setSelectedProductIds((prev) => {
+    setSelectedBrushProductIds((prev) => {
       if (allSelected) {
         return prev.filter((id) => !filteredIds.includes(id));
       }
@@ -283,25 +302,25 @@ export default function BrushProductsPage() {
   );
 
   const handleBatchRemove = () => {
-    if (selectedProductIds.length === 0) return;
+    if (selectedBrushProductIds.length === 0) return;
 
     setConfirmConfig({
       isOpen: true,
       title: "批量移出刷单商品库",
-      message: `确定将选中的 ${selectedProductIds.length} 个商品移出刷单商品库吗？不会删除原商品资料。`,
+      message: `确定将选中的 ${selectedBrushProductIds.length} 个商品移出刷单商品库吗？不会删除原商品资料。`,
       onConfirm: async () => {
         try {
           const res = await fetch("/api/brush-products", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productIds: selectedProductIds }),
+            body: JSON.stringify({ productIds: selectedBrushProductIds }),
           });
 
           if (!res.ok) throw new Error("Batch delete failed");
 
-          showToast(`已移出 ${selectedProductIds.length} 个刷单商品`, "success");
-          setItems((prev) => prev.filter((item) => !selectedProductIds.includes(item.id)));
-          setSelectedProductIds([]);
+          showToast(`已移出 ${selectedBrushProductIds.length} 个刷单商品`, "success");
+          setItems((prev) => prev.filter((item) => !selectedBrushProductIds.includes(item.id)));
+          setSelectedBrushProductIds([]);
         } catch (error) {
           console.error("Failed to batch remove brush products:", error);
           showToast("批量移除失败", "error");
@@ -557,8 +576,7 @@ export default function BrushProductsPage() {
             const product = item.product;
             const editingValue = editingKeywords[item.id] ?? item.brushKeyword ?? "";
             const isDirty = editingValue !== (item.brushKeyword ?? "");
-            const selectionKey = getBrushSelectionKey(item);
-            const isSelected = selectedProductIds.includes(selectionKey);
+            const isSelected = selectedBrushProductIds.includes(item.id);
             return (
               <div
                 key={item.id}
@@ -585,7 +603,7 @@ export default function BrushProductsPage() {
                     )}
                   <button
                     type="button"
-                    onClick={() => toggleSelectProduct(selectionKey)}
+                    onClick={() => toggleSelectProduct(item.id)}
                     className={`absolute top-3 left-3 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                       isSelected
                         ? "scale-110 border-foreground bg-foreground text-background dark:text-black"
@@ -704,10 +722,10 @@ export default function BrushProductsPage() {
       />
 
       <ActionBar
-        selectedCount={selectedProductIds.length}
+        selectedCount={selectedBrushProductIds.length}
         totalCount={filteredItems.length}
         onToggleSelectAll={toggleSelectAllFiltered}
-        onClear={() => setSelectedProductIds([])}
+        onClear={() => setSelectedBrushProductIds([])}
         onDelete={handleBatchRemove}
         label="个商品"
       />

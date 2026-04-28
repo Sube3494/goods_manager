@@ -237,6 +237,7 @@ model BrushProduct {
   userId    String?
   productId String
   shopId    String?
+  shopProductId String?
   isActive  Boolean  @default(true)
   brushKeyword String?
   createdAt DateTime @default(now())
@@ -244,11 +245,14 @@ model BrushProduct {
   user      User?    @relation(fields: [userId], references: [id])
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   shop      Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  shopProduct ShopProduct? @relation(fields: [shopProductId], references: [id], onDelete: SetNull)
 
   @@unique([userId, shopId, productId])
+  @@unique([userId, shopProductId])
   @@index([userId, createdAt(sort: Desc)])
   @@index([productId])
   @@index([shopId])
+  @@index([shopProductId])
 }
 
 model VerificationCode {
@@ -538,6 +542,7 @@ model ShopProduct {
 
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
   product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  brushProducts BrushProduct[]
   purchaseOrderItems PurchaseOrderItem[]
   outboundOrderItems OutboundOrderItem[]
 

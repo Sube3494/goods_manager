@@ -17,6 +17,7 @@ interface BrushProductKeywordBody {
 type BrushProductSelectionItem = {
   productId: string;
   shopId: string | null;
+  shopProductId: string | null;
 };
 
 function buildProductSearchWhere(search: string): Prisma.ProductWhereInput | undefined {
@@ -46,12 +47,14 @@ function normalizeBrushSelectionItems(input: unknown): BrushProductSelectionItem
       const record = item as Record<string, unknown>;
       const productId = typeof record.productId === "string" ? record.productId.trim() : "";
       const shopId = typeof record.shopId === "string" ? record.shopId.trim() : "";
-      if (!productId) {
+      const shopProductId = typeof record.shopProductId === "string" ? record.shopProductId.trim() : "";
+      if (!productId && !shopProductId) {
         return null;
       }
       return {
         productId,
         shopId: shopId || null,
+        shopProductId: shopProductId || null,
       };
     })
     .filter((item): item is BrushProductSelectionItem => Boolean(item));
@@ -64,6 +67,7 @@ async function buildBrushProductResponseItems(
     userId: string | null;
     productId: string;
     shopId: string | null;
+    shopProductId: string | null;
     isActive: boolean;
     brushKeyword: string | null;
     createdAt: Date;
@@ -112,11 +116,28 @@ async function buildBrushProductResponseItems(
       id: string;
       name: string;
     } | null;
+    shopProduct: {
+      id: string;
+      shopId: string;
+      sku: string | null;
+      productName: string | null;
+      productImage: string | null;
+      categoryId: string | null;
+      supplierId: string | null;
+      costPrice: number;
+      stock: number;
+      remark: string | null;
+      shop: {
+        id: string;
+        name: string;
+      };
+    } | null;
   }>
 ) {
   const storage = await getStorageStrategy();
-  const shopIds = Array.from(new Set(items.map((item) => item.shopId).filter((value): value is string => Boolean(value))));
-  const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean)));
+  const fallbackItems = items.filter((item) => !item.shopProduct);
+  const shopIds = Array.from(new Set(fallbackItems.map((item) => item.shopId).filter((value): value is string => Boolean(value))));
+  const productIds = Array.from(new Set(fallbackItems.map((item) => item.productId).filter(Boolean)));
 
   const shopProducts = shopIds.length > 0 && productIds.length > 0
     ? await prisma.shopProduct.findMany({
@@ -148,9 +169,11 @@ async function buildBrushProductResponseItems(
   });
 
   return items.map((item) => {
-    const matchedShopProduct = item.shopId
-      ? shopProductMap.get(`${item.shopId}:${item.productId}`) || null
-      : null;
+    const matchedShopProduct = item.shopProduct || (
+      item.shopId
+        ? shopProductMap.get(`${item.shopId}:${item.productId}`) || null
+        : null
+    );
     const resolvedImage = matchedShopProduct?.productImage || item.product.image;
 
     return {
@@ -191,19 +214,30 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchKeyword = search.trim();
+    const andWhere: Prisma.BrushProductWhereInput[] = [];
+    if (shopId) {
+      andWhere.push({
+        OR: [
+          { shopProduct: { shopId } },
+          { shopProductId: null, shopId },
+        ],
+      });
+    }
+    if (supplierId) {
+      andWhere.push({ product: { supplierId } });
+    }
+    if (searchKeyword) {
+      andWhere.push({
+        OR: [
+          { brushKeyword: { contains: searchKeyword, mode: "insensitive" } },
+          { product: buildProductSearchWhere(search) },
+        ],
+      });
+    }
     const where: Prisma.BrushProductWhereInput = {
       userId: user.id,
       isActive: true,
-      ...(shopId ? { shopId } : {}),
-      ...(supplierId ? { product: { supplierId } } : {}),
-      ...(searchKeyword
-        ? {
-            OR: [
-              { brushKeyword: { contains: searchKeyword, mode: "insensitive" } },
-              { product: buildProductSearchWhere(search) },
-            ],
-          }
-        : {}),
+      ...(andWhere.length > 0 ? { AND: andWhere } : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -220,6 +254,16 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               name: true,
+            },
+          },
+          shopProduct: {
+            include: {
+              shop: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
             },
           },
         },
@@ -259,13 +303,14 @@ export async function POST(request: NextRequest) {
     const selectionItems = normalizeBrushSelectionItems(body.items);
     const normalizedItems = selectionItems.length > 0
       ? selectionItems
-      : legacyProductIds.map((productId) => ({ productId, shopId: null }));
+      : legacyProductIds.map((productId) => ({ productId, shopId: null, shopProductId: null }));
 
     if (normalizedItems.length === 0) {
       return NextResponse.json({ error: "No product items provided" }, { status: 400 });
     }
 
-    const requestedProductIds = Array.from(new Set(normalizedItems.map((item) => item.productId)));
+    const requestedProductIds = Array.from(new Set(normalizedItems.map((item) => item.productId).filter(Boolean)));
+    const requestedShopProductIds = Array.from(new Set(normalizedItems.map((item) => item.shopProductId).filter((value): value is string => Boolean(value))));
     const ownedProducts = await prisma.product.findMany({
       where: {
         id: { in: requestedProductIds },
@@ -281,8 +326,25 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
     const ownedProductIds = new Set(ownedProducts.map((item) => item.id));
+    const ownedShopProducts = requestedShopProductIds.length > 0
+      ? await prisma.shopProduct.findMany({
+          where: user.role === "SUPER_ADMIN"
+            ? { id: { in: requestedShopProductIds } }
+            : {
+                id: { in: requestedShopProductIds },
+                shop: { userId: user.id },
+              },
+          select: {
+            id: true,
+            shopId: true,
+            productId: true,
+            sourceProductId: true,
+          },
+        })
+      : [];
+    const ownedShopProductMap = new Map(ownedShopProducts.map((item) => [item.id, item]));
 
-    if (ownedProductIds.size === 0) {
+    if (ownedProductIds.size === 0 && ownedShopProductMap.size === 0) {
       return NextResponse.json({ error: "No valid products found" }, { status: 400 });
     }
 
@@ -301,7 +363,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const validItems = normalizedItems.filter((item) => ownedProductIds.has(item.productId));
+    const validItems = normalizedItems
+      .map((item) => {
+        const ownedShopProduct = item.shopProductId ? ownedShopProductMap.get(item.shopProductId) : null;
+        const resolvedProductId = ownedShopProduct?.productId || ownedShopProduct?.sourceProductId || item.productId;
+        const resolvedShopId = ownedShopProduct?.shopId || item.shopId || null;
+        if (!resolvedProductId || !ownedProductIds.has(resolvedProductId)) {
+          return null;
+        }
+        return {
+          productId: resolvedProductId,
+          shopId: resolvedShopId,
+          shopProductId: ownedShopProduct?.id || null,
+        };
+      })
+      .filter((item): item is { productId: string; shopId: string | null; shopProductId: string | null } => Boolean(item));
     if (validItems.length === 0) {
       return NextResponse.json({ error: "No valid product items found" }, { status: 400 });
     }
@@ -311,6 +387,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         productId: item.productId,
         shopId: item.shopId,
+        shopProductId: item.shopProductId,
         isActive: true,
         brushKeyword: null,
       })),
@@ -366,6 +443,16 @@ export async function PATCH(request: NextRequest) {
           select: {
             id: true,
             name: true,
+          },
+        },
+        shopProduct: {
+          include: {
+            shop: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },

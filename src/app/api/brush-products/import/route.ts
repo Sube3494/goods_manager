@@ -76,19 +76,20 @@ export async function POST(request: Request) {
               shopId: shop.id,
               sku,
             },
-            select: { productId: true },
+            select: { id: true, productId: true, sourceProductId: true },
           })
         : await prisma.shopProduct.findFirst({
             where: {
               shopId: shop.id,
               productName: name,
             },
-            select: { productId: true },
+            select: { id: true, productId: true, sourceProductId: true },
           });
 
+      const matchedShopProductId = typeof shopProduct?.id === "string" ? shopProduct.id.trim() : "";
       const matchedProductId = typeof shopProduct?.productId === "string" ? shopProduct.productId.trim() : "";
 
-      if (!matchedProductId) {
+      if (!matchedShopProductId || !matchedProductId) {
         results.failed += 1;
         results.errors.push(`第 ${rowNumber} 行：在店铺「${shop.name}」里找不到匹配商品${sku ? `（${sku}）` : `（${name}）`}`);
         continue;
@@ -97,8 +98,10 @@ export async function POST(request: Request) {
       const existing = await prisma.brushProduct.findFirst({
         where: {
           userId: user.id,
-          shopId: shop.id,
-          productId: matchedProductId,
+          OR: [
+            { shopProductId: matchedShopProductId },
+            { shopProductId: null, shopId: shop.id, productId: matchedProductId },
+          ],
         },
         select: { id: true },
       });
@@ -108,6 +111,8 @@ export async function POST(request: Request) {
           where: { id: existing.id },
           data: {
             isActive: true,
+            shopId: shop.id,
+            shopProductId: matchedShopProductId,
             brushKeyword: brushKeyword || null,
           },
         });
@@ -120,6 +125,7 @@ export async function POST(request: Request) {
           userId: user.id,
           productId: matchedProductId,
           shopId: shop.id,
+          shopProductId: matchedShopProductId,
           isActive: true,
           brushKeyword: brushKeyword || null,
         },
