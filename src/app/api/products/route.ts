@@ -120,15 +120,6 @@ export async function POST(request: Request) {
     // 格式化价格和库存
     const stockNum = Number(stock) || 0;
 
-    if (normalizedSku) {
-      const existingProduct = await findConflictingProductBySku(normalizedSku);
-      if (existingProduct) {
-        return NextResponse.json({
-          error: `商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`
-        }, { status: 409 });
-      }
-    }
-
     let resolvedShopId: string | null = null;
     let resolvedShopName = "";
     if (shopId) {
@@ -205,6 +196,15 @@ export async function POST(request: Request) {
         shopName: resolvedShopName,
         assignedShopIds: [shopProduct.shopId],
       });
+    }
+
+    if (normalizedSku) {
+      const existingProduct = await findConflictingProductBySku(normalizedSku);
+      if (existingProduct) {
+        return NextResponse.json({
+          error: `商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`
+        }, { status: 409 });
+      }
     }
 
     if (resolvedShopId && normalizedSku) {
