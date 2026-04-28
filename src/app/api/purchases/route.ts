@@ -6,6 +6,7 @@ import { Prisma } from "../../../../prisma/generated-client";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
+import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 
 // 获取所有采购订单
 export async function GET(request: Request) {
@@ -28,24 +29,40 @@ export async function GET(request: Request) {
   }
 
   try {
-    const where: Prisma.PurchaseOrderWhereInput = {};
+    const autoInboundExclusion: Prisma.PurchaseOrderWhereInput = {
+      NOT: {
+        OR: [
+          { type: AUTO_INBOUND_TYPE },
+          { note: { contains: AUTO_INBOUND_NOTE_KEYWORD } },
+        ],
+      },
+    };
+    const where: Prisma.PurchaseOrderWhereInput = {
+      AND: [autoInboundExclusion],
+    };
     if (type === "Inbound") {
-        where.OR = [
+        where.AND?.push({
+          OR: [
             { type: "Inbound" },
-            { status: "Received" }
-        ];
+            { type: "Return" },
+            { type: "InternalReturn" },
+            { status: "Received" },
+          ],
+        });
     } else if (type) {
-        where.type = type;
+        where.AND?.push({ type });
     }
     if (productId) {
-      where.items = {
-        some: {
-          OR: [
-            { productId },
-            { shopProductId: productId },
-          ],
-        }
-      };
+      where.AND?.push({
+        items: {
+          some: {
+            OR: [
+              { productId },
+              { shopProductId: productId },
+            ],
+          }
+        },
+      });
     }
 
     const [purchases, total] = await Promise.all([

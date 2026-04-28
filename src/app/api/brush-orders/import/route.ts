@@ -5,6 +5,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { OrderParser } from "@/lib/orderParser";
 import { InventoryService } from "@/services/inventoryService";
+import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { ProductService } from "@/services/productService";
 import { AddressItem, BrushShopItem } from "@/lib/types";
 import { Prisma } from "../../../../../prisma/generated-client";
@@ -721,7 +722,7 @@ export async function POST(req: NextRequest) {
                 await tx.purchaseOrder.create({
                   data: {
                     id: compensateOrderId,
-                    type: "Inbound",
+                    type: AUTO_INBOUND_TYPE,
                     status: "Received", // 直接完成
                     totalAmount: 0,
                     date: new Date(),

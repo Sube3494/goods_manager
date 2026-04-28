@@ -7,6 +7,7 @@ import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShop
 import { ProductService } from "@/services/productService";
 import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
+import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey } from "@/lib/shopIdentity";
 
@@ -3423,7 +3424,7 @@ export async function createOutboundFromAutoPickOrder(
           await tx.purchaseOrder.create({
             data: {
               id: compensateOrderId,
-              type: "Inbound",
+              type: AUTO_INBOUND_TYPE,
               status: "Received",
               totalAmount: 0,
               date: new Date(),
@@ -3460,7 +3461,7 @@ export async function createOutboundFromAutoPickOrder(
           await tx.purchaseOrder.create({
             data: {
               id: compensateOrderId,
-              type: "Inbound",
+              type: AUTO_INBOUND_TYPE,
               status: "Received",
               totalAmount: 0,
               date: new Date(),
