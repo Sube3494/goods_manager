@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
                 image: true,
                 categoryId: true,
                 supplierId: true,
+                supplier: { select: { id: true, name: true } },
                 category: { select: { name: true } },
               },
             },
@@ -132,6 +133,9 @@ export async function GET(request: NextRequest) {
             categoryId: item.categoryId || item.product?.categoryId || null,
             categoryName: item.categoryName || item.product?.category?.name || "未分类",
             supplierId: item.supplierId || item.product?.supplierId || null,
+            supplier: item.product?.supplier
+              ? { id: item.product.supplier.id, name: item.product.supplier.name }
+              : null,
             costPrice: item.costPrice ?? 0,
             stock: item.stock ?? 0,
             shopId: item.shopId,
@@ -169,6 +173,7 @@ export async function GET(request: NextRequest) {
               image: true,
               categoryId: true,
               supplierId: true,
+              supplier: { select: { id: true, name: true } },
               category: { select: { name: true } },
             },
           },
@@ -191,6 +196,9 @@ export async function GET(request: NextRequest) {
           categoryId: item.categoryId || item.product?.categoryId || null,
           categoryName: item.categoryName || item.product?.category?.name || "未分类",
           supplierId: item.supplierId || item.product?.supplierId || null,
+          supplier: item.product?.supplier
+            ? { id: item.product.supplier.id, name: item.product.supplier.name }
+            : null,
           costPrice: item.costPrice ?? 0,
           stock: item.stock ?? 0,
           shopId: item.shopId,
@@ -238,6 +246,7 @@ export async function GET(request: NextRequest) {
               image: true,
               categoryId: true,
               supplierId: true,
+              supplier: { select: { id: true, name: true } },
               category: { select: { name: true } },
             },
           },
@@ -263,6 +272,9 @@ export async function GET(request: NextRequest) {
         categoryId: item.categoryId || item.product?.categoryId || null,
         categoryName: item.categoryName || item.product?.category?.name || "未分类",
         supplierId: item.supplierId || item.product?.supplierId || null,
+        supplier: item.product?.supplier
+          ? { id: item.product.supplier.id, name: item.product.supplier.name }
+          : null,
         costPrice: item.costPrice ?? 0,
         stock: item.stock ?? 0,
         shopId: item.shopId,
@@ -314,6 +326,7 @@ export async function GET(request: NextRequest) {
               image: true,
               categoryId: true,
               supplierId: true,
+              supplier: { select: { id: true, name: true } },
               category: { select: { name: true } },
             },
           },
@@ -340,6 +353,9 @@ export async function GET(request: NextRequest) {
       categoryId: item.categoryId || item.product?.categoryId || null,
       categoryName: item.categoryName || item.product?.category?.name || "未分类",
       supplierId: item.supplierId || item.product?.supplierId || null,
+      supplier: item.product?.supplier
+        ? { id: item.product.supplier.id, name: item.product.supplier.name }
+        : null,
       costPrice: item.costPrice ?? 0,
       stock: item.stock ?? 0,
       shopId: item.shopId,

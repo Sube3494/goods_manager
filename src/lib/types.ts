@@ -14,6 +14,11 @@ export interface Supplier {
   updatedAt?: string;
 }
 
+export interface SupplierSummary {
+  id: string;
+  name: string;
+}
+
 export interface AddressItem {
   id: string;
   label: string;
@@ -63,7 +68,7 @@ export interface Product {
   specs?: Record<string, string>;
   remark?: string;
   supplierId?: string;
-  supplier?: Supplier;
+  supplier?: SupplierSummary;
   workspaceId?: string;
   gallery?: GalleryItem[];
   assignedShopIds?: string[];
@@ -99,6 +104,7 @@ export interface ShopCatalogItem {
   categoryId?: string | null;
   categoryName?: string | null;
   supplierId?: string | null;
+  supplier?: SupplierSummary | null;
   costPrice?: number | null;
   stock?: number | null;
   shopId?: string | null;

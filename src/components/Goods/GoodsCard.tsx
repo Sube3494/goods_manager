@@ -262,6 +262,7 @@ export const GoodsCard = memo(function GoodsCard({
     prev.product.image === next.product.image &&
     prev.product.sku === next.product.sku &&
     prev.product.supplierId === next.product.supplierId &&
+    prev.product.supplier?.name === next.product.supplier?.name &&
     prev.product.categoryId === next.product.categoryId &&
     prev.product.isDiscontinued === next.product.isDiscontinued &&
     prev.hideDiscontinuedState === next.hideDiscontinuedState
