@@ -6,8 +6,11 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 const HIDDEN_CATEGORY_NAMES = ["历史残留"];
 const HIDDEN_CATEGORY_DESCRIPTION = "系统历史残留商品归档";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getFreshSession() as SessionUser | null;
+  const { searchParams } = new URL(request.url);
+  const scope = searchParams.get("scope") || "all";
+  const mainProductsOnly = scope === "main-products";
 
   try {
     const categories = await prisma.category.findMany({
@@ -28,6 +31,7 @@ export async function GET() {
       prisma.product.findMany({
         where: session ? {
           userId: session.id,
+          ...(mainProductsOnly ? { isShopOnly: false } : {}),
         } : {
           isPublic: true,
           isShopOnly: false,
@@ -68,7 +72,8 @@ export async function GET() {
       name: c.name,
       description: c.description || "",
       count: countMap.get(c.id) || 0,
-    }));
+    }))
+      .filter((category) => !mainProductsOnly || category.count > 0);
 
     return NextResponse.json(formatted);
   } catch (error) {

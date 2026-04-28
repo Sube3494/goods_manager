@@ -170,7 +170,7 @@ export default function GoodsPage() {
   // Fetch metadata once on mount
   useEffect(() => {
     // Categories
-    fetch("/api/categories")
+    fetch("/api/categories?scope=main-products")
       .then(r => r.ok ? r.json() : [])
       .then(data => Array.isArray(data) ? setCategories(data) : setCategories([]))
       .catch(() => setCategories([]));

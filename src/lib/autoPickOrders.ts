@@ -95,6 +95,10 @@ type AutoPickConfigPayload = {
 };
 
 type AutoPickSystemMeta = {
+  resolvedShop?: {
+    id?: string;
+    name?: string;
+  };
   mainSystemSelfDelivery?: {
     triggered: boolean;
     triggeredAt?: string;
@@ -344,6 +348,25 @@ function readAutoPickSystemMeta(rawPayload: unknown): AutoPickSystemMeta | null 
   }
 
   return candidate as AutoPickSystemMeta;
+}
+
+function readResolvedAutoPickShop(rawPayload: unknown) {
+  const systemMeta = readAutoPickSystemMeta(rawPayload);
+  const resolvedShop = systemMeta?.resolvedShop;
+  if (!resolvedShop || typeof resolvedShop !== "object") {
+    return null;
+  }
+
+  const id = String(resolvedShop.id || "").trim();
+  const name = String(resolvedShop.name || "").trim();
+  if (!id && !name) {
+    return null;
+  }
+
+  return {
+    id: id || null,
+    name: name || null,
+  };
 }
 
 function mergeAutoPickSystemMeta(
@@ -1906,6 +1929,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
   const order = await prisma.$transaction(async (tx) => {
     await ensureShopProductsForAutoPickOrder(tx, userId, normalized, items);
+    const resolvedInternalShop = await resolveAutoPickInternalShop(tx, userId, normalized);
 
     const existingCandidates = await tx.autoPickOrder.findMany({
       where: {
@@ -1994,6 +2018,20 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       normalized as unknown as Record<string, unknown>,
       existing?.rawPayload
     );
+    const existingSystemMeta = readAutoPickSystemMeta(existing?.rawPayload) || {};
+    const nextSystemMeta: AutoPickSystemMeta = {
+      ...existingSystemMeta,
+      resolvedShop: resolvedInternalShop
+        ? {
+            id: resolvedInternalShop.id,
+            name: resolvedInternalShop.name,
+          }
+        : existingSystemMeta.resolvedShop,
+    };
+    const nextRawPayloadWithResolvedShop = {
+      ...nextRawPayload,
+      systemMeta: nextSystemMeta,
+    };
 
     const createData = {
       userId,
@@ -2018,7 +2056,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       expectedIncome: Number.isFinite(Number(normalized.expectedIncome)) ? Math.round(Number(normalized.expectedIncome)) : null,
       platformCommission: Math.round(Number(normalized.platformCommission || 0)),
       delivery: nextDeliveryValue,
-      rawPayload: asPrismaJsonValue(nextRawPayload),
+      rawPayload: asPrismaJsonValue(nextRawPayloadWithResolvedShop),
       lastSyncedAt: new Date(),
     } satisfies Prisma.AutoPickOrderUncheckedCreateInput;
 
@@ -2044,7 +2082,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       expectedIncome: Number.isFinite(Number(normalized.expectedIncome)) ? Math.round(Number(normalized.expectedIncome)) : null,
       platformCommission: Math.round(Number(normalized.platformCommission || 0)),
       delivery: nextDeliveryValue,
-      rawPayload: asPrismaJsonValue(nextRawPayload),
+      rawPayload: asPrismaJsonValue(nextRawPayloadWithResolvedShop),
       lastSyncedAt: new Date(),
     } satisfies Prisma.AutoPickOrderUncheckedUpdateInput;
 
@@ -2924,10 +2962,11 @@ async function resolveBrushOrderItemsForAutoPickOrder(
   const rawPayloadRecord = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
     ? order.rawPayload as Record<string, unknown>
     : {};
+  const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
   const rawShopName = readPreferredMaiyatianShopName(rawPayloadRecord) || null;
   const rawShopAddress = readPreferredMaiyatianShopAddress(rawPayloadRecord) || null;
   const preferredMappedShopName = String(order.preferredMappedShopName || "").trim() || null;
-  const mappedShopName = preferredMappedShopName || findMappedShopNameFromAutoPickConfig(
+  const mappedShopName = preferredMappedShopName || lockedResolvedShop?.name || findMappedShopNameFromAutoPickConfig(
     normalizeExternalId(order.shopId) || null,
     rawShopName,
     rawShopAddress,
@@ -2951,7 +2990,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
         },
         },
       });
-  const userShops = mappedShopName
+  const userShops = mappedShopName || lockedResolvedShop?.id
     ? await prisma.shop.findMany({
         where: { userId },
         select: {
@@ -2962,7 +3001,9 @@ async function resolveBrushOrderItemsForAutoPickOrder(
         },
       })
     : [];
-  const internalShop = mappedShopName
+  const internalShop = lockedResolvedShop?.id
+    ? userShops.find((shop) => shop.id === lockedResolvedShop.id) || null
+    : mappedShopName
     ? findMatchingShopRecord(userShops, { name: mappedShopName })
     : null;
   const mappedShopNameText = String(internalShop?.name || mappedShopName || "").trim();
@@ -3112,15 +3153,18 @@ async function resolveOutboundItemsForAutoPickOrder(
   const rawPayloadRecord = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
     ? order.rawPayload as Record<string, unknown>
     : {};
+  const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
   const rawShopName = readPreferredMaiyatianShopName(rawPayloadRecord) || null;
   const rawShopAddress = readPreferredMaiyatianShopAddress(rawPayloadRecord) || null;
   const preferredMappedShopName = String(order.preferredMappedShopName || "").trim() || null;
-  const resolvedInternalShop = await resolveAutoPickInternalShop(tx, userId, {
-    shopId: order.shopId || undefined,
-    rawShopName: rawShopName || undefined,
-    rawShopAddress: rawShopAddress || undefined,
-  });
-  const mappedShopName = preferredMappedShopName || resolvedInternalShop?.name || findMappedShopNameFromAutoPickConfig(
+  const resolvedInternalShop = lockedResolvedShop?.id
+    ? { id: lockedResolvedShop.id, name: String(lockedResolvedShop.name || "").trim() || "" }
+    : await resolveAutoPickInternalShop(tx, userId, {
+        shopId: order.shopId || undefined,
+        rawShopName: rawShopName || undefined,
+        rawShopAddress: rawShopAddress || undefined,
+      });
+  const mappedShopName = preferredMappedShopName || resolvedInternalShop?.name || lockedResolvedShop?.name || findMappedShopNameFromAutoPickConfig(
     normalizeExternalId(order.shopId) || null,
     rawShopName,
     rawShopAddress,
@@ -3197,6 +3241,20 @@ async function resolveOutboundItemsForAutoPickOrder(
       const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
         isCandidateInMappedShop(candidate.shopName)
       );
+      const uniqueCandidateShopIds = Array.from(
+        new Set(
+          skuCandidates
+            .map((candidate) => String(candidate.shopId || "").trim())
+            .filter(Boolean)
+        )
+      );
+
+      if (!internalShop?.id && uniqueCandidateShopIds.length > 1) {
+        throw new Error(
+          `店铺商品匹配冲突：SKU ${normalizedSku} 命中多个店铺，且当前订单未能唯一识别店铺`
+        );
+      }
+
       const sameShopSkuCandidate = skuCandidates.find((candidate) =>
         Boolean(candidate.productId || candidate.sourceProductId)
       );
