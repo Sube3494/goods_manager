@@ -949,32 +949,46 @@ function IntegrationModal({
   maiyatianShops,
   localShops,
   isFetchingMaiyatianShops,
-  isTestingIntegration,
+  isTestingPlugin,
+  isTestingCookie,
   modalRef,
   onClose,
   onChange,
   onFetchMaiyatianShops,
-  onTest,
+  onTestPlugin,
+  onTestCookie,
 }: {
   integrationConfig: AutoPickIntegrationConfig;
   maiyatianShops: AutoPickMaiyatianShop[];
   localShops: LocalShopOption[];
   isFetchingMaiyatianShops: boolean;
-  isTestingIntegration: boolean;
+  isTestingPlugin: boolean;
+  isTestingCookie: boolean;
   modalRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onChange: (value: AutoPickIntegrationConfig) => void;
   onFetchMaiyatianShops: () => void;
-  onTest: () => void;
+  onTestPlugin: () => void;
+  onTestCookie: () => void;
 }) {
   const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
+  const hasInboundApiKey = Boolean(integrationConfig.inboundApiKey.trim());
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
+  const [isEditingInboundApiKey, setIsEditingInboundApiKey] = useState(!hasInboundApiKey);
+  const [copiedCallback, setCopiedCallback] = useState(false);
   const pillButtonClass = "inline-flex items-center gap-1 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
     value: item.name,
     label: `${item.name}${item.isDefault ? "（默认）" : ""}`,
     hint: item.address,
   }));
+  const callbackBaseUrl = useMemo(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    return window.location.origin;
+  }, []);
+  const callbackOrderUrl = callbackBaseUrl ? `${callbackBaseUrl}/api/v1/api-key/listened-orders` : "/api/v1/api-key/listened-orders";
 
   useEffect(() => {
     if (!integrationConfig.maiyatianCookie.trim()) {
@@ -983,6 +997,23 @@ function IntegrationModal({
     }
     setIsEditingCookie(false);
   }, [integrationConfig.maiyatianCookie]);
+
+  useEffect(() => {
+    if (!integrationConfig.inboundApiKey.trim()) {
+      setIsEditingInboundApiKey(true);
+      return;
+    }
+    setIsEditingInboundApiKey(false);
+  }, [integrationConfig.inboundApiKey]);
+
+  const copyCallbackUrl = useCallback(async () => {
+    if (!callbackOrderUrl || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      return;
+    }
+    await navigator.clipboard.writeText(callbackOrderUrl);
+    setCopiedCallback(true);
+    window.setTimeout(() => setCopiedCallback(false), 1500);
+  }, [callbackOrderUrl]);
 
   return (
     <div className="fixed inset-0 z-100000 flex items-center justify-center p-4">
@@ -997,7 +1028,7 @@ function IntegrationModal({
               Auto Pick
             </div>
             <h2 className="mt-3 text-2xl font-black tracking-tight text-foreground">订单对接配置</h2>
-            <p className="mt-2 text-sm text-muted-foreground">主系统直接使用麦芽田 Cookie 拉单、查详情和执行履约动作。</p>
+            <p className="mt-2 text-sm text-muted-foreground">脚本负责监听订单和执行动作，主系统这里只保留回调配置和门店映射。</p>
           </div>
           <button
             type="button"
@@ -1009,14 +1040,41 @@ function IntegrationModal({
         </div>
 
         <div className="mt-6 flex-1 overflow-y-auto px-5 pb-5 sm:px-7 sm:pb-7">
-          <div className="grid gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
-            <div className="space-y-4">
-              <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03]">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
-                    <p className="mt-1 text-xs text-muted-foreground">填写后主系统会直接读取订单、门店和履约状态。</p>
-                  </div>
+          <div className="grid gap-5 lg:grid-cols-[420px_minmax(0,1fr)]">
+            <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03] lg:col-start-1 lg:row-start-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统回调地址</div>
+                <button
+                  type="button"
+                  onClick={() => void copyCallbackUrl()}
+                  className={pillButtonClass}
+                >
+                  <CheckCheck size={12} />
+                  {copiedCallback ? "已复制" : "复制"}
+                </button>
+              </div>
+              <div className="mt-3 rounded-xl border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-[#111827]">
+                <div className="break-all font-mono text-xs leading-5 text-foreground">{callbackOrderUrl}</div>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本里的上报地址填这里，`MYSHOP_API_KEY` 填下面的回调密钥。</p>
+            </div>
+
+            <div className="rounded-[20px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03] sm:p-4 lg:col-start-2 lg:row-start-1">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
+                  <p className="mt-1 text-xs text-muted-foreground">这里只用于读取麦芽田门店，方便你做门店映射。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasCookie ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCookie((current) => !current)}
+                      className={pillButtonClass}
+                    >
+                      {isEditingCookie ? "取消" : "编辑"}
+                    </button>
+                  ) : null}
                   {hasCookie ? (
                     <button
                       type="button"
@@ -1027,13 +1085,69 @@ function IntegrationModal({
                     </button>
                   ) : null}
                 </div>
+              </div>
 
-                {isEditingCookie ? (
-                  <textarea
-                    value={integrationConfig.maiyatianCookie}
-                    onChange={(event) => onChange({ ...integrationConfig, maiyatianCookie: event.target.value })}
-                    placeholder="粘贴麦芽田 cookie，用于读取发货门店"
-                    className="mt-3 min-h-[92px] w-full rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+              {isEditingCookie ? (
+                <textarea
+                  value={integrationConfig.maiyatianCookie}
+                  onChange={(event) => onChange({ ...integrationConfig, maiyatianCookie: event.target.value })}
+                  placeholder="粘贴麦芽田 cookie，用于读取发货门店"
+                  className="mt-3 min-h-[92px] w-full rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                />
+              ) : (
+                <div
+                  onCopy={(event) => event.preventDefault()}
+                  onCut={(event) => event.preventDefault()}
+                  className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827]"
+                >
+                  <div className="text-sm font-medium text-foreground">已保存 Cookie</div>
+                  <div className="mt-1 text-xs text-muted-foreground">默认隐藏，当前界面不展示明文。</div>
+                  <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
+                    {"•".repeat(28)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03] lg:col-start-1 lg:row-start-2">
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">脚本地址</div>
+                <input
+                  value={integrationConfig.pluginBaseUrl}
+                  onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
+                  placeholder="例如 http://127.0.0.1:22800"
+                  className="mt-3 h-11 w-full rounded-xl border border-black/8 bg-white/80 px-3 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                />
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">主系统通过这个地址调用 `auto-pick` 脚本。</p>
+              </div>
+              <div className="mt-4 min-w-0 border-t border-black/8 pt-4 dark:border-white/10">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调密钥</div>
+                  {hasInboundApiKey ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingInboundApiKey((current) => !current)}
+                        className={pillButtonClass}
+                      >
+                        {isEditingInboundApiKey ? "取消" : "编辑"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...integrationConfig, inboundApiKey: "" })}
+                        className={pillButtonClass}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {isEditingInboundApiKey ? (
+                  <input
+                    value={integrationConfig.inboundApiKey}
+                    onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
+                    placeholder="脚本回调主系统时使用"
+                    className="mt-3 h-11 w-full rounded-xl border border-black/8 bg-white/80 px-3 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
                   />
                 ) : (
                   <div
@@ -1041,128 +1155,130 @@ function IntegrationModal({
                     onCut={(event) => event.preventDefault()}
                     className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827]"
                   >
-                    <div className="text-sm font-medium text-foreground">已保存 Cookie</div>
+                    <div className="text-sm font-medium text-foreground">已保存密钥</div>
                     <div className="mt-1 text-xs text-muted-foreground">默认隐藏，当前界面不展示明文。</div>
                     <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
                       {"•".repeat(28)}
                     </div>
                   </div>
                 )}
-              </div>
-
-              <div className="rounded-[18px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03]">
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">当前模式</div>
-                <p className="mt-2 text-sm font-medium text-foreground">已切换为系统直连麦芽田</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  不再依赖来单回调。同步时由主系统直接使用 Cookie 拉取麦芽田订单和详情。
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                <ActionButton
-                  label={isTestingIntegration ? "测试中..." : "测试连接"}
-                  icon={isTestingIntegration ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  onClick={() => onTest()}
-                  disabled={isTestingIntegration}
-                />
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本上报订单时使用这个密钥。</p>
               </div>
             </div>
 
-            <div className="rounded-[20px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03] sm:p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田门店绑定</div>
-                <p className="mt-1 text-xs text-muted-foreground">读取麦芽田发货门店后，在这里手动映射到系统门店。</p>
+            <div className="rounded-[20px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03] sm:p-4 lg:col-start-2 lg:row-start-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田门店绑定</div>
+                  <p className="mt-1 text-xs text-muted-foreground">读取麦芽田发货门店后，在这里手动映射到系统门店。</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onFetchMaiyatianShops}
+                  disabled={isFetchingMaiyatianShops}
+                  className={cn(
+                    pillButtonClass,
+                    "bg-white/88 dark:bg-white/[0.05]",
+                    "disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-black/6 disabled:bg-black/[0.04] disabled:text-muted-foreground disabled:shadow-none",
+                    "dark:disabled:border-white/10 dark:disabled:bg-white/[0.04] dark:disabled:text-white/45"
+                  )}
+                >
+                  {isFetchingMaiyatianShops ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  读取门店
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={onFetchMaiyatianShops}
-                disabled={isFetchingMaiyatianShops}
-                className={cn(
-                  pillButtonClass,
-                  "bg-white/88 dark:bg-white/[0.05]",
-                  "disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-black/6 disabled:bg-black/[0.04] disabled:text-muted-foreground disabled:shadow-none",
-                  "dark:disabled:border-white/10 dark:disabled:bg-white/[0.04] dark:disabled:text-white/45"
-                )}
-              >
-                {isFetchingMaiyatianShops ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                读取门店
-              </button>
-            </div>
 
-            {localShops.length === 0 ? (
-              <div className="mt-3 rounded-xl border border-dashed border-black/8 bg-white/65 px-3 py-2.5 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.03]">
-                还没有读取到系统发货地址，请先去个人资料里维护地址。
-              </div>
-            ) : null}
+              {localShops.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-dashed border-black/8 bg-white/65 px-3 py-2.5 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.03]">
+                  还没有读取到系统发货地址，请先去个人资料里维护地址。
+                </div>
+              ) : null}
 
-            <div className="mt-3 space-y-2.5">
-              {maiyatianShops.length > 0 ? maiyatianShops.map((shop) => {
-                const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
-                return (
-                  <div key={shop.id} className="rounded-2xl border border-black/8 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.04]">
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
-                      <div className="min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold leading-5 text-foreground">{shop.name}</div>
-                            <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                              {shop.address}
+              <div className="mt-3 space-y-2.5">
+                {maiyatianShops.length > 0 ? maiyatianShops.map((shop) => {
+                  const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
+                  return (
+                    <div key={shop.id} className="rounded-2xl border border-black/8 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
+                        <div className="min-w-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold leading-5 text-foreground">{shop.name}</div>
+                              <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                                {shop.address}
+                              </div>
+                              <div className="mt-1.5 text-[11px] text-muted-foreground">
+                                {shop.cityName ? `${shop.cityName} · ` : ""}ID {shop.id}
+                              </div>
                             </div>
-                            <div className="mt-1.5 text-[11px] text-muted-foreground">
-                              {shop.cityName ? `${shop.cityName} · ` : ""}ID {shop.id}
-                            </div>
+                            <span className={cn(
+                              "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
+                              mapped
+                                ? "border border-emerald-500/20 bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                                : "border border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+                            )}>
+                              {mapped ? "已映射" : "待映射"}
+                            </span>
                           </div>
-                          <span className={cn(
-                            "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
-                            mapped
-                              ? "border border-emerald-500/20 bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
-                              : "border border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
-                          )}>
-                            {mapped ? "已映射" : "待映射"}
-                          </span>
+                          {!mapped?.localShopName ? (
+                            <div className="mt-2.5 text-[11px] text-muted-foreground">还没绑定系统门店。</div>
+                          ) : null}
                         </div>
-                        {!mapped?.localShopName ? (
-                          <div className="mt-2.5 text-[11px] text-muted-foreground">还没绑定系统门店。</div>
-                        ) : null}
-                      </div>
 
-                      <div className="rounded-[16px] border border-black/8 bg-black/[0.02] p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
-                        <MappingSelect
-                          value={mapped?.localShopName || ""}
-                          options={[{ value: "", label: "暂不映射" }, ...localShopOptions]}
-                          onChange={(localShopName) => {
-                            const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
-                            if (localShopName) {
-                              nextMappings.push({
-                                maiyatianShopId: shop.id,
-                                maiyatianShopName: shop.name,
-                                maiyatianShopAddress: shop.address,
-                                localShopName,
-                                cityCode: shop.cityCode || undefined,
-                                cityName: shop.cityName || undefined,
+                        <div className="rounded-[16px] border border-black/8 bg-black/[0.02] p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+                          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
+                          <MappingSelect
+                            value={mapped?.localShopName || ""}
+                            options={[{ value: "", label: "暂不映射" }, ...localShopOptions]}
+                            onChange={(localShopName) => {
+                              const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
+                              if (localShopName) {
+                                nextMappings.push({
+                                  maiyatianShopId: shop.id,
+                                  maiyatianShopName: shop.name,
+                                  maiyatianShopAddress: shop.address,
+                                  localShopName,
+                                  cityCode: shop.cityCode || undefined,
+                                  cityName: shop.cityName || undefined,
+                                });
+                              }
+                              onChange({
+                                ...integrationConfig,
+                                maiyatianShopMappings: nextMappings,
                               });
-                            }
-                            onChange({
-                              ...integrationConfig,
-                              maiyatianShopMappings: nextMappings,
-                            });
-                          }}
-                        />
-                        {!mapped?.localShopName ? (
-                          <div className="mt-2 text-[11px] text-muted-foreground">选择后会固定这条映射。</div>
-                        ) : null}
+                            }}
+                          />
+                          {!mapped?.localShopName ? (
+                            <div className="mt-2 text-[11px] text-muted-foreground">选择后会固定这条映射。</div>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
+                  );
+                }) : (
+                  <div className="rounded-[18px] border border-dashed border-black/8 bg-white/60 px-4 py-5 text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                    读取后会在这里列出麦芽田发货门店，你可以逐条绑定到系统门店。
                   </div>
-                );
-              }) : (
-                <div className="rounded-[18px] border border-dashed border-black/8 bg-white/60 px-4 py-5 text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
-                  读取后会在这里列出麦芽田发货门店，你可以逐条绑定到系统门店。
-                </div>
-              )}
+                )}
+              </div>
             </div>
+
+            <div className="lg:col-start-1 lg:row-start-3">
+              <ActionButton
+                label={isTestingPlugin ? "测试中..." : "测试脚本"}
+                icon={isTestingPlugin ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                onClick={() => onTestPlugin()}
+                disabled={isTestingPlugin}
+              />
+            </div>
+
+            <div className="lg:col-start-2 lg:row-start-3">
+              <ActionButton
+                label={isTestingCookie ? "测试中..." : "测试 Cookie"}
+                icon={isTestingCookie ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                onClick={() => onTestCookie()}
+                disabled={isTestingCookie}
+              />
             </div>
           </div>
         </div>
@@ -1221,7 +1337,8 @@ export default function OrdersPage() {
   const [maiyatianShops, setMaiyatianShops] = useState<AutoPickMaiyatianShop[]>([]);
   const [localShops, setLocalShops] = useState<LocalShopOption[]>([]);
   const [isIntegrationOpen, setIsIntegrationOpen] = useState(false);
-  const [isTestingIntegration, setIsTestingIntegration] = useState(false);
+  const [isTestingPlugin, setIsTestingPlugin] = useState(false);
+  const [isTestingCookie, setIsTestingCookie] = useState(false);
   const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const [isBulkBrushSyncing, setIsBulkBrushSyncing] = useState(false);
@@ -1537,26 +1654,34 @@ export default function OrdersPage() {
     }
   }, [fetchOrders, integrationConfig, savedMappingsDigest, showToast]);
 
-  const testIntegrationConfig = async () => {
-    setIsTestingIntegration(true);
+  const testIntegrationConfig = async (target: "plugin" | "cookie") => {
+    if (target === "plugin") {
+      setIsTestingPlugin(true);
+    } else {
+      setIsTestingCookie(true);
+    }
     try {
       const response = await fetch("/api/orders/integration/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(integrationConfig),
+        body: JSON.stringify({ ...integrationConfig, target }),
       });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data?.error || "连通性测试失败");
+        throw new Error(data?.error || `${target === "plugin" ? "脚本" : "Cookie"} 测试失败`);
       }
 
-      showToast(data.ok ? "连通性测试通过" : "连通性测试未完全通过", data.ok ? "success" : "error");
+      showToast(data.ok ? `${target === "plugin" ? "脚本" : "Cookie"} 测试通过` : `${target === "plugin" ? "脚本" : "Cookie"} 测试未通过`, data.ok ? "success" : "error");
     } catch (error) {
       console.error("Failed to test order integration config:", error);
-      showToast(error instanceof Error ? error.message : "连通性测试失败", "error");
+      showToast(error instanceof Error ? error.message : `${target === "plugin" ? "脚本" : "Cookie"} 测试失败`, "error");
     } finally {
-      setIsTestingIntegration(false);
+      if (target === "plugin") {
+        setIsTestingPlugin(false);
+      } else {
+        setIsTestingCookie(false);
+      }
     }
   };
 
@@ -2152,12 +2277,14 @@ export default function OrdersPage() {
                 maiyatianShops={maiyatianShops}
                 localShops={localShops}
                 isFetchingMaiyatianShops={isFetchingMaiyatianShops}
-                isTestingIntegration={isTestingIntegration}
+                isTestingPlugin={isTestingPlugin}
+                isTestingCookie={isTestingCookie}
                 modalRef={modalRef}
                 onClose={() => setIsIntegrationOpen(false)}
                 onChange={setIntegrationConfig}
                 onFetchMaiyatianShops={fetchMaiyatianShops}
-                onTest={testIntegrationConfig}
+                onTestPlugin={() => void testIntegrationConfig("plugin")}
+                onTestCookie={() => void testIntegrationConfig("cookie")}
               />,
             document.body
           )

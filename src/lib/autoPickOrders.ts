@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
-import { isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { getBaseAutoPickStatusDisplay, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping } from "@/lib/types";
@@ -117,6 +117,8 @@ const MAIYATIAN_ORDER_DETAIL_PATH = "/order/detail/?detail=1&f=json&id=";
 const MAIYATIAN_DELIVERY_SUBMIT_PATH = "/delivery/submit/?f=json";
 const MAIYATIAN_DELIVERY_TRACK_PATH = "/delivery/track/?f=json&token=";
 const MAIYATIAN_MEAL_COMPLETE_PATH = "/order/mealComplete/?f=json";
+const AUTO_PICK_CONFIRM_LISTEN_INTERVAL_MS = 1500;
+const AUTO_PICK_STATE_LISTEN_INTERVAL_MS = 5000;
 
 type MaiyatianRawOrder = {
   id?: string;
@@ -163,6 +165,14 @@ type MaiyatianRawListResponse = {
   errno?: number;
   message?: string;
   data?: MaiyatianRawOrder[];
+};
+
+type AutoPickCookieListenerState = {
+  started: boolean;
+  running: boolean;
+  timer?: NodeJS.Timeout;
+  stateSignatures: Map<string, string>;
+  lastStateSyncAt: number;
 };
 
 type MaiyatianQueryOrder = Record<string, unknown>;
@@ -303,6 +313,23 @@ function resolveAutoPickDeliveryTimeRange(input: Record<string, unknown>) {
 
 function asPrismaJsonValue<T>(value: T): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
+}
+
+function getAutoPickCookieListenerState() {
+  const scoped = globalThis as typeof globalThis & {
+    autoPickCookieListenerState?: AutoPickCookieListenerState;
+  };
+
+  if (!scoped.autoPickCookieListenerState) {
+    scoped.autoPickCookieListenerState = {
+      started: false,
+      running: false,
+      stateSignatures: new Map<string, string>(),
+      lastStateSyncAt: 0,
+    };
+  }
+
+  return scoped.autoPickCookieListenerState;
 }
 
 function readAutoPickSystemMeta(rawPayload: unknown): AutoPickSystemMeta | null {
@@ -1312,6 +1339,28 @@ export async function getAutoPickIntegrationConfigByUserId(userId: string) {
   return normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
 }
 
+async function listAutoPickCookieUsers() {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      permissions: true,
+    },
+  });
+
+  return users
+    .map((user) => {
+      const permissions = user.permissions && typeof user.permissions === "object"
+        ? user.permissions as AutoPickConfigPayload
+        : {};
+      const config = normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
+      return {
+        id: user.id,
+        cookie: String(config.maiyatianCookie || "").trim(),
+      };
+    })
+    .filter((item) => item.cookie);
+}
+
 export async function updateAutoPickIntegrationConfigByUserId(userId: string, config: AutoPickIntegrationConfig) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -1415,6 +1464,31 @@ export async function getAutoPickBaseUrlForUser(userId: string) {
     throw new Error("Auto-pick plugin base URL is not configured");
   }
   return config.pluginBaseUrl;
+}
+
+async function fetchAutoPickPluginJson<T>(userId: string, pathname: string, init?: RequestInit): Promise<{
+  ok: boolean;
+  status: number;
+  data: T;
+}> {
+  const baseUrl = await getAutoPickBaseUrlForUser(userId);
+  const url = new URL(pathname.replace(/^\//, ""), `${baseUrl.replace(/\/+$/, "")}/`);
+  const response = await fetch(url.toString(), {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers || {}),
+    },
+    cache: "no-store",
+  });
+
+  const data = await response.json().catch(() => ({})) as T;
+  return {
+    ok: response.ok,
+    status: response.status,
+    data,
+  };
 }
 
 export function getRequestApiKey(headers: Headers, searchParams?: URLSearchParams) {
@@ -1857,7 +1931,9 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const shouldKeepTerminalStatus = isAutoPickOrderTerminalStatus(existing?.status) && !isAutoPickOrderTerminalStatus(normalized.status);
     const status = shouldKeepTerminalStatus
       ? existing?.status || null
-      : normalized.status || existing?.status || null;
+      : shouldPreservePickingStatus(existing || {}, normalized.status)
+        ? existing?.status || null
+        : normalized.status || existing?.status || null;
     const deliveryDeadline = shouldKeepTerminalStatus
       ? existing?.deliveryDeadline || normalized.deliveryDeadline || null
       : normalized.deliveryDeadline || existing?.deliveryDeadline || null;
@@ -1972,10 +2048,21 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 }
 
 export async function syncAutoPickOrdersFromPlugin(userId: string, options: { status?: AutoPickSyncStatus; date?: string }) {
-  const cookie = await getMaiyatianCookieForUser(userId);
-  const normalized = options.date
-    ? await fetchSimplifiedAllMaiyatianOrdersByDateByCookie(cookie, options.date)
-    : await fetchSimplifiedMaiyatianOrderListByCookie(cookie, options.status || "confirm");
+  const pluginResult = options.date
+    ? await fetchAutoPickPluginJson<AutoPickInboundOrder[]>(userId, `/all-orders/${encodeURIComponent(options.date)}`)
+    : await fetchAutoPickPluginJson<AutoPickInboundOrder[]>(userId, `/list-orders/${encodeURIComponent(options.status || "confirm")}`);
+
+  if (!pluginResult.ok || !Array.isArray(pluginResult.data)) {
+    const errorPayload = (!Array.isArray(pluginResult.data) && pluginResult.data && typeof pluginResult.data === "object")
+      ? pluginResult.data as Record<string, unknown>
+      : null;
+    const reason = errorPayload
+      ? String(errorPayload.error || errorPayload.reason || "")
+      : "";
+    throw new Error(reason || `Auto-pick plugin request failed (${pluginResult.status})`);
+  }
+
+  const normalized = pluginResult.data;
 
   const results = [];
   let skipped = 0;
@@ -2041,6 +2128,119 @@ export async function syncAutoPickOrdersFromPlugin(userId: string, options: { st
   };
 }
 
+async function syncAutoPickConfirmOrdersByCookieListener(userId: string, cookie: string) {
+  const orders = await fetchSimplifiedMaiyatianOrderListByCookie(cookie, "confirm");
+  for (const order of orders) {
+    const normalized = normalizeAutoPickOrderPayload(order);
+    if (!normalized) {
+      continue;
+    }
+
+    if (isAutoPickOrderDeletedStatus(normalized.status)) {
+      await deleteAutoPickOrderByIdentity(userId, {
+        platform: String(normalized.platform || ""),
+        orderNo: String(normalized.orderNo || ""),
+      }).catch(() => null);
+      continue;
+    }
+
+    await upsertAutoPickOrder(userId, normalized).catch((error) => {
+      console.error("Auto-pick confirm listener upsert failed:", {
+        userId,
+        orderNo: normalized.orderNo,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+}
+
+async function syncAutoPickChangedOrdersByCookieListener(userId: string, cookie: string, state: AutoPickCookieListenerState) {
+  const date = formatLocalDate(new Date());
+  const orders = await fetchSimplifiedAllMaiyatianOrdersByDateByCookie(cookie, date);
+
+  for (const order of orders) {
+    const normalized = normalizeAutoPickOrderPayload(order);
+    if (!normalized) {
+      continue;
+    }
+
+    const signature = buildAutoPickOrderStateSignature(normalized);
+    const key = `${userId}:${normalized.platform}:${normalized.orderNo}`;
+    const previousSignature = state.stateSignatures.get(key);
+
+    if (previousSignature === signature) {
+      continue;
+    }
+
+    if (isAutoPickOrderDeletedStatus(normalized.status)) {
+      await deleteAutoPickOrderByIdentity(userId, {
+        platform: String(normalized.platform || ""),
+        orderNo: String(normalized.orderNo || ""),
+      }).catch(() => null);
+      state.stateSignatures.set(key, signature);
+      continue;
+    }
+
+    await upsertAutoPickOrder(userId, normalized).catch((error) => {
+      console.error("Auto-pick changed-state listener upsert failed:", {
+        userId,
+        orderNo: normalized.orderNo,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    state.stateSignatures.set(key, signature);
+  }
+}
+
+async function runAutoPickCookieListenerCycle() {
+  const state = getAutoPickCookieListenerState();
+  if (state.running) {
+    return;
+  }
+
+  state.running = true;
+  try {
+    const users = await listAutoPickCookieUsers();
+    for (const user of users) {
+      await syncAutoPickConfirmOrdersByCookieListener(user.id, user.cookie).catch((error) => {
+        console.error("Auto-pick confirm listener failed:", {
+          userId: user.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+      if (Date.now() - state.lastStateSyncAt >= AUTO_PICK_STATE_LISTEN_INTERVAL_MS) {
+        await syncAutoPickChangedOrdersByCookieListener(user.id, user.cookie, state).catch((error) => {
+          console.error("Auto-pick changed-state listener failed:", {
+            userId: user.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
+    }
+
+    if (Date.now() - state.lastStateSyncAt >= AUTO_PICK_STATE_LISTEN_INTERVAL_MS) {
+      state.lastStateSyncAt = Date.now();
+    }
+  } finally {
+    state.running = false;
+  }
+}
+
+export async function startAutoPickCookieListener() {
+  const state = getAutoPickCookieListenerState();
+  if (state.started) {
+    return;
+  }
+
+  state.started = true;
+  await runAutoPickCookieListenerCycle();
+  state.timer = setInterval(() => {
+    void runAutoPickCookieListenerCycle();
+  }, AUTO_PICK_CONFIRM_LISTEN_INTERVAL_MS);
+}
+
 function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPayload | null {
   if (!payload || typeof payload !== "object") {
     return null;
@@ -2068,6 +2268,28 @@ export function parseAutoPickProgressPayload(payload: unknown) {
   return normalizeAutoPickProgressPayload(payload);
 }
 
+function buildAutoPickOrderStateSignature(order: AutoPickInboundOrder) {
+  return JSON.stringify({
+    platform: String(order.platform || "").trim(),
+    orderNo: String(order.orderNo || "").trim(),
+    status: String(order.status || "").trim(),
+    deliveryDeadline: String(order.deliveryDeadline || "").trim(),
+    deliveryTimeRange: String(order.deliveryTimeRange || "").trim(),
+    actualPaid: Number(order.actualPaid || 0),
+    expectedIncome: Number(order.expectedIncome || 0),
+    platformCommission: Number(order.platformCommission || 0),
+    userAddress: String(order.userAddress || "").trim(),
+    delivery: order.delivery || null,
+    items: Array.isArray(order.items)
+      ? order.items.map((item) => ({
+          productName: String(item.productName || "").trim(),
+          productNo: String(item.productNo || "").trim(),
+          quantity: Number(item.quantity || 0),
+        }))
+      : [],
+  });
+}
+
 function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: string | null) {
   if (progress.pickCompleted) {
     return "已拣货";
@@ -2086,6 +2308,44 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
 
 function hasDeliveryValue(value: unknown) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0);
+}
+
+function readAutoPickRawPayloadRecord(rawPayload: unknown) {
+  return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+    ? rawPayload as Record<string, unknown>
+    : {};
+}
+
+function readAutoPickPickProgress(rawPayload: unknown) {
+  const record = readAutoPickRawPayloadRecord(rawPayload);
+  const progress = record.pickProgress;
+  if (!progress || typeof progress !== "object" || Array.isArray(progress)) {
+    return null;
+  }
+  return progress as {
+    pickRemainingSeconds?: number | null;
+    pickCompleted?: boolean;
+    updatedAt?: string;
+  };
+}
+
+function shouldPreservePickingStatus(existing: {
+  status?: string | null;
+  rawPayload?: unknown;
+}, incomingStatus?: string | null) {
+  const progress = readAutoPickPickProgress(existing.rawPayload);
+  if (!progress || (!progress.pickCompleted && typeof progress.pickRemainingSeconds !== "number")) {
+    return false;
+  }
+
+  const normalizedIncoming = String(incomingStatus || "").trim();
+  if (!normalizedIncoming) {
+    return false;
+  }
+
+  const incomingBaseStatus = getBaseAutoPickStatusDisplay(normalizedIncoming);
+
+  return incomingBaseStatus === "待处理" || incomingBaseStatus === "同步中";
 }
 
 function toAutoPickBaseProductName(value: string | null | undefined) {
@@ -2532,44 +2792,14 @@ export async function backfillPersistedAutoPickOrderFields(userId: string) {
 }
 
 export async function callAutoPickCommand(userId: string, pathname: "/self-delivery" | "/complete-delivery" | "/pickup-complete", payload: Record<string, unknown>) {
-  const cookie = await getMaiyatianCookieForUser(userId);
-  let sourceId = String(payload.sourceId || "").trim();
-  let logisticId = String(payload.logisticId || "").trim();
-  const orderNo = String(payload.orderNo || "").trim();
-
-  if (pathname === "/self-delivery") {
-    if (sourceId && !logisticId) {
-      const detailOrder = await fetchSimplifiedMaiyatianOrderDetailByCookie(cookie, sourceId).catch(() => null);
-      logisticId = String(detailOrder?.logisticId || "").trim();
-    }
-    const result = await submitMaiyatianSelfDeliveryByCookie(cookie, sourceId, logisticId, orderNo);
-    return {
-      ok: result.ok,
-      status: result.ok ? 200 : 409,
-      data: result,
-    };
-  }
-
-  if (pathname === "/pickup-complete") {
-    const result = await submitMaiyatianPickupCompleteByCookie(cookie, sourceId, orderNo);
-    return {
-      ok: result.ok,
-      status: result.ok ? 200 : 409,
-      data: result,
-    };
-  }
-
-  if (sourceId && !logisticId) {
-    const detailOrder = await fetchSimplifiedMaiyatianOrderDetailByCookie(cookie, sourceId).catch(() => null);
-    logisticId = String(detailOrder?.logisticId || "").trim();
-  }
-
-  const result = await submitMaiyatianCompleteDeliveryByCookie(cookie, sourceId, logisticId, orderNo);
-
+  const result = await fetchAutoPickPluginJson<Record<string, unknown>>(userId, pathname, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
   return {
     ok: result.ok,
-    status: result.ok ? 200 : 409,
-    data: result,
+    status: result.status,
+    data: result.data,
   };
 }
 
@@ -2594,7 +2824,7 @@ export async function markAutoPickOrderMainSystemSelfDelivery(userId: string, or
     : {};
   const existingSystemMeta = readAutoPickSystemMeta(order.rawPayload) || {};
 
-  return await prisma.autoPickOrder.update({
+  const updatedOrder = await prisma.autoPickOrder.update({
     where: { id: order.id },
     data: {
       rawPayload: asPrismaJsonValue({
@@ -2611,6 +2841,17 @@ export async function markAutoPickOrderMainSystemSelfDelivery(userId: string, or
       lastSyncedAt: new Date(),
     },
   });
+
+  emitAutoPickOrderEvent({
+    type: "upsert",
+    userId,
+    orderId: updatedOrder.id,
+    orderNo: updatedOrder.orderNo,
+    platform: updatedOrder.platform,
+    at: new Date().toISOString(),
+  });
+
+  return updatedOrder;
 }
 
 export async function wasAutoPickOrderSelfDeliveryTriggeredByMainSystem(userId: string, platformOrderId: string) {

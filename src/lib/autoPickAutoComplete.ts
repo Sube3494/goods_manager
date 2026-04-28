@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
+import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { AutoPickAutoCompleteJobStatus } from "../../prisma/generated-client";
 
@@ -98,6 +99,14 @@ async function markJobSuccess(jobId: string, orderId: string, userId: string, so
       },
     }),
   ]);
+  emitAutoPickOrderEvent({
+    type: "upsert",
+    userId,
+    orderId,
+    orderNo,
+    platform,
+    at: new Date().toISOString(),
+  });
   await syncBrushOrderFromCompletedAutoPickOrder(userId, orderId).catch((brushError) => {
     console.error("Failed to sync brush order after auto complete:", brushError);
   });
@@ -118,7 +127,17 @@ async function markJobSuccess(jobId: string, orderId: string, userId: string, so
 async function markJobRetry(jobId: string, error: string) {
   const currentJob = await prisma.autoPickAutoCompleteJob.findUnique({
     where: { id: jobId },
-    select: { attempts: true, orderId: true },
+    select: {
+      attempts: true,
+      orderId: true,
+      order: {
+        select: {
+          userId: true,
+          platform: true,
+          orderNo: true,
+        },
+      },
+    },
   });
 
   if (!currentJob) {
@@ -142,6 +161,16 @@ async function markJobRetry(jobId: string, error: string) {
         },
       }),
     ]);
+    if (currentJob.order) {
+      emitAutoPickOrderEvent({
+        type: "upsert",
+        userId: currentJob.order.userId,
+        orderId: currentJob.orderId,
+        orderNo: currentJob.order.orderNo,
+        platform: currentJob.order.platform,
+        at: new Date().toISOString(),
+      });
+    }
     return;
   }
 
@@ -157,11 +186,17 @@ async function markJobRetry(jobId: string, error: string) {
 }
 
 async function markJobCancelled(jobId: string, orderId: string, error?: string) {
-  await prisma.$transaction([
+  const [order] = await prisma.$transaction([
     prisma.autoPickOrder.update({
       where: { id: orderId },
       data: {
         autoCompleteAt: null,
+      },
+      select: {
+        id: true,
+        userId: true,
+        platform: true,
+        orderNo: true,
       },
     }),
     prisma.autoPickAutoCompleteJob.update({
@@ -173,6 +208,14 @@ async function markJobCancelled(jobId: string, orderId: string, error?: string) 
       },
     }),
   ]);
+  emitAutoPickOrderEvent({
+    type: "upsert",
+    userId: order.userId,
+    orderId: order.id,
+    orderNo: order.orderNo,
+    platform: order.platform,
+    at: new Date().toISOString(),
+  });
 }
 
 async function tryLockJob(jobId: string, staleBefore: Date) {

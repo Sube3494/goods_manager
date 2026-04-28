@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
+import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import {
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
@@ -58,6 +59,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           autoCompleteAt: null,
           lastSyncedAt: new Date(),
         },
+      });
+      emitAutoPickOrderEvent({
+        type: "upsert",
+        userId: session.id,
+        orderId: order.id,
+        orderNo: order.orderNo,
+        platform: order.platform,
+        at: new Date().toISOString(),
       });
       await cancelAutoCompleteJob(order.id, "manual-pickup-complete");
       await syncBrushOrderFromCompletedAutoPickOrder(session.id, order.id).catch((brushError) => {
