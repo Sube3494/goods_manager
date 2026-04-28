@@ -79,6 +79,7 @@ COPY scripts/fix_shop_external_id_duplicates.js ./scripts/fix_shop_external_id_d
 COPY scripts/fix_shop_dedupe_keys.js ./scripts/fix_shop_dedupe_keys.js
 COPY scripts/fix_shop_product_duplicate_skus.js ./scripts/fix_shop_product_duplicate_skus.js
 COPY scripts/cleanup_orphan_shop_only_products.js ./scripts/cleanup_orphan_shop_only_products.js
+COPY scripts/backfill_brush_product_shop_ids.js ./scripts/backfill_brush_product_shop_ids.js
 
 # 上传文件持久化目录（chmod 777 确保 volume 挂载时也能正常写入）
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
@@ -89,6 +90,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# 启动顺序：自动建库 → 清理重复 POI_ID → 回填 dedupeKey → 尝试 db push → 启动应用
-# db push 失败时仅告警，不阻断服务启动，避免容器因历史脏数据卡死。
+# 启动顺序：自动建库 → 清理重复 POI_ID → 回填 dedupeKey → 尝试 db push → 回填刷单商品店铺关联 → 启动应用
+# 修复步骤失败时仅告警，不阻断服务启动，避免容器因历史脏数据卡死。
 CMD ["sh", "scripts/start-app.sh"]
