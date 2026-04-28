@@ -42,13 +42,19 @@ export async function GET() {
           shopProductId: true,
           shop: {
             select: {
+              id: true,
               name: true,
             },
           },
           shopProduct: {
             select: {
+              id: true,
+              shopId: true,
+              productId: true,
+              sourceProductId: true,
               shop: {
                 select: {
+                  id: true,
                   name: true,
                 },
               },
@@ -80,20 +86,26 @@ export async function GET() {
         },
       }),
     ]);
-    const brushProductCount = new Set(
-      brushProducts.map((item) =>
-        item.shopProductId
-          ? `shop-product:${item.shopProductId}`
-          : `shop-product-fallback:${item.shopId || "unknown"}:${item.productId}`
-      )
-    ).size;
+    const resolveBrushProductKey = (item: (typeof brushProducts)[number]) => {
+      const resolvedShopId = String(item.shopProduct?.shopId || item.shop?.id || item.shopId || "").trim();
+      const resolvedProductId = String(
+        item.shopProduct?.sourceProductId ||
+        item.shopProduct?.productId ||
+        item.productId ||
+        item.shopProduct?.id ||
+        item.shopProductId ||
+        item.id
+      ).trim();
+
+      return `${resolvedShopId || "unknown"}:${resolvedProductId || "unknown"}`;
+    };
+
+    const brushProductCount = new Set(brushProducts.map(resolveBrushProductKey)).size;
     const brushProductShopMap = new Map<string, Set<string>>();
     brushProducts.forEach((item) => {
       const shopName = String(item.shopProduct?.shop?.name || item.shop?.name || "").trim();
       if (!shopName) return;
-      const uniqueKey = item.shopProductId
-        ? `shop-product:${item.shopProductId}`
-        : `shop-product-fallback:${item.shopId || "unknown"}:${item.productId}`;
+      const uniqueKey = resolveBrushProductKey(item);
       const bucket = brushProductShopMap.get(shopName) || new Set<string>();
       bucket.add(uniqueKey);
       brushProductShopMap.set(shopName, bucket);
