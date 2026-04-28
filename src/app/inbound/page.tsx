@@ -459,6 +459,7 @@ function InboundContent() {
         initialData={selectedOrder}
         onSubmit={() => {}}
         readOnly={true}
+        defaultType="Inbound"
       />
     </div>
   );

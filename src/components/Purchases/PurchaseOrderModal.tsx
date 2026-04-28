@@ -24,6 +24,7 @@ interface PurchaseOrderModalProps {
   onOverview?: (po: PurchaseOrder) => void;
   initialData?: PurchaseOrder | null;
   readOnly?: boolean;
+  defaultType?: "Purchase" | "Inbound";
 }
 
 const PurchaseItemRow = memo(({ 
@@ -283,7 +284,16 @@ const FeePill = memo(({
 ));
 FeePill.displayName = "FeePill";
 
-export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOverview, initialData, readOnly = false }: PurchaseOrderModalProps) {
+export function PurchaseOrderModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  onExport,
+  onOverview,
+  initialData,
+  readOnly = false,
+  defaultType = "Purchase",
+}: PurchaseOrderModalProps) {
   const { showToast } = useToast();
   const { user } = useUser();
   const router = useRouter();
@@ -295,7 +305,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     return {
       id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
       status: "Draft",
-      type: "Purchase",
+      type: defaultType,
       date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
       items: [],
       shippingFees: 0,
@@ -483,7 +493,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
                 status: "Draft",
                 date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
                 items: [],
-                type: prev.type === "Inbound" ? "Inbound" : "Purchase",
+                type: defaultType,
                 shippingFees: 0,
                 extraFees: 0,
                 totalAmount: 0,
@@ -498,7 +508,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen, initialData, user, typedUser?.shippingAddresses]);
+  }, [defaultType, isOpen, initialData, user, typedUser?.shippingAddresses]);
 
   // Auto-select default address if empty and list is available
   useEffect(() => {

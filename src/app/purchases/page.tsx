@@ -809,6 +809,7 @@ function PurchasesContent() {
         onOverview={(po) => setOverviewPurchases([po])}
         initialData={editingPurchase || undefined}
         readOnly={detailReadOnly}
+        defaultType="Purchase"
       />
 
       <ConfirmModal 
