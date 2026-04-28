@@ -117,6 +117,13 @@ type UserPermissionsPayload = {
   autoPickIntegration?: unknown;
 };
 
+type AutoPickSystemMeta = {
+  resolvedShop?: {
+    id?: string;
+    name?: string;
+  };
+};
+
 function toNormalizedText(value: string | null | undefined) {
   return String(value || "")
     .trim()
@@ -131,6 +138,39 @@ function readExpectedIncomeFromRawPayload(rawPayload: unknown) {
   }
   const value = Number((rawPayload as Record<string, unknown>).expectedIncome);
   return Number.isFinite(value) ? value : null;
+}
+
+function readAutoPickSystemMeta(rawPayload: unknown): AutoPickSystemMeta | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const record = rawPayload as Record<string, unknown>;
+  const candidate = record.systemMeta;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+
+  return candidate as AutoPickSystemMeta;
+}
+
+function readResolvedAutoPickShop(rawPayload: unknown) {
+  const systemMeta = readAutoPickSystemMeta(rawPayload);
+  const resolvedShop = systemMeta?.resolvedShop;
+  if (!resolvedShop || typeof resolvedShop !== "object") {
+    return null;
+  }
+
+  const id = String(resolvedShop.id || "").trim();
+  const name = String(resolvedShop.name || "").trim();
+  if (!id && !name) {
+    return null;
+  }
+
+  return {
+    id: id || null,
+    name: name || null,
+  };
 }
 
 function isJDPlatform(platform: string | null | undefined) {
@@ -727,13 +767,14 @@ export async function GET(request: NextRequest) {
         outboundOrderId: outboundByOrderNo.get(order.orderNo)?.id || null,
       };
     }).map((order) => {
+      const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
       const mappingDebug = resolveMappedShopDebug(
         order.shopId,
         order.rawShopName,
         order.rawShopAddress,
         userProfile?.permissions
       );
-      const matchedShopName = mappingDebug.localShopName;
+      const matchedShopName = String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName;
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
 
       return {

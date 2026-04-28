@@ -577,13 +577,28 @@ function parseUnixTimestampToOrderTime(rawValue: string | number | undefined) {
   const seconds = Number(rawValue || 0);
   if (!Number.isFinite(seconds) || seconds <= 0) return "";
   const date = new Date(seconds * 1000);
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const hours = `${date.getHours()}`.padStart(2, "0");
-  const minutes = `${date.getMinutes()}`.padStart(2, "0");
-  const secondsPart = `${date.getSeconds()}`.padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${secondsPart}`;
+  try {
+    const formatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    return formatter.format(date).replace(" ", " ");
+  } catch {
+    const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+    const year = shifted.getUTCFullYear();
+    const month = `${shifted.getUTCMonth() + 1}`.padStart(2, "0");
+    const day = `${shifted.getUTCDate()}`.padStart(2, "0");
+    const hours = `${shifted.getUTCHours()}`.padStart(2, "0");
+    const minutes = `${shifted.getUTCMinutes()}`.padStart(2, "0");
+    const secondsPart = `${shifted.getUTCSeconds()}`.padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}:${secondsPart}`;
+  }
 }
 
 function parseDeliveryDeadline(value: string | undefined) {
@@ -2019,15 +2034,16 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       existing?.rawPayload
     );
     const existingSystemMeta = readAutoPickSystemMeta(existing?.rawPayload) || {};
-    const nextSystemMeta: AutoPickSystemMeta = {
-      ...existingSystemMeta,
-      resolvedShop: resolvedInternalShop
-        ? {
+    const { resolvedShop: _previousResolvedShop, ...systemMetaWithoutResolvedShop } = existingSystemMeta;
+    const nextSystemMeta: AutoPickSystemMeta = resolvedInternalShop
+      ? {
+          ...systemMetaWithoutResolvedShop,
+          resolvedShop: {
             id: resolvedInternalShop.id,
             name: resolvedInternalShop.name,
-          }
-        : existingSystemMeta.resolvedShop,
-    };
+          },
+        }
+      : systemMetaWithoutResolvedShop;
     const nextRawPayloadWithResolvedShop = {
       ...nextRawPayload,
       systemMeta: nextSystemMeta,
