@@ -17,6 +17,11 @@ type DailyShopAggregate = DailyAggregate & {
   shopName: string;
 };
 
+type BrushProductShopAggregate = {
+  shopName: string;
+  count: number;
+};
+
 export async function GET() {
   const session = await getAuthorizedUser("brush:manage");
   if (!session) {
@@ -24,11 +29,31 @@ export async function GET() {
   }
 
   try {
-    const [brushProductCount, plans, orders] = await Promise.all([
-      prisma.brushProduct.count({
+    const [brushProducts, plans, orders] = await Promise.all([
+      prisma.brushProduct.findMany({
         where: {
           userId: session.id,
           isActive: true,
+        },
+        select: {
+          id: true,
+          shopId: true,
+          productId: true,
+          shopProductId: true,
+          shop: {
+            select: {
+              name: true,
+            },
+          },
+          shopProduct: {
+            select: {
+              shop: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
         },
       }),
       prisma.brushOrderPlan.findMany({
@@ -55,6 +80,30 @@ export async function GET() {
         },
       }),
     ]);
+    const brushProductCount = new Set(
+      brushProducts.map((item) =>
+        item.shopProductId
+          ? `shop-product:${item.shopProductId}`
+          : `shop-product-fallback:${item.shopId || "unknown"}:${item.productId}`
+      )
+    ).size;
+    const brushProductShopMap = new Map<string, Set<string>>();
+    brushProducts.forEach((item) => {
+      const shopName = String(item.shopProduct?.shop?.name || item.shop?.name || "").trim();
+      if (!shopName) return;
+      const uniqueKey = item.shopProductId
+        ? `shop-product:${item.shopProductId}`
+        : `shop-product-fallback:${item.shopId || "unknown"}:${item.productId}`;
+      const bucket = brushProductShopMap.get(shopName) || new Set<string>();
+      bucket.add(uniqueKey);
+      brushProductShopMap.set(shopName, bucket);
+    });
+    const brushProductCountByShop: BrushProductShopAggregate[] = Array.from(brushProductShopMap.entries())
+      .map(([shopName, items]) => ({
+        shopName,
+        count: items.size,
+      }))
+      .sort((a, b) => a.shopName.localeCompare(b.shopName, "zh-CN"));
 
     const today = formatLocalDate(new Date());
     let todayPlanItemCount = 0;
@@ -152,6 +201,7 @@ export async function GET() {
         commission: totalCommission,
         expense: totalExpense,
       },
+      brushProductCountByShop,
       shops: Array.from(
         new Set(
           orders.map((order) => order.shopName?.trim()).filter((shopName): shopName is string => Boolean(shopName))

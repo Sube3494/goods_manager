@@ -15,11 +15,12 @@ async function cleanupForCategory(category) {
     where: {
       userId: category.userId,
       categoryId: category.id,
-      isShopOnly: true,
       shopProducts: { none: {} },
     },
     select: {
       id: true,
+      isShopOnly: true,
+      sourceProductId: true,
       _count: {
         select: {
           brushOrderItems: true,
@@ -35,13 +36,20 @@ async function cleanupForCategory(category) {
   });
 
   if (rows.length === 0) {
-    return { scanned: 0, deleted: 0, moved: 0 };
+    return { scanned: 0, deleted: 0, moved: 0, skipped: 0 };
   }
 
   const deletableIds = [];
   const archivedIds = [];
+  let skipped = 0;
 
   for (const row of rows) {
+    const isLegacySystemProduct = row.isShopOnly || Boolean(row.sourceProductId);
+    if (!isLegacySystemProduct) {
+      skipped += 1;
+      continue;
+    }
+
     if (countReferences(row) > 0) {
       archivedIds.push(row.id);
     } else {
@@ -104,6 +112,7 @@ async function cleanupForCategory(category) {
     scanned: rows.length,
     deleted: result.deleted,
     moved: result.moved,
+    skipped,
   };
 }
 
@@ -166,18 +175,20 @@ async function main() {
   let totalScanned = 0;
   let totalDeleted = 0;
   let totalMoved = 0;
+  let totalSkipped = 0;
 
   for (const category of categories) {
     const result = await cleanupForCategory(category);
     totalScanned += result.scanned;
     totalDeleted += result.deleted;
     totalMoved += result.moved;
+    totalSkipped += result.skipped;
   }
 
   const deletedArchiveCategories = await cleanupEmptyArchiveCategories();
 
   console.log(
-    `孤儿单店商品清理完成：扫描 ${totalScanned} 条，删除 ${totalDeleted} 条，归档 ${totalMoved} 条，移除空历史残留分类 ${deletedArchiveCategories} 个。`
+    `孤儿单店商品清理完成：扫描 ${totalScanned} 条，删除 ${totalDeleted} 条，归档 ${totalMoved} 条，跳过 ${totalSkipped} 条正常主商品，移除空历史残留分类 ${deletedArchiveCategories} 个。`
   );
 }
 

@@ -67,6 +67,7 @@ type DailyShopAggregate = DailyAggregate & {
 
 type BrushDashboardPayload = {
   stats: DashboardStats;
+  brushProductCountByShop: Array<{ shopName: string; count: number }>;
   shops: string[];
   orderDaily: DailyAggregate[];
   orderDailyByShop: DailyShopAggregate[];
@@ -130,7 +131,7 @@ function MetricCard({
   href,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   hint: string;
   icon: typeof Package;
   accent?: "default" | "success";
@@ -190,50 +191,6 @@ function formatYAxisAmount(value: number) {
   return `${Math.round(value)}`;
 }
 
-function PointValueDot({
-  cx,
-  cy,
-  value,
-  color,
-  labelOffset = 18,
-  formatter = formatYAxisAmount,
-  showLabel = true,
-}: {
-  cx?: number;
-  cy?: number;
-  value?: number | string;
-  color: string;
-  labelOffset?: number;
-  formatter?: (value: number) => string;
-  showLabel?: boolean;
-}) {
-  if (typeof cx !== "number" || typeof cy !== "number" || typeof value !== "number") return null;
-
-  const label = formatter(value);
-  const y = cy - labelOffset;
-
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={3.5} fill={color} />
-      {showLabel && (
-        <text
-          x={cx}
-          y={y}
-          textAnchor="middle"
-          fill="#f8fafc"
-          fontSize="8.5"
-          fontWeight="500"
-          stroke="rgba(15,23,42,0.9)"
-          strokeWidth="2.2"
-          paintOrder="stroke"
-        >
-          {label}
-        </text>
-      )}
-    </g>
-  );
-}
-
 function ExpenseTooltip({
   active,
   payload,
@@ -270,6 +227,7 @@ export default function BrushCenterPage() {
 
   const [dashboardData, setDashboardData] = useState<BrushDashboardPayload>({
     stats: EMPTY_DASHBOARD_STATS,
+    brushProductCountByShop: [],
     shops: [],
     orderDaily: [],
     orderDailyByShop: [],
@@ -312,6 +270,7 @@ export default function BrushCenterPage() {
           const data = await dashboardRes.json();
           setDashboardData({
             stats: data?.stats || EMPTY_DASHBOARD_STATS,
+            brushProductCountByShop: Array.isArray(data?.brushProductCountByShop) ? data.brushProductCountByShop : [],
             shops: Array.isArray(data?.shops) ? data.shops : [],
             orderDaily: Array.isArray(data?.orderDaily) ? data.orderDaily : [],
             orderDailyByShop: Array.isArray(data?.orderDailyByShop) ? data.orderDailyByShop : [],
@@ -350,6 +309,42 @@ export default function BrushCenterPage() {
   }, [isCompactView, isLoading, userLoading]);
 
   const stats = dashboardData.stats;
+  const brushProductShopSummary = useMemo(() => {
+    const counts = dashboardData.brushProductCountByShop;
+    if (counts.length <= 1) {
+      return {
+        value: String(stats.brushProductCount),
+        hint: "已挑入专用商品池",
+        compact: null as React.ReactNode,
+      };
+    }
+
+    return {
+      value: (
+        <div className="space-y-1 text-base leading-tight sm:text-lg">
+          {counts.map((item) => (
+            <div key={item.shopName} className="break-all">
+              {item.shopName} {item.count}
+            </div>
+          ))}
+        </div>
+      ),
+      hint: "按店铺分别统计刷单商品数",
+      compact: (
+        <div className="flex flex-wrap gap-2">
+          {counts.map((item) => (
+            <span
+              key={item.shopName}
+              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground"
+            >
+              <span className="max-w-[120px] truncate">{item.shopName}</span>
+              <span className="text-muted-foreground">{item.count}</span>
+            </span>
+          ))}
+        </div>
+      ),
+    };
+  }, [dashboardData.brushProductCountByShop, stats.brushProductCount]);
 
   const shopOptions = useMemo(() => {
     return [
@@ -449,61 +444,37 @@ export default function BrushCenterPage() {
       .sort((a, b) => b.value - a.value);
   }, [expenseTrendByShop.data, expenseTrendByShop.shops]);
 
-  const shouldShowShopExpenseLabel = useCallback((shop: string, index: number) => {
-    const series = expenseTrendByShop.data.map((item) => Number(item[shop] || 0));
-
-    if (series.length <= 2) return true;
-    if (index === 0 || index === series.length - 1) return true;
-
-    const current = series[index];
-    const prev = series[index - 1];
-    const next = series[index + 1];
-    const min = Math.min(...series);
-    const max = Math.max(...series);
-
-    if (current === min || current === max) return true;
-
-    const isLocalPeak = current > prev && current > next;
-    const isLocalValley = current < prev && current < next;
-
-    return !isCompactView && (isLocalPeak || isLocalValley);
-  }, [expenseTrendByShop.data, isCompactView]);
-
-  const metricCards = useMemo(
+  const summaryItems = useMemo(
     () => [
       {
-        label: "刷单商品",
-        value: String(stats.brushProductCount),
-        hint: "已挑入专用商品池",
-        icon: Tags,
-        href: "/brush-products",
+        label: "商品池",
+        value: dashboardData.brushProductCountByShop.length <= 1 ? `${stats.brushProductCount}` : null,
+        detail:
+          dashboardData.brushProductCountByShop.length <= 1
+            ? "当前商品数"
+            : null,
+        custom: brushProductShopSummary.compact,
       },
       {
         label: "今日刷单",
-        value: `${stats.todayShopCount} 店`,
-        hint:
+        value: `${stats.todayShopCount} 店 / ${stats.todayPlanItemCount} 单`,
+        detail:
           stats.todayShopCount > 0
             ? `每店 ${Number.isInteger(stats.averageItemsPerShop) ? stats.averageItemsPerShop : stats.averageItemsPerShop.toFixed(1)} 单`
             : "今天还没安排刷单",
-        icon: ShoppingBag,
-        href: "/brush-plans",
       },
       {
         label: "今日录单",
         value: `${stats.todayOrderCount} 笔`,
-        hint: stats.todayOrderCount > 0 ? "今天已录入的刷单订单" : "今天还没有录单",
-        icon: CreditCard,
-        href: "/brush-orders",
+        detail: stats.todayOrderCount > 0 ? "今天已录入的刷单订单" : "今天还没有录单",
       },
       {
         label: "今日支出",
         value: formatExpenseCurrency(stats.todayExpense),
-        hint: `差额 ${formatExpenseCurrency(stats.todayPayment - stats.todayReceived)} / 佣金 ${formatExpenseCurrency(stats.todayCommission)}`,
-        icon: TrendingUp,
-        href: "/brush-orders",
+        detail: `差额 ${formatExpenseCurrency(stats.todayPayment - stats.todayReceived)} / 佣金 ${formatExpenseCurrency(stats.todayCommission)}`,
       },
     ],
-    [stats]
+    [brushProductShopSummary.compact, dashboardData.brushProductCountByShop.length, stats]
   );
 
   if (userLoading || isLoading) {
@@ -525,70 +496,67 @@ export default function BrushCenterPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-[32px] border border-border/60 bg-linear-to-br from-white/95 via-white/90 to-white/80 p-6 shadow-sm dark:from-white/[0.05] dark:via-white/[0.035] dark:to-transparent sm:p-7">
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] xl:items-stretch">
-          <div className="rounded-[28px] border border-border/50 bg-black/[0.02] p-5 dark:bg-white/[0.02] sm:p-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/6 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.22em] text-primary/80">
-              <Activity size={12} />
-              Brush Dashboard
-            </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-[40px]">刷单中心</h1>
-            <p className="mt-3 max-w-[46ch] text-sm leading-relaxed text-muted-foreground sm:text-base">
-              这里先看排单密度、金额走势和店铺表现；常用操作直接放在左下，不用再先找入口。
-            </p>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/6 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.22em] text-primary/80">
+                <Activity size={12} />
+                Brush Dashboard
+              </div>
+              <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-[40px]">刷单中心</h1>
+              <p className="mt-3 max-w-[50ch] text-sm leading-relaxed text-muted-foreground sm:text-base">
+                先看今天节奏，再决定排单和录单。多店信息合并到一条状态带里，首页只保留真正会用到的入口。
+              </p>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                今日计划 {stats.todayPlanItemCount} 单
+              <div className="mt-4 flex flex-wrap gap-2">
+                <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                  今日计划 {stats.todayPlanItemCount} 单
+                </div>
+                <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                  今日录单 {stats.todayOrderCount} 笔
+                </div>
               </div>
-              <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                今日录单 {stats.todayOrderCount} 笔
-              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/brush-products"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-border/60 bg-background/70 px-4 text-sm font-bold text-foreground transition-all hover:border-primary/30 hover:bg-primary/[0.06] sm:px-5"
+              >
+                <Tags size={16} className="text-primary" />
+                商品池
+              </Link>
+              <Link
+                href="/brush-orders"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground transition-all hover:-translate-y-0.5 sm:px-5"
+              >
+                <PenSquare size={16} />
+                去录单
+              </Link>
             </div>
           </div>
 
-          {canManageBrush && (
-            <>
-              <div className="hidden self-stretch md:grid md:grid-cols-2 md:gap-3">
-                {metricCards.map((card) => (
-                  <MetricCard key={card.label} {...card} />
-                ))}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+            {summaryItems.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[20px] border border-border/60 bg-black/[0.02] px-4 py-4 dark:bg-white/[0.02]"
+              >
+                <div className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">{item.label}</div>
+                {item.custom ? (
+                  <div className="mt-3">{item.custom}</div>
+                ) : (
+                  <>
+                    <div className="mt-3 text-2xl font-black tracking-tight">{item.value}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{item.detail}</div>
+                  </>
+                )}
               </div>
-
-              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 md:hidden">
-                {metricCards.map((card) => (
-                  <div key={card.label} className="min-w-[220px] shrink-0">
-                    <MetricCard {...card} />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+            ))}
+          </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <Link
-            href="/brush-products"
-            className="group rounded-[22px] border border-border/60 bg-black/[0.02] px-4 py-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/[0.06] dark:bg-white/[0.02]"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-black">去选刷单商品</div>
-                <div className="mt-1 text-sm text-muted-foreground">维护商品池，排单时直接取用。</div>
-              </div>
-              <Tags size={16} className="text-primary" />
-            </div>
-            <div className="mt-4 flex items-end justify-between">
-              <div>
-                <div className="text-xl font-black">{stats.brushProductCount}</div>
-                <div className="text-xs text-muted-foreground">当前商品数</div>
-              </div>
-              <span className="inline-flex items-center gap-1 text-sm font-bold text-primary">
-                商品池
-                <ArrowRight size={14} />
-              </span>
-            </div>
-          </Link>
-
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
           <Link
             href="/brush-plans"
             className="group rounded-[22px] border border-border/60 bg-black/[0.02] px-4 py-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/[0.06] dark:bg-white/[0.02]"
@@ -665,11 +633,11 @@ export default function BrushCenterPage() {
               }
             >
               {(!isCompactView || isExpenseChartOpen) && orderChartHighlights.length > 0 && (
-                <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-3">
                   {orderChartHighlights.map((item) => (
-                    <div key={item.label} className="rounded-[20px] border border-border/50 bg-black/[0.02] px-4 py-3 dark:bg-white/[0.02]">
+                    <div key={item.label} className="rounded-[16px] border border-border/50 bg-black/[0.02] px-3 py-3 dark:bg-white/[0.02]">
                       <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{item.label}</div>
-                      <div className="mt-2 text-lg font-black">{item.value}</div>
+                      <div className="mt-1.5 text-base font-black">{item.value}</div>
                       <div className="mt-1 text-xs text-muted-foreground">{item.hint}</div>
                     </div>
                   ))}
@@ -678,14 +646,14 @@ export default function BrushCenterPage() {
 
               {!isCompactView || isExpenseChartOpen ? (
                 <>
-                  <div className="mb-5 flex flex-wrap items-center gap-3 rounded-[22px] border border-border/60 bg-muted/10 px-3 py-3 sm:px-4">
+                  <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[18px] border border-border/60 bg-muted/10 px-3 py-3 sm:px-4">
                     <div className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">筛选</div>
 
                     <CustomSelect
                       options={shopOptions}
                       value={selectedShop}
                       onChange={setSelectedShop}
-                      triggerClassName="h-10 min-w-[144px] rounded-2xl border-border/70 bg-background/80 px-3 text-sm font-semibold"
+                      triggerClassName="h-10 min-w-[144px] rounded-xl border-border/70 bg-background/80 px-3 text-sm font-semibold"
                       className="w-[144px]"
                     />
 
@@ -701,7 +669,7 @@ export default function BrushCenterPage() {
                           type="button"
                           onClick={() => setSelectedRange(range.value)}
                           className={cn(
-                            "inline-flex h-10 items-center rounded-2xl border px-3 text-sm font-semibold transition-all",
+                            "inline-flex h-10 items-center rounded-xl border px-3 text-sm font-semibold transition-all",
                             selectedRange === range.value
                               ? "border-primary/30 bg-primary/10 text-primary"
                               : "border-border/70 bg-background/80 text-muted-foreground hover:bg-background hover:text-foreground"
@@ -719,7 +687,7 @@ export default function BrushCenterPage() {
                           setSelectedShop("all");
                           setSelectedRange("14");
                         }}
-                        className="inline-flex h-10 items-center rounded-2xl border border-border/70 px-3 text-sm font-semibold text-muted-foreground transition-all hover:bg-background hover:text-foreground"
+                        className="inline-flex h-10 items-center rounded-xl border border-border/70 px-3 text-sm font-semibold text-muted-foreground transition-all hover:bg-background hover:text-foreground"
                       >
                         重置
                       </button>
@@ -728,9 +696,9 @@ export default function BrushCenterPage() {
 
                   {orderTrendData.length > 0 ? (
                     showCharts ? (
-                    <div className={cn("h-[320px]", isCompactView && "h-[240px]")}>
+                    <div className={cn("h-[360px]", isCompactView && "h-[260px]")}>
                       <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={orderTrendData} margin={{ top: 28, right: 18, left: 8, bottom: 0 }}>
+                    <AreaChart data={orderTrendData} margin={{ top: 20, right: 18, left: 8, bottom: 0 }}>
                           <defs>
                             <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="#fb7185" stopOpacity={0.24} />
@@ -764,40 +732,26 @@ export default function BrushCenterPage() {
                             dataKey="expense"
                             name="总支出"
                             stroke="#fb7185"
-                            strokeWidth={3.2}
+                            strokeWidth={2.2}
                             fill="url(#expenseFill)"
-                            dot={(props) => (
-                              <PointValueDot
-                                {...props}
-                                color="#fb7185"
-                                labelOffset={isCompactView ? 10 : 16}
-                                formatter={formatExpenseCurrency}
-                              />
-                            )}
-                            activeDot={{ r: 5, strokeWidth: 0, fill: "#fb7185" }}
+                            dot={{ r: 2.5, fill: "#fb7185", strokeWidth: 0 }}
+                            activeDot={{ r: 4, strokeWidth: 0, fill: "#fb7185" }}
                           />
                           <Line
                             type="monotone"
                             dataKey="payment"
                             name="实付"
                             stroke="#5ba7ff"
-                            strokeWidth={2.6}
+                            strokeWidth={1.8}
                             strokeDasharray="0"
-                            dot={(props) => (
-                              <PointValueDot
-                                {...props}
-                                color="#5ba7ff"
-                                labelOffset={isCompactView ? 14 : 20}
-                                formatter={formatCurrency}
-                              />
-                            )}
+                            dot={{ r: 2.2, fill: "#5ba7ff", strokeWidth: 0 }}
                           />
                           <Line
                             type="monotone"
                             dataKey="commission"
                             name="佣金"
                             stroke="#f3b34c"
-                            strokeWidth={2.4}
+                            strokeWidth={1.6}
                             strokeDasharray="6 6"
                             dot={false}
                           />
@@ -805,7 +759,7 @@ export default function BrushCenterPage() {
                       </ResponsiveContainer>
                     </div>
                     ) : (
-                      <div className={cn("h-[320px] rounded-[22px] border border-border/50 bg-muted/10", isCompactView && "h-[240px]")} />
+                      <div className={cn("h-[360px] rounded-[22px] border border-border/50 bg-muted/10", isCompactView && "h-[260px]")} />
                     )
                   ) : (
                     <EmptyState message="当前筛选条件下没有订单数据，换个店铺或日期范围试试。" />
@@ -839,17 +793,12 @@ export default function BrushCenterPage() {
           }
         >
           {canManageBrush && latestShopExpense.length > 0 && (
-            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[18px] border border-border/50 bg-black/[0.02] px-4 py-3 text-sm dark:bg-white/[0.02]">
               {latestShopExpense.map((item) => (
-                <div key={item.shop} className="rounded-[18px] border border-border/50 bg-black/[0.02] px-4 py-3 dark:bg-white/[0.02]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-bold">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                      {item.shop}
-                    </div>
-                    <div className="text-base font-black">{formatExpenseCurrency(item.value)}</div>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">最新一天支出</div>
+                <div key={item.shop} className="inline-flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="font-bold">{item.shop}</span>
+                  <span className="text-muted-foreground">{formatExpenseCurrency(item.value)}</span>
                 </div>
               ))}
             </div>
@@ -859,9 +808,9 @@ export default function BrushCenterPage() {
             canManageBrush ? (
               expenseTrendByShop.data.length > 0 ? (
                 showCharts ? (
-                <div className={cn("mt-2 h-[320px] w-full", isCompactView && "h-[240px]")}>
+                <div className={cn("mt-2 h-[360px] w-full", isCompactView && "h-[260px]")}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={expenseTrendByShop.data} margin={{ top: 18, right: 62, left: 8, bottom: 0 }}>
+                    <LineChart data={expenseTrendByShop.data} margin={{ top: 14, right: 20, left: 8, bottom: 0 }}>
                       <CartesianGrid stroke="currentColor" strokeOpacity={0.08} vertical={false} />
                       <XAxis
                         dataKey="label"
@@ -885,24 +834,34 @@ export default function BrushCenterPage() {
                           dataKey={shop}
                           name={shop}
                           stroke={PLATFORM_COLORS[index % PLATFORM_COLORS.length]}
-                          strokeWidth={3}
-                          dot={(props) => (
-                            <PointValueDot
-                              {...props}
-                              color={PLATFORM_COLORS[index % PLATFORM_COLORS.length]}
-                              labelOffset={isCompactView ? 10 : 14}
-                              formatter={formatExpenseCurrency}
-                              showLabel={shouldShowShopExpenseLabel(shop, props.index ?? -1)}
-                            />
-                          )}
-                          activeDot={{ r: 5, strokeWidth: 0, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length] }}
+                          strokeWidth={2}
+                          dot={{ r: 2.5, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length], strokeWidth: 0 }}
+                          label={(props) => {
+                            const isLastPoint = (props.index ?? -1) === expenseTrendByShop.data.length - 1;
+                            if (!isLastPoint || typeof props.x !== "number" || typeof props.y !== "number" || typeof props.value !== "number") {
+                              return null;
+                            }
+                            return (
+                              <text
+                                x={props.x}
+                                y={props.y - 10}
+                                textAnchor="middle"
+                                fill={PLATFORM_COLORS[index % PLATFORM_COLORS.length]}
+                                fontSize="10"
+                                fontWeight="700"
+                              >
+                                {formatExpenseCurrency(props.value)}
+                              </text>
+                            );
+                          }}
+                          activeDot={{ r: 4, strokeWidth: 0, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length] }}
                         />
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
                 ) : (
-                  <div className={cn("mt-2 h-[320px] rounded-[22px] border border-border/50 bg-muted/10", isCompactView && "h-[240px]")} />
+                  <div className={cn("mt-2 h-[360px] rounded-[22px] border border-border/50 bg-muted/10", isCompactView && "h-[260px]")} />
                 )
               ) : (
                 <EmptyState message="还没有足够的订单数据，后续这里会按店铺展示支出曲线。" />
