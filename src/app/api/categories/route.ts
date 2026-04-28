@@ -17,9 +17,10 @@ export async function GET(request: Request) {
       where: session ? {
         userId: session.id,
         name: { notIn: HIDDEN_CATEGORY_NAMES },
-        NOT: {
-          description: HIDDEN_CATEGORY_DESCRIPTION,
-        },
+        OR: [
+          { description: null },
+          { description: { not: HIDDEN_CATEGORY_DESCRIPTION } },
+        ],
       } : {},
       select: {
         id: true,
@@ -67,6 +68,7 @@ export async function GET(request: Request) {
       const current = countMap.get(product.categoryId) || 0;
       countMap.set(product.categoryId, current + 1);
     }
+
     
     // 映射回前端需要的结构
     const formatted = categories.map(c => ({
@@ -75,7 +77,17 @@ export async function GET(request: Request) {
       description: c.description || "",
       count: countMap.get(c.id) || 0,
     }))
-      .filter((category) => !mainProductsOnly || category.count > 0);
+      .filter((category) => !mainProductsOnly || category.count > 0)
+      .sort((a, b) => {
+        const nameCompare = a.name.localeCompare(b.name, "zh-CN", {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (nameCompare !== 0) {
+          return nameCompare;
+        }
+        return a.id.localeCompare(b.id, "en");
+      });
 
     return NextResponse.json(formatted);
   } catch (error) {

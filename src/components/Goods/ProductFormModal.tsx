@@ -1009,6 +1009,8 @@ export function ProductFormModal({
                                 onChange={(value) => setFormData({...formData, categoryId: value})}
                                 options={categories.map(c => ({ value: c.id, label: c.name }))}
                                 placeholder="选择分类"
+                                searchable={true}
+                                searchPlaceholder="搜索分类"
                                 triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                 onAddNew={() => setIsCategoryModalOpen(true)}
                                 addNewLabel="新增分类"

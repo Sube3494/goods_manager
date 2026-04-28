@@ -20,10 +20,24 @@ interface CustomSelectProps {
   triggerClassName?: string;
   onAddNew?: () => void;
   addNewLabel?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
 
-export function CustomSelect({ options, value, onChange, placeholder = "请选择...", className, triggerClassName, onAddNew, addNewLabel }: CustomSelectProps) {
+export function CustomSelect({
+  options,
+  value,
+  onChange,
+  placeholder = "请选择...",
+  className,
+  triggerClassName,
+  onAddNew,
+  addNewLabel,
+  searchable = false,
+  searchPlaceholder = "搜索...",
+}: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
     left: number;
@@ -32,14 +46,33 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
     isReady: boolean;
   }>({ top: 0, left: 0, width: 0, showAbove: false, isReady: false });
   const containerRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label || placeholder;
+  const filteredOptions = searchable
+    ? options.filter((option) =>
+        option.label.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : options;
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(handle);
   }, []);
+
+  useEffect(() => {
+    if (isOpen && searchable) {
+      const handle = requestAnimationFrame(() => inputRef.current?.focus());
+      return () => cancelAnimationFrame(handle);
+    }
+  }, [isOpen, searchable]);
+
+  useEffect(() => {
+    if (!isOpen && searchQuery) {
+      setSearchQuery("");
+    }
+  }, [isOpen, searchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -95,7 +128,29 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
           triggerClassName
         )}
       >
-        <span className={cn("truncate font-normal", !value && "text-muted-foreground")}>{selectedLabel}</span>
+        {searchable ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={isOpen ? searchQuery : selectedLabel}
+            onChange={(e) => {
+              if (!isOpen) {
+                setIsOpen(true);
+              }
+              setSearchQuery(e.target.value);
+            }}
+            onFocus={() => setIsOpen(true)}
+            onClick={(e) => e.stopPropagation()}
+            placeholder={placeholder}
+            className={cn(
+              "w-full bg-transparent outline-none text-xs font-normal",
+              !value && !searchQuery && "text-muted-foreground"
+            )}
+            readOnly={!isOpen}
+          />
+        ) : (
+          <span className={cn("truncate font-normal", !value && "text-muted-foreground")}>{selectedLabel}</span>
+        )}
         <ChevronDown
           size={12}
           className={cn("text-muted-foreground transition-transform duration-200 ml-1 shrink-0", isOpen && "rotate-180")}
@@ -123,14 +178,15 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
               className="rounded-lg glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden border border-border/50"
             >
               <div className="max-h-60 overflow-auto p-1 py-1.5">
-                {options.length > 0 ? (
-                  options.map((option, index) => (
+                {filteredOptions.length > 0 ? (
+                  filteredOptions.map((option, index) => (
                     <button
                       key={`${option.value}-${index}`}
                       type="button"
                       onClick={() => {
                         onChange(option.value);
                         setIsOpen(false);
+                        setSearchQuery("");
                       }}
                       className={cn(
                         "relative flex w-full select-none items-center rounded-md py-2 pl-2.5 pr-7 text-xs outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer",
@@ -147,7 +203,7 @@ export function CustomSelect({ options, value, onChange, placeholder = "请选�
                   ))
                 ) : (
                   <div className="py-6 text-center space-y-3">
-                    <p className="text-xs text-muted-foreground">暂无选项</p>
+                    <p className="text-xs text-muted-foreground">{searchable && searchQuery ? "暂无匹配结果" : "暂无选项"}</p>
                     {onAddNew && (
                       <button
                         type="button"
