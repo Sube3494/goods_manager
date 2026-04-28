@@ -29,6 +29,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    const andWhere: Prisma.PurchaseOrderWhereInput[] = [];
     const autoInboundExclusion: Prisma.PurchaseOrderWhereInput = {
       NOT: {
         OR: [
@@ -37,23 +38,21 @@ export async function GET(request: Request) {
         ],
       },
     };
-    const where: Prisma.PurchaseOrderWhereInput = {
-      AND: [autoInboundExclusion],
-    };
+    andWhere.push(autoInboundExclusion);
     if (type === "Inbound") {
-        where.AND?.push({
-          OR: [
-            { type: "Inbound" },
-            { type: "Return" },
-            { type: "InternalReturn" },
-            { status: "Received" },
-          ],
-        });
+      andWhere.push({
+        OR: [
+          { type: "Inbound" },
+          { type: "Return" },
+          { type: "InternalReturn" },
+          { status: "Received" },
+        ],
+      });
     } else if (type) {
-        where.AND?.push({ type });
+      andWhere.push({ type });
     }
     if (productId) {
-      where.AND?.push({
+      andWhere.push({
         items: {
           some: {
             OR: [
@@ -64,6 +63,7 @@ export async function GET(request: Request) {
         },
       });
     }
+    const where: Prisma.PurchaseOrderWhereInput = andWhere.length > 0 ? { AND: andWhere } : {};
 
     const [purchases, total] = await Promise.all([
       prisma.purchaseOrder.findMany({
