@@ -15,6 +15,7 @@ import { useUser } from "@/hooks/useUser";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -329,7 +330,10 @@ export function PurchaseOrderModal({
   const effectiveReadOnly = readOnly || formData.status === "Received" || (initialData?.status === "Received");
   
   // Derived: system-generated records (auto-created from outbound returns) are always locked
-  const isSystemGenerated = formData.type === "Return" || formData.type === "InternalReturn";
+  const isSystemGenerated =
+    formData.type === "Return" ||
+    formData.type === "InternalReturn" ||
+    formData.type === AUTO_INBOUND_TYPE;
 
 
 
@@ -812,10 +816,16 @@ export function PurchaseOrderModal({
             <div className="flex items-center justify-between border-b border-white/10 p-5 sm:p-8 shrink-0">
               <div className="flex flex-col gap-0.5 min-w-0">
                 <h2 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2 sm:gap-3 truncate">
-                  {formData.type === "Inbound" || formData.type === "Return" || formData.type === "InternalReturn" ? (
+                  {formData.type === "Inbound" || formData.type === AUTO_INBOUND_TYPE || formData.type === "Return" || formData.type === "InternalReturn" ? (
                       <div className="flex items-center gap-2 truncate">
                           <Package size={20} className="text-primary shrink-0 sm:w-6 sm:h-6" />
-                          <span className="truncate">{effectiveReadOnly ? "单据详情" : (initialData ? "编辑单据" : "新增入库")}</span>
+                          <span className="truncate">
+                            {formData.type === AUTO_INBOUND_TYPE
+                              ? "自动补库存详情"
+                              : effectiveReadOnly
+                              ? "单据详情"
+                              : (initialData ? "编辑单据" : "新增入库")}
+                          </span>
                       </div>
                   ) : (
                       <div className="flex items-center gap-2 truncate">
@@ -826,7 +836,7 @@ export function PurchaseOrderModal({
                 </h2>
                 {isSystemGenerated && (
                   <p className="text-[10px] font-bold text-orange-500/80 tracking-wider flex items-center gap-1 whitespace-nowrap overflow-hidden">
-                    <AlertCircle size={10} strokeWidth={3} className="shrink-0" /> <span className="truncate">系统自动生成的记录，不支持修改</span>
+                    <AlertCircle size={10} strokeWidth={3} className="shrink-0" /> <span className="truncate">{formData.type === AUTO_INBOUND_TYPE ? "系统自动补库存记录，不支持修改" : "系统自动生成的记录，不支持修改"}</span>
                   </p>
                 )}
               </div>

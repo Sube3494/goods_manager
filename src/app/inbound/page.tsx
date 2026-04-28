@@ -15,6 +15,28 @@ import { cn } from "@/lib/utils";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Suspense } from "react";
+import { AUTO_INBOUND_TYPE, isAutoInboundOrderLike } from "@/lib/purchaseOrderTypes";
+
+const INBOUND_TYPE_ALL = "全部类型";
+const INBOUND_TYPE_OPTIONS = [
+  { value: INBOUND_TYPE_ALL, label: INBOUND_TYPE_ALL },
+  { value: "Inbound", label: "手动入库" },
+  { value: AUTO_INBOUND_TYPE, label: "自动补库存" },
+  { value: "ReturnGroup", label: "退回入库" },
+] as const;
+
+function getInboundTypeLabel(order: PurchaseOrder) {
+  if (isAutoInboundOrderLike(order)) return "自动补库存";
+  switch (order.type) {
+    case "Return":
+      return "退货入库";
+    case "InternalReturn":
+      return "样品退回";
+    case "Inbound":
+    default:
+      return "手动入库";
+  }
+}
 
 function InboundContent() {
   const { showToast } = useToast();
@@ -29,19 +51,21 @@ function InboundContent() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedShop, setSelectedShop] = useState("全部");
+  const [selectedInboundType, setSelectedInboundType] = useState(INBOUND_TYPE_ALL);
   const [platformFilter, setPlatformFilter] = useState("全部平台");
   
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const hasActiveFilters = searchQuery.trim() !== "" || startDate !== "" || endDate !== "" || selectedShop !== "全部" || platformFilter !== "全部平台";
+  const hasActiveFilters = searchQuery.trim() !== "" || startDate !== "" || endDate !== "" || selectedShop !== "全部" || selectedInboundType !== INBOUND_TYPE_ALL || platformFilter !== "全部平台";
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     setStartDate("");
     setEndDate("");
     setSelectedShop("全部");
+    setSelectedInboundType(INBOUND_TYPE_ALL);
     setPlatformFilter("全部平台");
     setCurrentPage(1);
   }, []);
@@ -102,6 +126,14 @@ function InboundContent() {
     // Shop filter
     const matchesShop = selectedShop === "全部" || p.shopName === selectedShop;
 
+    // Inbound type filter
+    const orderType = isAutoInboundOrderLike(p)
+      ? AUTO_INBOUND_TYPE
+      : p.type === "Return" || p.type === "InternalReturn"
+      ? "ReturnGroup"
+      : (p.type || "Inbound");
+    const matchesInboundType = selectedInboundType === INBOUND_TYPE_ALL || orderType === selectedInboundType;
+
     // Platform filter
     const orderPlatform = extractPlatform(p.note);
     const matchesPlatform = platformFilter === "全部平台" || orderPlatform === platformFilter;
@@ -115,7 +147,7 @@ function InboundContent() {
       matchesDate = isWithinInterval(orderDate, { start, end });
     }
 
-    return matchesSearch && matchesShop && matchesPlatform && matchesDate;
+    return matchesSearch && matchesShop && matchesInboundType && matchesPlatform && matchesDate;
   });
 
   // Pagination Logic
@@ -129,7 +161,7 @@ function InboundContent() {
   // Reset page when search or date changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, startDate, endDate, selectedShop, platformFilter, pageSize]);
+  }, [searchQuery, startDate, endDate, selectedShop, selectedInboundType, platformFilter, pageSize]);
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
@@ -145,20 +177,33 @@ function InboundContent() {
 
       {/* Search Box & Reset */}
       <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 md:mb-8 text-foreground">
-        <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full md:flex-1">
-            <Search size={18} className="text-muted-foreground shrink-0" />
-            <input
-              type="text"
-              placeholder="搜索入库单号或商品名称..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
-            />
+        <div className="flex items-center gap-2 w-full">
+          <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0">
+              <Search size={18} className="text-muted-foreground shrink-0" />
+              <input
+                type="text"
+                placeholder="搜索入库单号或商品名称..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+              />
+          </div>
+
+          {hasActiveFilters && (
+              <button
+                  onClick={resetFilters}
+                  className="h-10 sm:h-11 px-3 sm:px-4 flex items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+              >
+                  <RotateCcw size={14} />
+                  <span className="hidden sm:inline">重置</span>
+                  <span className="sm:hidden text-[10px]">重置</span>
+              </button>
+          )}
         </div>
 
-        <div className="flex flex-row items-center gap-2 sm:gap-3 h-10 sm:h-11 w-full md:w-auto">
+        <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:flex-row sm:items-center sm:gap-3 sm:h-11 sm:w-auto">
             {/* Date Range Pickers */}
-            <div className="flex items-center gap-1.5 sm:gap-2 h-full shrink-0 flex-1 md:flex-none">
+            <div className="col-span-3 flex h-10 items-center gap-1.5 sm:h-full sm:shrink-0 sm:flex-1 md:flex-none">
                 <DatePicker 
                     value={startDate} 
                     onChange={setStartDate} 
@@ -180,7 +225,7 @@ function InboundContent() {
                 />
             </div>
 
-            <div className="w-24 sm:w-28 h-full shrink-0">
+            <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
                 <CustomSelect
                     value={platformFilter}
                     onChange={setPlatformFilter}
@@ -197,7 +242,21 @@ function InboundContent() {
                 />
             </div>
 
-            <div className="w-24 sm:w-28 h-full shrink-0">
+            <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
+                <CustomSelect
+                    value={selectedInboundType}
+                    onChange={setSelectedInboundType}
+                    options={INBOUND_TYPE_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+                    placeholder="入库类型"
+                    className="h-full"
+                    triggerClassName={cn(
+                        "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
+                        selectedInboundType !== INBOUND_TYPE_ALL ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                    )}
+                />
+            </div>
+
+            <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
                 <CustomSelect
                     value={selectedShop}
                     onChange={setSelectedShop}
@@ -214,16 +273,6 @@ function InboundContent() {
                 />
             </div>
 
-            {hasActiveFilters && (
-                <button
-                    onClick={resetFilters}
-                    className="h-full px-3 sm:px-4 flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-                >
-                    <RotateCcw size={14} />
-                    <span className="hidden sm:inline">重置</span>
-                    <span className="sm:hidden text-[10px]">重置</span>
-                </button>
-            )}
         </div>
       </div>
 
@@ -261,9 +310,13 @@ function InboundContent() {
                       <div className="flex flex-col items-center justify-center gap-1.5">
                         <div className="flex items-center gap-1.5">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                            po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                            isAutoInboundOrderLike(po)
+                              ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+                              : po.type === "Return" || po.type === "InternalReturn"
+                              ? 'bg-violet-500/10 text-violet-600 border-violet-500/20'
+                              : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
                           }`}>
-                            {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
+                            {getInboundTypeLabel(po)}
                           </span>
                           {po.shopName && (
                             <span className="flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 w-fit">

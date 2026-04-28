@@ -25,6 +25,21 @@ import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { sortPurchaseItems } from "@/lib/pinyin";
 import { filterPurchases, isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
 
+function sortPurchasesByRecency(items: PurchaseOrder[]) {
+  return [...items].sort((a, b) => {
+    const aTime = new Date(a.createdAt || a.date || 0).getTime();
+    const bTime = new Date(b.createdAt || b.date || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
+function replaceCurrentSearch(pathname: string, params: URLSearchParams) {
+  if (typeof window === "undefined") return;
+  const query = params.toString();
+  const nextUrl = query ? `${pathname}?${query}` : pathname;
+  window.history.replaceState(null, "", nextUrl);
+}
+
 function PurchasesContent() {
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
@@ -80,11 +95,10 @@ function PurchasesContent() {
     setShopFilter("All");
     setCurrentPage(1);
     
-    // Also clean URL params if necessary
     const params = new URLSearchParams(searchParams);
     params.delete('status');
-    router.replace(`${pathname}?${params.toString()}`);
-  }, [searchParams, router, pathname]);
+    replaceCurrentSearch(pathname, params);
+  }, [searchParams, pathname]);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -95,12 +109,15 @@ function PurchasesContent() {
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const pRes = await fetch("/api/purchases?page=1&pageSize=99999");
+      const pRes = await fetch(`/api/purchases?page=1&pageSize=99999&_ts=${Date.now()}`, {
+        cache: "no-store",
+      });
       
       if (pRes.ok) {
         const data = await pRes.json();
         // Extract items from paginated response
-        setPurchases(Array.isArray(data) ? data : (data.items || []));
+        const nextItems = Array.isArray(data) ? data : (data.items || []);
+        setPurchases(sortPurchasesByRecency(nextItems));
       }
     } catch (error) {
       console.error("Failed to fetch purchases data:", error);
@@ -158,7 +175,7 @@ function PurchasesContent() {
     } else {
         params.set('status', status);
     }
-    router.replace(`${pathname}?${params.toString()}`);
+    replaceCurrentSearch(pathname, params);
   };
 
   const handleCreate = () => {
@@ -232,15 +249,28 @@ function PurchasesContent() {
         // 由于返回的数据可能没有经过 URL resolve，我们在这里执行一次静默获取或者手动维护状态
         // 为了保险起见（图片 resolve 等），我们使用显式的刷新，但采用不带 loading 的方式
         if (isEdit) {
-            setPurchases(prev => prev.map(p => p.id === savedPO.id ? { ...p, ...savedPO } : p));
+            setPurchases(prev => sortPurchasesByRecency(prev.map(p => p.id === savedPO.id ? { ...p, ...savedPO } : p)));
         } else {
-            setPurchases(prev => [savedPO, ...prev]);
+            setPurchases(prev => sortPurchasesByRecency([savedPO, ...prev.filter(p => p.id !== savedPO.id)]));
+        }
+
+        if (!isEdit) {
+          setSearchQuery("");
+          setStatusFilter("All");
+          setShopFilter("All");
+          setCurrentPage(1);
+
+          const params = new URLSearchParams(searchParams);
+          params.delete("status");
+          replaceCurrentSearch(pathname, params);
         }
         
-        // 延迟后台同步，确保本地插入/更新动画流程不被刷新数据打断
-        setTimeout(() => {
-           fetchData(true);
-        }, 500);
+        if (isEdit) {
+          // 编辑时再静默对齐一次后端返回，避免覆盖刚创建的新单
+          setTimeout(() => {
+             fetchData(true);
+          }, 500);
+        }
         
         const msg = data.status === "Draft" ? "草稿已暂存" : (isEdit ? "采购单已更新" : "采购单已创建");
         showToast(msg, "success");
