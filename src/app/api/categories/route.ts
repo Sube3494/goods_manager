@@ -17,7 +17,9 @@ export async function GET(request: Request) {
       where: session ? {
         userId: session.id,
         name: { notIn: HIDDEN_CATEGORY_NAMES },
-        description: { not: HIDDEN_CATEGORY_DESCRIPTION },
+        NOT: {
+          description: HIDDEN_CATEGORY_DESCRIPTION,
+        },
       } : {},
       select: {
         id: true,
