@@ -78,6 +78,7 @@ COPY --chmod=755 scripts/start-app.sh ./scripts/start-app.sh
 COPY scripts/fix_shop_external_id_duplicates.js ./scripts/fix_shop_external_id_duplicates.js
 COPY scripts/fix_shop_dedupe_keys.js ./scripts/fix_shop_dedupe_keys.js
 COPY scripts/fix_shop_product_duplicate_skus.js ./scripts/fix_shop_product_duplicate_skus.js
+COPY scripts/cleanup_orphan_shop_only_products.js ./scripts/cleanup_orphan_shop_only_products.js
 
 # 上传文件持久化目录（chmod 777 确保 volume 挂载时也能正常写入）
 RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads

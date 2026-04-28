@@ -6,6 +6,7 @@ sh scripts/init-db.sh
 node scripts/fix_shop_external_id_duplicates.js
 node scripts/fix_shop_dedupe_keys.js
 node scripts/fix_shop_product_duplicate_skus.js
+node scripts/cleanup_orphan_shop_only_products.js
 
 echo "→ Trying prisma db push..."
 if prisma db push --skip-generate --accept-data-loss; then

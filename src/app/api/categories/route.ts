@@ -3,13 +3,18 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
+const HIDDEN_CATEGORY_NAMES = ["历史残留"];
+const HIDDEN_CATEGORY_DESCRIPTION = "系统历史残留商品归档";
+
 export async function GET() {
   const session = await getFreshSession() as SessionUser | null;
 
   try {
     const categories = await prisma.category.findMany({
       where: session ? {
-        userId: session.id
+        userId: session.id,
+        name: { notIn: HIDDEN_CATEGORY_NAMES },
+        description: { not: HIDDEN_CATEGORY_DESCRIPTION },
       } : {},
       select: {
         id: true,
@@ -19,21 +24,40 @@ export async function GET() {
       orderBy: { name: 'asc' }
     });
 
-    const products = await prisma.product.findMany({
-      where: session ? {
-        userId: session.id,
-        isShopOnly: false,
-      } : {
-        isPublic: true,
-        isShopOnly: false,
-      },
-      select: {
-        categoryId: true,
-      },
-    });
+    const [products, shopProducts] = await Promise.all([
+      prisma.product.findMany({
+        where: session ? {
+          userId: session.id,
+        } : {
+          isPublic: true,
+          isShopOnly: false,
+        },
+        select: {
+          categoryId: true,
+        },
+      }),
+      session
+        ? prisma.shopProduct.findMany({
+            where: {
+              shop: {
+                userId: session.id,
+              },
+            },
+            select: {
+              categoryId: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
 
     const countMap = new Map<string, number>();
     for (const product of products) {
+      if (!product.categoryId) continue;
+      const current = countMap.get(product.categoryId) || 0;
+      countMap.set(product.categoryId, current + 1);
+    }
+    for (const product of shopProducts) {
+      if (!product.categoryId) continue;
       const current = countMap.get(product.categoryId) || 0;
       countMap.set(product.categoryId, current + 1);
     }

@@ -8,7 +8,7 @@ import { ProductService } from "@/services/productService";
 import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
-import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopNameKey } from "@/lib/shopIdentity";
+import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey } from "@/lib/shopIdentity";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -2519,14 +2519,34 @@ async function resolveAutoPickInternalShop(
     name: normalized.rawShopName,
     address: normalizeShopAddress(normalized.rawShopAddress),
   });
-  if (!shop) {
+  if (shop) {
+    return {
+      id: shop.id,
+      name: shop.name || "",
+    };
+  }
+
+  const rawAddressKey = normalizeShopAddressKey(normalized.rawShopAddress);
+  if (!rawAddressKey) {
     return null;
   }
 
-  return {
-    id: shop.id,
-    name: shop.name || "",
-  };
+  const partialAddressMatchedShops = shops.filter((item) => {
+    const currentAddressKey = normalizeShopAddressKey(item.address);
+    if (!currentAddressKey) {
+      return false;
+    }
+    return currentAddressKey.includes(rawAddressKey) || rawAddressKey.includes(currentAddressKey);
+  });
+
+  if (partialAddressMatchedShops.length === 1) {
+    return {
+      id: partialAddressMatchedShops[0].id,
+      name: partialAddressMatchedShops[0].name || "",
+    };
+  }
+
+  return null;
 }
 
 async function ensureShopProductsForAutoPickOrder(
@@ -3095,26 +3115,19 @@ async function resolveOutboundItemsForAutoPickOrder(
   const rawShopName = readPreferredMaiyatianShopName(rawPayloadRecord) || null;
   const rawShopAddress = readPreferredMaiyatianShopAddress(rawPayloadRecord) || null;
   const preferredMappedShopName = String(order.preferredMappedShopName || "").trim() || null;
-  const mappedShopName = preferredMappedShopName || findMappedShopNameFromAutoPickConfig(
+  const resolvedInternalShop = await resolveAutoPickInternalShop(tx, userId, {
+    shopId: order.shopId || undefined,
+    rawShopName: rawShopName || undefined,
+    rawShopAddress: rawShopAddress || undefined,
+  });
+  const mappedShopName = preferredMappedShopName || resolvedInternalShop?.name || findMappedShopNameFromAutoPickConfig(
     normalizeExternalId(order.shopId) || null,
     rawShopName,
     rawShopAddress,
     user?.permissions
   );
-
-  const userShops = mappedShopName
-    ? await tx.shop.findMany({
-        where: { userId },
-        select: {
-          id: true,
-          name: true,
-          address: true,
-          externalId: true,
-        },
-      })
-    : [];
-  const internalShop = mappedShopName
-    ? findMatchingShopRecord(userShops, { name: mappedShopName })
+  const internalShop = resolvedInternalShop
+    ? { id: resolvedInternalShop.id, name: resolvedInternalShop.name }
     : null;
   const mappedShopNameText = String(internalShop?.name || mappedShopName || "").trim();
   const isCandidateInMappedShop = (candidateShopName: string | null | undefined) => {

@@ -66,14 +66,24 @@ export async function DELETE(
       return NextResponse.json({ error: "包含无权操作的分类" }, { status: 403 });
     }
 
-    const productCount = await prisma.product.count({
-      where: {
-        categoryId: { in: ownedIds },
-        userId: session.id,
-      },
-    });
+    const [productCount, shopProductCount] = await Promise.all([
+      prisma.product.count({
+        where: {
+          categoryId: { in: ownedIds },
+          userId: session.id,
+        },
+      }),
+      prisma.shopProduct.count({
+        where: {
+          categoryId: { in: ownedIds },
+          shop: {
+            userId: session.id,
+          },
+        },
+      }),
+    ]);
 
-    if (productCount > 0) {
+    if (productCount > 0 || shopProductCount > 0) {
       return NextResponse.json(
         { error: "无法删除：选中的某些分类下仍有商品。" },
         { status: 400 }
