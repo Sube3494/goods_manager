@@ -29,6 +29,22 @@ export async function POST(request: Request) {
       : Array.isArray(body?.rows)
       ? body.rows
       : null;
+    const rawShopId = typeof body?.shopId === "string" ? body.shopId.trim() : "";
+
+    if (!rawShopId) {
+      return NextResponse.json({ error: "请先选择店铺后再导入刷单商品" }, { status: 400 });
+    }
+
+    const shop = await prisma.shop.findFirst({
+      where: user.role === "SUPER_ADMIN"
+        ? { id: rawShopId }
+        : { id: rawShopId, userId: user.id },
+      select: { id: true, name: true },
+    });
+
+    if (!shop) {
+      return NextResponse.json({ error: "店铺不存在或无权限导入到该店铺" }, { status: 400 });
+    }
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: "没有可导入的数据" }, { status: 400 });
@@ -54,40 +70,35 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const product = sku
-        ? await prisma.product.findFirst({
+      const shopProduct = sku
+        ? await prisma.shopProduct.findFirst({
             where: {
+              shopId: shop.id,
               sku,
-              ...(user.role === "SUPER_ADMIN"
-                ? {}
-                : {
-                    OR: [{ userId: user.id }, { isPublic: true }],
-                  }),
             },
-            select: { id: true },
+            select: { productId: true },
           })
-        : await prisma.product.findFirst({
+        : await prisma.shopProduct.findFirst({
             where: {
-              name,
-              ...(user.role === "SUPER_ADMIN"
-                ? {}
-                : {
-                    OR: [{ userId: user.id }, { isPublic: true }],
-                  }),
+              shopId: shop.id,
+              productName: name,
             },
-            select: { id: true },
+            select: { productId: true },
           });
 
-      if (!product) {
+      const matchedProductId = typeof shopProduct?.productId === "string" ? shopProduct.productId.trim() : "";
+
+      if (!matchedProductId) {
         results.failed += 1;
-        results.errors.push(`第 ${rowNumber} 行：找不到匹配商品${sku ? `（${sku}）` : `（${name}）`}`);
+        results.errors.push(`第 ${rowNumber} 行：在店铺「${shop.name}」里找不到匹配商品${sku ? `（${sku}）` : `（${name}）`}`);
         continue;
       }
 
       const existing = await prisma.brushProduct.findFirst({
         where: {
           userId: user.id,
-          productId: product.id,
+          shopId: shop.id,
+          productId: matchedProductId,
         },
         select: { id: true },
       });
@@ -107,7 +118,8 @@ export async function POST(request: Request) {
       await prisma.brushProduct.create({
         data: {
           userId: user.id,
-          productId: product.id,
+          productId: matchedProductId,
+          shopId: shop.id,
           isActive: true,
           brushKeyword: brushKeyword || null,
         },

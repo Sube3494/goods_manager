@@ -404,12 +404,17 @@ export default function BrushProductsPage() {
   }, [filteredItems, showToast]);
 
   const handleImport = useCallback(async (rows: Record<string, unknown>[] | Record<string, unknown[]>) => {
+    if (!selectedShopId) {
+      showToast("请先选择店铺", "error");
+      return;
+    }
+
     try {
       const payload = Array.isArray(rows) ? rows : [];
       const res = await fetch("/api/brush-products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: payload }),
+        body: JSON.stringify({ rows: payload, shopId: selectedShopId }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -430,7 +435,7 @@ export default function BrushProductsPage() {
       console.error("Failed to import brush products:", error);
       showToast("导入失败", "error");
     }
-  }, [fetchBrushProducts, showToast]);
+  }, [fetchBrushProducts, selectedShopId, showToast]);
 
   if (!canManage) {
     return (
