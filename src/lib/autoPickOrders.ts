@@ -3077,6 +3077,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
 
   const resolvedItems: Array<{ productId: string; quantity: number }> = [];
   const missingItems: string[] = [];
+  const resolvedCandidateShopNames = new Set<string>();
 
   for (const item of order.items) {
     const productName = toAutoPickBaseProductName(item.productName);
@@ -3112,16 +3113,25 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       continue;
     }
 
+    const resolvedCandidateShopName = String(sameShopSkuCandidate?.shopName || "").trim();
+    if (resolvedCandidateShopName) {
+      resolvedCandidateShopNames.add(resolvedCandidateShopName);
+    }
+
     resolvedItems.push({
       productId: resolvedProductId,
       quantity: Math.max(1, Number(item.quantity || 1) || 1),
     });
   }
 
+  const resolvedShopNameFromCandidates = resolvedCandidateShopNames.size === 1
+    ? Array.from(resolvedCandidateShopNames)[0]
+    : null;
+
   return {
     items: resolvedItems,
     missingItems,
-    mappedShopName: mappedShopName || null,
+    mappedShopName: String(internalShop?.name || mappedShopName || resolvedShopNameFromCandidates || "").trim() || null,
   };
 }
 
