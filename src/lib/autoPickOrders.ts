@@ -498,21 +498,56 @@ function stripHtmlTags(value: string) {
     .trim();
 }
 
-function normalizePlatformName(platform: string, channelTag?: string | null) {
-  const normalizedTag = String(channelTag || "").trim().toLowerCase();
-  if (normalizedTag === "other") {
-    return "帮我取货";
-  }
-
+function normalizePlatformName(platform: string) {
   const normalized = String(platform || "").trim();
   if (!normalized) {
-    return normalizedTag ? "其他" : "未知";
-  }
-  if (normalized === "其他" && normalizedTag === "other") {
-    return "帮我取货";
+    return "";
   }
   if (normalized === "淘宝闪购") return "淘宝";
   return normalized;
+}
+
+function inferPlatformNameFromChannelTag(channelTag: unknown) {
+  const normalizedTag = String(channelTag || "").trim().toLowerCase();
+  if (!normalizedTag) {
+    return "";
+  }
+
+  if (normalizedTag === "shangou") {
+    return "美团";
+  }
+
+  if (normalizedTag === "daojia") {
+    return "京东";
+  }
+
+  return "";
+}
+
+function readPreferredMaiyatianPlatform(rawOrder: Record<string, unknown>, fallback = "") {
+  const extend = rawOrder.extend && typeof rawOrder.extend === "object" && !Array.isArray(rawOrder.extend)
+    ? rawOrder.extend as Record<string, unknown>
+    : null;
+  const inferredByChannelTag = inferPlatformNameFromChannelTag(
+    rawOrder.channel_tag ?? extend?.channel_tag
+  );
+
+  const candidates = [
+    rawOrder.channel_tag_name,
+    rawOrder.platform,
+    rawOrder.platform_name,
+    extend?.channel_tag_name,
+    inferredByChannelTag,
+  ];
+
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) {
+      return normalizePlatformName(value);
+    }
+  }
+
+  return normalizePlatformName(fallback);
 }
 
 function parseUnixTimestampToOrderTime(rawValue: string | number | undefined) {
@@ -686,7 +721,7 @@ function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickIn
   const orderNo = String(rawOrder.source_id || "").trim();
   if (!orderNo) return null;
   const channelTag = String((rawOrder as Record<string, unknown>).channel_tag || "").trim();
-  const platform = normalizePlatformName(String(rawOrder.channel_tag_name || "美团").trim() || "美团", channelTag);
+  const platform = readPreferredMaiyatianPlatform(rawOrder as Record<string, unknown>);
   const { actualPaid, expectedIncome, platformCommission } = parseAmountsFromRawValues(platform, {
     commission: rawOrder.fee?.commission ?? rawOrder.commission,
     userFee: rawOrder.fee?.user_fee ?? rawOrder.user_fee,
@@ -729,7 +764,7 @@ function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPi
   const orderNo = String(rawOrder.source_id || "").trim();
   if (!orderNo) return null;
   const channelTag = String(rawOrder.channel_tag || "").trim();
-  const platform = normalizePlatformName(String(rawOrder.channel_tag_name || "未知").trim() || "未知", channelTag);
+  const platform = readPreferredMaiyatianPlatform(rawOrder);
   const fee = rawOrder.fee && typeof rawOrder.fee === "object" && !Array.isArray(rawOrder.fee)
     ? rawOrder.fee as Record<string, unknown>
     : null;
@@ -1878,6 +1913,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
             platform: normalized.platform || "",
             orderNo: normalized.orderNo || "",
           },
+          {
+            orderNo: normalized.orderNo || "",
+            OR: [
+              { platform: "" },
+              { platform: "未知" },
+            ],
+          },
           ...(normalized.id ? [{ sourceId: normalized.id }] : []),
         ],
       },
@@ -2685,23 +2727,29 @@ export async function refreshAutoPickOrderFromPlugin(
   lookup: { id?: string; platform?: string; orderNo?: string; orderTime?: Date | string | null }
 ) {
   const cookie = await getMaiyatianCookieForUser(userId);
+  const fallbackPlatform = String(lookup.platform || "").trim();
+  const fallbackOrderNo = String(lookup.orderNo || "").trim();
+  const canTrustLookupPlatform = Boolean(fallbackPlatform && fallbackPlatform !== "未知");
 
   const sourceId = String(lookup.id || "").trim();
   if (sourceId) {
     const detailOrder = await fetchSimplifiedMaiyatianOrderDetailByCookie(cookie, sourceId).catch(() => null);
     if (detailOrder) {
-      const normalizedDetailOrder = normalizeAutoPickOrderPayload(detailOrder);
-      if (!normalizedDetailOrder) {
-        throw new Error("Maiyatian detail returned invalid order data");
-      }
+      const normalizedDetailOrder = normalizeAutoPickOrderPayload({
+        ...detailOrder,
+        platform: String(detailOrder.platform || "").trim() || fallbackPlatform,
+        orderNo: String(detailOrder.orderNo || "").trim() || fallbackOrderNo,
+      });
+      if (normalizedDetailOrder) {
       if (isAutoPickOrderDeletedStatus(normalizedDetailOrder.status)) {
         await deleteAutoPickOrderByIdentity(userId, {
-          platform: normalizedDetailOrder.platform || String(lookup.platform || ""),
-          orderNo: normalizedDetailOrder.orderNo || String(lookup.orderNo || ""),
+          platform: normalizedDetailOrder.platform || fallbackPlatform,
+          orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
         });
         return null;
       }
       return await upsertAutoPickOrder(userId, normalizedDetailOrder);
+      }
     }
   }
 
@@ -2712,7 +2760,13 @@ export async function refreshAutoPickOrderFromPlugin(
     .filter((order): order is AutoPickInboundOrder => Boolean(order))
     .find((order) => {
       if (lookup.id && order.id === lookup.id) return true;
-      return order.platform === lookup.platform && order.orderNo === lookup.orderNo;
+      if (order.orderNo !== lookup.orderNo) {
+        return false;
+      }
+      if (!canTrustLookupPlatform) {
+        return true;
+      }
+      return order.platform === fallbackPlatform;
     });
 
   if (!matched) {
@@ -2739,6 +2793,8 @@ export async function backfillPersistedAutoPickOrderFields(userId: string) {
         { shopAddress: null },
         { deliveryTimeRange: null },
         { expectedIncome: null },
+        { platform: "" },
+        { platform: "未知" },
       ],
     },
     select: {
@@ -2748,6 +2804,8 @@ export async function backfillPersistedAutoPickOrderFields(userId: string) {
       shopAddress: true,
       deliveryTimeRange: true,
       expectedIncome: true,
+      platform: true,
+      platformCommission: true,
     },
   });
 
@@ -2775,6 +2833,20 @@ export async function backfillPersistedAutoPickOrderFields(userId: string) {
 
     if (order.expectedIncome == null && Number.isFinite(Number(normalized.expectedIncome))) {
       nextData.expectedIncome = Math.round(Number(normalized.expectedIncome));
+    }
+
+    const existingPlatform = String(order.platform || "").trim();
+    const normalizedPlatform = String(normalized.platform || "").trim();
+    if ((!existingPlatform || existingPlatform === "未知") && normalizedPlatform) {
+      nextData.platform = normalizedPlatform;
+
+      if (Number.isFinite(Number(normalized.expectedIncome))) {
+        nextData.expectedIncome = Math.round(Number(normalized.expectedIncome));
+      }
+
+      if (Number.isFinite(Number(normalized.platformCommission))) {
+        nextData.platformCommission = Math.round(Number(normalized.platformCommission));
+      }
     }
 
     if (Object.keys(nextData).length === 0) {

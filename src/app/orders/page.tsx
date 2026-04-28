@@ -192,8 +192,8 @@ function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
 
   if (baseStatus === "已取消") return "已取消";
   if (baseStatus === "已删除") return "已删除";
-  if (baseStatus === "已完成") return "已自提";
-  return "待自提";
+  if (baseStatus === "已完成") return "已取货";
+  return "待取货";
 }
 
 function isCompletedStatus(status?: string | null) {
@@ -667,9 +667,9 @@ function OrderCard({
                 {order.completedAt ? (
                   <>
                     <span className="truncate sm:hidden">{`${compactCompletedAt} ${pickup ? "自提" : "完成"}`}</span>
-                    <span className="hidden sm:inline">{`${formatLocalDateTime(order.completedAt)} ${pickup ? "已自提" : "已完成"}`}</span>
+                    <span className="hidden sm:inline">{`${formatLocalDateTime(order.completedAt)} ${pickup ? "已取货" : "已完成"}`}</span>
                   </>
-                ) : pickup ? "已自提" : "订单已完成"}
+                ) : pickup ? "已取货" : "订单已完成"}
               </span>
             ) : null}
             {cancelled ? (
@@ -748,7 +748,7 @@ function OrderCard({
               }
             />
             <ActionButton
-              label={pickup ? "完成自提" : "完成配送"}
+              label={pickup ? "完成取货" : "完成配送"}
               variant="primary"
               icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
               onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
@@ -756,7 +756,7 @@ function OrderCard({
               mobileIconOnly
               title={
                 pickup
-                  ? (terminal ? (cancelled ? "订单已取消，不能完成自提" : "订单已自提，不能重复完成自提") : undefined)
+                  ? (terminal ? (cancelled ? "订单已取消，不能完成取货" : "订单已取货，不能重复完成取货") : undefined)
                   : terminal
                     ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
                     : undefined

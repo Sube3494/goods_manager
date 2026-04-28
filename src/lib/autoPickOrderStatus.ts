@@ -64,6 +64,7 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     || text.includes("新订单")
     || text.includes("待接单")
     || text.includes("商家处理中")
+    || normalized === "confirm"
     || normalized === "pending"
     || normalized === "processing"
   ) {

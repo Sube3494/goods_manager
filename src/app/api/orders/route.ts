@@ -476,10 +476,8 @@ export async function GET(request: NextRequest) {
     const hasDelivery = toBooleanFilter(searchParams.get("hasDelivery"));
     const mainSystemSelfDelivery = toBooleanFilter(searchParams.get("mainSystemSelfDelivery"));
 
-    const where: Prisma.AutoPickOrderWhereInput = {
+    const baseWhere: Prisma.AutoPickOrderWhereInput = {
       userId: session.id,
-      ...(platform ? { platform } : {}),
-      ...(buildStatusWhere(status) || {}),
       ...(startDate || endDate ? {
         orderTime: {
           ...(startDate ? { gte: parseAsShanghaiTime(startDate) } : {}),
@@ -512,6 +510,22 @@ export async function GET(request: NextRequest) {
           rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true },
         },
       } : {}),
+    };
+
+    const where: Prisma.AutoPickOrderWhereInput = {
+      ...baseWhere,
+      ...(platform ? { platform } : {}),
+      ...(buildStatusWhere(status) || {}),
+    };
+
+    const platformFilterWhere: Prisma.AutoPickOrderWhereInput = {
+      ...baseWhere,
+      ...(buildStatusWhere(status) || {}),
+    };
+
+    const statusFilterWhere: Prisma.AutoPickOrderWhereInput = {
+      ...baseWhere,
+      ...(platform ? { platform } : {}),
     };
 
     const [orders, total, platformRows, statusRows, userProfile] = await Promise.all([
@@ -567,13 +581,16 @@ export async function GET(request: NextRequest) {
       }),
       prisma.autoPickOrder.count({ where }),
       prisma.autoPickOrder.findMany({
-        where: { userId: session.id },
+        where: platformFilterWhere,
         distinct: ["platform"],
         select: { platform: true },
         orderBy: { platform: "asc" },
       }),
       prisma.autoPickOrder.findMany({
-        where: { userId: session.id, NOT: { status: null } },
+        where: {
+          ...statusFilterWhere,
+          NOT: { status: null },
+        },
         distinct: ["status"],
         select: { status: true },
         orderBy: { status: "asc" },
