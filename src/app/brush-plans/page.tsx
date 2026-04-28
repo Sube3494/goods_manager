@@ -160,7 +160,7 @@ export default function BrushPlansPage() {
     return (
         <div className="space-y-6 sm:space-y-8">
             <div className="mb-5 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <Link
                         href="/brush"
                         className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
@@ -174,7 +174,7 @@ export default function BrushPlansPage() {
                 {canManage && (
                     <button
                         onClick={handleCreate}
-                        className="h-11 sm:h-12 w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black px-4 sm:px-6 text-xs sm:text-sm font-black shadow-xl hover:-translate-y-0.5 transition-all shrink-0 active:scale-95"
+                        className="h-11 sm:h-12 w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black px-4 sm:px-6 text-xs sm:text-sm font-black shadow-xl hover:-translate-y-0.5 transition-all shrink-0 active:scale-95 sm:self-auto"
                     >
                         <Plus size={16} />
                         <span className="hidden sm:inline">新建计划</span>
@@ -183,8 +183,8 @@ export default function BrushPlansPage() {
                 )}
             </div>
 
-            <div className="space-y-3">
-                <div className="h-12 px-5 min-w-0 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div className="col-span-2 h-12 px-5 min-w-0 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
                     <Search size={18} className="text-muted-foreground" />
                     <input
                         type="text"
@@ -194,53 +194,53 @@ export default function BrushPlansPage() {
                         className="bg-transparent border-none outline-none w-full text-sm font-medium"
                     />
                 </div>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
-                    <div className="h-12 min-w-0">
-                        <DatePicker
-                            value={filterDate}
-                            onChange={setFilterDate}
-                            placeholder="日期筛选"
-                            className="h-full w-full"
-                            triggerClassName="rounded-full h-full text-sm"
-                        />
-                    </div>
-                    {user?.shippingAddresses && user.shippingAddresses.length > 0 && (
-                        <div className="h-12 min-w-0">
-                            <CustomSelect
-                                options={[
-                                    { value: "", label: "所有店铺" },
-                                    ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
-                                ]}
-                                value={filterShop}
-                                onChange={(val) => setFilterShop(val)}
-                                className="h-full w-full"
-                                triggerClassName="rounded-full h-full text-sm font-medium"
-                            />
-                        </div>
-                    )}
+                <div className="h-12 min-w-0">
+                    <DatePicker
+                        value={filterDate}
+                        onChange={setFilterDate}
+                        placeholder="日期筛选"
+                        className="h-full w-full"
+                        triggerClassName="rounded-full h-full text-sm"
+                    />
+                </div>
+                {user?.shippingAddresses && user.shippingAddresses.length > 0 ? (
                     <div className="h-12 min-w-0">
                         <CustomSelect
                             options={[
-                                { value: "", label: "所有平台" },
-                                { value: "美团", label: "美团" },
-                                { value: "淘宝", label: "淘宝" },
-                                { value: "京东", label: "京东" },
+                                { value: "", label: "所有店铺" },
+                                ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
                             ]}
-                            value={filterPlatform}
-                            onChange={(val) => setFilterPlatform(val)}
+                            value={filterShop}
+                            onChange={(val) => setFilterShop(val)}
                             className="h-full w-full"
                             triggerClassName="rounded-full h-full text-sm font-medium"
                         />
                     </div>
-                    {(searchQuery || filterDate || filterShop || filterPlatform) && (
-                        <button
-                            onClick={resetFilters}
-                            className="h-12 px-5 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-                        >
-                            <RotateCcw size={14} /> 重置
-                        </button>
-                    )}
+                ) : (
+                    <div className="hidden sm:block" />
+                )}
+                <div className={cn("h-12 min-w-0", (searchQuery || filterDate || filterShop || filterPlatform) ? "" : "col-span-2 sm:col-span-1")}>
+                    <CustomSelect
+                        options={[
+                            { value: "", label: "所有平台" },
+                            { value: "美团", label: "美团" },
+                            { value: "淘宝", label: "淘宝" },
+                            { value: "京东", label: "京东" },
+                        ]}
+                        value={filterPlatform}
+                        onChange={(val) => setFilterPlatform(val)}
+                        className="h-full w-full"
+                        triggerClassName="rounded-full h-full text-sm font-medium"
+                    />
                 </div>
+                {(searchQuery || filterDate || filterShop || filterPlatform) && (
+                    <button
+                        onClick={resetFilters}
+                        className="h-12 px-5 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+                    >
+                        <RotateCcw size={14} /> 重置
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">

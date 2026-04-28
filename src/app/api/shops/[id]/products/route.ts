@@ -12,6 +12,28 @@ function generatePinyinSearchText(name: string): string {
   return `${fullPinyin} ${firstLetters}`.toLowerCase();
 }
 
+function normalizeSku(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function findConflictingShopProductBySku(shopId: string, sku: string, excludeId?: string) {
+  return prisma.shopProduct.findFirst({
+    where: {
+      shopId,
+      sku,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: {
+      id: true,
+      productName: true,
+    },
+  });
+}
+
 async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
   return prisma.shop.findFirst({
     where: isAdmin ? { id: shopId } : { id: shopId, userId },
@@ -314,7 +336,7 @@ export async function PUT(
     }
 
     const productName = String(body?.name || "").trim();
-    const sku = typeof body?.sku === "string" ? body.sku.trim() : "";
+    const normalizedSku = normalizeSku(body?.sku);
     const categoryId = typeof body?.categoryId === "string" ? body.categoryId.trim() : "";
     const categoryName = String(body?.categoryName || "").trim();
     const productImage = typeof body?.image === "string" ? body.image.trim() : "";
@@ -328,6 +350,15 @@ export async function PUT(
       return NextResponse.json({ error: "商品名称不能为空" }, { status: 400 });
     }
 
+    if (normalizedSku) {
+      const conflictingShopProduct = await findConflictingShopProductBySku(shopId, normalizedSku, existing.id);
+      if (conflictingShopProduct) {
+        return NextResponse.json({
+          error: `当前店铺内商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`,
+        }, { status: 409 });
+      }
+    }
+
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
@@ -336,7 +367,7 @@ export async function PUT(
       data: {
         productName,
         pinyin: generatePinyinSearchText(productName),
-        sku: sku || null,
+        sku: normalizedSku,
         categoryId: categoryId || null,
         categoryName: categoryName || "未分类",
         productImage: normalizedProductImage,
@@ -443,13 +474,26 @@ export async function POST(
       return NextResponse.json({ error: "没有可加入店铺的公开商品" }, { status: 404 });
     }
 
+    const existingSkuRows = await prisma.shopProduct.findMany({
+      where: {
+        shopId,
+        sku: { in: products.map((product) => product.sku).filter((value): value is string => Boolean(value)) },
+      },
+      select: {
+        sku: true,
+      },
+    });
+    const existingSkuSet = new Set(existingSkuRows.map((item) => item.sku).filter((value): value is string => Boolean(value)));
+
     const categoryMap = await ensureUserCategories(
       shop.userId,
       products.map((product) => product.category?.name || "").filter(Boolean)
     );
 
     const result = await prisma.shopProduct.createMany({
-      data: products.map((product) => ({
+      data: products
+        .filter((product) => !product.sku || !existingSkuSet.has(product.sku))
+        .map((product) => ({
         shopId,
         productId: product.id,
         sourceProductId: product.id,

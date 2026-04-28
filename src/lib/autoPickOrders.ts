@@ -1902,6 +1902,8 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     throw new Error("Order items are required");
   }
 
+  let previousStatus: string | null = null;
+
   const order = await prisma.$transaction(async (tx) => {
     await ensureShopProductsForAutoPickOrder(tx, userId, normalized, items);
 
@@ -1942,6 +1944,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     });
 
     const existing = existingCandidates[0] || null;
+    previousStatus = existing?.status || null;
     const duplicateIds = existingCandidates
       .slice(1)
       .map((item) => item.id)
@@ -2085,6 +2088,16 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     platform: order.platform,
     at: new Date().toISOString(),
   });
+
+  const becameCompleted = isAutoPickOrderCompletedStatus(order.status) && !isAutoPickOrderCompletedStatus(previousStatus);
+  if (becameCompleted) {
+    await syncBrushOrderFromCompletedAutoPickOrder(userId, order.id).catch((brushError) => {
+      console.error("Failed to sync brush order after webhook upsert:", brushError);
+    });
+    await syncAutoOutboundFromCompletedAutoPickOrder(userId, order.id).catch((outboundError) => {
+      console.error("Failed to auto-create outbound after webhook upsert:", outboundError);
+    });
+  }
 
   return order;
 }
@@ -2419,63 +2432,47 @@ function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
   return compact.replace(/[^A-Z0-9]+/g, "");
 }
 
-async function ensureAutoPickCategory(tx: Prisma.TransactionClient, userId: string) {
-  const existing = await tx.category.findFirst({
-    where: {
-      userId,
-      name: "推单商品",
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  return await tx.category.create({
-    data: {
-      userId,
-      name: "推单商品",
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-}
-
-async function buildAvailableAutoPickSku(
+async function findExistingShopProductByShopAndSku(
   tx: Prisma.TransactionClient,
-  preferredSku: string | null | undefined
+  shopId: string,
+  sku: string | null | undefined
 ) {
-  const baseSku = String(preferredSku || "").trim();
-  if (!baseSku) {
+  const normalizedSku = normalizeAutoPickSkuForMatch(sku);
+  if (!shopId || !normalizedSku) {
     return null;
   }
 
-  const directHit = await tx.product.findUnique({
-    where: { sku: baseSku },
-    select: { id: true },
+  const directHit = await tx.shopProduct.findFirst({
+    where: {
+      shopId,
+      sku: String(sku || "").trim(),
+    },
+    select: {
+      id: true,
+      productId: true,
+      sourceProductId: true,
+      sku: true,
+      productName: true,
+    },
   });
-  if (!directHit) {
-    return baseSku;
+  if (directHit) {
+    return directHit;
   }
 
-  for (let index = 1; index <= 999; index += 1) {
-    const candidate = `${baseSku}-AUTO${index}`;
-    const hit = await tx.product.findUnique({
-      where: { sku: candidate },
-      select: { id: true },
-    });
-    if (!hit) {
-      return candidate;
-    }
-  }
+  const candidates = await tx.shopProduct.findMany({
+    where: {
+      shopId,
+    },
+    select: {
+      id: true,
+      productId: true,
+      sourceProductId: true,
+      sku: true,
+      productName: true,
+    },
+  });
 
-  return `${baseSku}-AUTO-${randomBytes(3).toString("hex")}`;
+  return candidates.find((item) => normalizeAutoPickSkuForMatch(item.sku) === normalizedSku) || null;
 }
 
 async function resolveAutoPickInternalShop(
@@ -2544,98 +2541,10 @@ async function ensureShopProductsForAutoPickOrder(
     rawPayload: AutoPickInboundItem;
   }>
 ) {
-  if (items.length === 0) {
-    return;
-  }
-
-  const shop = await resolveAutoPickInternalShop(tx, userId, normalized);
-
-  const existingShopProducts = await tx.shopProduct.findMany({
-    where: {
-      ...(shop?.id ? { shopId: shop.id } : { id: "__never__" }),
-    },
-    select: {
-      id: true,
-      productId: true,
-      sourceProductId: true,
-      sku: true,
-      productName: true,
-    },
-  });
-
-  const existingShopProductNames = new Set(
-    existingShopProducts
-      .map((item) => toNormalizedText(item.productName))
-      .filter(Boolean)
-  );
-
-  const missingItems = items.filter((item) => {
-    const normalizedName = toNormalizedText(toAutoPickBaseProductName(item.productName));
-    return normalizedName && !existingShopProductNames.has(normalizedName);
-  });
-
-  if (missingItems.length === 0) {
-    return;
-  }
-
-  const category = await ensureAutoPickCategory(tx, userId);
-
-  for (const item of missingItems) {
-    const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedName = toNormalizedText(productName);
-    if (!normalizedName || existingShopProductNames.has(normalizedName)) {
-      continue;
-    }
-
-    const normalizedSku = String(item.productNo || "").trim();
-    const sku = await buildAvailableAutoPickSku(tx, normalizedSku);
-    const product = await tx.product.create({
-      data: {
-        userId,
-        sku,
-        name: productName,
-        costPrice: 0,
-        stock: 0,
-        image: item.thumb || null,
-        categoryId: category.id,
-        pinyin: ProductService.generatePinyinSearchText(productName),
-        isPublic: false,
-        isShopOnly: true,
-        isDiscontinued: false,
-        remark: "自动推单补建",
-        specs: Prisma.JsonNull,
-      },
-      select: {
-        id: true,
-        name: true,
-        sku: true,
-      },
-    });
-
-    if (shop?.id) {
-      await tx.shopProduct.create({
-        data: {
-          shopId: shop.id,
-          productId: product.id,
-          sourceProductId: product.id,
-          sku: normalizedSku || product.sku || null,
-          productName: productName,
-          pinyin: ProductService.generatePinyinSearchText(productName),
-          productImage: item.thumb || null,
-          categoryId: category.id,
-          categoryName: category.name,
-          costPrice: 0,
-          stock: 0,
-          isPublic: false,
-          isDiscontinued: false,
-          remark: "自动推单补建",
-          specs: Prisma.JsonNull,
-        },
-      });
-    }
-
-    existingShopProductNames.add(normalizedName);
-  }
+  void tx;
+  void userId;
+  void normalized;
+  void items;
 }
 
 export async function applyAutoPickProgress(userId: string, payload: unknown) {
@@ -3121,62 +3030,13 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       || ""
     ).trim();
 
-    let finalProductId = resolvedProductId;
-    if (!finalProductId) {
-      const created = await prisma.$transaction(async (tx) => {
-        const category = await ensureAutoPickCategory(tx, userId);
-        const sku = await buildAvailableAutoPickSku(tx, normalizedSku);
-        const product = await tx.product.create({
-          data: {
-            userId,
-            sku,
-            name: productName,
-            costPrice: 0,
-            stock: 0,
-            image: null,
-            categoryId: category.id,
-            pinyin: ProductService.generatePinyinSearchText(productName),
-            isPublic: false,
-            isShopOnly: true,
-            isDiscontinued: false,
-            remark: "自动推单补建",
-            specs: Prisma.JsonNull,
-          },
-          select: {
-            id: true,
-            sku: true,
-          },
-        });
-
-        if (internalShop?.id) {
-          await tx.shopProduct.create({
-            data: {
-              shopId: internalShop.id,
-              productId: product.id,
-              sourceProductId: product.id,
-              sku: normalizedSku || product.sku || null,
-              productName: productName,
-              pinyin: ProductService.generatePinyinSearchText(productName),
-              productImage: null,
-              categoryId: category.id,
-              categoryName: category.name,
-              costPrice: 0,
-              stock: 0,
-              isPublic: false,
-              isDiscontinued: false,
-              remark: "自动推单补建",
-              specs: Prisma.JsonNull,
-            },
-          });
-        }
-
-        return product;
-      });
-      finalProductId = created.id;
+    if (!resolvedProductId) {
+      missingItems.push(`${productName}${normalizedSku ? ` / SKU ${normalizedSku}` : ""}`);
+      continue;
     }
 
     resolvedItems.push({
-      productId: finalProductId,
+      productId: resolvedProductId,
       quantity: Math.max(1, Number(item.quantity || 1) || 1),
     });
   }
@@ -3256,6 +3116,13 @@ async function resolveOutboundItemsForAutoPickOrder(
   const internalShop = mappedShopName
     ? findMatchingShopRecord(userShops, { name: mappedShopName })
     : null;
+  const mappedShopNameText = String(internalShop?.name || mappedShopName || "").trim();
+  const isCandidateInMappedShop = (candidateShopName: string | null | undefined) => {
+    if (!mappedShopNameText) {
+      return true;
+    }
+    return String(candidateShopName || "").trim() === mappedShopNameText;
+  };
 
   const shopProducts = await tx.shopProduct.findMany({
       where: {
@@ -3275,8 +3142,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         },
       },
     });
-
-  const shopProductNameMap = new Map<string, Array<{
+  const shopProductSkuMap = new Map<string, Array<{
     id: string;
     productId: string | null;
     sourceProductId: string | null;
@@ -3285,21 +3151,18 @@ async function resolveOutboundItemsForAutoPickOrder(
     shopName: string | null;
   }>>();
   for (const item of shopProducts) {
-    const entry = {
+    const normalizedSku = normalizeAutoPickSkuForMatch(item.sku);
+    if (!normalizedSku) continue;
+    const current = shopProductSkuMap.get(normalizedSku) || [];
+    current.push({
       id: item.id,
       productId: item.productId || null,
       sourceProductId: item.sourceProductId || null,
       sku: item.sku || null,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
-    };
-    const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedName = toNormalizedText(productName);
-    if (normalizedName) {
-      const current = shopProductNameMap.get(normalizedName) || [];
-      current.push(entry);
-      shopProductNameMap.set(normalizedName, current);
-    }
+    });
+    shopProductSkuMap.set(normalizedSku, current);
   }
 
   const priceShare = Math.max(0, FinanceMath.divide((Number(order.actualPaid || 0) || 0) / 100, Math.max(1, order.items.length)));
@@ -3307,77 +3170,46 @@ async function resolveOutboundItemsForAutoPickOrder(
 
   for (const item of order.items) {
     const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedName = toNormalizedText(productName);
-    const normalizedSku = String(item.productNo || "").trim();
-    const shopNameCandidates = normalizedName ? (shopProductNameMap.get(normalizedName) || []) : [];
-    const preferredShopCandidate = shopNameCandidates.find((candidate) => {
-      const candidateProductId = candidate.productId || candidate.sourceProductId;
-      return Boolean(candidateProductId) && String(candidate.shopName || "").trim() === String(mappedShopName || "").trim();
-    });
+    const normalizedSku = normalizeAutoPickSkuForMatch(item.productNo);
+    let resolvedShopProduct: {
+      id: string;
+      productId: string | null;
+      sourceProductId: string | null;
+      sku: string | null;
+      shopId: string | null;
+      shopName: string | null;
+    } | null = null;
 
-    let resolvedShopProduct = preferredShopCandidate || null;
+    if (normalizedSku) {
+      const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
+        isCandidateInMappedShop(candidate.shopName)
+      );
+      const sameShopSkuCandidate = skuCandidates.find((candidate) =>
+        Boolean(candidate.productId || candidate.sourceProductId)
+      );
+      if (sameShopSkuCandidate) {
+        resolvedShopProduct = sameShopSkuCandidate;
+      }
+    }
 
-    if (!resolvedShopProduct) {
-      const category = await ensureAutoPickCategory(tx, userId);
-      const nextSku = await buildAvailableAutoPickSku(tx, normalizedSku);
-      const createdProduct = await tx.product.create({
-        data: {
-          userId,
-          sku: nextSku,
-          name: productName,
-          costPrice: 0,
-          stock: 0,
-          image: item.thumb || null,
-          categoryId: category.id,
-          pinyin: ProductService.generatePinyinSearchText(productName),
-          isPublic: false,
-          isShopOnly: true,
-          isDiscontinued: false,
-          remark: "自动推单补建",
-          specs: Prisma.JsonNull,
-        },
-        select: {
-          id: true,
-          name: true,
-          sku: true,
-        },
-      });
-
-      if (internalShop?.id) {
-        const createdShopProduct = await tx.shopProduct.create({
-          data: {
-            shopId: internalShop.id,
-            productId: createdProduct.id,
-            sourceProductId: createdProduct.id,
-            sku: normalizedSku || createdProduct.sku || null,
-            productName: productName,
-            pinyin: ProductService.generatePinyinSearchText(productName),
-            productImage: item.thumb || null,
-            categoryId: category.id,
-            categoryName: category.name,
-            costPrice: 0,
-            stock: 0,
-            isPublic: false,
-            isDiscontinued: false,
-            remark: "自动推单补建",
-            specs: Prisma.JsonNull,
-          },
-          select: {
-            id: true,
-            productId: true,
-            sourceProductId: true,
-            sku: true,
-          },
-        });
+    if (!resolvedShopProduct && internalShop?.id && normalizedSku) {
+      const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku);
+      if (existingShopProduct) {
         resolvedShopProduct = {
-          id: createdShopProduct.id,
-          productId: createdShopProduct.productId || null,
-          sourceProductId: createdShopProduct.sourceProductId || null,
-          sku: createdShopProduct.sku || null,
+          id: existingShopProduct.id,
+          productId: existingShopProduct.productId || null,
+          sourceProductId: existingShopProduct.sourceProductId || null,
+          sku: existingShopProduct.sku || null,
           shopId: internalShop.id,
           shopName: internalShop.name,
         };
       }
+    }
+
+    if (!resolvedShopProduct) {
+      throw new Error(
+        `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / SKU ${normalizedSku || "未提供"}`
+      );
     }
 
     resolvedItems.push({
@@ -3392,10 +3224,19 @@ async function resolveOutboundItemsForAutoPickOrder(
     });
   }
 
+  const resolvedShopName = resolvedItems.length > 0
+    ? (
+        shopProducts.find((candidate) => candidate.id === resolvedItems.find((item) => item.shopProductId)?.shopProductId)?.shop?.name
+        || internalShop?.name
+        || mappedShopName
+        || null
+      )
+    : (internalShop?.name || mappedShopName || null);
+
   return {
     items: resolvedItems,
-    mappedShopName: mappedShopName || null,
-    displayShopName: mappedShopName || null,
+    mappedShopName: resolvedShopName,
+    displayShopName: resolvedShopName,
   };
 }
 

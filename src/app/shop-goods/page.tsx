@@ -56,6 +56,9 @@ export default function ShopGoodsPage() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const editScrollTopRef = useRef<number | null>(null);
+  const isFetchingRef = useRef(false);
+  const requestVersionRef = useRef(0);
+  const hasMoreRef = useRef(true);
 
   const selectedShop = useMemo(
     () => shops.find((shop) => shop.id === selectedShopId) || null,
@@ -90,6 +93,10 @@ export default function ShopGoodsPage() {
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
 
   useEffect(() => {
     const fetchShops = async () => {
@@ -167,6 +174,8 @@ export default function ShopGoodsPage() {
 
   const fetchShopProducts = useCallback(async (isFirstPage = true) => {
     if (!selectedShopId) {
+      requestVersionRef.current += 1;
+      isFetchingRef.current = false;
       setItems([]);
       setHasMore(false);
       setTotalResults(0);
@@ -174,14 +183,36 @@ export default function ShopGoodsPage() {
       setIsNextPageLoading(false);
       return;
     }
+
+    if (isFetchingRef.current) {
+      return;
+    }
+
+    const requestVersion = isFirstPage ? requestVersionRef.current + 1 : requestVersionRef.current;
+    if (isFirstPage) {
+      requestVersionRef.current = requestVersion;
+      currentPageRef.current = 1;
+      setHasMore(true);
+      hasMoreRef.current = true;
+      setIsLoading(true);
+      setIsNextPageLoading(false);
+    } else {
+      if (!hasMoreRef.current) return;
+      setIsNextPageLoading(true);
+    }
+
+    isFetchingRef.current = true;
+
     try {
       const targetPage = isFirstPage ? 1 : currentPageRef.current + 1;
-      if (isFirstPage && itemsRef.current.length === 0) setIsLoading(true);
-      if (!isFirstPage) setIsNextPageLoading(true);
 
       const res = await fetch(`/api/shop-products?${buildAggregateQuery(targetPage).toString()}`);
       const data: ShopProductsResponse = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error("Failed to fetch shop products");
+
+      if (requestVersion !== requestVersionRef.current) {
+        return;
+      }
 
       if (isFirstPage) {
         setItems(data.items || []);
@@ -196,16 +227,21 @@ export default function ShopGoodsPage() {
       setHasMore(Boolean(data.hasMore));
       setTotalResults(data.total || 0);
     } catch (error) {
+      if (requestVersion !== requestVersionRef.current) {
+        return;
+      }
       console.error("Failed to fetch shop products:", error);
       showToast("加载店铺商品失败", "error");
     } finally {
-      setIsLoading(false);
-      setIsNextPageLoading(false);
+      if (requestVersion === requestVersionRef.current) {
+        setIsLoading(false);
+        setIsNextPageLoading(false);
+      }
+      isFetchingRef.current = false;
     }
   }, [buildAggregateQuery, selectedShopId, showToast]);
 
   useEffect(() => {
-    currentPageRef.current = 1;
     setItems([]);
     setSelectedIds([]);
     void fetchShopProducts(true);
@@ -622,7 +658,7 @@ export default function ShopGoodsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 min-w-0">
             <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">店铺商品</h1>
@@ -633,11 +669,11 @@ export default function ShopGoodsPage() {
           </p>
         </div>
         {shops.length > 0 && (
-          <div className="flex items-center gap-2">
-            <button onClick={() => selectedShop ? setIsImportOpen(true) : showToast("先选择一个目标店铺再导入", "error")} className={cn("flex items-center gap-2 rounded-full border border-border/60 px-4 h-10 sm:h-11 text-sm font-bold transition-all whitespace-nowrap", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><span>导入</span></button>
-            <button onClick={handleExport} className="flex items-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 px-4 h-10 sm:h-11 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all whitespace-nowrap"><span>导出</span></button>
-            <button onClick={() => selectedShop ? setIsCreateOpen(true) : showToast("先选择一个目标店铺再新建商品", "error")} className={cn("flex items-center gap-2 rounded-full border border-border/60 px-4 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all whitespace-nowrap", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} /><span>新建店铺商品</span></button>
-            <button onClick={() => selectedShop ? setIsPickerOpen(true) : showToast("先选择一个目标店铺再从主库复制", "error")} className={cn("flex items-center gap-2 rounded-full border border-border/60 px-4 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all whitespace-nowrap", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} /><span>从主库复制</span></button>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            <button onClick={() => selectedShop ? setIsImportOpen(true) : showToast("先选择一个目标店铺再导入", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><span className="truncate">导入</span></button>
+            <button onClick={handleExport} className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 px-3 h-10 sm:h-11 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all"><span className="truncate">导出</span></button>
+            <button onClick={() => selectedShop ? setIsCreateOpen(true) : showToast("先选择一个目标店铺再新建商品", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} className="shrink-0" /><span className="truncate">新建店铺商品</span></button>
+            <button onClick={() => selectedShop ? setIsPickerOpen(true) : showToast("先选择一个目标店铺再从主库复制", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} className="shrink-0" /><span className="truncate">从主库复制</span></button>
           </div>
         )}
       </div>
@@ -651,7 +687,7 @@ export default function ShopGoodsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 xl:flex gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
+        <div className="grid grid-cols-2 xl:flex gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
           <div className="xl:w-52 h-10 sm:h-11">
             <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={shops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
           </div>

@@ -4,6 +4,11 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../prisma/generated-client";
 
+const naturalSortCollator = new Intl.Collator("zh-CN", {
+  numeric: true,
+  sensitivity: "base",
+});
+
 function buildSearchWhere(search: string): Prisma.ProductWhereInput | undefined {
   const keyword = search.trim();
   if (!keyword) return undefined;
@@ -28,6 +33,8 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const pageSize = Math.min(parseInt(searchParams.get("pageSize") || "20"), 200);
   const search = searchParams.get("search") || "";
+  const shopId = searchParams.get("shopId") || "";
+  const shopName = searchParams.get("shopName") || "";
   const skip = (page - 1) * pageSize;
 
   try {
@@ -35,6 +42,8 @@ export async function GET(request: NextRequest) {
     const where: Prisma.BrushProductWhereInput = {
       userId: user.id,
       isActive: true,
+      ...(shopId ? { shopId } : {}),
+      ...(shopName ? { shop: { name: shopName } } : {}),
       ...(searchKeyword
         ? {
             OR: [
@@ -55,8 +64,14 @@ export async function GET(request: NextRequest) {
               category: true,
             },
           },
+          shop: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip,
         take: pageSize,
       }),
@@ -64,11 +79,91 @@ export async function GET(request: NextRequest) {
     ]);
 
     const storage = await getStorageStrategy();
-    const products = items.map((item) => ({
-      ...item.product,
-      brushKeyword: item.brushKeyword || "",
-      image: item.product.image ? storage.resolveUrl(item.product.image) : null,
-    }));
+    const shopIds = Array.from(new Set(items.map((item) => item.shopId).filter((value): value is string => Boolean(value))));
+    const productIds = Array.from(new Set(items.map((item) => item.productId).filter(Boolean)));
+    const shopProducts = shopIds.length > 0 && productIds.length > 0
+      ? await prisma.shopProduct.findMany({
+          where: {
+            shop: { userId: user.id },
+            shopId: { in: shopIds },
+            OR: [
+              { productId: { in: productIds } },
+              { sourceProductId: { in: productIds } },
+            ],
+          },
+          include: {
+            shop: { select: { id: true, name: true } },
+          },
+        })
+      : [];
+
+    const shopProductMap = new Map<string, (typeof shopProducts)[number]>();
+    shopProducts.forEach((item) => {
+      const keys = [
+        item.productId ? `${item.shopId}:${item.productId}` : "",
+        item.sourceProductId ? `${item.shopId}:${item.sourceProductId}` : "",
+      ].filter(Boolean);
+      keys.forEach((key) => {
+        if (!shopProductMap.has(key)) {
+          shopProductMap.set(key, item);
+        }
+      });
+    });
+
+    const products = items.map((item) => {
+      const matchedShopProduct = item.shopId
+        ? shopProductMap.get(`${item.shopId}:${item.productId}`) || null
+        : null;
+      const resolvedImage = matchedShopProduct?.productImage || item.product.image;
+
+      return {
+        ...item.product,
+        brushKeyword: item.brushKeyword || "",
+        sourceProductId: item.product.id,
+        shopId: matchedShopProduct?.shopId || item.shopId || undefined,
+        shopName: matchedShopProduct?.shop.name || item.shop?.name || undefined,
+        shopProductId: matchedShopProduct?.id || undefined,
+        sku: matchedShopProduct?.sku || item.product.sku,
+        name: matchedShopProduct?.productName || item.product.name,
+        image: resolvedImage ? storage.resolveUrl(resolvedImage) : null,
+        remark: matchedShopProduct?.remark || item.product.remark,
+        supplierId: matchedShopProduct?.supplierId || item.product.supplierId,
+        categoryId: matchedShopProduct?.categoryId || item.product.categoryId,
+        costPrice: matchedShopProduct?.costPrice ?? item.product.costPrice,
+        stock: matchedShopProduct?.stock ?? item.product.stock,
+      };
+    });
+
+    products.sort((a, b) => {
+      const skuCompare = naturalSortCollator.compare(
+        String(a.sku || "").trim(),
+        String(b.sku || "").trim()
+      );
+      if (skuCompare !== 0) {
+        return skuCompare;
+      }
+
+      const nameCompare = naturalSortCollator.compare(
+        String(a.name || "").trim(),
+        String(b.name || "").trim()
+      );
+      if (nameCompare !== 0) {
+        return nameCompare;
+      }
+
+      const shopCompare = naturalSortCollator.compare(
+        String(a.shopName || "").trim(),
+        String(b.shopName || "").trim()
+      );
+      if (shopCompare !== 0) {
+        return shopCompare;
+      }
+
+      return naturalSortCollator.compare(
+        String(a.shopProductId || a.id || "").trim(),
+        String(b.shopProductId || b.id || "").trim()
+      );
+    });
 
     return NextResponse.json({
       items: products,

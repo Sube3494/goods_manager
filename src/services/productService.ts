@@ -11,6 +11,13 @@ export class ProductService {
     return `${fullPinyin} ${firstLetters}`.toLowerCase();
   }
 
+  static naturalCompareText(a: string | null | undefined, b: string | null | undefined) {
+    return String(a || "").localeCompare(String(b || ""), "zh-CN", {
+      numeric: true,
+      sensitivity: "base",
+    });
+  }
+
   static async getProducts(params: {
     userId?: string;
     role?: string;
@@ -119,11 +126,14 @@ export class ProductService {
     const where = andConditions.length > 0 ? { AND: andConditions } : {};
     const skip = (page - 1) * pageSize;
 
-    const standardOrderBy: Prisma.ProductOrderByWithRelationInput[] = 
-      field === "sku" ? [{ sku: order }] : 
-      field === "stock" ? [{ stock: order }] :
-      field === "name" ? [{ name: order }] :
-      [{ createdAt: order }];
+    const standardOrderBy: Prisma.ProductOrderByWithRelationInput[] =
+      field === "sku"
+        ? [{ sku: order }, { id: "asc" }]
+        : field === "stock"
+          ? [{ stock: order }, { id: "asc" }]
+          : field === "name"
+            ? [{ name: order }, { id: "asc" }]
+            : [{ createdAt: order }, { id: "asc" }];
 
     // Handle Natural Sort for SKU with performance consideration
     if (field === "sku") {
@@ -138,9 +148,13 @@ export class ProductService {
             allItems.sort((a, b) => {
               const aVal = a.sku || "";
               const bVal = b.sku || "";
-              return order === 'asc' 
-                ? aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' })
-                : bVal.localeCompare(aVal, undefined, { numeric: true, sensitivity: 'base' });
+              const skuCompare = order === 'asc'
+                ? this.naturalCompareText(aVal, bVal)
+                : this.naturalCompareText(bVal, aVal);
+              if (skuCompare !== 0) {
+                return skuCompare;
+              }
+              return this.naturalCompareText(a.id, b.id);
             });
 
             if (idsOnly) return { items: { ids: allItems.map(p => p.id), total: totalCount } };

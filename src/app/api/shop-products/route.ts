@@ -4,15 +4,15 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 
 function buildOrderBy(sortBy: string) {
-  if (sortBy === "createdAt-desc") return { createdAt: "desc" as const };
-  if (sortBy === "createdAt-asc") return { createdAt: "asc" as const };
-  if (sortBy === "stock-desc") return { stock: "desc" as const };
-  if (sortBy === "stock-asc") return { stock: "asc" as const };
-  if (sortBy === "name-asc") return { productName: "asc" as const };
-  if (sortBy === "shop-asc") return { shop: { name: "asc" as const } };
-  if (sortBy === "shop-desc") return { shop: { name: "desc" as const } };
-  if (sortBy === "sku-desc") return { sku: "desc" as const };
-  return { sku: "asc" as const };
+  if (sortBy === "createdAt-desc") return [{ createdAt: "desc" as const }, { id: "asc" as const }];
+  if (sortBy === "createdAt-asc") return [{ createdAt: "asc" as const }, { id: "asc" as const }];
+  if (sortBy === "stock-desc") return [{ stock: "desc" as const }, { id: "asc" as const }];
+  if (sortBy === "stock-asc") return [{ stock: "asc" as const }, { id: "asc" as const }];
+  if (sortBy === "name-asc") return [{ productName: "asc" as const }, { id: "asc" as const }];
+  if (sortBy === "shop-asc") return [{ shop: { name: "asc" as const } }, { id: "asc" as const }];
+  if (sortBy === "shop-desc") return [{ shop: { name: "desc" as const } }, { id: "asc" as const }];
+  if (sortBy === "sku-desc") return [{ sku: "desc" as const }, { id: "asc" as const }];
+  return [{ sku: "asc" as const }, { id: "asc" as const }];
 }
 
 export async function GET(request: NextRequest) {
@@ -71,9 +71,13 @@ export async function GET(request: NextRequest) {
       allItems.sort((a, b) => {
         const aVal = a.sku || "";
         const bVal = b.sku || "";
-        return sortBy === "sku-desc"
-          ? bVal.localeCompare(aVal, "zh-CN", { numeric: true, sensitivity: "base" })
-          : aVal.localeCompare(bVal, "zh-CN", { numeric: true, sensitivity: "base" });
+        const compareResult =
+          sortBy === "sku-desc"
+            ? bVal.localeCompare(aVal, "zh-CN", { numeric: true, sensitivity: "base" })
+            : aVal.localeCompare(bVal, "zh-CN", { numeric: true, sensitivity: "base" });
+
+        if (compareResult !== 0) return compareResult;
+        return a.id.localeCompare(b.id, "en");
       });
 
       return allItems;

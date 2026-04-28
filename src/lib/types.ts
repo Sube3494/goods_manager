@@ -235,6 +235,8 @@ export interface BrushProduct {
   id: string;
   userId?: string;
   productId: string;
+  shopId?: string | null;
+  shopName?: string | null;
   isActive?: boolean;
   brushKeyword?: string;
   product: Product;

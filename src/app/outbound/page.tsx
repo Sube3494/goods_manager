@@ -119,6 +119,16 @@ export default function OutboundPage() {
     return match ? match[1] : null;
   };
 
+  const resolveOrderShopName = (order: OutboundOrder): string | null => {
+    const noteShopName = extractShopName(order.note);
+    if (noteShopName) return noteShopName;
+
+    const itemShopName = order.items.find((item) => item.shopProduct?.shopName)?.shopProduct?.shopName;
+    if (itemShopName) return itemShopName;
+
+    return order.shopName || null;
+  };
+
   // 从 note 中提取平台的辅助函数 (如 [美团导入])
   const extractPlatform = (note: string | undefined | null): string | null => {
     if (!note) return null;
@@ -127,7 +137,7 @@ export default function OutboundPage() {
   };
 
   const allShopNames = useMemo(() => {
-    const names = orders.map(o => extractShopName(o.note)).filter(Boolean) as string[];
+    const names = orders.map((order) => resolveOrderShopName(order)).filter(Boolean) as string[];
     return Array.from(new Set(names)).sort();
   }, [orders]);
 
@@ -155,7 +165,7 @@ export default function OutboundPage() {
     const matchesPlatform = platformFilter === "全部平台" || orderPlatform === platformFilter;
 
     // Shop filter
-    const orderShop = extractShopName(order.note);
+    const orderShop = resolveOrderShopName(order);
     const matchesShop = selectedShop === "全部门店" || orderShop === selectedShop;
     
     // Date filter
@@ -343,7 +353,7 @@ export default function OutboundPage() {
                     const rawNote = noteParts ? noteParts[1] : (order.note || "");
                     
                     const shopMatch = rawNote.match(/^\[店铺:(.*?)\]\s*/);
-                    const shopName = shopMatch ? shopMatch[1] : null;
+                    const shopName = shopMatch ? shopMatch[1] : resolveOrderShopName(order);
                     let displayNote = shopMatch ? rawNote.replace(/^\[店铺:.*?\]\s*/, '') : rawNote;
 
                     const serialMatch = displayNote.match(/^\[流水号:(.*?)\]\s*/);
@@ -504,7 +514,7 @@ export default function OutboundPage() {
                 const rawNote = noteParts ? noteParts[1] : (order.note || "");
                 
                 const shopMatch = rawNote.match(/^\[店铺:(.*?)\]\s*/);
-                const shopName = shopMatch ? shopMatch[1] : null;
+                const shopName = shopMatch ? shopMatch[1] : resolveOrderShopName(order);
                 let displayNote = shopMatch ? rawNote.replace(/^\[店铺:.*?\]\s*/, '') : rawNote;
 
                 const serialMatch = displayNote.match(/^\[流水号:(.*?)\]\s*/);

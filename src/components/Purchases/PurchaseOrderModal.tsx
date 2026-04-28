@@ -340,14 +340,21 @@ export function PurchaseOrderModal({ isOpen, onClose, onSubmit, onExport, onOver
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
   const [batchConfirming, setBatchConfirming] = useState(false);
   const purchaseCatalogFetchPath = "/api/purchase-products";
-  const purchaseCatalogQuery = useMemo(
-    () => (formData.shopName ? { shopName: formData.shopName } : undefined),
-    [formData.shopName]
-  );
   const selectedPurchaseShopId = useMemo(
     () => shops.find((shop) => shop.name === formData.shopName)?.id || "",
     [shops, formData.shopName]
   );
+  const purchaseCatalogQuery = useMemo<Record<string, string> | undefined>(() => {
+    if (selectedPurchaseShopId) {
+      const nextQuery: Record<string, string> = { shopId: selectedPurchaseShopId };
+      return nextQuery;
+    }
+    if (formData.shopName) {
+      const nextQuery: Record<string, string> = { shopName: formData.shopName };
+      return nextQuery;
+    }
+    return undefined;
+  }, [selectedPurchaseShopId, formData.shopName]);
   const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductId || item.productId || "", []);
 
   const filteredItems = useMemo(() => {

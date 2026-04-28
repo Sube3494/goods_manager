@@ -356,8 +356,9 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 isOpen={isSelectionModalOpen}
                 onClose={() => setIsSelectionModalOpen(false)}
                 onSelect={(products, platform) => handleBatchAdd(products, platform)}
-                selectedIds={(formData.items || []).map(i => i.productId!).filter(Boolean)}
+                selectedIds={(formData.items || []).map((item) => item.product?.shopProductId || item.productId!).filter(Boolean)}
                 fetchPath="/api/brush-products/products"
+                query={formData.shopName ? { shopName: formData.shopName } : undefined}
                 title="选择刷单商品"
                 allowCreate={false}
                 imageOnly

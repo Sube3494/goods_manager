@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Plus, Search, Tags, Package, RotateCcw, Store, Download, Check, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { BrushProduct, Product } from "@/lib/types";
+import { BrushProduct, Product, Shop } from "@/lib/types";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
@@ -57,6 +57,8 @@ export default function BrushProductsPage() {
   const { user } = useUser();
   const canManage = hasPermission(user as SessionUser | null, "brush:manage");
   const { showToast } = useToast();
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [selectedShopId, setSelectedShopId] = useState("");
   const [items, setItems] = useState<BrushProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,6 +80,10 @@ export default function BrushProductsPage() {
     onConfirm: () => {},
   });
 
+  const getBrushSelectionKey = useCallback((item: BrushProduct) => {
+    return String(item.product.shopProductId || item.productId || item.id);
+  }, []);
+
   const fetchBrushProducts = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -87,6 +93,7 @@ export default function BrushProductsPage() {
         search: searchQuery,
       });
       if (supplierFilter) params.set("supplierId", supplierFilter);
+      if (selectedShopId) params.set("shopId", selectedShopId);
 
       const res = await fetch(`/api/brush-products?${params.toString()}`);
       if (!res.ok) throw new Error("Fetch failed");
@@ -98,7 +105,38 @@ export default function BrushProductsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, showToast, supplierFilter]);
+  }, [searchQuery, selectedShopId, showToast, supplierFilter]);
+
+  useEffect(() => {
+    if (!canManage) return;
+
+    const fetchShops = async () => {
+      try {
+        const res = await fetch("/api/shops?source=shipping-addresses");
+        const data = await res.json().catch(() => ({ shops: [] }));
+        if (!res.ok) {
+          showToast(data?.error || "加载店铺失败", "error");
+          setShops([]);
+          setSelectedShopId("");
+          return;
+        }
+
+        const nextShops: Shop[] = Array.isArray(data?.shops) ? data.shops : [];
+        setShops(nextShops);
+        setSelectedShopId((current) => {
+          if (current && nextShops.some((shop) => shop.id === current)) return current;
+          return nextShops[0]?.id || "";
+        });
+      } catch (error) {
+        console.error("Failed to fetch shops:", error);
+        showToast("加载店铺失败", "error");
+        setShops([]);
+        setSelectedShopId("");
+      }
+    };
+
+    void fetchShops();
+  }, [canManage, showToast]);
 
   useEffect(() => {
     if (canManage) {
@@ -131,23 +169,39 @@ export default function BrushProductsPage() {
   const anySelected = selectedProductIds.length > 0;
 
   useEffect(() => {
-    setSelectedProductIds((prev) => prev.filter((id) => items.some((item) => item.productId === id)));
-  }, [items]);
+    setSelectedProductIds((prev) => prev.filter((id) => items.some((item) => getBrushSelectionKey(item) === id)));
+  }, [items, getBrushSelectionKey]);
 
   const handleAddProducts = async (products: Product[]) => {
+    if (!selectedShopId) {
+      showToast("请先选择店铺", "error");
+      return;
+    }
+
     try {
-      const productIds = Array.from(
-        new Set(products.map((product) => product.sourceProductId || product.id).filter(Boolean))
+      const productItems = Array.from(
+        new Map(
+          products
+            .map((product) => {
+              const productId = String(product.sourceProductId || product.id || "").trim();
+              const shopId = String(selectedShopId).trim();
+              if (!productId) {
+                return null;
+              }
+              return [`${productId}:${shopId}`, { productId, shopId: shopId || null }];
+            })
+            .filter((entry): entry is [string, { productId: string; shopId: string | null }] => Boolean(entry))
+        ).values()
       );
       const res = await fetch("/api/brush-products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productIds }),
+        body: JSON.stringify({ items: productItems }),
       });
 
       if (!res.ok) throw new Error("Add failed");
 
-      showToast(`已加入 ${productIds.length} 个刷单商品`, "success");
+      showToast(`已加入 ${productItems.length} 个刷单商品`, "success");
       setIsPickerOpen(false);
       fetchBrushProducts();
     } catch (error) {
@@ -167,7 +221,7 @@ export default function BrushProductsPage() {
   };
 
   const toggleSelectAllFiltered = () => {
-    const filteredIds = filteredItems.map((item) => item.productId);
+    const filteredIds = filteredItems.map((item) => getBrushSelectionKey(item));
     const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedProductIds.includes(id));
 
     setSelectedProductIds((prev) => {
@@ -179,15 +233,15 @@ export default function BrushProductsPage() {
     });
   };
 
-  const handleSaveKeyword = async (product: Product) => {
-    setSavingProductId(product.id);
+  const handleSaveKeyword = async (item: BrushProduct) => {
+    setSavingProductId(item.id);
     try {
-      const nextKeyword = (editingKeywords[product.id] ?? items.find((item) => item.productId === product.id)?.brushKeyword ?? "").trim();
+      const nextKeyword = (editingKeywords[item.id] ?? item.brushKeyword ?? "").trim();
       const res = await fetch("/api/brush-products", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: product.id,
+          brushProductId: item.id,
           brushKeyword: nextKeyword,
         }),
       });
@@ -195,18 +249,18 @@ export default function BrushProductsPage() {
       if (!res.ok) throw new Error("Update failed");
 
       setItems((prev) =>
-        prev.map((item) =>
-          item.productId === product.id
+        prev.map((current) =>
+          current.id === item.id
             ? {
-                ...item,
+                ...current,
                 brushKeyword: nextKeyword,
               }
-            : item
+            : current
         )
       );
       setEditingKeywords((prev) => {
         const next = { ...prev };
-        delete next[product.id];
+        delete next[item.id];
         return next;
       });
       showToast("刷单关键词已更新", "success");
@@ -222,6 +276,11 @@ export default function BrushProductsPage() {
     setSearchQuery("");
     setSupplierFilter("");
   };
+
+  const selectedShop = useMemo(
+    () => shops.find((shop) => shop.id === selectedShopId) || null,
+    [selectedShopId, shops]
+  );
 
   const handleBatchRemove = () => {
     if (selectedProductIds.length === 0) return;
@@ -241,7 +300,7 @@ export default function BrushProductsPage() {
           if (!res.ok) throw new Error("Batch delete failed");
 
           showToast(`已移出 ${selectedProductIds.length} 个刷单商品`, "success");
-          setItems((prev) => prev.filter((item) => !selectedProductIds.includes(item.productId)));
+          setItems((prev) => prev.filter((item) => !selectedProductIds.includes(item.id)));
           setSelectedProductIds([]);
         } catch (error) {
           console.error("Failed to batch remove brush products:", error);
@@ -396,16 +455,16 @@ export default function BrushProductsPage() {
             <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
             <span>返回刷单中心</span>
           </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-4xl">刷单商品库</h1>
-            <span className="inline-flex items-center rounded-2xl border border-border/70 bg-white/70 px-3 py-1 text-xs font-bold text-foreground dark:bg-white/5">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-4xl">刷单商品库</h1>
+            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-2xl border border-border/70 bg-white/70 px-3 text-xs font-bold leading-none text-foreground dark:bg-white/5">
               {items.length}
             </span>
           </div>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">从现有商品库中挑选一批刷单专用商品，供刷单安排快速选用。</p>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-lg">先选店铺，再从对应商品库里挑刷单商品，后面安排时会更稳。</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:justify-end">
           <button
             onClick={() => setIsImportOpen(true)}
             className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-border bg-white/80 px-4 text-sm font-bold text-foreground transition-all active:scale-95 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 sm:h-12 sm:px-5"
@@ -421,18 +480,25 @@ export default function BrushProductsPage() {
             <span className="truncate">导出</span>
           </button>
           <button
-            onClick={() => setIsPickerOpen(true)}
-            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95 hover:-translate-y-0.5 sm:h-12 sm:px-6"
+            onClick={() => {
+              if (!selectedShopId) {
+                showToast("请先选择店铺", "error");
+                return;
+              }
+              setIsPickerOpen(true);
+            }}
+            disabled={!selectedShopId}
+            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:h-12 sm:px-6"
           >
             <Plus size={18} />
             <span className="truncate sm:hidden">添加</span>
-            <span className="hidden truncate sm:inline">从商品库添加</span>
+            <span className="hidden truncate sm:inline">添加商品</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
-        <div className="flex h-11 items-center gap-3 rounded-2xl border border-border bg-white px-5 transition-all focus-within:ring-2 focus-within:ring-primary/10 dark:bg-white/5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1fr)_220px_220px_auto]">
+        <div className="col-span-2 flex h-11 items-center gap-3 rounded-2xl border border-border bg-white px-5 transition-all focus-within:ring-2 focus-within:ring-primary/10 dark:bg-white/5 md:col-span-1">
           <Search size={18} className="text-muted-foreground" />
           <input
             type="text"
@@ -440,6 +506,17 @@ export default function BrushProductsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="bg-transparent border-none outline-none w-full text-sm"
+          />
+        </div>
+
+        <div className="h-11">
+          <CustomSelect
+            options={shops.map((shop) => ({ value: shop.id, label: shop.name }))}
+            value={selectedShopId}
+            onChange={setSelectedShopId}
+            placeholder="先选择店铺"
+            className="h-full"
+            triggerClassName="h-full rounded-2xl text-sm"
           />
         </div>
 
@@ -459,7 +536,7 @@ export default function BrushProductsPage() {
         {(searchQuery || supplierFilter) && (
           <button
             onClick={resetFilters}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary transition-all hover:bg-primary/10 md:justify-self-start"
+            className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary transition-all hover:bg-primary/10 md:col-span-1 md:justify-self-start"
           >
             <RotateCcw size={14} />
             重置
@@ -473,9 +550,10 @@ export default function BrushProductsPage() {
         <div className="grid grid-cols-1 gap-3 min-[560px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-5">
           {filteredItems.map((item) => {
             const product = item.product;
-            const editingValue = editingKeywords[product.id] ?? item.brushKeyword ?? "";
+            const editingValue = editingKeywords[item.id] ?? item.brushKeyword ?? "";
             const isDirty = editingValue !== (item.brushKeyword ?? "");
-            const isSelected = selectedProductIds.includes(product.id);
+            const selectionKey = getBrushSelectionKey(item);
+            const isSelected = selectedProductIds.includes(selectionKey);
             return (
               <div
                 key={item.id}
@@ -502,7 +580,7 @@ export default function BrushProductsPage() {
                     )}
                   <button
                     type="button"
-                    onClick={() => toggleSelectProduct(product.id)}
+                    onClick={() => toggleSelectProduct(selectionKey)}
                     className={`absolute top-3 left-3 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                       isSelected
                         ? "scale-110 border-foreground bg-foreground text-background dark:text-black"
@@ -525,6 +603,11 @@ export default function BrushProductsPage() {
                   </h3>
 
                   <div className="flex min-h-[22px] flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    {item.shopName && (
+                      <span className="flex h-5 items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold leading-none text-primary">
+                        {item.shopName}
+                      </span>
+                    )}
                     {product.sku && <span className="flex h-5 items-center rounded-full bg-secondary/80 px-2 py-0.5 font-mono text-[10px] leading-none">{product.sku}</span>}
                     {product.supplier?.name && (
                       <span className="flex h-5 items-center gap-1 rounded-full border border-zinc-500/10 bg-zinc-500/5 px-2 py-0.5 text-[10px] leading-none">
@@ -538,7 +621,7 @@ export default function BrushProductsPage() {
                     <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">刷单关键词</div>
                     <textarea
                       value={editingValue}
-                      onChange={(e) => handleKeywordChange(product.id, e.target.value)}
+                      onChange={(e) => handleKeywordChange(item.id, e.target.value)}
                       placeholder="填写刷单提示词"
                       rows={3}
                       className="mt-2 w-full resize-none rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm font-medium outline-none transition-all focus:border-primary/40"
@@ -546,11 +629,11 @@ export default function BrushProductsPage() {
                     <div className="mt-2 flex items-center justify-end">
                       <button
                         type="button"
-                        onClick={() => handleSaveKeyword(product)}
-                        disabled={!isDirty || savingProductId === product.id}
+                        onClick={() => handleSaveKeyword(item)}
+                        disabled={!isDirty || savingProductId === item.id}
                         className="inline-flex h-9 items-center rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {savingProductId === product.id ? "保存中..." : "保存关键词"}
+                        {savingProductId === item.id ? "保存中..." : "保存关键词"}
                       </button>
                     </div>
                   </div>
@@ -579,14 +662,15 @@ export default function BrushProductsPage() {
         isOpen={isPickerOpen}
         onClose={() => setIsPickerOpen(false)}
         onSelect={(products) => handleAddProducts(products)}
-        selectedIds={items.map((item) => item.productId)}
+        selectedIds={items.map((item) => getBrushSelectionKey(item))}
         showPrice={false}
-        showSku={false}
+        showSku={true}
         fetchPath="/api/purchase-products"
-        query={{ aggregateSource: "true" }}
-        title="选择要加入刷单商品库的商品"
+        title={selectedShop ? `选择要加入 ${selectedShop.name} 的商品` : "先选择店铺"}
         allowCreate={false}
         showPlatformSelector={false}
+        query={selectedShopId ? { shopId: selectedShopId } : undefined}
+        emptyStateText={selectedShop ? `${selectedShop.name} 还没有可选商品` : "请先选择店铺"}
       />
 
       <ImportModal

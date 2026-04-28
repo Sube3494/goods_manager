@@ -37,6 +37,8 @@ export default function GoodsPage() {
   const itemsRef = useRef<Product[]>([]);
   const [, setPage] = useState(1);
   const currentPageRef = useRef(1);
+  const isFetchingRef = useRef(false);
+  const requestVersionRef = useRef(0);
   const [hasMore, setHasMore] = useState(true);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
@@ -102,11 +104,19 @@ export default function GoodsPage() {
   }, [items]);
 
   const fetchGoods = useCallback(async (isFirstPage = true) => {
+    if (isFetchingRef.current) {
+      return;
+    }
+
+    isFetchingRef.current = true;
+    const requestVersion = ++requestVersionRef.current;
+
     try {
       const targetPage = isFirstPage ? 1 : currentPageRef.current + 1;
       
-      if (isFirstPage && itemsRef.current.length === 0) {
+      if (isFirstPage) {
         setIsLoading(true);
+        setHasMore(true);
       } else if (!isFirstPage) {
         setIsNextPageLoading(true);
       }
@@ -125,6 +135,10 @@ export default function GoodsPage() {
       if (!res.ok) throw new Error("Fetch failed");
       
       const data = await res.json();
+
+      if (requestVersion !== requestVersionRef.current) {
+        return;
+      }
       
       if (isFirstPage) {
         setItems(data.items);
@@ -143,6 +157,11 @@ export default function GoodsPage() {
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
+      if (requestVersion === requestVersionRef.current) {
+        isFetchingRef.current = false;
+      } else if (isFetchingRef.current) {
+        isFetchingRef.current = false;
+      }
       setIsLoading(false);
       setIsNextPageLoading(false);
     }

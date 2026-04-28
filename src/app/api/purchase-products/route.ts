@@ -24,9 +24,67 @@ type PurchasePickerItem = {
   supplierId?: string;
   supplier?: undefined;
   remark: string | null;
+  isStandaloneShopProduct?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
+
+const naturalSortCollator = new Intl.Collator("zh-CN", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+function comparePurchasePickerItems(a: PurchasePickerItem, b: PurchasePickerItem) {
+  const skuCompare = naturalSortCollator.compare(
+    String(a.sku || "").trim(),
+    String(b.sku || "").trim()
+  );
+  if (skuCompare !== 0) {
+    return skuCompare;
+  }
+
+  const nameCompare = naturalSortCollator.compare(
+    String(a.name || "").trim(),
+    String(b.name || "").trim()
+  );
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+
+  const shopCompare = naturalSortCollator.compare(
+    String(a.shopName || "").trim(),
+    String(b.shopName || "").trim()
+  );
+  if (shopCompare !== 0) {
+    return shopCompare;
+  }
+
+  return naturalSortCollator.compare(
+    String(a.id || "").trim(),
+    String(b.id || "").trim()
+  );
+}
+
+function buildPurchasePickerDedupeKey(item: PurchasePickerItem) {
+  const shopId = String(item.shopId || "").trim();
+  const sku = String(item.sku || "").trim().toLowerCase();
+  const name = String(item.name || "").trim().toLowerCase();
+  if (shopId && sku) {
+    return `${shopId}::sku::${sku}`;
+  }
+  if (shopId && name) {
+    return `${shopId}::name::${name}`;
+  }
+  return String(item.id || "").trim();
+}
+
+function scorePurchasePickerItem(item: PurchasePickerItem) {
+  let score = 0;
+  if (!item.isStandaloneShopProduct) score += 20;
+  if (String(item.sourceProductId || "").trim()) score += 10;
+  if (String(item.sku || "").trim()) score += 5;
+  return score;
+}
 
 export async function GET(request: Request) {
   try {
@@ -126,21 +184,28 @@ export async function GET(request: Request) {
         ).map(([, value]) => value)
       : merged;
 
-    normalizedItems.sort((a, b) => {
-      const aName = `${a.name} ${a.sku || ""}`.toLowerCase();
-      const bName = `${b.name} ${b.sku || ""}`.toLowerCase();
-      return aName.localeCompare(bName, "zh-CN", { numeric: true, sensitivity: "base" });
-    });
+    const dedupedItems = Array.from(
+      normalizedItems.reduce((acc, item) => {
+        const key = buildPurchasePickerDedupeKey(item);
+        const existing = acc.get(key);
+        if (!existing || scorePurchasePickerItem(item) > scorePurchasePickerItem(existing)) {
+          acc.set(key, item);
+        }
+        return acc;
+      }, new Map<string, PurchasePickerItem>())
+    ).map(([, value]) => value);
+
+    dedupedItems.sort(comparePurchasePickerItems);
 
     const start = (page - 1) * pageSize;
-    const items = normalizedItems.slice(start, start + pageSize);
+    const items = dedupedItems.slice(start, start + pageSize);
 
     return NextResponse.json({
       items,
-      total: normalizedItems.length,
+      total: dedupedItems.length,
       page,
       pageSize,
-      hasMore: start + items.length < normalizedItems.length,
+      hasMore: start + items.length < dedupedItems.length,
     });
   } catch (error) {
     console.error("Failed to fetch purchase products:", error);

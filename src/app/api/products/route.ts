@@ -28,6 +28,21 @@ async function findConflictingProductBySku(sku: string, excludeId?: string) {
   });
 }
 
+async function findConflictingShopProductBySku(shopId: string, sku: string, excludeId?: string) {
+  return prisma.shopProduct.findFirst({
+    where: {
+      shopId,
+      sku,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: {
+      id: true,
+      productName: true,
+      sku: true,
+    },
+  });
+}
+
 // 获取所有商品 (支持分页、筛选、排序)
 export async function GET(request: Request) {
   try {
@@ -140,6 +155,15 @@ export async function POST(request: Request) {
       : null;
 
     if (resolvedShopId && isShopOnly) {
+      if (normalizedSku) {
+        const existingShopProduct = await findConflictingShopProductBySku(resolvedShopId, normalizedSku);
+        if (existingShopProduct) {
+          return NextResponse.json({
+            error: `当前店铺内商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`
+          }, { status: 409 });
+        }
+      }
+
       const shopProduct = await prisma.shopProduct.create({
         data: {
           shopId: resolvedShopId,
@@ -181,6 +205,15 @@ export async function POST(request: Request) {
         shopName: resolvedShopName,
         assignedShopIds: [shopProduct.shopId],
       });
+    }
+
+    if (resolvedShopId && normalizedSku) {
+      const existingShopProduct = await findConflictingShopProductBySku(resolvedShopId, normalizedSku);
+      if (existingShopProduct) {
+        return NextResponse.json({
+          error: `当前店铺内商品编码 (SKU) "${normalizedSku}" 已存在，请使用其他编码`
+        }, { status: 409 });
+      }
     }
 
     const product = await prisma.product.create({

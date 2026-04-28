@@ -236,16 +236,19 @@ model BrushProduct {
   id        String   @id @default(cuid())
   userId    String?
   productId String
+  shopId    String?
   isActive  Boolean  @default(true)
   brushKeyword String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User?    @relation(fields: [userId], references: [id])
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop      Shop?    @relation(fields: [shopId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, productId])
+  @@unique([userId, shopId, productId])
   @@index([userId, createdAt(sort: Desc)])
   @@index([productId])
+  @@index([shopId])
 }
 
 model VerificationCode {
@@ -501,6 +504,7 @@ model Shop {
   externalId  String?  // 外部系统ID，如美团POI_ID，用于去重
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
+  brushProducts BrushProduct[]
   shopProducts ShopProduct[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -538,6 +542,7 @@ model ShopProduct {
   outboundOrderItems OutboundOrderItem[]
 
   @@unique([shopId, productId])
+  @@unique([shopId, sku])
   @@index([productId])
   @@index([shopId, createdAt])
   @@index([shopId, pinyin])

@@ -96,6 +96,10 @@ export function ProductSelectionModal({
   const PLATFORMS = ["美团", "淘宝", "京东"];
   const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
 
+  const getSelectionKey = useCallback((product: Product) => {
+    return String(product.shopProductId || product.id || product.sourceProductId || "").trim();
+  }, []);
+
 
   // 初始化重置逻辑
   useEffect(() => {
@@ -303,11 +307,11 @@ export function ProductSelectionModal({
     const matchesSupplier = !selectedSupplierId || p.supplierId === selectedSupplierId;
     return matchesSupplier;
   });
-  const selectableProducts = filteredProducts.filter((product) => !selectedIds.includes(product.sourceProductId || product.id));
+  const selectableProducts = filteredProducts.filter((product) => !selectedIds.includes(getSelectionKey(product)));
   const allFilteredSelected =
     !singleSelect &&
     selectableProducts.length > 0 &&
-    selectableProducts.every((product) => tempSelectedIds.includes(product.id));
+    selectableProducts.every((product) => tempSelectedIds.includes(getSelectionKey(product)));
 
   const handleToggleSelectAll = async () => {
     if (singleSelect || selectableProducts.length === 0) {
@@ -339,9 +343,9 @@ export function ProductSelectionModal({
       const fullyFilteredProducts = allMatchedProducts.filter((product: Product) => (
         !selectedSupplierId || product.supplierId === selectedSupplierId
       ));
-      const fullySelectableProducts = fullyFilteredProducts.filter((product: Product) => !selectedIds.includes(product.sourceProductId || product.id));
+      const fullySelectableProducts = fullyFilteredProducts.filter((product: Product) => !selectedIds.includes(getSelectionKey(product)));
 
-      setTempSelectedIds(fullySelectableProducts.map((product: Product) => product.id));
+      setTempSelectedIds(fullySelectableProducts.map((product: Product) => getSelectionKey(product)));
       setSelectedProducts(fullySelectableProducts);
     } catch (error) {
       console.error("Failed to select all products:", error);
@@ -349,9 +353,9 @@ export function ProductSelectionModal({
     }
   };
 
-  const toggleProduct = (product: Product) => {
-    const id = product.id;
-    if (selectedIds.includes(product.sourceProductId || id)) {
+  const toggleProduct = useCallback((product: Product) => {
+    const id = getSelectionKey(product);
+    if (selectedIds.includes(id)) {
       return;
     }
     if (singleSelect) {
@@ -365,12 +369,12 @@ export function ProductSelectionModal({
         });
         
         setSelectedProducts(prev => {
-            const isSelected = prev.some(p => p.id === id);
-            if (isSelected) return prev.filter(p => p.id !== id);
+            const isSelected = prev.some(p => getSelectionKey(p) === id);
+            if (isSelected) return prev.filter(p => getSelectionKey(p) !== id);
             return [...prev, product];
         });
     }
-  };
+  }, [getSelectionKey, selectedIds, singleSelect]);
 
   const handleConfirm = () => {
     onSelect(selectedProducts, targetPlatform);
@@ -491,8 +495,9 @@ export function ProductSelectionModal({
                  ) : (
                     <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
                     {filteredProducts.map(product => {
-                      const isSelected = tempSelectedIds.includes(product.id);
-                      const isAlreadySelected = selectedIds.includes(product.sourceProductId || product.id);
+                      const selectionKey = getSelectionKey(product);
+                      const isSelected = tempSelectedIds.includes(selectionKey);
+                      const isAlreadySelected = selectedIds.includes(selectionKey);
                       return (
                          <button
                           key={product.id}
@@ -552,8 +557,16 @@ export function ProductSelectionModal({
                                  </span>
                              )}
                             </div>
-                             {(minimalView ? product.category?.name : ((showSku && product.sku) || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark)) && (
+                             {(minimalView
+                               ? (product.shopName || product.category?.name)
+                               : (product.shopName || (showSku && product.sku) || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark)
+                             ) && (
                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                                    {product.shopName && (
+                                      <span className="text-[10px] bg-primary/10 px-1.5 py-0.5 rounded text-primary shrink-0">
+                                        {product.shopName}
+                                      </span>
+                                    )}
                                     {!minimalView && showSku && product.sku && (
                                       <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
                                         {product.sku}
