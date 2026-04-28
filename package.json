@@ -9,9 +9,7 @@
     "lint": "eslint",
     "test": "npx tsc --module commonjs --target es2020 --outDir tmp/purchase-tests --esModuleInterop --skipLibCheck src/lib/pinyin.ts src/lib/types.ts src/lib/purchases.ts scripts/purchases.test.ts && node tmp/purchase-tests/scripts/purchases.test.js",
     "audit:brush-cleanup": "node scripts/audit_brush_inventory_cleanup.js",
-    "cleanup:inactive-brush-products": "node scripts/cleanup_inactive_brush_products.js",
-    "fix:shop-poi-duplicates": "node scripts/fix_shop_external_id_duplicates.js",
-    "fix:shop-dedupe-keys": "node scripts/fix_shop_dedupe_keys.js"
+    "cleanup:inactive-brush-products": "node scripts/cleanup_inactive_brush_products.js"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
