@@ -1943,8 +1943,13 @@ export default function OrdersPage() {
   const ordersForOverview = activeTab === "today" ? filteredOrders : visibleOrders;
   const orderOverviewCounts = useMemo(() => {
     const cancelledCount = ordersForOverview.filter((item) => isCancelledStatus(item.status)).length;
+    const validOrders = ordersForOverview.filter((item) => !isCancelledStatus(item.status));
+    const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery).length;
+    const trueOrderCount = Math.max(0, validOrders.length - brushCount);
     return {
-      validCount: Math.max(0, ordersForOverview.length - cancelledCount),
+      validCount: validOrders.length,
+      trueOrderCount,
+      brushCount,
       cancelledCount,
     };
   }, [ordersForOverview]);
@@ -2092,10 +2097,14 @@ export default function OrdersPage() {
                     <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{ordersForOverview.length}</div>
                     <p className="mt-2 text-xs text-muted-foreground">{activeTab === "today" ? "今日订单分布" : "当前结果页分布"}</p>
                   </div>
-                  <div className="flex min-w-[92px] max-w-[118px] flex-col items-stretch gap-1">
-                    <div className="inline-flex items-center justify-between rounded-full border border-emerald-500/18 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                      <span className="truncate pr-2">有效</span>
-                      <span className="shrink-0">{orderOverviewCounts.validCount} 单</span>
+                  <div className="flex min-w-[98px] max-w-[126px] flex-col items-stretch gap-1">
+                    <div className="inline-flex items-center justify-between rounded-full border border-sky-500/18 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400">
+                      <span className="truncate pr-2">真单</span>
+                      <span className="shrink-0">{orderOverviewCounts.trueOrderCount} 单</span>
+                    </div>
+                    <div className="inline-flex items-center justify-between rounded-full border border-rose-500/18 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-400">
+                      <span className="truncate pr-2">刷单</span>
+                      <span className="shrink-0">{orderOverviewCounts.brushCount} 单</span>
                     </div>
                     <div className="inline-flex items-center justify-between rounded-full border border-slate-500/18 bg-slate-500/10 px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:text-slate-400">
                       <span className="truncate pr-2">取消</span>
