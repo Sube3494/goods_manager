@@ -976,7 +976,7 @@ function IntegrationModal({
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
   const [isEditingInboundApiKey, setIsEditingInboundApiKey] = useState(!hasInboundApiKey);
   const [copiedCallback, setCopiedCallback] = useState(false);
-  const pillButtonClass = "inline-flex items-center gap-1 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
+  const pillButtonClass = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 sm:min-h-9 sm:rounded-full sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
     value: item.name,
     label: `${item.name}${item.isDefault ? "（默认）" : ""}`,
@@ -1060,17 +1060,17 @@ function IntegrationModal({
             </div>
 
             <div className="rounded-[20px] border border-black/8 bg-black/[0.02] p-3.5 dark:border-white/10 dark:bg-white/[0.03] sm:p-4 lg:col-start-2 lg:row-start-1">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
                   <p className="mt-1 text-xs text-muted-foreground">这里只用于读取麦芽田门店，方便你做门店映射。</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
                   {hasCookie ? (
                     <button
                       type="button"
                       onClick={() => setIsEditingCookie((current) => !current)}
-                      className={pillButtonClass}
+                      className={cn(pillButtonClass, "min-w-[64px]")}
                     >
                       {isEditingCookie ? "取消" : "编辑"}
                     </button>
@@ -1079,7 +1079,7 @@ function IntegrationModal({
                     <button
                       type="button"
                       onClick={() => onChange({ ...integrationConfig, maiyatianCookie: "" })}
-                      className={pillButtonClass}
+                      className={cn(pillButtonClass, "min-w-[64px]")}
                     >
                       删除
                     </button>
@@ -1178,6 +1178,7 @@ function IntegrationModal({
                   disabled={isFetchingMaiyatianShops}
                   className={cn(
                     pillButtonClass,
+                    "min-w-[88px] shrink-0 self-start px-3.5 text-center leading-4",
                     "bg-white/88 dark:bg-white/[0.05]",
                     "disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-black/6 disabled:bg-black/[0.04] disabled:text-muted-foreground disabled:shadow-none",
                     "dark:disabled:border-white/10 dark:disabled:bg-white/[0.04] dark:disabled:text-white/45"
@@ -1986,7 +1987,7 @@ export default function OrdersPage() {
 
   return (
     <div className="relative px-2 sm:px-1">
-      <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-700 sm:space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         <section className="rounded-[24px] border border-black/8 bg-white/72 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/[0.04] sm:px-5">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -2002,7 +2003,7 @@ export default function OrdersPage() {
                   type="button"
                   onClick={syncOrders}
                   disabled={isBulkSyncing || isLoading}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   {isBulkSyncing ? <Loader2 size={15} className="animate-spin" /> : <ArrowUpRight size={15} />}
                   一键同步
@@ -2011,7 +2012,7 @@ export default function OrdersPage() {
                   type="button"
                   onClick={() => fetchOrders()}
                   disabled={isLoading || isRefreshing}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   {isLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
                   刷新订单
@@ -2020,7 +2021,7 @@ export default function OrdersPage() {
                   type="button"
                   onClick={syncBrushOrders}
                   disabled={isBulkBrushSyncing || isLoading}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   {isBulkBrushSyncing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                   同步刷单
@@ -2028,7 +2029,7 @@ export default function OrdersPage() {
                 <button
                   type="button"
                   onClick={() => setIsIntegrationOpen(true)}
-                  className="col-span-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:col-span-2 sm:w-auto dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
                 >
                   <Settings2 size={15} />
                   对接配置

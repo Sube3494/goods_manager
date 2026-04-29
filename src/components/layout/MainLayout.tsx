@@ -110,8 +110,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         )}
         
         <div className={cn(
-            "flex-1 flex flex-col min-h-dynamic-screen relative z-10 w-full transform-gpu",
-            canAnimate && "transition-[padding] duration-200 ease-in-out will-change-[padding]",
+            "flex-1 flex flex-col min-h-dynamic-screen relative z-10 w-full",
+            canAnimate && "lg:transition-[padding] lg:duration-200 lg:ease-in-out",
             showSidebar ? (isCollapsed ? "lg:pl-28" : "lg:pl-72") : "pl-0"
         )}>
             {!isFullScreenPage && (

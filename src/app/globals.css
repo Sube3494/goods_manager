@@ -175,9 +175,6 @@
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
-  /* Force GPU acceleration during transition */
-  transform: translateZ(0);
-  will-change: clip-path, transform;
 }
 
 /* 临时禁用过渡动画，防止主题切换时大量元素同时 transition 导致卡顿 */
