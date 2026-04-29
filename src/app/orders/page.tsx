@@ -541,6 +541,7 @@ function OrderCard({
   const autoCompleteFailed = hasAutoCompleteFailure(order);
   const autoOutboundFailed = hasAutoOutboundFailure(order);
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
+  const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
   return (
     <article className="overflow-hidden rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[30px]">
@@ -576,6 +577,12 @@ function OrderCard({
                   {order.isMainSystemSelfDelivery ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 text-[13px] font-medium leading-none text-rose-700 dark:text-rose-400">
                       刷单
+                    </span>
+                  ) : null}
+                  {autoOutboundFailed ? (
+                    <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 text-[13px] font-medium leading-none text-rose-700 dark:text-rose-400">
+                      <TriangleAlert size={13} />
+                      出库待处理
                     </span>
                   ) : null}
                   <StatusBadge order={order} />
@@ -660,7 +667,7 @@ function OrderCard({
         </div>
 
         <div className="mt-2.5 flex flex-col gap-2 border-t border-black/6 pt-2.5 dark:border-white/6 lg:flex-row lg:items-center lg:justify-between lg:pt-4">
-          <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-1.5">
             {completed ? (
               <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <CheckCheck size={12} />
@@ -685,9 +692,10 @@ function OrderCard({
               </span>
             ) : null}
             {!terminal && order.autoCompleteAt ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <TimerReset size={12} />
-                预计自动完成 {formatLocalDateTime(order.autoCompleteAt)}
+                <span className="truncate sm:hidden">{`自动完成 ${compactAutoCompleteAt}`}</span>
+                <span className="hidden sm:inline">{`预计自动完成 ${formatLocalDateTime(order.autoCompleteAt)}`}</span>
               </span>
             ) : null}
             {autoCompleteFailed ? (
@@ -696,17 +704,11 @@ function OrderCard({
                 自动完成失败
               </span>
             ) : null}
-            {autoOutboundFailed ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-700 dark:text-rose-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
-                <TriangleAlert size={12} />
-                出库待处理
-              </span>
-            ) : null}
             {deadlineDisplay !== "-" ? (
-              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-black/8 bg-white/85 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+              <span className="ml-auto inline-flex min-w-0 items-center justify-end gap-1.5 rounded-full border border-black/8 bg-white/85 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] sm:ml-0 sm:justify-start sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <Clock3 size={12} />
-                <span className="sm:hidden">
-                  <span className="truncate">{pickup ? `取货 ${compactDeadlineDisplay}` : subscribe ? `预约 ${compactDeadlineDisplay}` : `最晚 ${compactDeadlineDisplay}`}</span>
+                <span className="min-w-0 text-right sm:hidden">
+                  <span className="block truncate">{pickup ? `取货 ${compactDeadlineDisplay}` : subscribe ? `预约 ${compactDeadlineDisplay}` : `最晚 ${compactDeadlineDisplay}`}</span>
                 </span>
                 <span className="hidden sm:inline">
                   {pickup ? `取货时间 ${deadlineDisplay}` : subscribe ? `预约送达 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
@@ -951,10 +953,12 @@ function IntegrationModal({
   isFetchingMaiyatianShops,
   isTestingPlugin,
   isTestingCookie,
+  isRegeneratingInboundApiKey,
   modalRef,
   onClose,
   onChange,
   onFetchMaiyatianShops,
+  onRegenerateInboundApiKey,
   onTestPlugin,
   onTestCookie,
 }: {
@@ -964,17 +968,17 @@ function IntegrationModal({
   isFetchingMaiyatianShops: boolean;
   isTestingPlugin: boolean;
   isTestingCookie: boolean;
+  isRegeneratingInboundApiKey: boolean;
   modalRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onChange: (value: AutoPickIntegrationConfig) => void;
   onFetchMaiyatianShops: () => void;
+  onRegenerateInboundApiKey: () => void;
   onTestPlugin: () => void;
   onTestCookie: () => void;
 }) {
   const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
-  const hasInboundApiKey = Boolean(integrationConfig.inboundApiKey.trim());
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
-  const [isEditingInboundApiKey, setIsEditingInboundApiKey] = useState(!hasInboundApiKey);
   const [copiedCallback, setCopiedCallback] = useState(false);
   const pillButtonClass = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 sm:min-h-9 sm:rounded-full sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
@@ -997,14 +1001,6 @@ function IntegrationModal({
     }
     setIsEditingCookie(false);
   }, [integrationConfig.maiyatianCookie]);
-
-  useEffect(() => {
-    if (!integrationConfig.inboundApiKey.trim()) {
-      setIsEditingInboundApiKey(true);
-      return;
-    }
-    setIsEditingInboundApiKey(false);
-  }, [integrationConfig.inboundApiKey]);
 
   const copyCallbackUrl = useCallback(async () => {
     if (!callbackOrderUrl || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
@@ -1123,46 +1119,27 @@ function IntegrationModal({
               <div className="mt-4 min-w-0 border-t border-black/8 pt-4 dark:border-white/10">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调密钥</div>
-                  {hasInboundApiKey ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingInboundApiKey((current) => !current)}
-                        className={pillButtonClass}
-                      >
-                        {isEditingInboundApiKey ? "取消" : "编辑"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onChange({ ...integrationConfig, inboundApiKey: "" })}
-                        className={pillButtonClass}
-                      >
-                        删除
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                {isEditingInboundApiKey ? (
-                  <input
-                    value={integrationConfig.inboundApiKey}
-                    onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
-                    placeholder="脚本回调主系统时使用"
-                    className="mt-3 h-11 w-full rounded-xl border border-black/8 bg-white/80 px-3 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
-                  />
-                ) : (
-                  <div
-                    onCopy={(event) => event.preventDefault()}
-                    onCut={(event) => event.preventDefault()}
-                    className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827]"
+                  <button
+                    type="button"
+                    onClick={onRegenerateInboundApiKey}
+                    disabled={isRegeneratingInboundApiKey}
+                    className={pillButtonClass}
                   >
-                    <div className="text-sm font-medium text-foreground">已保存密钥</div>
-                    <div className="mt-1 text-xs text-muted-foreground">默认隐藏，当前界面不展示明文。</div>
-                    <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
-                      {"•".repeat(28)}
-                    </div>
+                    {isRegeneratingInboundApiKey ? "生成中..." : "重新生成"}
+                  </button>
+                </div>
+                <div
+                  onCopy={(event) => event.preventDefault()}
+                  onCut={(event) => event.preventDefault()}
+                  className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827]"
+                >
+                  <div className="text-sm font-medium text-foreground">已保存唯一密钥</div>
+                  <div className="mt-1 text-xs text-muted-foreground">默认隐藏，重新生成后系统会自动复制到剪贴板。</div>
+                  <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
+                    {"•".repeat(28)}
                   </div>
-                )}
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本上报订单时使用这个密钥。</p>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本上报订单时使用这个值区分用户。</p>
               </div>
             </div>
 
@@ -1340,6 +1317,7 @@ export default function OrdersPage() {
   const [isIntegrationOpen, setIsIntegrationOpen] = useState(false);
   const [isTestingPlugin, setIsTestingPlugin] = useState(false);
   const [isTestingCookie, setIsTestingCookie] = useState(false);
+  const [isRegeneratingInboundApiKey, setIsRegeneratingInboundApiKey] = useState(false);
   const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const [isBulkBrushSyncing, setIsBulkBrushSyncing] = useState(false);
@@ -1654,6 +1632,48 @@ export default function OrdersPage() {
       }
     }
   }, [fetchOrders, integrationConfig, savedMappingsDigest, showToast]);
+
+  const regenerateInboundApiKey = useCallback(async () => {
+    setIsRegeneratingInboundApiKey(true);
+    try {
+      const response = await fetch("/api/orders/integration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regenerateInboundApiKey: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || "重新生成回调密钥失败");
+      }
+
+      setIntegrationConfig({
+        pluginBaseUrl: String(data.pluginBaseUrl || ""),
+        inboundApiKey: String(data.inboundApiKey || ""),
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+      });
+      setSavedIntegrationDigest(serializeIntegrationConfig({
+        maiyatianCookie: String(data.maiyatianCookie || ""),
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+      }));
+      setSavedMappingsDigest(serializeMaiyatianMappings({
+        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+      }));
+      const nextInboundApiKey = String(data.inboundApiKey || "").trim();
+      if (nextInboundApiKey && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(nextInboundApiKey);
+        showToast("已生成新的唯一回调密钥，并自动复制到剪贴板", "success");
+      } else {
+        showToast("已生成新的唯一回调密钥", "success");
+      }
+    } catch (error) {
+      console.error("Failed to regenerate inbound api key:", error);
+      showToast(error instanceof Error ? error.message : "重新生成回调密钥失败", "error");
+    } finally {
+      setIsRegeneratingInboundApiKey(false);
+    }
+  }, [showToast]);
 
   const testIntegrationConfig = async (target: "plugin" | "cookie") => {
     if (target === "plugin") {
@@ -2280,10 +2300,12 @@ export default function OrdersPage() {
                 isFetchingMaiyatianShops={isFetchingMaiyatianShops}
                 isTestingPlugin={isTestingPlugin}
                 isTestingCookie={isTestingCookie}
+                isRegeneratingInboundApiKey={isRegeneratingInboundApiKey}
                 modalRef={modalRef}
                 onClose={() => setIsIntegrationOpen(false)}
                 onChange={setIntegrationConfig}
                 onFetchMaiyatianShops={fetchMaiyatianShops}
+                onRegenerateInboundApiKey={() => void regenerateInboundApiKey()}
                 onTestPlugin={() => void testIntegrationConfig("plugin")}
                 onTestCookie={() => void testIntegrationConfig("cookie")}
               />,

@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
           method: "GET",
           headers: {
             Accept: "application/json",
+            "X-API-Key": config.inboundApiKey,
           },
           cache: "no-store",
         });

@@ -3,6 +3,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import {
   getAutoPickIntegrationConfigByUserId,
   normalizeAutoPickIntegrationConfig,
+  regenerateAutoPickIntegrationInboundKey,
   updateAutoPickIntegrationConfigByUserId,
 } from "@/lib/autoPickOrders";
 
@@ -33,6 +34,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json().catch(() => ({}));
+    if (body && typeof body === "object" && body.regenerateInboundApiKey) {
+      const regenerated = await regenerateAutoPickIntegrationInboundKey(session.id);
+      return NextResponse.json(regenerated);
+    }
     const config = normalizeAutoPickIntegrationConfig(body);
 
     const saved = await updateAutoPickIntegrationConfigByUserId(session.id, config);
