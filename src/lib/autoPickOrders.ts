@@ -2604,14 +2604,50 @@ function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
   return compact.replace(/[^A-Z0-9]+/g, "");
 }
 
+function isJdPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized === "jd" || normalized.includes("jingdong") || normalized.includes("jddj") || normalized.includes("京东");
+}
+
+function normalizeShopProductSkuForPlatformMatch(
+  platform: string | null | undefined,
+  item: { sku?: string | null; jdSkuId?: string | null }
+) {
+  if (isJdPlatform(platform)) {
+    return normalizeAutoPickSkuForMatch(item.jdSkuId || item.sku);
+  }
+  return normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
+}
+
 async function findExistingShopProductByShopAndSku(
   tx: Prisma.TransactionClient,
   shopId: string,
-  sku: string | null | undefined
+  sku: string | null | undefined,
+  platform?: string | null
 ) {
   const normalizedSku = normalizeAutoPickSkuForMatch(sku);
   if (!shopId || !normalizedSku) {
     return null;
+  }
+
+  if (isJdPlatform(platform)) {
+    const directJdHit = await tx.shopProduct.findFirst({
+      where: {
+        shopId,
+        jdSkuId: String(sku || "").trim(),
+      },
+      select: {
+        id: true,
+        productId: true,
+        sourceProductId: true,
+        sku: true,
+        jdSkuId: true,
+        productName: true,
+      },
+    });
+    if (directJdHit) {
+      return directJdHit;
+    }
   }
 
   const directHit = await tx.shopProduct.findFirst({
@@ -2624,6 +2660,7 @@ async function findExistingShopProductByShopAndSku(
       productId: true,
       sourceProductId: true,
       sku: true,
+      jdSkuId: true,
       productName: true,
     },
   });
@@ -2640,11 +2677,12 @@ async function findExistingShopProductByShopAndSku(
       productId: true,
       sourceProductId: true,
       sku: true,
+      jdSkuId: true,
       productName: true,
     },
   });
 
-  return candidates.find((item) => normalizeAutoPickSkuForMatch(item.sku) === normalizedSku) || null;
+  return candidates.find((item) => normalizeShopProductSkuForPlatformMatch(platform, item) === normalizedSku) || null;
 }
 
 async function resolveAutoPickInternalShop(
@@ -3082,6 +3120,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
   userId: string,
   order: {
     orderNo?: string | null;
+    platform?: string | null;
     shopId?: string | null;
     rawPayload?: unknown;
     preferredMappedShopName?: string | null;
@@ -3117,6 +3156,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
         sourceProductId: true,
         productName: true,
         sku: true,
+        jdSkuId: true,
         shop: {
           select: {
             name: true,
@@ -3152,12 +3192,14 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
+    jdSkuId: string | null;
     shopName: string | null;
   }>>();
   const shopProductSkuMap = new Map<string, Array<{
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
+    jdSkuId: string | null;
     shopName: string | null;
   }>>();
   const normalizedShopProductEntries: Array<{
@@ -3165,6 +3207,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
+    jdSkuId: string | null;
     shopName: string | null;
   }> = [];
   for (const item of shopProducts) {
@@ -3172,6 +3215,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       productId: item.productId || null,
       sourceProductId: item.sourceProductId || null,
       sku: item.sku || null,
+      jdSkuId: item.jdSkuId || null,
       shopName: item.shop?.name || null,
     };
     const productName = toAutoPickBaseProductName(item.productName);
@@ -3185,7 +3229,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
         ...entry,
       });
     }
-    const normalizedSku = normalizeAutoPickSkuForMatch(item.sku);
+    const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
     if (normalizedSku) {
       const current = shopProductSkuMap.get(normalizedSku) || [];
       current.push(entry);
@@ -3277,6 +3321,7 @@ async function resolveOutboundItemsForAutoPickOrder(
   tx: Prisma.TransactionClient,
   userId: string,
   order: {
+    platform?: string | null;
     shopId?: string | null;
     rawPayload?: unknown;
     actualPaid?: number | null;
@@ -3335,6 +3380,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         sourceProductId: true,
         productName: true,
         sku: true,
+        jdSkuId: true,
         shop: {
           select: {
             id: true,
@@ -3348,11 +3394,12 @@ async function resolveOutboundItemsForAutoPickOrder(
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
+    jdSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
   }>>();
   for (const item of shopProducts) {
-    const normalizedSku = normalizeAutoPickSkuForMatch(item.sku);
+    const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
     if (!normalizedSku) continue;
     const current = shopProductSkuMap.get(normalizedSku) || [];
     current.push({
@@ -3360,6 +3407,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       productId: item.productId || null,
       sourceProductId: item.sourceProductId || null,
       sku: item.sku || null,
+      jdSkuId: item.jdSkuId || null,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     });
@@ -3377,6 +3425,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       productId: string | null;
       sourceProductId: string | null;
       sku: string | null;
+      jdSkuId: string | null;
       shopId: string | null;
       shopName: string | null;
     } | null = null;
@@ -3408,13 +3457,14 @@ async function resolveOutboundItemsForAutoPickOrder(
     }
 
     if (!resolvedShopProduct && internalShop?.id && normalizedSku) {
-      const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku);
+      const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform);
       if (existingShopProduct) {
         resolvedShopProduct = {
           id: existingShopProduct.id,
           productId: existingShopProduct.productId || null,
           sourceProductId: existingShopProduct.sourceProductId || null,
           sku: existingShopProduct.sku || null,
+          jdSkuId: existingShopProduct.jdSkuId || null,
           shopId: internalShop.id,
           shopName: internalShop.name,
         };
@@ -3516,6 +3566,7 @@ export async function createOutboundFromAutoPickOrder(
 
   const created = await prisma.$transaction(async (tx) => {
     const resolved = await resolveOutboundItemsForAutoPickOrder(tx, userId, {
+      platform: order.platform,
       shopId: order.shopId,
       rawPayload: order.rawPayload,
       actualPaid: order.actualPaid,
@@ -3804,6 +3855,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
 
   const resolved = await resolveBrushOrderItemsForAutoPickOrder(userId, {
     orderNo: order.orderNo,
+    platform: order.platform,
     shopId: order.shopId,
     rawPayload: order.rawPayload,
     preferredMappedShopName: options?.preferredMappedShopName || null,

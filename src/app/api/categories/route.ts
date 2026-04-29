@@ -3,9 +3,6 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
-const HIDDEN_CATEGORY_NAMES = ["历史残留"];
-const HIDDEN_CATEGORY_DESCRIPTION = "系统历史残留商品归档";
-
 export async function GET(request: Request) {
   const session = await getFreshSession() as SessionUser | null;
   const { searchParams } = new URL(request.url);
@@ -16,11 +13,6 @@ export async function GET(request: Request) {
     const categories = await prisma.category.findMany({
       where: session ? {
         userId: session.id,
-        name: { notIn: HIDDEN_CATEGORY_NAMES },
-        OR: [
-          { description: null },
-          { description: { not: HIDDEN_CATEGORY_DESCRIPTION } },
-        ],
       } : {},
       select: {
         id: true,

@@ -90,6 +90,7 @@ export class ProductService {
         OR: [
           { name: { contains: search, mode: "insensitive" } },
           { sku: { contains: search, mode: "insensitive" } },
+          { jdSkuId: { contains: search, mode: "insensitive" } },
           { category: { name: { contains: search, mode: "insensitive" } } },
           { pinyin: { contains: search, mode: "insensitive" } }
         ]

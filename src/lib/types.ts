@@ -54,6 +54,7 @@ export interface User {
 export interface Product {
   id: string;
   sku?: string;
+  jdSkuId?: string;
   name: string;
   productId?: string | null;
   sourceProductId?: string | null;
@@ -99,6 +100,7 @@ export interface ShopCatalogItem {
   sourceProductId?: string | null;
   productId?: string | null;
   sku?: string | null;
+  jdSkuId?: string | null;
   name: string;
   image?: string | null;
   categoryId?: string | null;

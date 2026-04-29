@@ -26,6 +26,7 @@ model Category {
 model Product {
   id              String              @id @default(cuid())
   sku             String?             @unique
+  jdSkuId         String?
   name            String
   costPrice       Float               @default(0)
   stock           Int                 @default(0)
@@ -524,6 +525,7 @@ model ShopProduct {
   shopId          String
   productId       String?
   sku             String?
+  jdSkuId         String?
   productName     String?
   pinyin          String?
   productImage    String?
@@ -548,6 +550,7 @@ model ShopProduct {
 
   @@unique([shopId, productId])
   @@unique([shopId, sku])
+  @@unique([shopId, jdSkuId])
   @@index([productId])
   @@index([shopId, createdAt])
   @@index([shopId, pinyin])

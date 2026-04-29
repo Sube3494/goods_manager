@@ -44,6 +44,9 @@ export default function ShopGoodsPage() {
   const [sortBy, setSortBy] = useState("sku-asc");
   const [categoryOptions, setCategoryOptions] = useState([{ value: "all", label: "全部分类" }]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [assignedTemplateIds, setAssignedTemplateIds] = useState<string[]>([]);
+  const [templateCatalogProducts, setTemplateCatalogProducts] = useState<Product[]>([]);
+  const [isTemplateCatalogLoading, setIsTemplateCatalogLoading] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -68,15 +71,6 @@ export default function ShopGoodsPage() {
   const templateCatalogQuery = useMemo(
     () => ({ includeShopOnly: "true", includePublic: "true" }),
     []
-  );
-
-  const assignedTemplateIds = useMemo(
-    () =>
-      items
-        .filter((item) => item.shopId === selectedShopId)
-        .map((item) => item.sourceProductId || item.productId || "")
-        .filter(Boolean),
-    [items, selectedShopId]
   );
 
   const displayedItems = useMemo(
@@ -248,6 +242,80 @@ export default function ShopGoodsPage() {
   }, [fetchShopProducts]);
 
   useEffect(() => {
+    const fetchAssignedTemplateIds = async () => {
+      if (!selectedShopId) {
+        setAssignedTemplateIds([]);
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          all: "true",
+          pageSize: "2000",
+        });
+        const res = await fetch(`/api/shops/${selectedShopId}/products?${params.toString()}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to fetch assigned template ids");
+        }
+
+        const nextIds = Array.isArray(data?.items)
+          ? data.items
+              .map((item: ShopCatalogItem) => String(item.productId || item.sourceProductId || "").trim())
+              .filter(Boolean)
+          : [];
+
+        setAssignedTemplateIds(Array.from(new Set(nextIds)));
+      } catch (error) {
+        console.error("Failed to fetch assigned template ids:", error);
+        setAssignedTemplateIds([]);
+      }
+    };
+
+    void fetchAssignedTemplateIds();
+  }, [selectedShopId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchTemplateCatalog = async () => {
+      setIsTemplateCatalogLoading(true);
+      try {
+        const params = new URLSearchParams({
+          all: "true",
+          page: "1",
+          pageSize: "2000",
+          includeShopOnly: "true",
+          includePublic: "true",
+        });
+        const res = await fetch(`/api/products?${params.toString()}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to fetch template catalog");
+        }
+
+        if (cancelled) return;
+        const nextProducts = Array.isArray(data?.items) ? data.items : [];
+        setTemplateCatalogProducts(nextProducts);
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to fetch template catalog:", error);
+        setTemplateCatalogProducts([]);
+      } finally {
+        if (!cancelled) {
+          setIsTemplateCatalogLoading(false);
+        }
+      }
+    };
+
+    void fetchTemplateCatalog();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const fetchCategoryOptions = async () => {
       try {
         const queryParams = buildAggregateQuery(1, { pageSize: "2000" });
@@ -331,6 +399,7 @@ export default function ShopGoodsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sku: formData.sku?.trim() || "",
+          jdSkuId: formData.jdSkuId?.trim() || "",
           name: formData.name.trim(),
           categoryId: formData.categoryId || "",
           supplierId: formData.supplierId || "",
@@ -425,6 +494,7 @@ export default function ShopGoodsPage() {
     setEditingProduct({
       id: "",
       sku: item.sku || "",
+      jdSkuId: item.jdSkuId || "",
       name: item.name,
       categoryId: item.categoryId || "",
       costPrice: item.costPrice || 0,
@@ -506,6 +576,7 @@ export default function ShopGoodsPage() {
         body: JSON.stringify({
           id: editingItemId,
           sku: formData.sku?.trim() || "",
+          jdSkuId: formData.jdSkuId?.trim() || "",
           name: formData.name.trim(),
           categoryId: formData.categoryId,
           categoryName,
@@ -730,10 +801,10 @@ export default function ShopGoodsPage() {
       ) : null}
 
       <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: selectedShop ? `删除 ${selectedShop.name} 商品` : "删除所选商品", onClick: handleRemoveSelected, variant: "danger" }]} />
-      <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} allowCreate={false} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" />
+      <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} allowCreate={false} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" prefetchedProducts={templateCatalogProducts} externalLoading={isTemplateCatalogLoading} />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
-      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
-      <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
+      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
+      <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
 
       {typeof document !== "undefined" && createPortal(<AnimatePresence>{showScrollTop && <motion.button initial={{ opacity: 0, scale: 0.5, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.5, y: 20 }} onClick={scrollToTop} className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"><ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" /></motion.button>}</AnimatePresence>, document.body)}

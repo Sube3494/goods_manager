@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         ? {
             OR: [
               { sku: { contains: search, mode: "insensitive" as const } },
+              { jdSkuId: { contains: search, mode: "insensitive" as const } },
               { productName: { contains: search, mode: "insensitive" as const } },
               { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } },
               { categoryName: { contains: search, mode: "insensitive" as const } },
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest) {
             sourceProductId: item.sourceProductId || item.productId || item.id,
             productId: item.productId || null,
             sku: item.sku || null,
+            jdSkuId: item.jdSkuId || null,
             name: item.productName || item.product?.name || "未命名商品",
             image: item.productImage
               ? storage.resolveUrl(item.productImage)
@@ -187,6 +189,7 @@ export async function GET(request: NextRequest) {
           sourceProductId: item.sourceProductId || item.productId || item.id,
           productId: item.productId || null,
           sku: item.sku || null,
+          jdSkuId: item.jdSkuId || null,
           name: item.productName || item.product?.name || "未命名商品",
           image: item.productImage
             ? storage.resolveUrl(item.productImage)
@@ -263,6 +266,7 @@ export async function GET(request: NextRequest) {
         sourceProductId: item.sourceProductId || item.productId || item.id,
         productId: item.productId || null,
         sku: item.sku || null,
+        jdSkuId: item.jdSkuId || null,
         name: item.productName || item.product?.name || "未命名商品",
         image: item.productImage
           ? storage.resolveUrl(item.productImage)
@@ -344,6 +348,7 @@ export async function GET(request: NextRequest) {
       sourceProductId: item.sourceProductId || item.productId || item.id,
       productId: item.productId || null,
       sku: item.sku || null,
+      jdSkuId: item.jdSkuId || null,
       name: item.productName || item.product?.name || "未命名商品",
       image: item.productImage
         ? storage.resolveUrl(item.productImage)

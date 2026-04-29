@@ -91,8 +91,9 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, remark } = body;
+    const { name, sku, jdSkuId, costPrice, stock, categoryId, supplierId, image, isPublic, remark } = body;
     const normalizedSku = normalizeSku(sku);
+    const normalizedJdSkuId = normalizeSku(jdSkuId);
 
     if (normalizedSku) {
       const conflict = await prisma.product.findFirst({
@@ -110,11 +111,29 @@ export async function PUT(
       }
     }
 
+    if (normalizedJdSkuId) {
+      const conflict = await prisma.product.findFirst({
+        where: {
+          userId: session.id,
+          jdSkuId: normalizedJdSkuId,
+          id: { not: id }
+        },
+        select: { id: true }
+      });
+
+      if (conflict) {
+        return NextResponse.json({
+          error: `主商品库里 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查是否重复建品`
+        }, { status: 409 });
+      }
+    }
+
     const product = await prisma.product.update({
       where: { id },
       data: {
         name,
         sku: normalizedSku,
+        jdSkuId: normalizedJdSkuId,
         costPrice: Number(costPrice || body.price), // Fallback to price if costPrice is missing for compatibility
         stock: Number(stock),
         categoryId,

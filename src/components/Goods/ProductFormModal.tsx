@@ -48,6 +48,7 @@ interface ProductFormModalProps {
   disableHistorySection?: boolean;
   showCoverSection?: boolean;
   mainImageUploadEndpoint?: string;
+  showJdSkuField?: boolean;
 }
 
 import { createPortal } from "react-dom";
@@ -72,6 +73,7 @@ export function ProductFormModal({
   disableHistorySection = false,
   showCoverSection = false,
   mainImageUploadEndpoint,
+  showJdSkuField = false,
 }: ProductFormModalProps) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
@@ -82,6 +84,7 @@ export function ProductFormModal({
     image: initialData?.image || "",
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
+    jdSkuId: initialData?.jdSkuId || "",
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {},
@@ -261,6 +264,7 @@ export function ProductFormModal({
       if (initialData) {
         setFormData({
           sku: initialData.sku || "",
+          jdSkuId: initialData.jdSkuId || "",
           name: initialData.name,
           costPrice: String(initialData.costPrice || ""),
           stock: String(initialData.stock || ""),
@@ -278,6 +282,7 @@ export function ProductFormModal({
       } else {
         setFormData({
           sku: "",
+          jdSkuId: "",
           name: "",
           costPrice: "",
           stock: "",
@@ -979,6 +984,21 @@ export function ProductFormModal({
                               onChange={(e) => setFormData({...formData, sku: e.target.value})}
                               className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                               placeholder="例如：SKU-001"
+                          />
+                      </div>
+                    )}
+
+                    {showJdSkuField && (
+                      <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <FileText size={16} /> JD SKU ID
+                          </label>
+                          <input
+                              type="text"
+                              value={formData.jdSkuId}
+                              onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value })}
+                              className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                              placeholder="填写京东商品SKU编码"
                           />
                       </div>
                     )}

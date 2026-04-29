@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getLightSession } from "@/lib/auth";
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await getLightSession();
+    if (!user || user.role !== "SUPER_ADMIN" || !user.id) {
+      return NextResponse.json(
+        { error: "Unauthorized or insufficient permissions" },
+        { status: 401 }
+      );
+    }
+
     const { ids } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -12,33 +21,126 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete products in batch
-    // First, delete related records to avoid foreign key constraint errors
-    // 1. Delete gallery items
-    await prisma.galleryItem.deleteMany({
-      where: {
-        productId: {
-          in: ids
-        }
-      }
+    const normalizedIds = ids.map((id: unknown) => String(id || "").trim()).filter(Boolean);
+    if (normalizedIds.length === 0) {
+      return NextResponse.json(
+        { error: "Invalid request: ids array is required" },
+        { status: 400 }
+      );
+    }
+
+    const ownedProducts = await prisma.product.findMany({
+      where: user.role === "SUPER_ADMIN"
+        ? { id: { in: normalizedIds } }
+        : { id: { in: normalizedIds }, userId: user.id },
+      select: {
+        id: true,
+        shopProducts: {
+          select: {
+            id: true,
+          },
+        },
+      },
     });
 
-    // 2. Delete purchase order items
-    await prisma.purchaseOrderItem.deleteMany({
-      where: {
-        productId: {
-          in: ids
-        }
-      }
-    });
+    const ownedProductIds = ownedProducts.map((product) => product.id);
+    const relatedShopProductIds = ownedProducts.flatMap((product) => product.shopProducts.map((item) => item.id));
 
-    // 3. Finally delete the products
-    const result = await prisma.product.deleteMany({
-      where: {
-        id: {
-          in: ids
-        }
+    if (ownedProductIds.length === 0) {
+      return NextResponse.json(
+        { error: "没有可删除的商品" },
+        { status: 404 }
+      );
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.galleryItem.deleteMany({
+        where: {
+          productId: {
+            in: ownedProductIds,
+          },
+        },
+      });
+
+      await tx.purchaseOrderItem.deleteMany({
+        where: {
+          OR: [
+            {
+              productId: {
+                in: ownedProductIds,
+              },
+            },
+            relatedShopProductIds.length > 0
+              ? {
+                  shopProductId: {
+                    in: relatedShopProductIds,
+                  },
+                }
+              : undefined,
+          ].filter(Boolean) as Array<Record<string, unknown>>,
+        },
+      });
+
+      await tx.brushOrderItem.deleteMany({
+        where: {
+          productId: {
+            in: ownedProductIds,
+          },
+        },
+      });
+
+      await tx.brushOrderPlanItem.deleteMany({
+        where: {
+          productId: {
+            in: ownedProductIds,
+          },
+        },
+      });
+
+      await tx.storeOpeningItem.deleteMany({
+        where: {
+          productId: {
+            in: ownedProductIds,
+          },
+        },
+      });
+
+      await tx.outboundOrderItem.deleteMany({
+        where: {
+          OR: [
+            {
+              productId: {
+                in: ownedProductIds,
+              },
+            },
+            relatedShopProductIds.length > 0
+              ? {
+                  shopProductId: {
+                    in: relatedShopProductIds,
+                  },
+                }
+              : undefined,
+          ].filter(Boolean) as Array<Record<string, unknown>>,
+        },
+      });
+
+      if (relatedShopProductIds.length > 0) {
+        await tx.shopProduct.deleteMany({
+          where: {
+            id: {
+              in: relatedShopProductIds,
+            },
+          },
+        });
       }
+
+      return await tx.product.deleteMany({
+        where: {
+          id: {
+            in: ownedProductIds,
+          },
+        },
+      });
     });
 
     return NextResponse.json({
@@ -49,7 +151,7 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error("Batch delete error:", error);
     return NextResponse.json(
-      { error: "Failed to delete products" },
+      { error: error instanceof Error ? error.message : "Failed to delete products" },
       { status: 500 }
     );
   }
@@ -57,6 +159,14 @@ export async function DELETE(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const user = await getLightSession();
+    if (!user || user.role !== "SUPER_ADMIN" || !user.id) {
+      return NextResponse.json(
+        { error: "Unauthorized or insufficient permissions" },
+        { status: 401 }
+      );
+    }
+
     const { ids, categoryId, supplierId, isPublic, isDiscontinued, costPrice } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -80,12 +190,20 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const normalizedIds = ids.map((id: unknown) => String(id || "").trim()).filter(Boolean);
     const result = await prisma.product.updateMany({
-      where: {
-        id: {
-          in: ids
-        }
-      },
+      where: user.role === "SUPER_ADMIN"
+        ? {
+            id: {
+              in: normalizedIds
+            }
+          }
+        : {
+            id: {
+              in: normalizedIds
+            },
+            userId: user.id,
+          },
       data: updateData
     });
 

@@ -32,6 +32,7 @@ export default function GoodsPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
+  const [isSyncingStandalone, setIsSyncingStandalone] = useState(false);
   
   const [items, setItems] = useState<Product[]>([]);
   const itemsRef = useRef<Product[]>([]);
@@ -129,6 +130,7 @@ export default function GoodsPage() {
         status: selectedStatus,
         supplierId: selectedSupplier,
         sortBy: sortBy,
+        includeShopOnly: "true",
       });
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
@@ -170,7 +172,7 @@ export default function GoodsPage() {
   // Fetch metadata once on mount
   useEffect(() => {
     // Categories
-    fetch("/api/categories?scope=main-products")
+    fetch("/api/categories")
       .then(r => r.ok ? r.json() : [])
       .then(data => Array.isArray(data) ? setCategories(data) : setCategories([]))
       .catch(() => setCategories([]));
@@ -290,6 +292,7 @@ export default function GoodsPage() {
         supplierId: selectedSupplier,
         sortBy: sortBy,
         idsOnly: "true",
+        includeShopOnly: "true",
       });
 
 
@@ -470,6 +473,7 @@ export default function GoodsPage() {
         status: selectedStatus,
         supplierId: selectedSupplier,
         sortBy: sortBy,
+        includeShopOnly: "true",
       });
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
@@ -565,6 +569,47 @@ export default function GoodsPage() {
       showToast("导入请求失败", "error");
     }
   };
+
+  const refreshCategories = useCallback(async () => {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json().catch(() => []);
+      if (res.ok && Array.isArray(data)) {
+        setCategories(data);
+      }
+    } catch (error) {
+      console.error("Failed to refresh categories:", error);
+    }
+  }, []);
+
+  const handleSyncStandaloneProducts = useCallback(async () => {
+    try {
+      setIsSyncingStandalone(true);
+      const res = await fetch("/api/products/sync-shop-standalone", {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(data?.error || "同步失败", "error");
+        return;
+      }
+
+      const synced = Number(data?.synced || 0);
+      const scanned = Number(data?.scanned || 0);
+      showToast(
+        scanned > 0
+          ? `已同步 ${synced} 条历史自建商品到主库`
+          : "没有需要同步的历史自建商品",
+        "success"
+      );
+      fetchGoods(true);
+    } catch (error) {
+      console.error("Failed to sync standalone shop products:", error);
+      showToast("同步失败", "error");
+    } finally {
+      setIsSyncingStandalone(false);
+    }
+  }, [fetchGoods, showToast]);
   
   
   // Sync URL filter to state on mount if needed, or just use state
@@ -606,6 +651,16 @@ export default function GoodsPage() {
                 >
                   <Download size={16} className="sm:size-[18px]" />
                   <span className="hidden sm:inline ml-2">导入</span>
+                </button>
+                <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
+                <button
+                  onClick={handleSyncStandaloneProducts}
+                  disabled={isSyncingStandalone}
+                  className="flex items-center justify-center rounded-full w-7 h-7 sm:w-auto sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  title="同步历史单店自建商品"
+                >
+                  <span className="hidden sm:inline">{isSyncingStandalone ? "同步自建中..." : "同步自建"}</span>
+                  <span className="inline sm:hidden text-[10px]">{isSyncingStandalone ? "同步中" : "自建"}</span>
                 </button>
                 <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
                 <button 
@@ -677,6 +732,11 @@ export default function GoodsPage() {
                 <CustomSelect 
                     value={selectedCategory}
                     onChange={(val) => startTransition(() => setSelectedCategory(val))}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        void refreshCategories();
+                      }
+                    }}
                     options={[
                         { value: 'all', label: '所有分类' },
                         ...(Array.isArray(categories) ? categories.map(c => ({ value: c.name, label: c.name })) : [])
@@ -821,6 +881,7 @@ export default function GoodsPage() {
         onSubmit={handleSaveItem}
         initialData={editingProduct}
         hideStockField={true}
+        showJdSkuField={true}
       />
 
       <BatchEditModal 

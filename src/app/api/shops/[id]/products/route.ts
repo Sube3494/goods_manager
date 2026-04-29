@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../../prisma/generated-client";
 import { pinyin } from "pinyin-pro";
+import { syncStandaloneShopProductToCatalog } from "@/lib/shopProductCatalogSync";
 
 function generatePinyinSearchText(name: string): string {
   if (!name) return "";
@@ -30,6 +31,34 @@ async function findConflictingShopProductBySku(shopId: string, sku: string, excl
     select: {
       id: true,
       productName: true,
+    },
+  });
+}
+
+async function findConflictingShopProductByJdSkuId(shopId: string, jdSkuId: string, excludeId?: string) {
+  return prisma.shopProduct.findFirst({
+    where: {
+      shopId,
+      jdSkuId,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: {
+      id: true,
+      productName: true,
+    },
+  });
+}
+
+async function findConflictingOwnedProductByJdSkuId(userId: string, jdSkuId: string, excludeId?: string) {
+  return prisma.product.findFirst({
+    where: {
+      userId,
+      jdSkuId,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
     },
   });
 }
@@ -116,6 +145,7 @@ export async function GET(
         ? {
             OR: [
               { sku: { contains: search, mode: "insensitive" as const } },
+              { jdSkuId: { contains: search, mode: "insensitive" as const } },
               { productName: { contains: search, mode: "insensitive" as const } },
               { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } },
               { categoryName: { contains: search, mode: "insensitive" as const } },
@@ -183,6 +213,7 @@ export async function GET(
         sourceProductId: item.sourceProductId || item.productId || item.id,
         productId: item.productId || null,
         sku: item.sku || null,
+        jdSkuId: item.jdSkuId || null,
         name: item.productName || item.product?.name || "未命名商品",
         image: item.productImage
           ? storage.resolveUrl(item.productImage)
@@ -265,6 +296,7 @@ export async function GET(
       sourceProductId: item.sourceProductId || item.productId || item.id,
       productId: item.productId || null,
       sku: item.sku || null,
+      jdSkuId: item.jdSkuId || null,
       name: item.productName || item.product?.name || "未命名商品",
       image: item.productImage
         ? storage.resolveUrl(item.productImage)
@@ -328,7 +360,24 @@ export async function PUT(
         id: itemId,
         shopId,
       },
-      select: { id: true },
+      select: {
+        id: true,
+        productId: true,
+        sourceProductId: true,
+        shopId: true,
+        shop: {
+          select: {
+            userId: true,
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            isShopOnly: true,
+            userId: true,
+          },
+        },
+      },
     });
 
     if (!existing) {
@@ -337,6 +386,7 @@ export async function PUT(
 
     const productName = String(body?.name || "").trim();
     const normalizedSku = normalizeSku(body?.sku);
+    const normalizedJdSkuId = normalizeSku(body?.jdSkuId);
     const categoryId = typeof body?.categoryId === "string" ? body.categoryId.trim() : "";
     const categoryName = String(body?.categoryName || "").trim();
     const productImage = typeof body?.image === "string" ? body.image.trim() : "";
@@ -359,50 +409,104 @@ export async function PUT(
       }
     }
 
+    if (normalizedJdSkuId) {
+      const conflictingShopProduct = await findConflictingShopProductByJdSkuId(shopId, normalizedJdSkuId, existing.id);
+      if (conflictingShopProduct) {
+        return NextResponse.json({
+          error: `当前店铺内 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查映射商品`,
+        }, { status: 409 });
+      }
+    }
+
+    const ownerUserId = String(existing.shop?.userId || "").trim();
+    const linkedStandaloneProductId =
+      existing.product?.isShopOnly && existing.product?.userId === ownerUserId
+        ? existing.product.id
+        : null;
+    const shouldSyncStandaloneProduct =
+      (!existing.productId && !existing.sourceProductId)
+      || Boolean(linkedStandaloneProductId);
+
+    if (ownerUserId && shouldSyncStandaloneProduct && normalizedJdSkuId) {
+      const conflictingOwnedProduct = await findConflictingOwnedProductByJdSkuId(
+        ownerUserId,
+        normalizedJdSkuId,
+        linkedStandaloneProductId || undefined
+      );
+      if (conflictingOwnedProduct) {
+        return NextResponse.json({
+          error: `主商品库里 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查是否重复映射`,
+        }, { status: 409 });
+      }
+    }
+
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
-    const updated = await prisma.shopProduct.update({
-      where: { id: existing.id },
-      data: {
-        productName,
-        pinyin: generatePinyinSearchText(productName),
-        sku: normalizedSku,
-        categoryId: categoryId || null,
-        categoryName: categoryName || "未分类",
-        productImage: normalizedProductImage,
-        supplierId: supplierId || null,
-        costPrice: Number.isFinite(costPrice) ? costPrice : 0,
-        stock: Number.isFinite(stock) ? stock : 0,
-        isPublic,
-        isDiscontinued,
-        remark: remark || null,
-        specs: Prisma.JsonNull,
-      },
-      select: {
-        id: true,
-        sourceProductId: true,
-        sku: true,
-        productName: true,
-        productImage: true,
-        categoryId: true,
-        categoryName: true,
-        supplierId: true,
-        costPrice: true,
-        stock: true,
-        isPublic: true,
-        isDiscontinued: true,
-        remark: true,
-        specs: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const syncedProduct = ownerUserId && shouldSyncStandaloneProduct
+        ? await syncStandaloneShopProductToCatalog(tx, {
+            ownerUserId,
+            linkedProductId: linkedStandaloneProductId || null,
+            name: productName,
+            jdSkuId: normalizedJdSkuId,
+            categoryId: categoryId || null,
+            categoryName: categoryName || "未分类",
+            supplierId: supplierId || null,
+            image: normalizedProductImage,
+            remark: remark || null,
+          })
+        : null;
+
+      return await tx.shopProduct.update({
+        where: { id: existing.id },
+        data: {
+          productId: existing.productId || syncedProduct?.productId || null,
+          sourceProductId: existing.sourceProductId || syncedProduct?.productId || null,
+          productName,
+          pinyin: generatePinyinSearchText(productName),
+          sku: normalizedSku,
+          jdSkuId: normalizedJdSkuId,
+          categoryId: syncedProduct?.categoryId || categoryId || null,
+          categoryName: syncedProduct?.categoryName || categoryName || "未分类",
+          productImage: normalizedProductImage,
+          supplierId: supplierId || null,
+          costPrice: Number.isFinite(costPrice) ? costPrice : 0,
+          stock: Number.isFinite(stock) ? stock : 0,
+          isPublic,
+          isDiscontinued,
+          remark: remark || null,
+          specs: Prisma.JsonNull,
+        },
+        select: {
+          id: true,
+          productId: true,
+          sourceProductId: true,
+          sku: true,
+          jdSkuId: true,
+          productName: true,
+          productImage: true,
+          categoryId: true,
+          categoryName: true,
+          supplierId: true,
+          costPrice: true,
+          stock: true,
+          isPublic: true,
+          isDiscontinued: true,
+          remark: true,
+          specs: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
     });
 
     return NextResponse.json({
       id: updated.id,
+      productId: updated.productId || null,
       sourceProductId: updated.sourceProductId,
       sku: updated.sku || null,
+      jdSkuId: updated.jdSkuId || null,
       name: updated.productName || "未命名商品",
       image: updated.productImage ? storage.resolveUrl(updated.productImage) : null,
       categoryId: updated.categoryId || null,

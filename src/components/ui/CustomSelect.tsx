@@ -15,6 +15,7 @@ interface CustomSelectProps {
   options: Option[];
   value: string;
   onChange: (value: string) => void;
+  onOpenChange?: (open: boolean) => void;
   placeholder?: string;
   className?: string;
   triggerClassName?: string;
@@ -28,6 +29,7 @@ export function CustomSelect({
   options,
   value,
   onChange,
+  onOpenChange,
   placeholder = "请选择...",
   className,
   triggerClassName,
@@ -73,6 +75,10 @@ export function CustomSelect({
       setSearchQuery("");
     }
   }, [isOpen, searchQuery]);
+
+  useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

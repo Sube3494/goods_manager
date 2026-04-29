@@ -4,6 +4,8 @@ import { getStorageStrategy } from "@/lib/storage";
 import { getLightSession, getCachedSettings, getAuthorizedUser } from "@/lib/auth";
 import { handlePrismaError } from "@/lib/api-errors";
 import { ProductService } from "@/services/productService";
+import { syncStandaloneShopProductToCatalog } from "@/lib/shopProductCatalogSync";
+import { Prisma } from "../../../../prisma/generated-client";
 
 function normalizeSku(sku: unknown) {
   if (typeof sku !== "string") {
@@ -28,6 +30,21 @@ async function findConflictingProductBySku(sku: string, excludeId?: string) {
   });
 }
 
+async function findConflictingProductByJdSkuId(userId: string, jdSkuId: string, excludeId?: string) {
+  return prisma.product.findFirst({
+    where: {
+      userId,
+      jdSkuId,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      jdSkuId: true,
+    },
+  });
+}
+
 async function findConflictingShopProductBySku(shopId: string, sku: string, excludeId?: string) {
   return prisma.shopProduct.findFirst({
     where: {
@@ -39,6 +56,21 @@ async function findConflictingShopProductBySku(shopId: string, sku: string, excl
       id: true,
       productName: true,
       sku: true,
+    },
+  });
+}
+
+async function findConflictingShopProductByJdSkuId(shopId: string, jdSkuId: string, excludeId?: string) {
+  return prisma.shopProduct.findFirst({
+    where: {
+      shopId,
+      jdSkuId,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: {
+      id: true,
+      productName: true,
+      jdSkuId: true,
     },
   });
 }
@@ -112,8 +144,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
+    const { name, sku, jdSkuId, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
     const normalizedSku = normalizeSku(sku);
+    const normalizedJdSkuId = normalizeSku(jdSkuId);
 
     const storage = await getStorageStrategy();
 
@@ -155,46 +188,83 @@ export async function POST(request: Request) {
         }
       }
 
-      const shopProduct = await prisma.shopProduct.create({
-        data: {
-          shopId: resolvedShopId,
-          sourceProductId: null,
-          sku: normalizedSku,
-          productName: name,
-          pinyin: ProductService.generatePinyinSearchText(name),
-          productImage: storage.stripUrl(image),
+      if (normalizedJdSkuId) {
+        const existingJdSkuShopProduct = await findConflictingShopProductByJdSkuId(resolvedShopId, normalizedJdSkuId);
+        if (existingJdSkuShopProduct) {
+          return NextResponse.json({
+            error: `当前店铺内 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查映射商品`
+          }, { status: 409 });
+        }
+      }
+
+      if (normalizedJdSkuId) {
+        const existingJdSkuProduct = await findConflictingProductByJdSkuId(user.id, normalizedJdSkuId);
+        if (existingJdSkuProduct) {
+          return NextResponse.json({
+            error: `主商品库里 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查是否重复建品`
+          }, { status: 409 });
+        }
+      }
+
+      const synced = await prisma.$transaction(async (tx) => {
+        const masterProduct = await syncStandaloneShopProductToCatalog(tx, {
+          ownerUserId: user.id,
+          name,
+          jdSkuId: normalizedJdSkuId,
           categoryId: categoryId || null,
           categoryName: category?.name || null,
           supplierId: supplierId || null,
-          costPrice: Number(costPrice) || 0,
-          stock: stockNum,
-          isPublic: isPublic ?? true,
-          isDiscontinued: isDiscontinued ?? false,
+          image: storage.stripUrl(image),
           remark: remark || null,
-          specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
-        },
+        });
+
+        const shopProduct = await tx.shopProduct.create({
+          data: {
+            shopId: resolvedShopId,
+            productId: masterProduct.productId,
+            sourceProductId: masterProduct.productId,
+            sku: normalizedSku,
+            jdSkuId: normalizedJdSkuId,
+            productName: name,
+            pinyin: ProductService.generatePinyinSearchText(name),
+            productImage: storage.stripUrl(image),
+            categoryId: masterProduct.categoryId,
+            categoryName: masterProduct.categoryName || category?.name || null,
+            supplierId: supplierId || null,
+            costPrice: Number(costPrice) || 0,
+            stock: stockNum,
+            isPublic: isPublic ?? true,
+            isDiscontinued: isDiscontinued ?? false,
+            remark: remark || null,
+            specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : Prisma.JsonNull) : undefined,
+          },
+        });
+
+        return shopProduct;
       });
 
       return NextResponse.json({
-        id: shopProduct.id,
-        shopProductId: shopProduct.id,
+        id: synced.id,
+        shopProductId: synced.id,
         sourceType: "shopProduct",
-        sourceProductId: null,
-        isStandaloneShopProduct: true,
-        name: shopProduct.productName || name,
-        sku: shopProduct.sku,
-        categoryId: shopProduct.categoryId,
-        costPrice: shopProduct.costPrice,
-        stock: shopProduct.stock,
-        image: shopProduct.productImage ? storage.resolveUrl(shopProduct.productImage) : null,
-        supplierId: shopProduct.supplierId,
-        isPublic: shopProduct.isPublic,
-        isDiscontinued: shopProduct.isDiscontinued,
-        specs: shopProduct.specs,
-        remark: shopProduct.remark,
-        shopId: shopProduct.shopId,
+        sourceProductId: synced.sourceProductId || synced.productId || null,
+        productId: synced.productId || null,
+        isStandaloneShopProduct: !synced.productId,
+        name: synced.productName || name,
+        sku: synced.sku,
+        jdSkuId: synced.jdSkuId,
+        categoryId: synced.categoryId,
+        costPrice: synced.costPrice,
+        stock: synced.stock,
+        image: synced.productImage ? storage.resolveUrl(synced.productImage) : null,
+        supplierId: synced.supplierId,
+        isPublic: synced.isPublic,
+        isDiscontinued: synced.isDiscontinued,
+        specs: synced.specs,
+        remark: synced.remark,
+        shopId: synced.shopId,
         shopName: resolvedShopName,
-        assignedShopIds: [shopProduct.shopId],
+        assignedShopIds: [synced.shopId],
       });
     }
 
@@ -216,10 +286,29 @@ export async function POST(request: Request) {
       }
     }
 
+    if (resolvedShopId && normalizedJdSkuId) {
+      const existingJdSkuShopProduct = await findConflictingShopProductByJdSkuId(resolvedShopId, normalizedJdSkuId);
+      if (existingJdSkuShopProduct) {
+        return NextResponse.json({
+          error: `当前店铺内 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查映射商品`
+        }, { status: 409 });
+      }
+    }
+
+    if (normalizedJdSkuId) {
+      const existingJdSkuProduct = await findConflictingProductByJdSkuId(user.id, normalizedJdSkuId);
+      if (existingJdSkuProduct) {
+        return NextResponse.json({
+          error: `主商品库里 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查是否重复建品`
+        }, { status: 409 });
+      }
+    }
+
     const product = await prisma.product.create({
       data: {
         name,
         sku: normalizedSku,
+        jdSkuId: normalizedJdSkuId,
         costPrice: Number(costPrice) || 0,
         stock: 0,
         categoryId: categoryId || undefined,
@@ -238,6 +327,7 @@ export async function POST(request: Request) {
               shopId: resolvedShopId,
               sourceProductId: undefined,
               sku: normalizedSku,
+              jdSkuId: normalizedJdSkuId,
               productName: name,
               pinyin: ProductService.generatePinyinSearchText(name),
               productImage: storage.stripUrl(image),
@@ -280,8 +370,9 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { id, name, sku, jdSkuId, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
     const normalizedSku = normalizeSku(sku);
+    const normalizedJdSkuId = normalizeSku(jdSkuId);
 
     const storage = await getStorageStrategy();
 
@@ -306,11 +397,21 @@ export async function PUT(request: Request) {
       }
     }
 
+    if (normalizedJdSkuId) {
+      const existingProduct = await findConflictingProductByJdSkuId(user.id, normalizedJdSkuId, id);
+      if (existingProduct) {
+        return NextResponse.json({
+          error: `主商品库里 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查是否重复建品`
+        }, { status: 409 });
+      }
+    }
+
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
         name,
         sku: normalizedSku,
+        jdSkuId: normalizedJdSkuId,
         costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
         categoryId: categoryId || undefined,
         supplierId: supplierId || null,
