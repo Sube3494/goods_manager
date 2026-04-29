@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
-import { canAutoPickCompleteDelivery, isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { AutoPickAutoCompleteJobStatus } from "../../prisma/generated-client";
 
 const AUTO_COMPLETE_RETRY_DELAY_MS = 15 * 1000;
@@ -296,12 +296,6 @@ export async function processDueAutoCompleteJobs(limit = 20) {
     const order = job.order;
     if (!order || isAutoPickOrderTerminalStatus(order.status)) {
       await markJobCancelled(job.id, job.orderId, "order-terminal-before-auto-complete");
-      results.push({ id: job.id, ok: true });
-      continue;
-    }
-
-    if (!canAutoPickCompleteDelivery(order.status)) {
-      await markJobCancelled(job.id, job.orderId, "delivery-not-started-before-auto-complete");
       results.push({ id: job.id, ok: true });
       continue;
     }

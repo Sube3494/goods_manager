@@ -6,7 +6,6 @@ import {
   markAutoPickApiKeyUsed,
   normalizeAutoPickOrderPayload,
   resolveAutoPickTargetUserId,
-  tryStartPendingAutoPickSelfDelivery,
   upsertAutoPickOrder,
 } from "@/lib/autoPickOrders";
 
@@ -59,10 +58,6 @@ export async function POST(request: NextRequest) {
     }
 
     const order = await upsertAutoPickOrder(targetUserId, normalized);
-    await tryStartPendingAutoPickSelfDelivery(targetUserId, order.id).catch((deferredError) => {
-      console.error("Failed to process pending self delivery after webhook upsert:", deferredError);
-      return null;
-    });
     await markAutoPickApiKeyUsed(requestApiKey);
     return NextResponse.json({
       ok: true,

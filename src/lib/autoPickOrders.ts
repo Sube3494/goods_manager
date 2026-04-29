@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
-import { canAutoPickStartSelfDelivery, getBaseAutoPickStatusDisplay, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { getBaseAutoPickStatusDisplay, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping } from "@/lib/types";
@@ -10,8 +10,6 @@ import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey } from "@/lib/shopIdentity";
-import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
-import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -106,8 +104,6 @@ type AutoPickSystemMeta = {
     triggered: boolean;
     triggeredAt?: string;
     userId?: string;
-    pendingAfterPick?: boolean;
-    pendingRequestedAt?: string;
   };
   autoOutbound?: {
     status?: "success" | "failed";
@@ -2331,12 +2327,7 @@ export async function syncAutoPickOrdersFromPlugin(userId: string, options: { st
         });
         continue;
       }
-      const upserted = await upsertAutoPickOrder(userId, current);
-      await tryStartPendingAutoPickSelfDelivery(userId, upserted.id).catch((deferredError) => {
-        console.error("Failed to process pending self delivery after batch sync upsert:", deferredError);
-        return null;
-      });
-      results.push(upserted);
+      results.push(await upsertAutoPickOrder(userId, current));
     } catch (error) {
       skipped += 1;
       const reason = error instanceof Error ? error.message : String(error);
@@ -2380,20 +2371,13 @@ async function syncAutoPickConfirmOrdersByCookieListener(userId: string, cookie:
       continue;
     }
 
-    await upsertAutoPickOrder(userId, normalized)
-      .then(async (upserted) => {
-        await tryStartPendingAutoPickSelfDelivery(userId, upserted.id).catch((deferredError) => {
-          console.error("Failed to process pending self delivery after confirm listener upsert:", deferredError);
-          return null;
-        });
-      })
-      .catch((error) => {
+    await upsertAutoPickOrder(userId, normalized).catch((error) => {
       console.error("Auto-pick confirm listener upsert failed:", {
         userId,
         orderNo: normalized.orderNo,
         error: error instanceof Error ? error.message : String(error),
       });
-      });
+    });
   }
 }
 
@@ -2424,20 +2408,13 @@ async function syncAutoPickChangedOrdersByCookieListener(userId: string, cookie:
       continue;
     }
 
-    await upsertAutoPickOrder(userId, normalized)
-      .then(async (upserted) => {
-        await tryStartPendingAutoPickSelfDelivery(userId, upserted.id).catch((deferredError) => {
-          console.error("Failed to process pending self delivery after changed-state listener upsert:", deferredError);
-          return null;
-        });
-      })
-      .catch((error) => {
+    await upsertAutoPickOrder(userId, normalized).catch((error) => {
       console.error("Auto-pick changed-state listener upsert failed:", {
         userId,
         orderNo: normalized.orderNo,
         error: error instanceof Error ? error.message : String(error),
       });
-      });
+    });
 
     state.stateSignatures.set(key, signature);
   }
@@ -3069,8 +3046,6 @@ export async function markAutoPickOrderMainSystemSelfDelivery(userId: string, or
             triggered: true,
             triggeredAt: new Date().toISOString(),
             userId,
-            pendingAfterPick: false,
-            pendingRequestedAt: undefined,
           },
         },
       }),
@@ -3088,144 +3063,6 @@ export async function markAutoPickOrderMainSystemSelfDelivery(userId: string, or
   });
 
   return updatedOrder;
-}
-
-export async function markAutoPickOrderPendingSelfDelivery(userId: string, orderId: string) {
-  const order = await prisma.autoPickOrder.findFirst({
-    where: {
-      id: orderId,
-      userId,
-    },
-    select: {
-      id: true,
-      rawPayload: true,
-      orderNo: true,
-      platform: true,
-    },
-  });
-
-  if (!order) {
-    return null;
-  }
-
-  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
-    ? order.rawPayload as Record<string, unknown>
-    : {};
-  const existingSystemMeta: AutoPickSystemMeta = readAutoPickSystemMeta(order.rawPayload) || {};
-  const existingMarker: NonNullable<AutoPickSystemMeta["mainSystemSelfDelivery"]> = existingSystemMeta.mainSystemSelfDelivery || { triggered: false };
-  const pendingRequestedAt = String(existingMarker.pendingRequestedAt || "").trim() || new Date().toISOString();
-
-  const updatedOrder = await prisma.autoPickOrder.update({
-    where: { id: order.id },
-    data: {
-      rawPayload: asPrismaJsonValue({
-        ...rawPayload,
-        systemMeta: {
-          ...existingSystemMeta,
-          mainSystemSelfDelivery: {
-            ...existingMarker,
-            triggered: false,
-            pendingAfterPick: true,
-            pendingRequestedAt,
-            userId,
-          },
-        },
-      }),
-      lastSyncedAt: new Date(),
-    },
-  });
-
-  emitAutoPickOrderEvent({
-    type: "upsert",
-    userId,
-    orderId: updatedOrder.id,
-    orderNo: updatedOrder.orderNo,
-    platform: updatedOrder.platform,
-    at: new Date().toISOString(),
-  });
-
-  return updatedOrder;
-}
-
-function hasPendingSelfDeliveryRequest(rawPayload: unknown) {
-  const systemMeta = readAutoPickSystemMeta(rawPayload);
-  return Boolean(systemMeta?.mainSystemSelfDelivery?.pendingAfterPick);
-}
-
-export async function tryStartPendingAutoPickSelfDelivery(userId: string, orderId: string) {
-  const order = await prisma.autoPickOrder.findFirst({
-    where: {
-      id: orderId,
-      userId,
-    },
-  });
-
-  if (!order) {
-    return { ok: false, skipped: true as const, reason: "order-not-found" as const };
-  }
-
-  if (!hasPendingSelfDeliveryRequest(order.rawPayload)) {
-    return { ok: false, skipped: true as const, reason: "pending-self-delivery-not-requested" as const };
-  }
-
-  if (isAutoPickOrderTerminalStatus(order.status)) {
-    await cancelAutoCompleteJob(order.id, "pending-self-delivery-order-terminal");
-    return { ok: false, skipped: true as const, reason: "order-terminal" as const };
-  }
-
-  if (isAutoPickPickupOrder(order.rawPayload, order.userAddress)) {
-    return { ok: false, skipped: true as const, reason: "pickup-order" as const };
-  }
-
-  if (!canAutoPickStartSelfDelivery(order.status, order.rawPayload)) {
-    return { ok: false, skipped: true as const, reason: "picking-not-completed" as const };
-  }
-
-  const result = await callAutoPickCommand(userId, "/self-delivery", {
-    platform: order.platform,
-    dailyPlatformSequence: order.dailyPlatformSequence,
-    orderNo: order.orderNo,
-    sourceId: order.sourceId,
-    logisticId: order.logisticId,
-  });
-
-  if (!result.ok) {
-    return { ok: false, skipped: false as const, reason: "self-delivery-command-failed" as const, result };
-  }
-
-  const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
-    id: order.sourceId,
-    platform: order.platform,
-    orderNo: order.orderNo,
-    orderTime: order.orderTime,
-  }).catch((refreshError) => {
-    console.error("Failed to refresh auto-pick order after deferred self delivery:", refreshError);
-    return null;
-  });
-
-  const schedulingOrder = refreshedOrder || order;
-  const autoCompleteAt = getEstimatedAutoCompleteAt(schedulingOrder);
-  await prisma.autoPickOrder.update({
-    where: { id: order.id },
-    data: {
-      status: "配送中",
-      deliveryDeadline: refreshedOrder?.deliveryDeadline || order.deliveryDeadline || null,
-      autoCompleteAt: autoCompleteAt || null,
-    },
-  });
-  await markAutoPickOrderMainSystemSelfDelivery(userId, order.id);
-
-  if (autoCompleteAt) {
-    await ensureAutoCompleteJob({
-      userId,
-      orderId: order.id,
-      dueAt: autoCompleteAt,
-    });
-  } else {
-    await cancelAutoCompleteJob(order.id, "missing-auto-complete-time");
-  }
-
-  return { ok: true, skipped: false as const, result };
 }
 
 export async function wasAutoPickOrderSelfDeliveryTriggeredByMainSystem(userId: string, platformOrderId: string) {

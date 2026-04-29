@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder, tryStartPendingAutoPickSelfDelivery } from "@/lib/autoPickOrders";
+import { normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
 
@@ -69,11 +69,6 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
     }
 
-    const deferredSelfDelivery = await tryStartPendingAutoPickSelfDelivery(session.id, refreshedOrder.id).catch((deferredError) => {
-      console.error("Failed to process pending self delivery after order sync:", deferredError);
-      return null;
-    });
-
     const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);
 
     return NextResponse.json({
@@ -84,7 +79,6 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       status: refreshedOrder.status,
       completedAt: normalized?.completedAt || null,
       lastSyncedAt: refreshedOrder.lastSyncedAt,
-      deferredSelfDeliveryStarted: Boolean(deferredSelfDelivery?.ok),
     });
   } catch (error) {
     console.error("Failed to sync auto-pick order:", error);

@@ -200,7 +200,6 @@ export interface AutoPickOrder {
   hasOutbound?: boolean;
   outboundOrderId?: string | null;
   lastSyncedAt?: string | null;
-  rawPayload?: unknown;
   createdAt?: string;
   updatedAt?: string;
 }
