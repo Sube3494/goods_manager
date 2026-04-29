@@ -199,6 +199,43 @@ function ChartLoadingState({
   );
 }
 
+function InlineLegend({
+  items,
+  compact = false,
+}: {
+  items: Array<{ label: string; color: string; dashed?: boolean }>;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center text-muted-foreground",
+        compact ? "mb-2 text-[11px]" : "mb-3 text-xs"
+      )}
+    >
+      {items.map((item) => (
+        <div key={`${item.label}-${item.color}`} className="inline-flex items-center gap-2">
+          <span
+            className={cn(
+              "inline-block rounded-full",
+              compact ? "h-[3px] w-5" : "h-[4px] w-6",
+              item.dashed && "bg-transparent"
+            )}
+            style={
+              item.dashed
+                ? {
+                    backgroundImage: `repeating-linear-gradient(to right, ${item.color} 0 6px, transparent 6px 10px)`,
+                  }
+                : { backgroundColor: item.color }
+            }
+          />
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function formatCurrency(value: number) {
   return `￥${value.toFixed(2)}`;
 }
@@ -908,6 +945,17 @@ export default function BrushCenterPage() {
 
                   {orderExpenseCompositionData.length > 0 ? (
                     showCharts ? (
+                    <>
+                      {isCompactView ? (
+                        <InlineLegend
+                          compact
+                          items={[
+                            { label: "总支出", color: "#fb7185" },
+                            { label: "平台佣金", color: "#5ba7ff" },
+                            { label: "刷单佣金", color: "#f3b34c", dashed: true },
+                          ]}
+                        />
+                      ) : null}
                     <div className={cn("h-[360px]", isCompactView && "h-[220px]")}>
                       <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={orderExpenseCompositionData} margin={{ top: 20, right: 18, left: 8, bottom: 0 }}>
@@ -970,6 +1018,7 @@ export default function BrushCenterPage() {
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
+                    </>
                     ) : (
                       <ChartLoadingState
                         compact={isCompactView}
@@ -1044,6 +1093,16 @@ export default function BrushCenterPage() {
               {canManageBrush ? (
                 shopMetricConfig.data.length > 0 ? (
                   showCharts ? (
+                    <>
+                      {isCompactView ? (
+                        <InlineLegend
+                          compact
+                          items={shopMetricConfig.shops.map((shop, index) => ({
+                            label: shop,
+                            color: PLATFORM_COLORS[index % PLATFORM_COLORS.length],
+                          }))}
+                        />
+                      ) : null}
                     <div className={cn("mt-2 h-[360px] w-full xl:h-[440px]", isCompactView && "h-[220px]")}>
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={shopMetricConfig.data} margin={{ top: 14, right: 20, left: 8, bottom: 0 }}>
@@ -1082,6 +1141,7 @@ export default function BrushCenterPage() {
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
+                    </>
                   ) : (
                     <ChartLoadingState compact={isCompactView} message={shopMetricConfig.loading} />
                   )
