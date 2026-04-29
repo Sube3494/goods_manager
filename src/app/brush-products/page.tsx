@@ -571,7 +571,7 @@ export default function BrushProductsPage() {
       {isLoading ? (
         <div className="py-20 text-center text-muted-foreground">加载中...</div>
       ) : filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 gap-3 min-[560px]:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
           {filteredItems.map((item) => {
             const product = item.product;
             const editingValue = editingKeywords[item.id] ?? item.brushKeyword ?? "";
@@ -580,19 +580,19 @@ export default function BrushProductsPage() {
             return (
               <div
                 key={item.id}
-                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-all duration-200 cursor-pointer dark:bg-white/5 ${
+                className={`group relative flex flex-col overflow-hidden rounded-[18px] border bg-white transition-all duration-200 cursor-pointer dark:bg-white/5 sm:rounded-2xl ${
                   isSelected
                     ? "border-primary/40 ring-2 ring-primary/10 shadow-lg shadow-primary/10 bg-primary/5"
-                    : "border-border hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-primary/10"
+                    : "border-border hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 sm:hover:-translate-y-1.5 sm:hover:shadow-2xl"
                 }`}
               >
-                <div className="relative aspect-4/3 w-full overflow-hidden bg-secondary/30">
+                <div className="relative aspect-[0.98/1] w-full overflow-hidden bg-secondary/30 sm:aspect-4/3">
                     {product.image ? (
                       <Image
                         src={product.image}
                         alt={product.name}
                         fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                         className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
                         unoptimized
                       />
@@ -604,7 +604,7 @@ export default function BrushProductsPage() {
                   <button
                     type="button"
                     onClick={() => toggleSelectProduct(item.id)}
-                    className={`absolute top-3 left-3 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                    className={`absolute left-2.5 top-2.5 z-10 inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 transition-all duration-300 sm:left-3 sm:top-3 sm:h-6 sm:w-6 ${
                       isSelected
                         ? "scale-110 border-foreground bg-foreground text-background dark:text-black"
                         : anySelected
@@ -617,44 +617,44 @@ export default function BrushProductsPage() {
                   </button>
                 </div>
 
-                <div className="flex flex-1 flex-col p-3 sm:p-5">
+                <div className="flex flex-1 flex-col p-2.5 sm:p-5">
                   <h3
-                    className="mb-2 text-[13px] font-bold leading-snug text-foreground transition-colors group-hover:text-primary break-words sm:mb-2.5 sm:text-[15px]"
+                    className="mb-1.5 line-clamp-3 text-[12px] font-bold leading-snug text-foreground transition-colors group-hover:text-primary break-words sm:mb-2.5 sm:line-clamp-none sm:text-[15px]"
                     title={product.name}
                   >
                     {product.name}
                   </h3>
 
-                  <div className="flex min-h-[22px] flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <div className="flex min-h-[20px] flex-wrap items-center gap-1 text-xs text-muted-foreground sm:min-h-[22px] sm:gap-1.5">
                     {item.shopName && (
-                      <span className="flex h-5 items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold leading-none text-primary">
+                      <span className="flex h-5 items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary sm:px-2">
                         {item.shopName}
                       </span>
                     )}
-                    {product.sku && <span className="flex h-5 items-center rounded-full bg-secondary/80 px-2 py-0.5 font-mono text-[10px] leading-none">{product.sku}</span>}
+                    {product.sku && <span className="flex h-5 items-center rounded-full bg-secondary/80 px-1.5 py-0.5 font-mono text-[10px] leading-none sm:px-2">{product.sku}</span>}
                     {product.supplier?.name && (
-                      <span className="flex h-5 items-center gap-1 rounded-full border border-zinc-500/10 bg-zinc-500/5 px-2 py-0.5 text-[10px] leading-none">
+                      <span className="hidden h-5 items-center gap-1 rounded-full border border-zinc-500/10 bg-zinc-500/5 px-2 py-0.5 text-[10px] leading-none sm:flex">
                         <Store size={10} />
                         {product.supplier.name}
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-4 border-t border-white/10 pt-4">
+                  <div className="mt-3 border-t border-white/10 pt-3 sm:mt-4 sm:pt-4">
                     <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">刷单关键词</div>
                     <textarea
                       value={editingValue}
                       onChange={(e) => handleKeywordChange(item.id, e.target.value)}
                       placeholder="填写刷单提示词"
-                      rows={3}
-                      className="mt-2 w-full resize-none rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm font-medium outline-none transition-all focus:border-primary/40"
+                      rows={2}
+                      className="mt-2 w-full resize-none rounded-xl border border-border/60 bg-background/70 px-2.5 py-2 text-xs font-medium outline-none transition-all focus:border-primary/40 sm:px-3 sm:text-sm"
                     />
                     <div className="mt-2 flex items-center justify-end">
                       <button
                         type="button"
                         onClick={() => handleSaveKeyword(item)}
                         disabled={!isDirty || savingProductId === item.id}
-                        className="inline-flex h-9 items-center rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-8 items-center rounded-xl bg-primary px-2.5 text-[11px] font-black text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:px-3 sm:text-xs"
                       >
                         {savingProductId === item.id ? "保存中..." : "保存关键词"}
                       </button>
@@ -662,7 +662,7 @@ export default function BrushProductsPage() {
                   </div>
 
                   {product.remark && (
-                    <div className="mt-3 line-clamp-2 rounded-xl border border-amber-500/10 bg-amber-500/5 px-3 py-3 text-xs text-amber-700 dark:text-amber-400">
+                    <div className="mt-2.5 line-clamp-2 rounded-xl border border-amber-500/10 bg-amber-500/5 px-2.5 py-2.5 text-[11px] text-amber-700 dark:text-amber-400 sm:mt-3 sm:px-3 sm:py-3 sm:text-xs">
                       {product.remark}
                     </div>
                   )}
