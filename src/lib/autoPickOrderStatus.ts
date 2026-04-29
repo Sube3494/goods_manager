@@ -95,6 +95,57 @@ export function isAutoPickOrderDeliveringStatus(status?: string | null) {
   return getBaseAutoPickStatusDisplay(status) === "配送中";
 }
 
+function readAutoPickRawPayloadRecord(rawPayload: unknown) {
+  return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+    ? rawPayload as Record<string, unknown>
+    : {};
+}
+
+function readAutoPickPickProgress(rawPayload: unknown) {
+  const record = readAutoPickRawPayloadRecord(rawPayload);
+  const progress = record.pickProgress;
+  if (!progress || typeof progress !== "object" || Array.isArray(progress)) {
+    return null;
+  }
+  return progress as {
+    pickRemainingSeconds?: number | null;
+    pickCompleted?: boolean;
+    updatedAt?: string;
+  };
+}
+
+export function isAutoPickPickingCompleted(status?: string | null, rawPayload?: unknown) {
+  const progress = readAutoPickPickProgress(rawPayload);
+  if (progress?.pickCompleted === true) {
+    return true;
+  }
+
+  const record = readAutoPickRawPayloadRecord(rawPayload);
+  const pickCandidates = [
+    record.pickStatus,
+    record.pick_status,
+    record.pickRemark,
+    record.pick_remark,
+    record.status,
+    record.tips,
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+
+  if (pickCandidates.some((item) => /未上报拣货|未拣货/.test(item))) {
+    return false;
+  }
+
+  const baseStatus = getBaseAutoPickStatusDisplay(status);
+  return baseStatus === "已拣货" || baseStatus === "待配送" || baseStatus === "配送中" || baseStatus === "已完成";
+}
+
+export function canAutoPickStartSelfDelivery(status?: string | null, rawPayload?: unknown) {
+  return isAutoPickPickingCompleted(status, rawPayload);
+}
+
+export function canAutoPickCompleteDelivery(status?: string | null) {
+  return getBaseAutoPickStatusDisplay(status) === "配送中";
+}
+
 export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string | null) {
   const candidates = [userAddress];
 

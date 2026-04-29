@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
-import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
+import { markAutoPickOrderPendingSelfDelivery, tryStartPendingAutoPickSelfDelivery } from "@/lib/autoPickOrders";
 import {
+  canAutoPickStartSelfDelivery,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickPickupOrder,
 } from "@/lib/autoPickOrderStatus";
-import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -43,49 +42,23 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
     }
 
-    const result = await callAutoPickCommand(session.id, "/self-delivery", {
-      platform: order.platform,
-      dailyPlatformSequence: order.dailyPlatformSequence,
-      orderNo: order.orderNo,
-      sourceId: order.sourceId,
-      logisticId: order.logisticId,
-    });
-
-    if (result.ok) {
-      const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
-        id: order.sourceId,
-        platform: order.platform,
-        orderNo: order.orderNo,
-        orderTime: order.orderTime,
-      }).catch((refreshError) => {
-        console.error("Failed to refresh auto-pick order after self delivery:", refreshError);
-        return null;
+    if (!canAutoPickStartSelfDelivery(order.status, order.rawPayload)) {
+      await markAutoPickOrderPendingSelfDelivery(session.id, id);
+      return NextResponse.json({
+        ok: true,
+        pending: true,
+        reason: "picking-not-completed",
       });
-
-      const schedulingOrder = refreshedOrder || order;
-      const autoCompleteAt = getEstimatedAutoCompleteAt(schedulingOrder);
-      await prisma.autoPickOrder.update({
-        where: { id },
-        data: {
-          status: "配送中",
-          deliveryDeadline: refreshedOrder?.deliveryDeadline || order.deliveryDeadline || null,
-          autoCompleteAt: autoCompleteAt || null,
-        },
-      });
-      await markAutoPickOrderMainSystemSelfDelivery(session.id, id);
-
-      if (autoCompleteAt) {
-        await ensureAutoCompleteJob({
-          userId: session.id,
-          orderId: id,
-          dueAt: autoCompleteAt,
-        });
-      } else {
-        await cancelAutoCompleteJob(id, "missing-auto-complete-time");
-      }
     }
 
-    return NextResponse.json(result.data, { status: result.status });
+    const result = await tryStartPendingAutoPickSelfDelivery(session.id, id);
+    if (result.ok) {
+      return NextResponse.json(result.result?.data ?? { ok: true }, { status: result.result?.status ?? 200 });
+    }
+
+    return NextResponse.json({
+      error: result.reason || "Failed to start self delivery",
+    }, { status: 409 });
   } catch (error) {
     console.error("Failed to start self delivery:", error);
     return NextResponse.json({

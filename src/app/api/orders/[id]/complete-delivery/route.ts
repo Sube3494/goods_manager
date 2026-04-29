@@ -5,6 +5,7 @@ import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFr
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import {
+  canAutoPickCompleteDelivery,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickPickupOrder,
@@ -41,6 +42,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     if (isAutoPickPickupOrder(order.rawPayload, order.userAddress)) {
       return NextResponse.json({ error: "Pickup order does not require complete delivery" }, { status: 409 });
+    }
+
+    if (!canAutoPickCompleteDelivery(order.status)) {
+      return NextResponse.json({ error: "delivery-not-started" }, { status: 409 });
     }
 
     const result = await callAutoPickCommand(session.id, "/complete-delivery", {

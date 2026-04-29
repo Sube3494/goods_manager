@@ -28,6 +28,8 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
+  canAutoPickCompleteDelivery,
+  canAutoPickStartSelfDelivery,
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
@@ -135,6 +137,10 @@ function getOrderActionErrorMessage(raw: unknown) {
       return "完成配送接口还没完全迁进主系统，这一步我还在补。";
     case "picking-not-completed":
       return "当前订单还没完成拣货，暂时不能执行这个操作。";
+    case "delivery-not-started":
+      return "当前订单还没进入配送中，暂时不能完成配送。";
+    case "pending-self-delivery-not-requested":
+      return "这张订单还没有加入待自配。";
     case "Order already completed":
       return "订单已完成，不需要重复操作。";
     case "Order already cancelled":
@@ -531,6 +537,8 @@ function OrderCard({
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
   const pickup = Boolean(order.isPickup);
   const subscribe = isSubscribeOrder(order);
+  const canStartSelfDelivery = canAutoPickStartSelfDelivery(order.status, order.rawPayload);
+  const canFinishDelivery = canAutoPickCompleteDelivery(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
@@ -737,7 +745,7 @@ function OrderCard({
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal || delivering || pickup}
+              disabled={Boolean(actingId) || terminal || delivering || pickup || !canStartSelfDelivery}
               mobileIconOnly
               title={
                 pickup
@@ -746,6 +754,8 @@ function OrderCard({
                   ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
                   : delivering
                     ? "订单已在配送中，不能重复发起自配"
+                    : !canStartSelfDelivery
+                      ? "订单还没完成拣货，暂时不能发起自配"
                     : undefined
               }
             />
@@ -754,13 +764,15 @@ function OrderCard({
               variant="primary"
               icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
               onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
-              disabled={Boolean(actingId) || terminal}
+              disabled={Boolean(actingId) || terminal || (!pickup && !canFinishDelivery)}
               mobileIconOnly
               title={
                 pickup
                   ? (terminal ? (cancelled ? "订单已取消，不能完成取货" : "订单已取货，不能重复完成取货") : undefined)
                   : terminal
                     ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
+                    : !canFinishDelivery
+                      ? "订单还没进入配送中，暂时不能完成配送"
                     : undefined
               }
             />
@@ -1541,6 +1553,11 @@ export default function OrdersPage() {
 
       const nowIso = new Date().toISOString();
       if (action === "self-delivery") {
+        if (data?.pending) {
+          showToast("已加入待自配，拣货完成后会自动发起", "success");
+          void fetchOrders({ silent: true });
+          return;
+        }
         patchOrder(orderId, (order) => ({
           ...order,
           status: "配送中",
