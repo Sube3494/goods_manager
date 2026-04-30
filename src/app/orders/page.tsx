@@ -32,7 +32,6 @@ import {
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
-  isAutoPickOrderPickedStatus,
   isAutoPickOrderTerminalStatus,
 } from "@/lib/autoPickOrderStatus";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
@@ -213,10 +212,6 @@ function isDeliveringStatus(status?: string | null) {
   return isAutoPickOrderDeliveringStatus(status);
 }
 
-function isPickedStatus(status?: string | null) {
-  return isAutoPickOrderPickedStatus(status);
-}
-
 function getStatusTone(display: string) {
 
   if (display === "已取消") {
@@ -248,14 +243,6 @@ function getStatusTone(display: string) {
       badge: "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-400",
       dot: "bg-sky-500",
       soft: "bg-sky-500/8 text-sky-700 dark:text-sky-300",
-    };
-  }
-
-  if (display === "已拣货") {
-    return {
-      badge: "border-teal-500/15 bg-teal-500/10 text-teal-700 dark:text-teal-400",
-      dot: "bg-teal-500",
-      soft: "bg-teal-500/8 text-teal-700 dark:text-teal-300",
     };
   }
 
@@ -542,7 +529,6 @@ function OrderCard({
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
-  const picked = isPickedStatus(order.status);
   const pickup = Boolean(order.isPickup);
   const subscribe = isSubscribeOrder(order);
   const hasOutbound = Boolean(order.hasOutbound);
@@ -751,7 +737,7 @@ function OrderCard({
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal || delivering || pickup || !picked}
+              disabled={Boolean(actingId) || terminal || delivering || pickup}
               mobileIconOnly
               title={
                 pickup
@@ -760,8 +746,6 @@ function OrderCard({
                   ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
                   : delivering
                     ? "订单已在配送中，不能重复发起自配"
-                    : !picked
-                      ? "当前订单还没完成拣货，暂时不能发起自配送"
                     : undefined
               }
             />
@@ -1288,8 +1272,6 @@ export default function OrdersPage() {
   const isFetchingRef = useRef(false);
   const hasLoadedIntegrationRef = useRef(false);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
-  const realtimePollingTimerRef = useRef<number | null>(null);
-  const sseHealthyRef = useRef(false);
 
   const [isMounted, setIsMounted] = useState(false);
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -1504,7 +1486,7 @@ export default function OrdersPage() {
   );
 
   const statusOptions = useMemo(() => {
-    const preferredOrder = ["同步中", "待处理", "拣货中", "已拣货", "待配送", "配送中", "已完成", "已取消", "已删除"];
+    const preferredOrder = ["同步中", "待处理", "已拣货", "待配送", "配送中", "已完成", "已取消", "已删除"];
     const labels = Array.from(
       new Set(
         statuses
@@ -1526,21 +1508,6 @@ export default function OrdersPage() {
       })),
     ];
   }, [statuses]);
-
-  const shouldUseRealtimePolling = useMemo(() => {
-    if (!isMounted || typeof window === "undefined") {
-      return false;
-    }
-
-    try {
-      const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches;
-      const touchCapable = navigator.maxTouchPoints > 0;
-      const mobileUa = /android|iphone|ipad|ipod|mobile|via/i.test(navigator.userAgent);
-      return Boolean(coarsePointer || touchCapable || mobileUa);
-    } catch {
-      return false;
-    }
-  }, [isMounted]);
 
   const shopOptions = useMemo(() => {
     const labels = Array.from(new Set(orders.map((item) => String(item.matchedShopName || "").trim()).filter(Boolean)));
@@ -2008,15 +1975,10 @@ export default function OrdersPage() {
     };
 
     source.addEventListener("order-update", queueRefresh);
-    source.addEventListener("ready", () => {
-      sseHealthyRef.current = true;
-    });
-    source.onerror = () => {
-      sseHealthyRef.current = false;
-    };
+    source.addEventListener("ready", () => undefined);
+    source.onerror = () => undefined;
 
     return () => {
-      sseHealthyRef.current = false;
       if (realtimeRefreshTimerRef.current) {
         window.clearTimeout(realtimeRefreshTimerRef.current);
         realtimeRefreshTimerRef.current = null;
@@ -2024,45 +1986,6 @@ export default function OrdersPage() {
       source.close();
     };
   }, [fetchOrders, isMounted]);
-
-  useEffect(() => {
-    if (!isMounted || typeof window === "undefined") {
-      return;
-    }
-
-    const runSilentRefresh = () => {
-      if (document.visibilityState !== "visible" || isFetchingRef.current) {
-        return;
-      }
-      void fetchOrders({ silent: true });
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        runSilentRefresh();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    if (shouldUseRealtimePolling) {
-      realtimePollingTimerRef.current = window.setInterval(() => {
-        if (!sseHealthyRef.current) {
-          runSilentRefresh();
-          return;
-        }
-        runSilentRefresh();
-      }, 15000);
-    }
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (realtimePollingTimerRef.current) {
-        window.clearInterval(realtimePollingTimerRef.current);
-        realtimePollingTimerRef.current = null;
-      }
-    };
-  }, [fetchOrders, isMounted, shouldUseRealtimePolling]);
 
   useEffect(() => {
     let ticking = false;
