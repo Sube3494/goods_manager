@@ -41,6 +41,18 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
   }
 
   if (
+    text.includes("已拣货")
+  ) {
+    return "已拣货";
+  }
+
+  if (
+    text.includes("拣货中")
+  ) {
+    return "拣货中";
+  }
+
+  if (
     text.includes("待配送")
     || text.includes("待发货")
     || text.includes("待送达")
@@ -53,10 +65,6 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     || normalized === "pendingdelivery"
   ) {
     return "待配送";
-  }
-
-  if (text.includes("已拣货") || text.includes("拣货中")) {
-    return "已拣货";
   }
 
   if (
@@ -93,6 +101,10 @@ export function isAutoPickOrderTerminalStatus(status?: string | null) {
 
 export function isAutoPickOrderDeliveringStatus(status?: string | null) {
   return getBaseAutoPickStatusDisplay(status) === "配送中";
+}
+
+export function isAutoPickOrderPickedStatus(status?: string | null) {
+  return getBaseAutoPickStatusDisplay(status) === "已拣货";
 }
 
 export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string | null) {
@@ -134,7 +146,7 @@ export function resolveAutoPickBusinessStatus(
   const baseStatus = getBaseAutoPickStatusDisplay(status);
 
   if (isAutoPickOtherPickupOrder(rawPayload) && !isAutoPickPickupOrder(rawPayload, userAddress)) {
-    if (baseStatus === "同步中" || baseStatus === "待处理" || baseStatus === "已拣货") {
+    if (baseStatus === "同步中" || baseStatus === "待处理" || baseStatus === "拣货中" || baseStatus === "已拣货") {
       return "待配送";
     }
   }

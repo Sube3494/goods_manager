@@ -74,11 +74,16 @@ function buildStatusWhere(status: string): Prisma.AutoPickOrderWhereInput | unde
           { status: { equals: "pendingdelivery", mode: "insensitive" } },
         ],
       };
+    case "拣货中":
+      return {
+        OR: [
+          { status: { contains: "拣货中", mode: "insensitive" } },
+        ],
+      };
     case "已拣货":
       return {
         OR: [
           { status: { contains: "已拣货", mode: "insensitive" } },
-          { status: { contains: "拣货中", mode: "insensitive" } },
         ],
       };
     case "待处理":

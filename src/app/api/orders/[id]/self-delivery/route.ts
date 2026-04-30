@@ -6,6 +6,7 @@ import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAuto
 import {
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
+  isAutoPickOrderPickedStatus,
   isAutoPickPickupOrder,
 } from "@/lib/autoPickOrderStatus";
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
@@ -41,6 +42,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     if (isAutoPickPickupOrder(order.rawPayload, order.userAddress)) {
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
+    }
+
+    if (!isAutoPickOrderPickedStatus(order.status)) {
+      return NextResponse.json({ error: "picking-not-completed" }, { status: 409 });
     }
 
     const result = await callAutoPickCommand(session.id, "/self-delivery", {
