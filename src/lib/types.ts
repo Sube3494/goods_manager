@@ -55,6 +55,7 @@ export interface Product {
   id: string;
   sku?: string;
   jdSkuId?: string;
+  jdSkuIds?: string[];
   name: string;
   productId?: string | null;
   sourceProductId?: string | null;

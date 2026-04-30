@@ -1,5 +1,6 @@
 import { Prisma } from "../../prisma/generated-client";
 import { ProductService } from "@/services/productService";
+import { getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 
 type CategoryRecord = { id: string; name: string } | null;
 
@@ -115,7 +116,7 @@ export async function syncStandaloneShopProductToCatalog(
 
   const productPayload = {
     name: input.name,
-    jdSkuId: normalizeText(input.jdSkuId) || null,
+    jdSkuId: getPrimaryJdSkuId(normalizeJdSkuIds(input.jdSkuId)),
     categoryId: category.id,
     supplierId: normalizeText(input.supplierId) || null,
     image: normalizeText(input.image) || null,
@@ -147,6 +148,13 @@ export async function syncStandaloneShopProductToCatalog(
         },
       });
 
+      await replaceProductJdSkuMappings(
+        tx,
+        updated.id,
+        input.ownerUserId,
+        normalizeJdSkuIds(input.jdSkuId)
+      );
+
       return {
         productId: updated.id,
         categoryId: updated.categoryId || null,
@@ -169,6 +177,13 @@ export async function syncStandaloneShopProductToCatalog(
       categoryId: true,
     },
   });
+
+  await replaceProductJdSkuMappings(
+    tx,
+    created.id,
+    input.ownerUserId,
+    normalizeJdSkuIds(input.jdSkuId)
+  );
 
   return {
     productId: created.id,

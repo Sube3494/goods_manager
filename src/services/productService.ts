@@ -91,6 +91,7 @@ export class ProductService {
           { name: { contains: search, mode: "insensitive" } },
           { sku: { contains: search, mode: "insensitive" } },
           { jdSkuId: { contains: search, mode: "insensitive" } },
+          { jdSkuMappings: { some: { jdSkuId: { contains: search, mode: "insensitive" } } } },
           { category: { name: { contains: search, mode: "insensitive" } } },
           { pinyin: { contains: search, mode: "insensitive" } }
         ]
@@ -173,6 +174,7 @@ export class ProductService {
                     supplier: true,
                     gallery: { take: 1 },
                     shopProducts: { select: { shopId: true } },
+                    jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
                   },
                 });
 
@@ -202,6 +204,7 @@ export class ProductService {
               supplier: true,
               gallery: { take: 1 },
               shopProducts: { select: { shopId: true } },
+              jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
             },
             orderBy: standardOrderBy,
             skip,
@@ -221,6 +224,7 @@ export class ProductService {
       image: p.image ? storage.resolveUrl(p.image as string) : null,
       gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || [],
       assignedShopIds: (p.shopProducts as Array<{ shopId: string }> | undefined)?.map((item) => item.shopId) || [],
+      jdSkuIds: (p.jdSkuMappings as Array<{ jdSkuId: string }> | undefined)?.map((item) => item.jdSkuId) || (p.jdSkuId ? [p.jdSkuId as string] : []),
     }));
 
     return {

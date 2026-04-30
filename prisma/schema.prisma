@@ -54,6 +54,7 @@ model Product {
   orderItems      PurchaseOrderItem[]
   shopProducts    ShopProduct[]
   storeOpeningItems StoreOpeningItem[]
+  jdSkuMappings   ProductJdSku[]
 
   @@index([categoryId])
   @@index([supplierId])
@@ -61,6 +62,21 @@ model Product {
   @@index([userId, pinyin])
   @@index([userId, createdAt])
   @@unique([userId, sourceProductId])
+}
+
+model ProductJdSku {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String?
+  jdSkuId   String
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, jdSkuId])
+  @@unique([userId, jdSkuId])
+  @@index([productId])
+  @@index([userId, jdSkuId])
 }
 
 model Supplier {

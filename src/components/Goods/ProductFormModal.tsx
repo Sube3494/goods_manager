@@ -23,6 +23,25 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function normalizeJdSkuPreview(value: string) {
+  return Array.from(
+    new Set(
+      String(value || "")
+        .split(/[，,]+/g)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function formatInitialJdSkuValue(initialData?: Product | null) {
+  const jdSkuIds = Array.isArray(initialData?.jdSkuIds) ? initialData.jdSkuIds.filter(Boolean) : [];
+  if (jdSkuIds.length > 0) {
+    return jdSkuIds.join("\n");
+  }
+  return initialData?.jdSkuId || "";
+}
+
 const toolbarButtonClass =
   "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-primary transition-all duration-300 hover:bg-primary hover:text-primary-foreground active:scale-95 shadow-sm disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -84,7 +103,7 @@ export function ProductFormModal({
     image: initialData?.image || "",
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
-    jdSkuId: initialData?.jdSkuId || "",
+    jdSkuId: formatInitialJdSkuValue(initialData),
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {},
@@ -128,6 +147,7 @@ export function ProductFormModal({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   // 移动端排序模式 (Mobile reorder mode)
   const [isReorderMode, setIsReorderMode] = useState(false);
+  const jdSkuPreview = useMemo(() => normalizeJdSkuPreview(formData.jdSkuId), [formData.jdSkuId]);
 
   // Lock page scroll without losing the user's current scroll position.
   useEffect(() => {
@@ -264,7 +284,7 @@ export function ProductFormModal({
       if (initialData) {
         setFormData({
           sku: initialData.sku || "",
-          jdSkuId: initialData.jdSkuId || "",
+          jdSkuId: formatInitialJdSkuValue(initialData),
           name: initialData.name,
           costPrice: String(initialData.costPrice || ""),
           stock: String(initialData.stock || ""),
@@ -996,10 +1016,14 @@ export function ProductFormModal({
                           <input
                               type="text"
                               value={formData.jdSkuId}
-                              onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value })}
+                              onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
                               className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
-                              placeholder="填写京东商品SKU编码"
+                              placeholder="用逗号分隔多个 JD SKU，例如：123456,234567,345678"
                           />
+                          <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
+                            <span>只支持逗号分隔多个 JD SKU，保存时会自动去重。</span>
+                            <span className="shrink-0 font-mono">{jdSkuPreview.length} 条</span>
+                          </div>
                       </div>
                     )}
 

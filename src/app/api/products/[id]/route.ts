@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getLightSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { handlePrismaError } from "@/lib/api-errors";
+import { findConflictingProductJdSkuIds, getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 
 function normalizeSku(sku: unknown) {
   if (typeof sku !== "string") {
@@ -25,6 +26,10 @@ export async function GET(
       include: {
         category: true,
         supplier: true,
+        jdSkuMappings: {
+          select: { jdSkuId: true },
+          orderBy: { createdAt: "asc" }
+        },
         gallery: {
           orderBy: [
             { sortOrder: 'asc' },
@@ -55,6 +60,7 @@ export async function GET(
     const resolvedProduct = {
       ...product,
       image: product.image ? storage.resolveUrl(product.image) : null,
+      jdSkuIds: product.jdSkuMappings.map((item) => item.jdSkuId),
       gallery: product.gallery.map(item => ({
         ...item,
         url: storage.resolveUrl(item.url),
@@ -91,9 +97,10 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, costPrice, stock, categoryId, supplierId, image, isPublic, remark } = body;
+    const { name, sku, jdSkuId, jdSkuIds, costPrice, stock, categoryId, supplierId, image, isPublic, remark } = body;
     const normalizedSku = normalizeSku(sku);
-    const normalizedJdSkuId = normalizeSku(jdSkuId);
+    const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
+    const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
 
     if (normalizedSku) {
       const conflict = await prisma.product.findFirst({
@@ -111,43 +118,50 @@ export async function PUT(
       }
     }
 
-    if (normalizedJdSkuId) {
-      const conflict = await prisma.product.findFirst({
-        where: {
-          userId: session.id,
-          jdSkuId: normalizedJdSkuId,
-          id: { not: id }
-        },
-        select: { id: true }
-      });
-
-      if (conflict) {
+    if (normalizedJdSkuIds.length > 0) {
+      const conflicts = await findConflictingProductJdSkuIds(prisma, session.id, normalizedJdSkuIds, id);
+      if (conflicts.length > 0) {
         return NextResponse.json({
-          error: `主商品库里 JD SKU ID "${normalizedJdSkuId}" 已存在，请检查是否重复建品`
+          error: `主商品库里 JD SKU ID "${conflicts[0].jdSkuId}" 已存在，请检查是否重复建品`
         }, { status: 409 });
       }
     }
 
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        name,
-        sku: normalizedSku,
-        jdSkuId: normalizedJdSkuId,
-        costPrice: Number(costPrice || body.price), // Fallback to price if costPrice is missing for compatibility
-        stock: Number(stock),
-        categoryId,
-        supplierId,
-        image,
-        isPublic,
-        remark: remark !== undefined ? remark : undefined
-      }
+    const product = await prisma.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id },
+        data: {
+          name,
+          sku: normalizedSku,
+          jdSkuId: normalizedJdSkuId,
+          costPrice: Number(costPrice || body.price),
+          stock: Number(stock),
+          categoryId,
+          supplierId,
+          image,
+          isPublic,
+          remark: remark !== undefined ? remark : undefined
+        }
+      });
+
+      await replaceProductJdSkuMappings(tx, id, session.id, normalizedJdSkuIds);
+
+      return tx.product.findUniqueOrThrow({
+        where: { id },
+        include: {
+          jdSkuMappings: {
+            select: { jdSkuId: true },
+            orderBy: { createdAt: "asc" }
+          },
+        },
+      });
     });
 
     const storage = await getStorageStrategy();
     return NextResponse.json({
       ...product,
-      image: product.image ? storage.resolveUrl(product.image) : null
+      image: product.image ? storage.resolveUrl(product.image) : null,
+      jdSkuIds: product.jdSkuMappings.map((item) => item.jdSkuId),
     });
   } catch (error: unknown) {
     return handlePrismaError(error, "商品", "Failed to update product");
