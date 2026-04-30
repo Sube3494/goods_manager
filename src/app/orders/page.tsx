@@ -1272,6 +1272,8 @@ export default function OrdersPage() {
   const isFetchingRef = useRef(false);
   const hasLoadedIntegrationRef = useRef(false);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
+  const realtimePollingTimerRef = useRef<number | null>(null);
+  const sseHealthyRef = useRef(false);
 
   const [isMounted, setIsMounted] = useState(false);
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -1508,6 +1510,21 @@ export default function OrdersPage() {
       })),
     ];
   }, [statuses]);
+
+  const shouldUseRealtimePolling = useMemo(() => {
+    if (!isMounted || typeof window === "undefined") {
+      return false;
+    }
+
+    try {
+      const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches;
+      const touchCapable = navigator.maxTouchPoints > 0;
+      const mobileUa = /android|iphone|ipad|ipod|mobile|via/i.test(navigator.userAgent);
+      return Boolean(coarsePointer || touchCapable || mobileUa);
+    } catch {
+      return false;
+    }
+  }, [isMounted]);
 
   const shopOptions = useMemo(() => {
     const labels = Array.from(new Set(orders.map((item) => String(item.matchedShopName || "").trim()).filter(Boolean)));
@@ -1975,10 +1992,15 @@ export default function OrdersPage() {
     };
 
     source.addEventListener("order-update", queueRefresh);
-    source.addEventListener("ready", () => undefined);
-    source.onerror = () => undefined;
+    source.addEventListener("ready", () => {
+      sseHealthyRef.current = true;
+    });
+    source.onerror = () => {
+      sseHealthyRef.current = false;
+    };
 
     return () => {
+      sseHealthyRef.current = false;
       if (realtimeRefreshTimerRef.current) {
         window.clearTimeout(realtimeRefreshTimerRef.current);
         realtimeRefreshTimerRef.current = null;
@@ -1986,6 +2008,41 @@ export default function OrdersPage() {
       source.close();
     };
   }, [fetchOrders, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted || typeof window === "undefined") {
+      return;
+    }
+
+    const runSilentRefresh = () => {
+      if (document.visibilityState !== "visible" || isFetchingRef.current) {
+        return;
+      }
+      void fetchOrders({ silent: true });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        runSilentRefresh();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    if (shouldUseRealtimePolling) {
+      realtimePollingTimerRef.current = window.setInterval(() => {
+        runSilentRefresh();
+      }, sseHealthyRef.current ? 20000 : 10000);
+    }
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (realtimePollingTimerRef.current) {
+        window.clearInterval(realtimePollingTimerRef.current);
+        realtimePollingTimerRef.current = null;
+      }
+    };
+  }, [fetchOrders, isMounted, shouldUseRealtimePolling]);
 
   useEffect(() => {
     let ticking = false;
