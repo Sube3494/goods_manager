@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -12,7 +13,9 @@ interface ActionBarProps {
   label?: string;
   extraActions?: Array<{
     label: string;
+    icon?: ReactNode;
     onClick: () => void;
+    title?: string;
     variant?: "default" | "danger";
   }>;
 }
@@ -83,13 +86,15 @@ export function ActionBar({
                 <button
                   key={action.label}
                   onClick={action.onClick}
+                  title={action.title || action.label}
                   className={
                     action.variant === "danger"
-                      ? "h-9 sm:h-8 px-4 sm:px-6 rounded-full bg-red-500 hover:bg-red-600 text-white text-[11px] sm:text-xs font-black shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all whitespace-nowrap"
-                      : "h-9 sm:h-8 px-4 sm:px-6 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] sm:text-xs font-black shadow-lg shadow-primary/20 active:scale-[0.98] transition-all whitespace-nowrap"
+                      ? "flex h-9 w-9 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all whitespace-nowrap hover:bg-red-600 sm:h-8 sm:w-auto sm:px-6"
+                      : "flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 active:scale-[0.98] transition-all whitespace-nowrap hover:bg-primary/90 sm:h-8 sm:w-auto sm:px-6"
                   }
                 >
-                  {action.label}
+                  {action.icon ? <span className="sm:hidden">{action.icon}</span> : null}
+                  <span className={action.icon ? "hidden sm:inline text-[11px] sm:text-xs font-black" : "text-[11px] sm:text-xs font-black"}>{action.label}</span>
                 </button>
               ))}
               <div className="w-px h-6 sm:h-8 bg-black/5 dark:bg-white/10 mx-1 sm:mx-2" />

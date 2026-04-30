@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { ActionBar } from "@/components/ui/ActionBar";
 import { createPortal } from "react-dom";
 import { useUser } from "@/hooks/useUser";
 import { hasAdminAccess, SessionUser } from "@/lib/permissions";
@@ -39,6 +40,30 @@ interface WhitelistEntry {
   };
 }
 
+function SelectionCircleButton({
+  checked,
+  onClick,
+  className = "",
+}: {
+  checked: boolean;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
+        checked
+          ? "bg-foreground border-foreground text-background dark:text-black scale-110 shadow-lg shadow-black/10"
+          : "bg-white dark:bg-white/5 border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-foreground/50 shadow-sm"
+      } ${className}`}
+    >
+      {checked ? <Check size={12} strokeWidth={4} /> : null}
+    </button>
+  );
+}
+
 function RemarkModal({
   email,
   initialRemark,
@@ -62,8 +87,8 @@ function RemarkModal({
   }, []);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
-      <div className="w-full max-w-lg overflow-hidden rounded-[28px] sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
+      <div className="mb-10 w-full max-w-lg overflow-hidden rounded-[28px] sm:mb-0 sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative">
         <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-border bg-background/95 backdrop-blur">
           <h3 className="text-lg sm:text-xl font-black text-foreground">成员备注</h3>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-all">{email}</p>
@@ -125,8 +150,8 @@ function RoleAssignmentModal({
     }, []);
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
-            <div className="w-full max-w-lg overflow-hidden rounded-[28px] sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative max-h-safe-modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
+            <div className="mb-10 w-full max-w-lg overflow-hidden rounded-[28px] sm:mb-0 sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative max-h-[calc(100dvh-5rem)] sm:max-h-safe-modal">
                 <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-border bg-background/95 backdrop-blur">
                     <h3 className="text-lg sm:text-xl font-black text-foreground">设置成员角色</h3>
                     <p className="text-xs sm:text-sm text-muted-foreground mt-1">请选择一个角色以更新该成员的访问权限集</p>
@@ -190,6 +215,7 @@ export function UserManager() {
   const [entries, setEntries] = useState<WhitelistEntry[]>([]);
   const [roles, setRoles] = useState<RoleProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
   
   // Invite State
   const [newEmail, setNewEmail] = useState("");
@@ -205,6 +231,8 @@ export function UserManager() {
   const [editingRemarkEntry, setEditingRemarkEntry] = useState<WhitelistEntry | null>(null);
   const [isSavingRemark, setIsSavingRemark] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const [isBatchRoleOpen, setIsBatchRoleOpen] = useState(false);
 
   const filteredEntries = useMemo(() => {
     const keyword = searchQuery.trim();
@@ -219,6 +247,17 @@ export function UserManager() {
       );
     });
   }, [entries, searchQuery]);
+
+  const selectedEntries = useMemo(
+    () => filteredEntries.filter((entry) => selectedEmails.includes(entry.email)),
+    [filteredEntries, selectedEmails]
+  );
+  const selectedRegisteredEntries = useMemo(
+    () => selectedEntries.filter((entry) => Boolean(entry.user)),
+    [selectedEntries]
+  );
+  const allFilteredSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedEmails.includes(entry.email));
+  const shouldHideActionBar = Boolean(editingUserId || isBatchRoleOpen || editingRemarkEntry || deleteEmail);
 
   const fetchData = useCallback(async () => {
     if (!canViewEntries) {
@@ -255,6 +294,10 @@ export function UserManager() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    setSelectedEmails((current) => current.filter((email) => entries.some((entry) => entry.email === email)));
+  }, [entries]);
 
   // Set default role "基础访客" once roles are loaded
   useEffect(() => {
@@ -382,6 +425,111 @@ export function UserManager() {
     }
   };
 
+  const toggleSelectEmail = (email: string) => {
+    setSelectedEmails((current) => (
+      current.includes(email)
+        ? current.filter((item) => item !== email)
+        : [...current, email]
+    ));
+  };
+
+  const toggleSelectAllFiltered = () => {
+    const filteredEmails = filteredEntries.map((entry) => entry.email);
+    setSelectedEmails((current) => {
+      if (allFilteredSelected) {
+        return current.filter((email) => !filteredEmails.includes(email));
+      }
+      return Array.from(new Set([...current, ...filteredEmails]));
+    });
+  };
+
+  const runBatchStatusChange = async (status: "ACTIVE" | "DISABLED") => {
+    if (!canManageMemberStatus || selectedRegisteredEntries.length === 0) {
+      return;
+    }
+
+    setIsBatchRunning(true);
+    try {
+      const res = await fetch("/api/admin/users/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emails: selectedRegisteredEntries.map((entry) => entry.email),
+          status,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("状态更新失败");
+      }
+      showToast(`已批量${status === "ACTIVE" ? "启用" : "禁用"} ${selectedRegisteredEntries.length} 个成员`, "success");
+      setSelectedEmails([]);
+      fetchData();
+    } catch (error) {
+      console.error("Batch status update failed:", error);
+      showToast("批量状态更新失败", "error");
+    } finally {
+      setIsBatchRunning(false);
+    }
+  };
+
+  const runBatchRoleSave = async (roleId: string) => {
+    if (!canManageMembers || selectedEntries.length === 0) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/admin/whitelist", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emails: selectedEntries.map((entry) => entry.email),
+          roleProfileId: roleId,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("角色更新失败");
+      }
+      showToast(`已批量更新 ${selectedEntries.length} 个成员角色`, "success");
+      setIsBatchRoleOpen(false);
+      setSelectedEmails([]);
+      fetchData();
+    } catch (error) {
+      console.error("Batch role update failed:", error);
+      showToast("批量角色更新失败", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const runBatchDelete = async () => {
+    if (!canManageWhitelist || selectedEntries.length === 0) {
+      return;
+    }
+
+    setIsBatchRunning(true);
+    try {
+      const res = await fetch("/api/admin/whitelist", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emails: selectedEntries.map((entry) => entry.email),
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("批量移除失败");
+      }
+      showToast(`已批量移除 ${selectedEntries.length} 个成员/邀请`, "success");
+      setSelectedEmails([]);
+      fetchData();
+    } catch (error) {
+      console.error("Batch delete failed:", error);
+      showToast("批量移除失败", "error");
+    } finally {
+      setIsBatchRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {canManageWhitelist && (
@@ -469,6 +617,11 @@ export function UserManager() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-muted/30 border-b border-border">
+                <th className="px-4 py-3 text-center">
+                  <div className="flex justify-center">
+                    <SelectionCircleButton checked={allFilteredSelected} onClick={toggleSelectAllFiltered} />
+                  </div>
+                </th>
                 <th className="px-5 py-3 text-xs font-bold text-foreground">成员信息</th>
                 <th className="px-5 py-3 text-xs font-bold text-foreground text-center">系统角色</th>
                 <th className="px-5 py-3 text-xs font-bold text-foreground text-center">状态</th>
@@ -478,13 +631,13 @@ export function UserManager() {
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="py-20 text-center text-muted-foreground">
+                  <td colSpan={5} className="py-20 text-center text-muted-foreground">
                     <Loader2 className="animate-spin mx-auto mb-4 text-primary" size={32} />
                     正在整理成员目录...
                   </td>
                 </tr>
               ) : filteredEntries.length === 0 ? (
-                <tr><td colSpan={4} className="py-20 text-center text-muted-foreground">暂无成员数据</td></tr>
+                <tr><td colSpan={5} className="py-20 text-center text-muted-foreground">暂无成员数据</td></tr>
               ) : (
                 filteredEntries.map((entry) => {
                   const isRegistered = !!entry.user;
@@ -492,6 +645,11 @@ export function UserManager() {
                   
                   return (
                     <tr key={entry.id} className="hover:bg-muted/20 transition-colors group">
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex justify-center">
+                          <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
+                        </div>
+                      </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${isRegistered ? 'bg-primary/10 text-primary' : 'bg-muted/30 border border-dashed border-muted-foreground/30 text-muted-foreground'}`}>
@@ -586,72 +744,74 @@ export function UserManager() {
               const roleName = isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name;
               
               return (
-                <div key={entry.id} className="p-4 space-y-3 hover:bg-muted/10 transition-colors">
-                  {/* 成员信息 */}
-                  <div className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isRegistered ? 'bg-primary/10 text-primary' : 'bg-muted/30 border border-dashed border-muted-foreground/30 text-muted-foreground'}`}>
-                      {isRegistered ? <UserIcon size={18} /> : <Mail size={16} />}
+                <div key={entry.id} className="p-4 transition-colors hover:bg-muted/10">
+                  <div className="rounded-3xl border border-border/70 bg-background/70 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isRegistered ? 'bg-primary/10 text-primary' : 'bg-muted/30 border border-dashed border-muted-foreground/30 text-muted-foreground'}`}>
+                          {isRegistered ? <UserIcon size={18} /> : <Mail size={16} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
+                          <span className="mt-0.5 block text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{entry.email}</span>
+                          {entry.remark ? (
+                            <span className="mt-2 inline-flex max-w-full items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 break-all">
+                              {entry.remark}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
                     </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
-                      <span className="text-[10px] text-muted-foreground font-mono truncate">{entry.email}</span>
-                      {entry.remark ? (
-                        <span className="mt-1 inline-flex max-w-fit items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                          {entry.remark}
-                        </span>
-                      ) : null}
+
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <span className="inline-flex min-w-0 items-center gap-1 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1 text-[10px] font-bold text-primary">
+                        <Shield size={10} className="shrink-0" />
+                        <span className="truncate">{roleName || "未分配"}</span>
+                      </span>
+                      {isRegistered ? (
+                        <Switch
+                          checked={entry.user?.status === 'ACTIVE'}
+                          onChange={() => handleStatusToggle(entry.email, entry.user?.status || 'ACTIVE')}
+                          disabled={!canManageMemberStatus}
+                        />
+                      ) : (
+                        <span className="shrink-0 rounded-lg bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-600">等待加入</span>
+                      )}
                     </div>
-                  </div>
-                  
-                  {/* 角色与状态 */}
-                  <div className="flex items-center justify-between pl-[52px]">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 whitespace-nowrap">
-                      <Shield size={10} />
-                      {roleName || "未分配"}
-                    </span>
-                    {isRegistered ? (
-                      <Switch
-                        checked={entry.user?.status === 'ACTIVE'}
-                        onChange={() => handleStatusToggle(entry.email, entry.user?.status || 'ACTIVE')}
-                        disabled={!canManageMemberStatus}
-                      />
-                    ) : (
-                      <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-1 rounded-lg">等待加入</span>
-                    )}
-                  </div>
-                  
-                  {/* 操作按钮 */}
-                  <div className="flex items-center justify-end gap-2 pl-[52px]">
-                    {canManageWhitelist && (
-                      <button
-                        onClick={() => setEditingRemarkEntry(entry)}
-                        className="flex-1 h-9 rounded-xl bg-amber-500/5 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/10 flex items-center justify-center gap-2"
-                      >
-                        <NotebookPen size={14} />
-                        备注
-                      </button>
-                    )}
-                    {isRegistered && canManageMembers && (
-                      <button
-                        onClick={() => {
-                          setEditingUserId(entry.user!.id);
-                          setCurrentRoleId(entry.user!.roleProfileId);
-                        }}
-                        className="flex-1 h-9 rounded-xl bg-primary/5 text-primary text-xs font-bold transition-all hover:bg-primary/10 flex items-center justify-center gap-2"
-                      >
-                        <Settings2 size={14} />
-                        角色分配
-                      </button>
-                    )}
-                    {canManageWhitelist && (
-                      <button
-                        onClick={() => setDeleteEmail(entry.email)}
-                        className="flex-1 h-9 rounded-xl bg-red-500/5 text-red-500 text-xs font-bold transition-all hover:bg-red-500/10 flex items-center justify-center gap-2"
-                      >
-                        <Trash2 size={14} />
-                        {isRegistered ? "移除成员" : "撤销邀请"}
-                      </button>
-                    )}
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      {canManageWhitelist && (
+                        <button
+                          onClick={() => setEditingRemarkEntry(entry)}
+                          className="h-9 rounded-xl bg-amber-500/5 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/10 flex items-center justify-center gap-2"
+                        >
+                          <NotebookPen size={14} />
+                          备注
+                        </button>
+                      )}
+                      {isRegistered && canManageMembers && (
+                        <button
+                          onClick={() => {
+                            setEditingUserId(entry.user!.id);
+                            setCurrentRoleId(entry.user!.roleProfileId);
+                          }}
+                          className="h-9 rounded-xl bg-primary/5 text-primary text-xs font-bold transition-all hover:bg-primary/10 flex items-center justify-center gap-2"
+                        >
+                          <Settings2 size={14} />
+                          角色分配
+                        </button>
+                      )}
+                      {canManageWhitelist && (
+                        <button
+                          onClick={() => setDeleteEmail(entry.email)}
+                          className="col-span-2 h-9 rounded-xl bg-red-500/5 text-red-500 text-xs font-bold transition-all hover:bg-red-500/10 flex items-center justify-center gap-2"
+                        >
+                          <Trash2 size={14} />
+                          {isRegistered ? "移除成员" : "撤销邀请"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -671,6 +831,16 @@ export function UserManager() {
          />
        )}
 
+       {isBatchRoleOpen && canManageMembers && (
+         <RoleAssignmentModal
+           roles={roles}
+           currentRoleId={null}
+           onClose={() => setIsBatchRoleOpen(false)}
+           onSave={runBatchRoleSave}
+           isSaving={isSaving}
+         />
+       )}
+
        {editingRemarkEntry && canManageWhitelist && (
          <RemarkModal
            email={editingRemarkEntry.email}
@@ -687,6 +857,11 @@ export function UserManager() {
            onClose={() => setDeleteEmail(null)}
            onConfirm={async () => {
                if (!deleteEmail) return;
+               if (deleteEmail === "__BATCH__") {
+                   await runBatchDelete();
+                   setDeleteEmail(null);
+                   return;
+               }
                const res = await fetch(`/api/admin/whitelist?email=${deleteEmail}`, { method: "DELETE" });
                if (res.ok) {
                    showToast("已成功移除", "success");
@@ -697,10 +872,16 @@ export function UserManager() {
                setDeleteEmail(null);
            }}
            title={(() => {
+               if (deleteEmail === "__BATCH__") {
+                 return "批量移除";
+               }
                const entry = entries.find(e => e.email === deleteEmail);
                return entry?.user ? "移除成员" : "撤销邀请";
            })()}
            message={(() => {
+               if (deleteEmail === "__BATCH__") {
+                 return `确定要批量移除选中的 ${selectedEntries.length} 个成员或邀请吗？`;
+               }
                const entry = entries.find(e => e.email === deleteEmail);
                return entry?.user 
                   ? `确定要移除成员 ${entry.user.name || deleteEmail} 吗？移除后该账号将无法登录且所有权限将被收回。`
@@ -709,6 +890,58 @@ export function UserManager() {
            variant="danger"
          />
        )}
+
+       <ActionBar
+         selectedCount={shouldHideActionBar ? 0 : selectedEntries.length}
+         totalCount={filteredEntries.length}
+         onToggleSelectAll={toggleSelectAllFiltered}
+         onClear={() => setSelectedEmails([])}
+         label="项"
+         extraActions={[
+           ...(canManageMemberStatus ? [
+             {
+               label: "批量启用",
+               icon: <UserCheck size={14} />,
+               onClick: () => void runBatchStatusChange("ACTIVE"),
+               title: "批量启用",
+             },
+             {
+               label: "批量禁用",
+               icon: <Ban size={14} />,
+               onClick: () => void runBatchStatusChange("DISABLED"),
+               title: "批量禁用",
+             },
+           ] : []),
+           ...(canManageMembers ? [
+             {
+               label: "批量分配角色",
+               icon: <Settings2 size={14} />,
+               onClick: () => setIsBatchRoleOpen(true),
+               title: "批量分配角色",
+             },
+           ] : []),
+           ...(canManageWhitelist ? [
+             {
+               label: "批量移除",
+               icon: <Trash2 size={14} />,
+               onClick: () => setDeleteEmail("__BATCH__"),
+               title: "批量移除",
+               variant: "danger" as const,
+             },
+           ] : []),
+         ].filter((action) => {
+           if ((action.label === "批量启用" || action.label === "批量禁用") && (isBatchRunning || selectedRegisteredEntries.length === 0)) {
+             return false;
+           }
+           if (action.label === "批量分配角色" && isSaving) {
+             return false;
+           }
+           if (action.label === "批量移除" && isBatchRunning) {
+             return false;
+           }
+           return true;
+         })}
+       />
     </div>
   );
 }

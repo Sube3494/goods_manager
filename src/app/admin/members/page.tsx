@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, LayoutGrid, ShieldAlert, Loader2, ShieldCheck, UserCog, MailPlus } from "lucide-react";
+import { Users, LayoutGrid, ShieldAlert, Loader2 } from "lucide-react";
 import { UserManager } from "@/components/Admin/UserManager";
 import { useUser } from "@/hooks/useUser";
 import { hasAdminAccess, SessionUser } from "@/lib/permissions";
@@ -55,36 +55,6 @@ export default function MembersPage() {
           </h1>
           <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-2xl">
             在这里统一处理成员账号、准入白名单与邀请关系。页面会按你的实际管理能力显示可执行操作，避免前后端口径不一致。
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-border bg-white/60 dark:bg-white/5 p-4">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <UserCog size={16} className={canManageMembers ? "text-primary" : "text-muted-foreground"} />
-            成员角色
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {canManageMembers ? "可以调整成员角色与账号归属。" : "当前账号不能修改成员角色。"}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-white/60 dark:bg-white/5 p-4">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <ShieldCheck size={16} className={canManageMemberStatus ? "text-emerald-500" : "text-muted-foreground"} />
-            账号状态
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {canManageMemberStatus ? "可以启用或禁用现有成员账号。" : "当前账号不能修改成员状态。"}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-white/60 dark:bg-white/5 p-4">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <MailPlus size={16} className={canManageWhitelist ? "text-sky-500" : "text-muted-foreground"} />
-            邀请与白名单
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {canManageWhitelist ? "可以发起邀请、撤销准入和维护白名单。" : "当前账号不能管理邀请与白名单。"}
           </p>
         </div>
       </div>

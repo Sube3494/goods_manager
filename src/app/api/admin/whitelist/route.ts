@@ -144,25 +144,57 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const { email: rawEmail, roleProfileId, remark } = await request.json();
+    const { email: rawEmail, emails, roleProfileId, remark } = await request.json();
     const email = rawEmail?.toLowerCase().trim();
+    const targetEmails = Array.from(new Set(
+      [
+        ...(email ? [email] : []),
+        ...(Array.isArray(emails) ? emails : []),
+      ]
+        .map((item) => String(item || "").trim().toLowerCase())
+        .filter(Boolean)
+    ));
 
-    if (!email) {
+    if (targetEmails.length === 0) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const updated = await prisma.emailWhitelist.update({
-      where: { email },
-      data: {
-        roleProfileId: roleProfileId !== undefined ? (roleProfileId || null) : undefined,
-        remark: remark !== undefined ? (String(remark).trim() || null) : undefined,
-      },
-      include: {
-        roleProfile: true,
+    if (targetEmails.length === 1 && remark !== undefined && roleProfileId === undefined) {
+      const updated = await prisma.emailWhitelist.update({
+        where: { email: targetEmails[0] },
+        data: {
+          remark: String(remark).trim() || null,
+        },
+        include: {
+          roleProfile: true,
+        }
+      });
+
+      return NextResponse.json(updated);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (roleProfileId !== undefined || remark !== undefined) {
+        await tx.emailWhitelist.updateMany({
+          where: { email: { in: targetEmails } },
+          data: {
+            roleProfileId: roleProfileId !== undefined ? (roleProfileId || null) : undefined,
+            remark: remark !== undefined ? (String(remark).trim() || null) : undefined,
+          },
+        });
+      }
+
+      if (roleProfileId !== undefined) {
+        await tx.user.updateMany({
+          where: { email: { in: targetEmails } },
+          data: {
+            roleProfileId: roleProfileId || null,
+          },
+        });
       }
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ success: true, count: targetEmails.length });
   } catch (error) {
     console.error("Failed to update whitelist entry:", error);
     return NextResponse.json({ error: "Failed to update whitelist entry" }, { status: 500 });
@@ -183,34 +215,39 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const rawEmail = searchParams.get("email");
     const email = rawEmail?.toLowerCase().trim();
+    const body = request.headers.get("content-length") ? await request.json().catch(() => ({})) : {};
+    const targetEmails = Array.from(new Set(
+      [
+        ...(email ? [email] : []),
+        ...(Array.isArray((body as { emails?: unknown }).emails) ? (body as { emails: unknown[] }).emails : []),
+      ]
+        .map((item) => String(item || "").trim().toLowerCase())
+        .filter(Boolean)
+    ));
 
-    if (!email) {
+    if (targetEmails.length === 0) {
        return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
     // Transaction to ensure consistency
     await prisma.$transaction(async (tx) => {
         // 1. Delete whitelist entry
-        await tx.emailWhitelist.delete({
-            where: { email }
-        }).catch(() => {
-            console.log(`Whitelist entry for ${email} already gone or not found.`);
+        await tx.emailWhitelist.deleteMany({
+            where: { email: { in: targetEmails } }
         });
 
         // 2. Delete invitations
         await tx.invitation.deleteMany({
-            where: { email }
+            where: { email: { in: targetEmails } }
         });
 
         // 3. Always try to delete matching user account to ensure complete removal
-        await tx.user.delete({
-            where: { email }
-        }).catch(() => {
-            console.log(`User record for ${email} not found during revocation.`);
+        await tx.user.deleteMany({
+            where: { email: { in: targetEmails } }
         });
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, count: targetEmails.length });
   } catch (error) {
     console.error("Delete failed:", error);
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });

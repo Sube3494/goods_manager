@@ -9,18 +9,26 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const { email, status } = await request.json();
+    const { email, emails, status } = await request.json();
+    const targetEmails = Array.from(new Set(
+      [
+        ...(typeof email === "string" ? [email] : []),
+        ...(Array.isArray(emails) ? emails : []),
+      ]
+        .map((item) => String(item || "").trim().toLowerCase())
+        .filter(Boolean)
+    ));
 
-    if (!email || !status) {
+    if (targetEmails.length === 0 || !status) {
         return NextResponse.json({ error: "Email and status are required" }, { status: 400 });
     }
 
-    await prisma.user.update({
-        where: { email },
+    const result = await prisma.user.updateMany({
+        where: { email: { in: targetEmails } },
         data: { status }
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, count: result.count });
   } catch (error) {
     console.error("Failed to update status:", error);
     return NextResponse.json({ error: "Failed to update status" }, { status: 500 });
