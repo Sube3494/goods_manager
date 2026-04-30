@@ -25,7 +25,8 @@ function isPickCompleted(order: {
     }
   }
 
-  return getBaseAutoPickStatusDisplay(order.status) === "已拣货";
+  const baseStatus = getBaseAutoPickStatusDisplay(order.status);
+  return baseStatus === "已拣货" || baseStatus === "待配送";
 }
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {

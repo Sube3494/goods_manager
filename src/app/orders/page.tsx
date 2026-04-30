@@ -205,7 +205,8 @@ function isPickCompleted(order: Pick<AutoPickOrder, "status" | "rawPayload">) {
     }
   }
 
-  return getBaseAutoPickStatusDisplay(order.status) === "已拣货";
+  const baseStatus = getBaseAutoPickStatusDisplay(order.status);
+  return baseStatus === "已拣货" || baseStatus === "待配送";
 }
 
 function isCompletedStatus(status?: string | null) {
