@@ -160,6 +160,7 @@ export interface AutoPickOrder {
   id: string;
   userId: string;
   sourceId: string;
+  rawPayload?: unknown;
   shopId?: string | null;
   logisticId?: string | null;
   city?: number | null;

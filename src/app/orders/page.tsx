@@ -196,6 +196,18 @@ function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
   return "待取货";
 }
 
+function isPickCompleted(order: Pick<AutoPickOrder, "status" | "rawPayload">) {
+  if (order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)) {
+    const record = order.rawPayload as Record<string, unknown>;
+    const progress = record.pickProgress;
+    if (progress && typeof progress === "object" && !Array.isArray(progress)) {
+      return Boolean((progress as { pickCompleted?: boolean }).pickCompleted);
+    }
+  }
+
+  return getBaseAutoPickStatusDisplay(order.status) === "已拣货";
+}
+
 function isCompletedStatus(status?: string | null) {
   return isAutoPickOrderCompletedStatus(status);
 }
@@ -530,6 +542,7 @@ function OrderCard({
   const terminal = isTerminalStatus(order.status);
   const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
   const pickup = Boolean(order.isPickup);
+  const pickCompleted = isPickCompleted(order);
   const subscribe = isSubscribeOrder(order);
   const hasOutbound = Boolean(order.hasOutbound);
   const orderTypeLabel = getOrderTypeLabel(order);
@@ -737,7 +750,7 @@ function OrderCard({
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal || delivering || pickup}
+              disabled={Boolean(actingId) || terminal || delivering || pickup || !pickCompleted}
               mobileIconOnly
               title={
                 pickup
@@ -746,7 +759,9 @@ function OrderCard({
                   ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
                   : delivering
                     ? "订单已在配送中，不能重复发起自配"
-                    : undefined
+                    : !pickCompleted
+                      ? "当前订单还没完成拣货，暂时不能发起自配送"
+                      : undefined
               }
             />
             <ActionButton
@@ -1272,6 +1287,8 @@ export default function OrdersPage() {
   const isFetchingRef = useRef(false);
   const hasLoadedIntegrationRef = useRef(false);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
+  const realtimePollingTimerRef = useRef<number | null>(null);
+  const sseHealthyRef = useRef(false);
 
   const [isMounted, setIsMounted] = useState(false);
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -1508,6 +1525,21 @@ export default function OrdersPage() {
       })),
     ];
   }, [statuses]);
+
+  const shouldUseRealtimePolling = useMemo(() => {
+    if (!isMounted || typeof window === "undefined") {
+      return false;
+    }
+
+    try {
+      const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches;
+      const touchCapable = navigator.maxTouchPoints > 0;
+      const mobileUa = /android|iphone|ipad|ipod|mobile|via/i.test(navigator.userAgent);
+      return Boolean(coarsePointer || touchCapable || mobileUa);
+    } catch {
+      return false;
+    }
+  }, [isMounted]);
 
   const shopOptions = useMemo(() => {
     const labels = Array.from(new Set(orders.map((item) => String(item.matchedShopName || "").trim()).filter(Boolean)));
@@ -1975,10 +2007,15 @@ export default function OrdersPage() {
     };
 
     source.addEventListener("order-update", queueRefresh);
-    source.addEventListener("ready", () => undefined);
-    source.onerror = () => undefined;
+    source.addEventListener("ready", () => {
+      sseHealthyRef.current = true;
+    });
+    source.onerror = () => {
+      sseHealthyRef.current = false;
+    };
 
     return () => {
+      sseHealthyRef.current = false;
       if (realtimeRefreshTimerRef.current) {
         window.clearTimeout(realtimeRefreshTimerRef.current);
         realtimeRefreshTimerRef.current = null;
@@ -1986,6 +2023,41 @@ export default function OrdersPage() {
       source.close();
     };
   }, [fetchOrders, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted || typeof window === "undefined") {
+      return;
+    }
+
+    const runSilentRefresh = () => {
+      if (document.visibilityState !== "visible" || isFetchingRef.current) {
+        return;
+      }
+      void fetchOrders({ silent: true });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        runSilentRefresh();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    if (shouldUseRealtimePolling) {
+      realtimePollingTimerRef.current = window.setInterval(() => {
+        runSilentRefresh();
+      }, sseHealthyRef.current ? 20000 : 10000);
+    }
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (realtimePollingTimerRef.current) {
+        window.clearInterval(realtimePollingTimerRef.current);
+        realtimePollingTimerRef.current = null;
+      }
+    };
+  }, [fetchOrders, isMounted, shouldUseRealtimePolling]);
 
   useEffect(() => {
     let ticking = false;
