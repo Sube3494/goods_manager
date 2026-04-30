@@ -2,6 +2,44 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getStorageStrategy } from '@/lib/storage';
 
+async function resolvePlanProductImage(userId: string | null | undefined, shopName: string | null | undefined, productId: string | null | undefined) {
+  const normalizedUserId = String(userId || "").trim();
+  const normalizedShopName = String(shopName || "").trim();
+  const normalizedProductId = String(productId || "").trim();
+  if (!normalizedUserId || !normalizedShopName || !normalizedProductId) {
+    return null;
+  }
+
+  const shop = await prisma.shop.findFirst({
+    where: {
+      userId: normalizedUserId,
+      name: normalizedShopName,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!shop) {
+    return null;
+  }
+
+  const shopProduct = await prisma.shopProduct.findFirst({
+    where: {
+      shopId: shop.id,
+      OR: [
+        { productId: normalizedProductId },
+        { sourceProductId: normalizedProductId },
+      ],
+    },
+    select: {
+      productImage: true,
+    },
+  });
+
+  return shopProduct?.productImage || null;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -48,7 +86,9 @@ export async function GET(
       title: plan.title,
       note: plan.note,
       status: plan.status,
-      items: plan.items.map(item => ({
+      items: await Promise.all(plan.items.map(async (item) => {
+        const image = await resolvePlanProductImage(plan.userId, plan.shopName, item.productId);
+        return ({
         id: item.id,
         quantity: item.quantity,
         searchKeyword: item.searchKeyword,
@@ -58,8 +98,9 @@ export async function GET(
         done: item.done,
         product: item.product ? {
           name: item.product.name,
-          image: item.product.image ? storage.resolveUrl(item.product.image) : null
+          image: image ? storage.resolveUrl(image) : null
         } : null
+      });
       }))
     };
 

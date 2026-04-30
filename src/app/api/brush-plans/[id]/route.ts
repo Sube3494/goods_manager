@@ -14,6 +14,101 @@ interface BrushPlanItemInput {
   sortOrder?: number;
 }
 
+async function resolvePlanProductImages<T extends {
+  userId?: string | null;
+  shopName?: string | null;
+  items: Array<{
+    productId?: string | null;
+    product?: Record<string, unknown> | null;
+  }>;
+}>(plans: T[]) {
+  const storage = await getStorageStrategy();
+  const shopKeys = Array.from(new Set(
+    plans
+      .map((plan) => {
+        const userId = String(plan.userId || "").trim();
+        const shopName = String(plan.shopName || "").trim();
+        return userId && shopName ? `${userId}::${shopName}` : "";
+      })
+      .filter(Boolean)
+  ));
+  const productIds = Array.from(new Set(
+    plans.flatMap((plan) => plan.items.map((item) => String(item.productId || "").trim()).filter(Boolean))
+  ));
+
+  if (shopKeys.length === 0 || productIds.length === 0) {
+    return plans.map((plan) => ({
+      ...plan,
+      items: plan.items.map((item) => ({
+        ...item,
+        product: item.product ? { ...item.product, image: null } : null,
+      })),
+    }));
+  }
+
+  const shops = await prisma.shop.findMany({
+    where: {
+      OR: shopKeys.map((key) => {
+        const [userId, shopName] = key.split("::");
+        return { userId, name: shopName };
+      }),
+    },
+    select: {
+      id: true,
+      userId: true,
+      name: true,
+    },
+  });
+  const shopIdByKey = new Map(shops.map((shop) => [`${shop.userId}::${shop.name}`, shop.id]));
+
+  const shopProducts = shops.length > 0
+    ? await prisma.shopProduct.findMany({
+        where: {
+          shopId: { in: shops.map((shop) => shop.id) },
+          OR: [
+            { productId: { in: productIds } },
+            { sourceProductId: { in: productIds } },
+          ],
+        },
+        select: {
+          shopId: true,
+          productId: true,
+          sourceProductId: true,
+          productImage: true,
+        },
+      })
+    : [];
+
+  const imageMap = new Map<string, string | null>();
+  for (const item of shopProducts) {
+    for (const productId of [item.productId, item.sourceProductId].filter(Boolean)) {
+      const key = `${item.shopId}::${productId}`;
+      if (!imageMap.has(key)) {
+        imageMap.set(key, item.productImage || null);
+      }
+    }
+  }
+
+  return plans.map((plan) => {
+    const shopKey = `${String(plan.userId || "").trim()}::${String(plan.shopName || "").trim()}`;
+    const shopId = shopIdByKey.get(shopKey) || "";
+    return {
+      ...plan,
+      items: plan.items.map((item) => {
+        const productId = String(item.productId || "").trim();
+        const image = shopId && productId ? imageMap.get(`${shopId}::${productId}`) || null : null;
+        return {
+          ...item,
+          product: item.product ? {
+            ...item.product,
+            image: image ? storage.resolveUrl(image) : null,
+          } : null,
+        };
+      }),
+    };
+  });
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -49,17 +144,7 @@ export async function GET(
        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const storage = await getStorageStrategy();
-    const resolvedPlan = {
-      ...plan,
-      items: plan.items.map(item => ({
-        ...item,
-        product: item.product ? {
-          ...item.product,
-          image: item.product.image ? storage.resolveUrl(item.product.image) : null
-        } : null
-      }))
-    };
+    const [resolvedPlan] = await resolvePlanProductImages([plan]);
 
     return NextResponse.json(resolvedPlan);
   } catch (error) {
@@ -162,17 +247,7 @@ export async function PUT(
       }
     });
 
-    const storage = await getStorageStrategy();
-    const resolvedPlan = {
-      ...plan,
-      items: plan.items.map(item => ({
-        ...item,
-        product: item.product ? {
-          ...item.product,
-          image: item.product.image ? storage.resolveUrl(item.product.image) : null
-        } : null
-      }))
-    };
+    const [resolvedPlan] = await resolvePlanProductImages([plan]);
 
     return NextResponse.json(resolvedPlan);
   } catch (error) {

@@ -15,6 +15,145 @@ interface BrushPlanItemInput {
   sortOrder?: number;
 }
 
+type PlanWithItems = {
+  userId?: string | null;
+  shopName?: string | null;
+  items: Array<{
+    productId?: string | null;
+    product?: {
+      image?: string | null;
+    } | null;
+  }>;
+};
+
+async function buildPlanShopProductImageMap(plans: PlanWithItems[]) {
+  const shopKeys = Array.from(new Set(
+    plans
+      .map((plan) => {
+        const userId = String(plan.userId || "").trim();
+        const shopName = String(plan.shopName || "").trim();
+        return userId && shopName ? `${userId}::${shopName}` : "";
+      })
+      .filter(Boolean)
+  ));
+
+  const productIds = Array.from(new Set(
+    plans.flatMap((plan) => plan.items.map((item) => String(item.productId || "").trim()).filter(Boolean))
+  ));
+
+  if (shopKeys.length === 0 || productIds.length === 0) {
+    return new Map<string, string | null>();
+  }
+
+  const shops = await prisma.shop.findMany({
+    where: {
+      OR: shopKeys.map((key) => {
+        const [userId, shopName] = key.split("::");
+        return {
+          userId,
+          name: shopName,
+        };
+      }),
+    },
+    select: {
+      id: true,
+      userId: true,
+      name: true,
+    },
+  });
+
+  if (shops.length === 0) {
+    return new Map<string, string | null>();
+  }
+
+  const shopProducts = await prisma.shopProduct.findMany({
+    where: {
+      shopId: { in: shops.map((shop) => shop.id) },
+      OR: [
+        { productId: { in: productIds } },
+        { sourceProductId: { in: productIds } },
+      ],
+    },
+    select: {
+      shopId: true,
+      productId: true,
+      sourceProductId: true,
+      productImage: true,
+    },
+  });
+
+  const imageMap = new Map<string, string | null>();
+  for (const item of shopProducts) {
+    const productKeys = [item.productId, item.sourceProductId].filter(Boolean);
+    for (const productId of productKeys) {
+      const key = `${item.shopId}::${productId}`;
+      if (!imageMap.has(key)) {
+        imageMap.set(key, item.productImage || null);
+      }
+    }
+  }
+
+  return new Map(
+    Array.from(imageMap.entries()).map(([key, image]) => [key, image])
+  );
+}
+
+async function resolvePlanProductImages<T extends {
+  userId?: string | null;
+  shopName?: string | null;
+  items: Array<{
+    productId?: string | null;
+    product?: Record<string, unknown> | null;
+  }>;
+}>(plans: T[]) {
+  const storage = await getStorageStrategy();
+  const imageMap = await buildPlanShopProductImageMap(plans);
+
+  const shops = await prisma.shop.findMany({
+    where: {
+      OR: Array.from(new Set(
+        plans
+          .map((plan) => {
+            const userId = String(plan.userId || "").trim();
+            const shopName = String(plan.shopName || "").trim();
+            return userId && shopName ? `${userId}::${shopName}` : "";
+          })
+          .filter(Boolean)
+      )).map((key) => {
+        const [userId, shopName] = key.split("::");
+        return { userId, name: shopName };
+      }),
+    },
+    select: {
+      id: true,
+      userId: true,
+      name: true,
+    },
+  });
+  const shopIdByKey = new Map(
+    shops.map((shop) => [`${shop.userId}::${shop.name}`, shop.id])
+  );
+
+  return plans.map((plan) => {
+    const shopKey = `${String(plan.userId || "").trim()}::${String(plan.shopName || "").trim()}`;
+    const shopId = shopIdByKey.get(shopKey) || "";
+    return {
+      ...plan,
+      items: plan.items.map((item) => {
+        const productId = String(item.productId || "").trim();
+        const image = shopId && productId ? imageMap.get(`${shopId}::${productId}`) || null : null;
+        return {
+          ...item,
+          product: item.product ? {
+            ...item.product,
+            image: image ? storage.resolveUrl(image) : null,
+          } : null,
+        };
+      }),
+    };
+  });
+}
+
 export async function GET(req: NextRequest) {
   const session = await getAuthorizedUser("brush:manage");
   if (!session) {
@@ -58,9 +197,10 @@ export async function GET(req: NextRequest) {
       })
     ]);
 
+    const resolvedItems = await resolvePlanProductImages(items);
     const totalPages = Math.ceil(total / limit);
     return NextResponse.json({
-      items,
+      items: resolvedItems,
       meta: {
         total,
         page,
@@ -124,17 +264,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const storage = await getStorageStrategy();
-    const resolvedPlan = {
-      ...plan,
-      items: plan.items.map(item => ({
-        ...item,
-        product: item.product ? {
-          ...item.product,
-          image: item.product.image ? storage.resolveUrl(item.product.image) : null
-        } : null
-      }))
-    };
+    const [resolvedPlan] = await resolvePlanProductImages([plan]);
 
     return NextResponse.json(resolvedPlan, { status: 201 });
   } catch (error) {
