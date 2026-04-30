@@ -51,7 +51,6 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     || text.includes("商家自配")
     || normalized === "pending_delivery"
     || normalized === "pendingdelivery"
-    || normalized === "expect"
   ) {
     return "待配送";
   }

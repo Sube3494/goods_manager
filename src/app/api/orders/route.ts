@@ -72,7 +72,6 @@ function buildStatusWhere(status: string): Prisma.AutoPickOrderWhereInput | unde
           { status: { contains: "商家自配", mode: "insensitive" } },
           { status: { equals: "pending_delivery", mode: "insensitive" } },
           { status: { equals: "pendingdelivery", mode: "insensitive" } },
-          { status: { equals: "expect", mode: "insensitive" } },
         ],
       };
     case "已拣货":
