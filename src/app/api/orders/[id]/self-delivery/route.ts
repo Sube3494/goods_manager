@@ -4,7 +4,6 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
-  getBaseAutoPickStatusDisplay,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickPickupOrder,
@@ -12,21 +11,6 @@ import {
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
-
-function isPickCompleted(order: {
-  status?: string | null;
-  rawPayload?: unknown;
-}) {
-  if (order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)) {
-    const record = order.rawPayload as Record<string, unknown>;
-    const progress = record.pickProgress;
-    if (progress && typeof progress === "object" && !Array.isArray(progress)) {
-      return Boolean((progress as { pickCompleted?: boolean }).pickCompleted);
-    }
-  }
-
-  return getBaseAutoPickStatusDisplay(order.status) === "已拣货";
-}
 
 export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
@@ -57,10 +41,6 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     if (isAutoPickPickupOrder(order.rawPayload, order.userAddress)) {
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
-    }
-
-    if (!isPickCompleted(order)) {
-      return NextResponse.json({ error: "picking-not-completed" }, { status: 409 });
     }
 
     const result = await callAutoPickCommand(session.id, "/self-delivery", {
