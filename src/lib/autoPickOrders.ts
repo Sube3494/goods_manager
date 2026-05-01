@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
-import { getBaseAutoPickStatusDisplay, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { getBaseAutoPickStatusDisplay, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
@@ -3572,6 +3572,10 @@ export async function createOutboundFromAutoPickOrder(
     return { ok: false, skipped: true, reason: "order-not-completed" as const };
   }
 
+  if (isAutoPickOtherPickupOrder(order.rawPayload)) {
+    return { ok: false, skipped: true, reason: "other-pickup-no-outbound" as const };
+  }
+
   const existingOutbound = await prisma.outboundOrder.findFirst({
     where: {
       userId,
@@ -3789,6 +3793,10 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
   const systemMeta = readAutoPickSystemMeta(order.rawPayload);
   if (systemMeta?.mainSystemSelfDelivery?.triggered) {
     return { ok: false, skipped: true, reason: "brush-order-no-auto-outbound" as const };
+  }
+
+  if (isAutoPickOtherPickupOrder(order.rawPayload)) {
+    return { ok: false, skipped: true, reason: "other-pickup-no-outbound" as const };
   }
 
   try {
