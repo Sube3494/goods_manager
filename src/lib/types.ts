@@ -220,6 +220,14 @@ export interface AutoPickIntegrationConfig {
   inboundApiKey: string;
   maiyatianCookie: string;
   maiyatianShopMappings: AutoPickMaiyatianShopMapping[];
+  selfDeliveryTiming: AutoPickSelfDeliveryTimingConfig;
+}
+
+export interface AutoPickSelfDeliveryTimingConfig {
+  pickupMinutes: number;
+  minutesPerKm: number;
+  riderUpstairsMinutes: number;
+  deadlineLeadMinutes: number;
 }
 
 export interface AutoPickMaiyatianShop {

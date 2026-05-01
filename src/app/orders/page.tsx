@@ -69,15 +69,58 @@ type LocalShopOption = {
   isDefault?: boolean;
 };
 
-function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "maiyatianCookie" | "maiyatianShopMappings">) {
+type TimingFieldKey = keyof AutoPickIntegrationConfig["selfDeliveryTiming"];
+
+function createDefaultSelfDeliveryTiming() {
+  return {
+    pickupMinutes: 8,
+    minutesPerKm: 3,
+    riderUpstairsMinutes: 5,
+    deadlineLeadMinutes: 5,
+  };
+}
+
+function normalizeSelfDeliveryTiming(input: unknown) {
+  const payload = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const defaults = createDefaultSelfDeliveryTiming();
+  const readNumber = (value: unknown, fallback: number) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  };
+
+  return {
+    pickupMinutes: readNumber(payload.pickupMinutes, defaults.pickupMinutes),
+    minutesPerKm: readNumber(payload.minutesPerKm, defaults.minutesPerKm),
+    riderUpstairsMinutes: readNumber(payload.riderUpstairsMinutes, defaults.riderUpstairsMinutes),
+    deadlineLeadMinutes: readNumber(payload.deadlineLeadMinutes, defaults.deadlineLeadMinutes),
+  };
+}
+
+function readIntegrationConfigResponse(data: unknown): AutoPickIntegrationConfig {
+  const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  return {
+    pluginBaseUrl: String(payload.pluginBaseUrl || ""),
+    inboundApiKey: String(payload.inboundApiKey || ""),
+    maiyatianCookie: String(payload.maiyatianCookie || ""),
+    maiyatianShopMappings: Array.isArray(payload.maiyatianShopMappings) ? payload.maiyatianShopMappings : [],
+    selfDeliveryTiming: normalizeSelfDeliveryTiming(payload.selfDeliveryTiming),
+  };
+}
+
+function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "maiyatianCookie" | "maiyatianShopMappings" | "selfDeliveryTiming">) {
   return JSON.stringify({
     maiyatianCookie: String(config.maiyatianCookie || ""),
     maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : [],
+    selfDeliveryTiming: normalizeSelfDeliveryTiming(config.selfDeliveryTiming),
   });
 }
 
 function serializeMaiyatianMappings(config: Pick<AutoPickIntegrationConfig, "maiyatianShopMappings">) {
   return JSON.stringify(Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : []);
+}
+
+function formatTimingNumber(value: number) {
+  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
 
 const TODAY_TAB_PAGE_SIZE = 9999;
@@ -994,6 +1037,19 @@ function IntegrationModal({
   }, []);
   const callbackOrderUrl = callbackBaseUrl ? `${callbackBaseUrl}/api/v1/api-key/listened-orders` : "/api/v1/api-key/listened-orders";
   const showCookieEditor = !integrationConfig.maiyatianCookie.trim() || isEditingCookie;
+  const timing = integrationConfig.selfDeliveryTiming;
+  const timingTotalLabel = `${formatTimingNumber(timing.pickupMinutes)} + 距离 × ${formatTimingNumber(timing.minutesPerKm)} + ${formatTimingNumber(timing.riderUpstairsMinutes)}`;
+
+  const updateTimingField = useCallback((field: TimingFieldKey, rawValue: string) => {
+    const numeric = Number(rawValue);
+    onChange({
+      ...integrationConfig,
+      selfDeliveryTiming: {
+        ...integrationConfig.selfDeliveryTiming,
+        [field]: Number.isFinite(numeric) ? numeric : 0,
+      },
+    });
+  }, [integrationConfig, onChange]);
 
   const copyCallbackUrl = useCallback(async () => {
     if (!callbackOrderUrl || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
@@ -1234,7 +1290,49 @@ function IntegrationModal({
               </div>
             </div>
 
-            <div className="lg:col-start-1 lg:row-start-3">
+            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-3 lg:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">自配完成时间</div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">按环节输入分钟数。</p>
+                </div>
+                <div className="shrink-0 rounded-full border border-black/8 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-foreground dark:border-white/10 dark:bg-white/6">
+                  当前公式: {timingTotalLabel}
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { key: "pickupMinutes", label: "到店取货", step: "1" },
+                  { key: "minutesPerKm", label: "每公里配送", step: "0.5" },
+                  { key: "riderUpstairsMinutes", label: "送达收尾", step: "1" },
+                  { key: "deadlineLeadMinutes", label: "提前量", step: "1" },
+                ].map((item) => (
+                  <label key={item.key} className="rounded-xl border border-black/8 bg-white/78 px-3 py-2.5 dark:border-white/10 dark:bg-white/4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs font-semibold text-foreground">{item.label}</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step={item.step}
+                          value={integrationConfig.selfDeliveryTiming[item.key as TimingFieldKey]}
+                          onChange={(event) => updateTimingField(item.key as TimingFieldKey, event.target.value)}
+                          className="h-9 w-20 rounded-lg border border-black/8 bg-white/88 px-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                        />
+                        <span className="text-[11px] text-muted-foreground">分钟</span>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                自动完成 = 当前时间 + 到店取货 + 距离 × 每公里配送 + 送达收尾；若有预计送达时间，会减去提前量后截断。
+              </div>
+            </div>
+
+            <div className="lg:col-start-1 lg:row-start-4">
               <ActionButton
                 label={isTestingPlugin ? "测试中..." : "测试脚本"}
                 icon={isTestingPlugin ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -1243,7 +1341,7 @@ function IntegrationModal({
               />
             </div>
 
-            <div className="lg:col-start-2 lg:row-start-3">
+            <div className="lg:col-start-2 lg:row-start-4">
               <ActionButton
                 label={isTestingCookie ? "测试中..." : "测试 Cookie"}
                 icon={isTestingCookie ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -1306,6 +1404,7 @@ export default function OrdersPage() {
     inboundApiKey: "",
     maiyatianCookie: "",
     maiyatianShopMappings: [],
+    selfDeliveryTiming: createDefaultSelfDeliveryTiming(),
   });
   const [maiyatianShops, setMaiyatianShops] = useState<AutoPickMaiyatianShop[]>([]);
   const [localShops, setLocalShops] = useState<LocalShopOption[]>([]);
@@ -1319,6 +1418,7 @@ export default function OrdersPage() {
   const [savedIntegrationDigest, setSavedIntegrationDigest] = useState(() => serializeIntegrationConfig({
     maiyatianCookie: "",
     maiyatianShopMappings: [],
+    selfDeliveryTiming: createDefaultSelfDeliveryTiming(),
   }));
   const [savedMappingsDigest, setSavedMappingsDigest] = useState(() => serializeMaiyatianMappings({
     maiyatianShopMappings: [],
@@ -1368,18 +1468,15 @@ export default function OrdersPage() {
         throw new Error(data?.error || "加载对接配置失败");
       }
 
-      setIntegrationConfig({
-        pluginBaseUrl: String(data.pluginBaseUrl || ""),
-        inboundApiKey: String(data.inboundApiKey || ""),
-        maiyatianCookie: String(data.maiyatianCookie || ""),
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
-      });
+      const nextConfig = readIntegrationConfigResponse(data);
+      setIntegrationConfig(nextConfig);
       setSavedIntegrationDigest(serializeIntegrationConfig({
-        maiyatianCookie: String(data.maiyatianCookie || ""),
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+        maiyatianCookie: nextConfig.maiyatianCookie,
+        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
+        selfDeliveryTiming: nextConfig.selfDeliveryTiming,
       }));
       setSavedMappingsDigest(serializeMaiyatianMappings({
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
       }));
       hasLoadedIntegrationRef.current = true;
     } catch (error) {
@@ -1616,18 +1713,15 @@ export default function OrdersPage() {
         throw new Error(data?.error || "保存对接配置失败");
       }
 
-      setIntegrationConfig({
-        pluginBaseUrl: String(data.pluginBaseUrl || ""),
-        inboundApiKey: String(data.inboundApiKey || ""),
-        maiyatianCookie: String(data.maiyatianCookie || ""),
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
-      });
+      const savedConfig = readIntegrationConfigResponse(data);
+      setIntegrationConfig(savedConfig);
       setSavedIntegrationDigest(serializeIntegrationConfig({
-        maiyatianCookie: String(data.maiyatianCookie || ""),
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+        maiyatianCookie: savedConfig.maiyatianCookie,
+        maiyatianShopMappings: savedConfig.maiyatianShopMappings,
+        selfDeliveryTiming: savedConfig.selfDeliveryTiming,
       }));
       setSavedMappingsDigest(serializeMaiyatianMappings({
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+        maiyatianShopMappings: savedConfig.maiyatianShopMappings,
       }));
       if (!options?.silent) {
         showToast("自动推单对接配置已保存", "success");
@@ -1657,20 +1751,17 @@ export default function OrdersPage() {
         throw new Error(data?.error || "重新生成回调密钥失败");
       }
 
-      setIntegrationConfig({
-        pluginBaseUrl: String(data.pluginBaseUrl || ""),
-        inboundApiKey: String(data.inboundApiKey || ""),
-        maiyatianCookie: String(data.maiyatianCookie || ""),
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
-      });
+      const nextConfig = readIntegrationConfigResponse(data);
+      setIntegrationConfig(nextConfig);
       setSavedIntegrationDigest(serializeIntegrationConfig({
-        maiyatianCookie: String(data.maiyatianCookie || ""),
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+        maiyatianCookie: nextConfig.maiyatianCookie,
+        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
+        selfDeliveryTiming: nextConfig.selfDeliveryTiming,
       }));
       setSavedMappingsDigest(serializeMaiyatianMappings({
-        maiyatianShopMappings: Array.isArray(data.maiyatianShopMappings) ? data.maiyatianShopMappings : [],
+        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
       }));
-      const nextInboundApiKey = String(data.inboundApiKey || "").trim();
+      const nextInboundApiKey = nextConfig.inboundApiKey.trim();
       if (nextInboundApiKey && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(nextInboundApiKey);
         showToast("已生成新的唯一回调密钥，并自动复制到剪贴板", "success");

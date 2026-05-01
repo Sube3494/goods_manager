@@ -3,7 +3,7 @@ import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { getBaseAutoPickStatusDisplay, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
 import { ProductService } from "@/services/productService";
 import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
@@ -492,6 +492,37 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
   };
 }
 
+function normalizeTimingMinutes(value: unknown, fallback: number, options?: { min?: number; max?: number }) {
+  const min = options?.min ?? 0;
+  const max = options?.max ?? 999;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Number(numeric.toFixed(2))));
+}
+
+export function getDefaultAutoPickSelfDeliveryTimingConfig(): AutoPickSelfDeliveryTimingConfig {
+  return {
+    pickupMinutes: 8,
+    minutesPerKm: 3,
+    riderUpstairsMinutes: 5,
+    deadlineLeadMinutes: 5,
+  };
+}
+
+export function normalizeAutoPickSelfDeliveryTimingConfig(input: unknown): AutoPickSelfDeliveryTimingConfig {
+  const payload = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const defaults = getDefaultAutoPickSelfDeliveryTimingConfig();
+
+  return {
+    pickupMinutes: normalizeTimingMinutes(payload.pickupMinutes, defaults.pickupMinutes, { min: 0, max: 180 }),
+    minutesPerKm: normalizeTimingMinutes(payload.minutesPerKm, defaults.minutesPerKm, { min: 0, max: 60 }),
+    riderUpstairsMinutes: normalizeTimingMinutes(payload.riderUpstairsMinutes, defaults.riderUpstairsMinutes, { min: 0, max: 180 }),
+    deadlineLeadMinutes: normalizeTimingMinutes(payload.deadlineLeadMinutes, defaults.deadlineLeadMinutes, { min: 0, max: 120 }),
+  };
+}
+
 export function normalizeAutoPickIntegrationConfig(input: unknown): AutoPickIntegrationConfig {
   const payload = input && typeof input === "object" ? input as Record<string, unknown> : {};
   return {
@@ -503,6 +534,7 @@ export function normalizeAutoPickIntegrationConfig(input: unknown): AutoPickInte
           .map((item) => normalizeMaiyatianShopMapping(item))
           .filter((item): item is AutoPickMaiyatianShopMapping => Boolean(item))
       : [],
+    selfDeliveryTiming: normalizeAutoPickSelfDeliveryTimingConfig(payload.selfDeliveryTiming),
   };
 }
 

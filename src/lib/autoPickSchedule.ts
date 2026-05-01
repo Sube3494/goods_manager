@@ -1,15 +1,22 @@
+import { getDefaultAutoPickSelfDeliveryTimingConfig } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
-
-const PICKUP_MINUTES = 8;
-const MINUTES_PER_KM = 3;
-const RIDER_UPSTAIRS_MINUTES = 5;
-const DELIVERY_DEADLINE_LEAD_MINUTES = 5;
+import { AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
 
 export type SchedulableAutoPickOrder = {
   orderTime: Date | string;
   distanceKm?: number | null;
   deliveryDeadline?: string | null;
 };
+
+function getSelfDeliveryTimingConfig(config?: Partial<AutoPickSelfDeliveryTimingConfig> | null) {
+  const defaults = getDefaultAutoPickSelfDeliveryTimingConfig();
+  return {
+    pickupMinutes: typeof config?.pickupMinutes === "number" ? config.pickupMinutes : defaults.pickupMinutes,
+    minutesPerKm: typeof config?.minutesPerKm === "number" ? config.minutesPerKm : defaults.minutesPerKm,
+    riderUpstairsMinutes: typeof config?.riderUpstairsMinutes === "number" ? config.riderUpstairsMinutes : defaults.riderUpstairsMinutes,
+    deadlineLeadMinutes: typeof config?.deadlineLeadMinutes === "number" ? config.deadlineLeadMinutes : defaults.deadlineLeadMinutes,
+  };
+}
 
 export function parseExpectedDeliveryTime(deadlineText: string | null | undefined, orderTime: Date | string) {
   const text = String(deadlineText || "").replace(/\s+/g, " ").trim();
@@ -44,18 +51,19 @@ export function parseExpectedDeliveryTime(deadlineText: string | null | undefine
   return candidate;
 }
 
-export function getEstimatedAutoCompleteAt(order: SchedulableAutoPickOrder) {
+export function getEstimatedAutoCompleteAt(order: SchedulableAutoPickOrder, config?: Partial<AutoPickSelfDeliveryTimingConfig> | null) {
+  const timing = getSelfDeliveryTimingConfig(config);
   const distanceKm = typeof order.distanceKm === "number" ? order.distanceKm : null;
   const heuristicAt = distanceKm != null
-    ? new Date(Date.now() + (PICKUP_MINUTES + distanceKm * MINUTES_PER_KM + RIDER_UPSTAIRS_MINUTES) * 60 * 1000)
+    ? new Date(Date.now() + (timing.pickupMinutes + distanceKm * timing.minutesPerKm + timing.riderUpstairsMinutes) * 60 * 1000)
     : null;
 
   const expectedAt = parseExpectedDeliveryTime(order.deliveryDeadline, order.orderTime);
   const latestSafeAt = expectedAt
-    ? new Date(expectedAt.getTime() - DELIVERY_DEADLINE_LEAD_MINUTES * 60 * 1000)
+    ? new Date(expectedAt.getTime() - timing.deadlineLeadMinutes * 60 * 1000)
     : null;
 
-  // 主逻辑仍然按 8分钟到店取货 + 3*公里数 + 5分钟上楼 计算，但如果会晚于预计送达前的安全时间，就向前截断。
+  // 主逻辑按配置的取货/路程/送达时长计算，但如果会晚于预计送达前的安全时间，就向前截断。
   if (heuristicAt && latestSafeAt) {
     return heuristicAt.getTime() <= latestSafeAt.getTime() ? heuristicAt : latestSafeAt;
   }

@@ -686,6 +686,9 @@ export default function BrushProductsPage() {
         onClose={() => setIsPickerOpen(false)}
         onSelect={(products) => handleAddProducts(products)}
         selectedIds={items.map((item) => getBrushSelectionKey(item))}
+        selectedBadgeLabel="已加入刷单库"
+        unselectedOnlyLabel="显示未加入"
+        unselectedOnlyTitle="切换是否只显示未加入刷单商品库的商品"
         showPrice={false}
         showSku={true}
         fetchPath="/api/purchase-products"

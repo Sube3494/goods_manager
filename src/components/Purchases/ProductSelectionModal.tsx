@@ -22,6 +22,8 @@ interface ProductSelectionModalProps {
   onSelect: (products: Product[], platform: string) => void;
   selectedIds: string[];
   selectedBadgeLabel?: string;
+  unselectedOnlyLabel?: string;
+  unselectedOnlyTitle?: string;
   singleSelect?: boolean;
   showPrice?: boolean;
   showSku?: boolean;
@@ -61,6 +63,8 @@ export function ProductSelectionModal({
   onSelect,
   selectedIds,
   selectedBadgeLabel = "已在计划中",
+  unselectedOnlyLabel = "显示未复制",
+  unselectedOnlyTitle = "切换是否只显示未复制商品",
   singleSelect = false,
   showPrice = true,
   showSku = true,
@@ -481,9 +485,9 @@ export function ProductSelectionModal({
                         ? "border-primary/30 bg-primary/10 text-primary"
                         : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10"
                     )}
-                    title="切换是否只显示未复制商品"
+                    title={unselectedOnlyTitle}
                   >
-                    显示未复制
+                    {unselectedOnlyLabel}
                   </button>
                 </div>
                 {!singleSelect ? (

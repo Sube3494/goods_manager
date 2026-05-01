@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
   isAutoPickOrderCancelledStatus,
@@ -63,7 +63,8 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
 
       const schedulingOrder = refreshedOrder || order;
-      const autoCompleteAt = getEstimatedAutoCompleteAt(schedulingOrder);
+      const integrationConfig = await getAutoPickIntegrationConfigByUserId(session.id);
+      const autoCompleteAt = getEstimatedAutoCompleteAt(schedulingOrder, integrationConfig.selfDeliveryTiming);
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
