@@ -4,7 +4,6 @@ import { PurchaseOrder, PurchaseStatus } from "./types";
 export const PURCHASE_STATUS_OPTIONS = [
   { value: "All", label: "全部" },
   { value: "Confirmed", label: "已下单" },
-  { value: "Shipped", label: "运输中" },
   { value: "Received", label: "已入库" },
   { value: "Draft", label: "草稿" },
 ] as const;
@@ -42,10 +41,9 @@ export function getPurchaseStatusColor(status: PurchaseStatus) {
   switch (status) {
     case "Received":
       return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
-    case "Shipped":
-      return "bg-orange-500/10 text-orange-500 border-orange-500/20";
     case "Confirmed":
     case "Ordered":
+    case "Shipped":
       return "bg-blue-500/10 text-blue-500 border-blue-500/20";
     default:
       return "bg-zinc-500/10 text-zinc-500 border-zinc-500/20";
@@ -56,10 +54,9 @@ export function getPurchaseStatusLabel(status: PurchaseStatus) {
   switch (status) {
     case "Received":
       return "已入库";
-    case "Shipped":
-      return "运输中";
     case "Confirmed":
     case "Ordered":
+    case "Shipped":
       return "已下单";
     default:
       return "草稿";

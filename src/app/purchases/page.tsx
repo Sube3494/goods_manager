@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense, useMemo, useTransition } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store } from "lucide-react";
+import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
 import { PurchaseOrder, User as UserType } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { ImageGallery } from "@/components/ui/ImageGallery";
 import { Pagination } from "@/components/ui/Pagination";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
@@ -16,7 +15,6 @@ import { SessionUser } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { PurchaseFilters } from "@/components/Purchases/PurchaseFilters";
 import { PurchaseStatusBadge } from "@/components/Purchases/PurchaseStatusBadge";
-import { PurchaseTrackingList } from "@/components/Purchases/PurchaseTrackingList";
 
 
 
@@ -24,6 +22,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { sortPurchaseItems } from "@/lib/pinyin";
 import { filterPurchases, isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
+import NextImage from "next/image";
 
 function sortPurchasesByRecency(items: PurchaseOrder[]) {
   return [...items].sort((a, b) => {
@@ -33,11 +32,63 @@ function sortPurchasesByRecency(items: PurchaseOrder[]) {
   });
 }
 
+function formatPurchaseItemsSummary(purchase: PurchaseOrder) {
+  const visibleItems = purchase.items.slice(0, 2);
+  const totalQuantity = purchase.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+
+  return {
+    items: visibleItems.map((item) => ({
+      key: item.id || item.shopProductId || item.productId || `${item.quantity}-${item.costPrice}`,
+      name: item.shopProduct?.name || item.product?.name || "未知商品",
+      image: item.shopProduct?.image || item.product?.image || "",
+      quantity: item.quantity,
+    })),
+    hasMore: purchase.items.length > visibleItems.length,
+    totalQuantity,
+  };
+}
+
 function replaceCurrentSearch(pathname: string, params: URLSearchParams) {
   if (typeof window === "undefined") return;
   const query = params.toString();
   const nextUrl = query ? `${pathname}?${query}` : pathname;
   window.history.replaceState(null, "", nextUrl);
+}
+
+function formatCurrency(value: number) {
+  return `￥${value.toLocaleString("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function PurchaseMetricCard({
+  label,
+  value,
+  hint,
+  icon,
+  accentClassName,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: ReactNode;
+  accentClassName: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-black/8 bg-white/76 px-3.5 py-3 shadow-xs dark:border-white/10 dark:bg-white/5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+          <div className="mt-1.5 text-[24px] font-black leading-none tracking-tight text-foreground">{value}</div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p>
+        </div>
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", accentClassName)}>
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PurchasesContent() {
@@ -73,20 +124,6 @@ function PurchasesContent() {
     onConfirm: () => {},
     message: "",
   });
-  const [galleryState, setGalleryState] = useState<{
-    isOpen: boolean;
-    images: string[];
-    currentIndex: number;
-    scale: number;
-    direction: number;
-  }>({
-    isOpen: false,
-    images: [],
-    currentIndex: 0,
-    scale: 1,
-    direction: 0
-  });
-
   const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "All";
 
   const resetFilters = useCallback(() => {
@@ -287,6 +324,25 @@ function PurchasesContent() {
   const filteredPurchases = useMemo(() => {
     return filterPurchases(purchases, { searchQuery, statusFilter, shopFilter });
   }, [purchases, searchQuery, statusFilter, shopFilter]);
+
+  const purchaseStats = useMemo(() => {
+    const totalAmount = filteredPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
+    const receivedPurchases = filteredPurchases.filter((purchase) => purchase.status === "Received");
+    const pendingPurchases = filteredPurchases.filter((purchase) => purchase.status !== "Received");
+    const receivedAmount = receivedPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
+    const pendingAmount = pendingPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
+    const shopCount = new Set(filteredPurchases.map((purchase) => purchase.shopName).filter(Boolean)).size;
+
+    return {
+      totalCount: filteredPurchases.length,
+      totalAmount,
+      receivedCount: receivedPurchases.length,
+      receivedAmount,
+      pendingCount: pendingPurchases.length,
+      pendingAmount,
+      shopCount,
+    };
+  }, [filteredPurchases]);
 
   const totalItems = filteredPurchases.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -552,21 +608,6 @@ function PurchasesContent() {
     }
   }, [filteredPurchases, showToast, typedUser?.shippingAddresses]);
 
-  const handleCopyTrackingNumber = useCallback((trackingNumber: string, compact = false) => {
-    navigator.clipboard.writeText(trackingNumber);
-    showToast(compact ? "单号已复制" : "单号已复制到剪贴板", "success");
-  }, [showToast]);
-
-
-
-
-
-
-
-
-
-
-
   if (!mounted) return null;
 
   return (
@@ -575,7 +616,7 @@ function PurchasesContent() {
       <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
         <div>
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">采购管理</h1>
-          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理与供应商的采购订单，跟踪入库进度。</p>
+          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">先下单，等实物到货确认无误后再直接入库。</p>
         </div>
         
         {canCreate && (
@@ -594,6 +635,39 @@ function PurchasesContent() {
 
 
       </div>
+
+      <section className="mb-5 md:mb-6">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+          <PurchaseMetricCard
+            label="采购单数"
+            value={`${purchaseStats.totalCount}`}
+            hint={`覆盖 ${purchaseStats.shopCount} 家店铺，列表和统计同步更新`}
+            icon={<ReceiptText size={18} className="text-sky-600 dark:text-sky-400" />}
+            accentClassName="border-sky-500/15 bg-sky-500/10"
+          />
+          <PurchaseMetricCard
+            label="采购总金额"
+            value={formatCurrency(purchaseStats.totalAmount)}
+            hint={`当前筛选结果共 ${purchaseStats.totalCount} 单`}
+            icon={<Wallet size={18} className="text-emerald-600 dark:text-emerald-400" />}
+            accentClassName="border-emerald-500/15 bg-emerald-500/10"
+          />
+          <PurchaseMetricCard
+            label="待入库金额"
+            value={formatCurrency(purchaseStats.pendingAmount)}
+            hint={`还有 ${purchaseStats.pendingCount} 单待入库`}
+            icon={<Package size={18} className="text-amber-600 dark:text-amber-400" />}
+            accentClassName="border-amber-500/15 bg-amber-500/10"
+          />
+          <PurchaseMetricCard
+            label="已入库金额"
+            value={formatCurrency(purchaseStats.receivedAmount)}
+            hint={`已完成 ${purchaseStats.receivedCount} 单采购入库`}
+            icon={<Archive size={18} className="text-violet-600 dark:text-violet-400" />}
+            accentClassName="border-violet-500/15 bg-violet-500/10"
+          />
+        </div>
+      </section>
 
       <PurchaseFilters
         purchases={purchases}
@@ -620,18 +694,18 @@ function PurchasesContent() {
           <table className="w-full text-left border-collapse min-w-200 table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">单据编号</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">序号</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">归属店铺</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">商品与数量</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">交易金额</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">状态</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单/入库时间</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">物流信息</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单时间</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               <AnimatePresence>
-                {paginatedPurchases.map((po) => (
+                {paginatedPurchases.map((po, index) => (
                    <motion.tr 
                     key={po.id}
                     initial={{ opacity: 0 }}
@@ -644,7 +718,9 @@ function PurchasesContent() {
                     className="hover:bg-muted/20 transition-colors group"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="font-bold text-foreground font-mono text-xs">{po.id}</span>
+                      <span className="text-xs font-bold text-muted-foreground">
+                        {(currentPage - 1) * pageSize + index + 1}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {po.shopName ? (
@@ -653,6 +729,46 @@ function PurchasesContent() {
                               {po.shopName}
                           </span>
                       ) : <span className="text-[10px] text-muted-foreground/30 italic">未归属</span>}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-center">
+                      {(() => {
+                        const summary = formatPurchaseItemsSummary(po);
+                        return (
+                          <div className="mx-auto flex max-w-[320px] flex-wrap justify-center gap-2">
+                            {summary.items.length > 0 ? summary.items.map((item) => (
+                              <div
+                                key={item.key}
+                                className="flex items-center gap-2 rounded-full border border-border/50 bg-secondary/30 p-0.5 pr-2.5 shadow-sm transition-all hover:border-primary/30 dark:bg-white/5 max-w-[200px]"
+                                title={item.name}
+                              >
+                                <div className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                  {item.image ? (
+                                    <NextImage src={item.image} className="object-cover" alt="" fill sizes="24px" />
+                                  ) : (
+                                    <Package size={12} className="text-muted-foreground/50" />
+                                  )}
+                                </div>
+                                <span className="truncate text-[10px] font-medium leading-none text-foreground/80">
+                                  {item.name}
+                                </span>
+                                <span className="shrink-0 text-[10px] font-black leading-none text-primary">
+                                  x{item.quantity}
+                                </span>
+                              </div>
+                            )) : (
+                              <span className="text-xs text-muted-foreground">暂无商品</span>
+                            )}
+                            {summary.hasMore && (
+                              <div className="flex h-7 items-center justify-center rounded-full border border-border/50 bg-muted/50 px-3 text-[10px] font-bold text-muted-foreground">
+                                +{po.items.length - summary.items.length}
+                              </div>
+                            )}
+                            <div className="w-full text-center text-[10px] font-bold text-muted-foreground">
+                              共 {po.items.length} 项，数量 {summary.totalQuantity}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center text-foreground font-bold">
@@ -670,13 +786,6 @@ function PurchasesContent() {
                               {formatLocalDateTime(po.date)}
                           </span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                        <PurchaseTrackingList
-                          trackingData={po.trackingData}
-                          status={po.status}
-                          onCopy={handleCopyTrackingNumber}
-                        />
                     </td>
                     <td className="px-6 py-4 text-center whitespace-nowrap">
                       <div className="flex justify-center items-center gap-3">
@@ -732,75 +841,111 @@ function PurchasesContent() {
                 <p className="text-muted-foreground text-sm font-medium">加载中...</p>
              </div>
           ) : paginatedPurchases.length > 0 ? (
-            paginatedPurchases.map((po) => (
+            paginatedPurchases.map((po, index) => (
               <motion.div
                 key={po.id}
                 layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="rounded-2xl border border-border bg-white dark:bg-white/5 p-4 shadow-sm"
+                className="rounded-[22px] border border-border/70 bg-white p-3.5 shadow-sm dark:border-white/10 dark:bg-[#161b2b]"
               >
-                {/* Card Header */}
-                <div className="flex items-center justify-between mb-4">
-                       <div className="flex items-center gap-2">
-                          <span className="font-bold text-base leading-tight font-mono">
-                            {po.id}
-                          </span>
-                       </div>
-                   <PurchaseStatusBadge status={po.status} />
-                </div>
-                
-                {/* Card Body */}
-                <div className="space-y-3 text-sm mb-4 bg-muted/30 p-3 rounded-xl">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">交易金额</span>
-                      <span className="font-bold flex items-center text-foreground">
-                          <span className="mr-0.5 opacity-70">￥</span>
-                          {po.totalAmount.toLocaleString()}
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-black text-foreground dark:bg-white/8 dark:text-white">
+                        {(currentPage - 1) * pageSize + index + 1}
                       </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">下单时间</span>
-                      <div className="flex items-center gap-1.5 text-foreground/80 text-xs text-right font-mono">
-                          <Calendar size={13} />
-                          <span>
-                              {formatLocalDateTime(po.date)}
-                          </span>
+                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-1 text-xs font-bold text-primary dark:bg-white/6 dark:text-white">
+                      <Store size={12} />
+                      <span className="truncate">{po.shopName || "未指定店铺"}</span>
                       </div>
                     </div>
-                    {po.trackingData && po.trackingData.length > 0 && (
-                      <div className="pt-2 border-t border-border/10 space-y-1.5">
-                          <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">物流包裹 ({po.trackingData.length})</span>
-                          <PurchaseTrackingList
-                            trackingData={po.trackingData}
-                            status={po.status}
-                            compact
-                            onCopy={handleCopyTrackingNumber}
-                          />
-                      </div>
-                    )}
+                  </div>
+                  <PurchaseStatusBadge status={po.status} />
                 </div>
-  
-                 <div className="flex items-center gap-3 justify-end mt-4 pt-4 border-t border-border/10">
-                    {/* Unified Mobile Action */}
-                    <button 
-                        onClick={() => handleEdit(po)}
-                        className="h-10 w-10 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white active:scale-95 transition-all shadow-sm"
-                        title="详细管理"
-                    >
-                        <Eye size={20} />
-                    </button>
 
-                    {canEdit && (
-                        <button 
-                            onClick={() => handleDelete(po.id)}
-                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white active:scale-95 transition-all shadow-sm"
-                            title="删除"
-                        >
-                            <Trash2 size={20} />
-                        </button>
-                    )}
+                <div className="space-y-3">
+                    <div className="rounded-[18px] border border-border/40 bg-muted/25 p-2.5 dark:border-white/6 dark:bg-white/[0.04]">
+                      <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">商品与数量</div>
+                      {(() => {
+                        const summary = formatPurchaseItemsSummary(po);
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              {summary.items.length > 0 ? summary.items.map((item) => (
+                                <div
+                                  key={item.key}
+                                  className="flex max-w-[150px] items-center gap-1.5 rounded-full border border-border/50 bg-white/70 p-0.5 pr-2 shadow-sm dark:border-white/8 dark:bg-white/[0.06]"
+                                  title={item.name}
+                                >
+                                  <div className="relative flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                    {item.image ? (
+                                      <NextImage src={item.image} className="object-cover" alt="" fill sizes="20px" />
+                                    ) : (
+                                      <Package size={10} className="text-muted-foreground/50" />
+                                    )}
+                                  </div>
+                                  <span className="truncate text-[10px] font-medium leading-none text-foreground/85">
+                                    {item.name}
+                                  </span>
+                                  <span className="shrink-0 text-[10px] font-black leading-none text-primary">
+                                    x{item.quantity}
+                                  </span>
+                                </div>
+                              )) : (
+                                <div className="text-xs text-muted-foreground">暂无商品</div>
+                              )}
+                              {summary.hasMore && (
+                                <div className="flex h-6 items-center justify-center rounded-full border border-border/50 bg-muted/50 px-2 text-[10px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/[0.05]">
+                                  +{po.items.length - summary.items.length}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between rounded-xl bg-white/70 px-2.5 py-2 text-[10px] font-bold text-muted-foreground dark:bg-white/[0.06]">
+                              <span>共 {po.items.length} 项</span>
+                              <span>数量 {summary.totalQuantity}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                      <div className="rounded-2xl border border-border/40 bg-muted/25 px-3 py-2.5 dark:border-white/6 dark:bg-white/[0.04]">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">交易金额</div>
+                        <div className="mt-1 text-[22px] font-black leading-none tracking-tight text-foreground">
+                          {formatCurrency(po.totalAmount)}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-border/40 bg-muted/25 px-3 py-2.5 text-right dark:border-white/6 dark:bg-white/[0.04]">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/75">下单时间</div>
+                        <div className="mt-1 flex items-center justify-end gap-1.5 text-[11px] font-mono text-foreground/70">
+                          <Calendar size={12} />
+                          <span>{formatLocalDateTime(po.date)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 border-t border-border/30 pt-2 dark:border-white/6">
+                      <button 
+                          onClick={() => handleEdit(po)}
+                          className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 shadow-sm transition-all active:scale-95 hover:bg-blue-500 hover:text-white dark:bg-blue-500/12 dark:text-blue-300"
+                          title="详细管理"
+                      >
+                          <Eye size={18} />
+                      </button>
+
+                      {canEdit && (
+                          <button 
+                              onClick={() => handleDelete(po.id)}
+                              className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-600 shadow-sm transition-all active:scale-95 hover:bg-red-500 hover:text-white dark:bg-red-500/12 dark:text-red-300"
+                              title="删除"
+                          >
+                              <Trash2 size={18} />
+                          </button>
+                      )}
+                    </div>
                 </div>
               </motion.div>
             ))
@@ -851,16 +996,6 @@ function PurchasesContent() {
         confirmLabel="确认删除"
         variant="danger"
       />
-
-
-      {/* Waybill Gallery Preview */}
-      <ImageGallery 
-        isOpen={galleryState.isOpen}
-        images={galleryState.images}
-        initialIndex={galleryState.currentIndex}
-        onClose={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
-      />
-
       {/* Purchase Overview Modal */}
       <PurchaseOverviewModal
         isOpen={overviewPurchases.length > 0}

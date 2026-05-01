@@ -360,7 +360,6 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 fetchPath="/api/brush-products/products"
                 query={formData.shopName ? { shopName: formData.shopName } : undefined}
                 title="选择刷单商品"
-                allowCreate={false}
                 imageOnly
             />
         </>

@@ -37,6 +37,7 @@ export async function GET(request: Request) {
           { type: AUTO_INBOUND_TYPE },
           { type: "Return" },
           { type: "InternalReturn" },
+          { status: "Received" },
         ],
       });
     } else if (type) {

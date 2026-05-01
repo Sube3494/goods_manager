@@ -20,13 +20,14 @@ import { AUTO_INBOUND_TYPE, isAutoInboundOrderLike } from "@/lib/purchaseOrderTy
 const INBOUND_TYPE_ALL = "全部类型";
 const INBOUND_TYPE_OPTIONS = [
   { value: INBOUND_TYPE_ALL, label: INBOUND_TYPE_ALL },
-  { value: "Inbound", label: "手动入库" },
+  { value: "Inbound", label: "采购入库" },
   { value: AUTO_INBOUND_TYPE, label: "自动补库存" },
   { value: "ReturnGroup", label: "退回入库" },
 ] as const;
 
 function getInboundTypeLabel(order: PurchaseOrder) {
   if (isAutoInboundOrderLike(order)) return "自动补库存";
+  if (order.type === "Purchase" && order.status === "Received") return "采购入库";
   switch (order.type) {
     case "Return":
       return "退货入库";
@@ -34,7 +35,7 @@ function getInboundTypeLabel(order: PurchaseOrder) {
       return "样品退回";
     case "Inbound":
     default:
-      return "手动入库";
+      return "采购入库";
   }
 }
 
@@ -129,6 +130,8 @@ function InboundContent() {
     // Inbound type filter
     const orderType = isAutoInboundOrderLike(p)
       ? AUTO_INBOUND_TYPE
+      : p.type === "Purchase" && p.status === "Received"
+      ? "Inbound"
       : p.type === "Return" || p.type === "InternalReturn"
       ? "ReturnGroup"
       : (p.type || "Inbound");
@@ -290,7 +293,7 @@ function InboundContent() {
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库单信息</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">包含商品</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">总数量</th>
+                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库金额</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">状态</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库时间</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">操作</th>
@@ -359,9 +362,10 @@ function InboundContent() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="font-bold text-sm text-foreground">
-                        {po.items.reduce((sum, item) => sum + item.quantity, 0)}
-                      </span>
+                      <div className="flex items-center justify-center font-bold text-sm text-foreground">
+                        <span className="mr-0.5 opacity-60">￥</span>
+                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
@@ -476,8 +480,9 @@ function InboundContent() {
                         <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
                     </div>
                     <div className="font-bold text-foreground text-sm flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground font-normal">总计:</span>
-                        {po.items.reduce((sum, item) => sum + item.quantity, 0)} 件
+                        <span className="text-[10px] text-muted-foreground font-normal">金额:</span>
+                        <span className="text-[10px] text-muted-foreground">￥</span>
+                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                     </div>
                   </div>
                 </div>

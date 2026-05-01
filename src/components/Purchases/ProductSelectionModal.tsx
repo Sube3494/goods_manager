@@ -3,10 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { X, Search, Check, Package, Plus } from "lucide-react";
-import { Product, Supplier, GalleryItem } from "@/lib/types";
+import { X, Search, Check, Package } from "lucide-react";
+import { Product, Supplier } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { clsx, type ClassValue } from "clsx";
@@ -29,12 +28,10 @@ interface ProductSelectionModalProps {
   showSku?: boolean;
   fetchPath?: string;
   title?: string;
-  allowCreate?: boolean;
   showPlatformSelector?: boolean;
   imageOnly?: boolean;
   minimalView?: boolean;
   query?: Record<string, string>;
-  createPayload?: Record<string, unknown>;
   emptyStateText?: string;
   prefetchedProducts?: Product[];
   prefetchedSuppliers?: Supplier[];
@@ -70,12 +67,10 @@ export function ProductSelectionModal({
   showSku = true,
   fetchPath = "/api/products",
   title = "选择商品",
-  allowCreate = true,
   showPlatformSelector = true,
   imageOnly = false,
   minimalView = false,
   query,
-  createPayload,
   emptyStateText = "未找到相关商品",
   prefetchedProducts,
   prefetchedSuppliers,
@@ -98,7 +93,6 @@ export function ProductSelectionModal({
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
   const { showToast } = useToast();
   const resultsVersion = useRef(0);
@@ -271,7 +265,10 @@ export function ProductSelectionModal({
   useEffect(() => {
     if (usesPrefetchedData) return;
     if (!isOpen || !isInitialized || isLoading) return; 
-    if (debouncedSearch.trim() === "") return;
+    if (debouncedSearch.trim() === "") {
+      fetchData('initial');
+      return;
+    }
     fetchData('search');
   }, [debouncedSearch, fetchData, isInitialized, isLoading, isOpen, usesPrefetchedData]);
 
@@ -294,67 +291,6 @@ export function ProductSelectionModal({
 
     return () => observer.disconnect();
   }, [fetchData, hasMore, isLoading, isNextPageLoading, isOpen, isSearching, usesPrefetchedData]);
-
-  const handleQuickCreate = async (data: Partial<Product>, galleryItems?: GalleryItem[]) => {
-    try {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          ...(createPayload || {}),
-        }),
-      });
-
-      if (res.ok) {
-        const product = await res.json();
-        if (galleryItems && galleryItems.length > 0) {
-          const tempItems = galleryItems.filter(item => item.id.startsWith('temp-'));
-          if (tempItems.length > 0) {
-            await fetch("/api/gallery", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                productId: product.id,
-                urls: tempItems.map(item => ({
-                  url: item.url,
-                  thumbnailUrl: item.thumbnailUrl,
-                  type: item.type
-                }))
-              })
-            });
-          }
-        }
-        showToast("商品创建成功", "success");
-        setIsCreateModalOpen(false);
-        await fetchData();
-        if (createPayload && typeof createPayload.shopId === "string" && fetchPath === "/api/purchase-products") {
-          const scopedQuery = new URLSearchParams({
-            page: "1",
-            pageSize: "200",
-            all: "true",
-            shopId: String(createPayload.shopId),
-          });
-          const scopedRes = await fetch(`${fetchPath}?${scopedQuery.toString()}`);
-          const scopedData = await scopedRes.json().catch(() => null);
-          const scopedItems = Array.isArray(scopedData?.items) ? scopedData.items : [];
-          const createdShopProduct = scopedItems.find((item: Product) =>
-            item.id === product.id ||
-            item.shopProductId === product.shopProductId ||
-            item.sourceProductId === product.sourceProductId ||
-            item.sourceProductId === product.id
-          );
-          toggleProduct(createdShopProduct || product);
-        } else {
-          toggleProduct(product);
-        }
-      } else {
-        showToast("创建失败", "error");
-      }
-    } catch {
-      showToast("请求失败", "error");
-    }
-  };
 
   const filteredProducts = (Array.isArray(products) ? products : []).filter(p => {
     const isVisible = (p.isPublic ?? true) && !(p.isDiscontinued ?? false);
@@ -425,15 +361,6 @@ export function ProductSelectionModal({
              <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold text-foreground">{title}</h2>
-                {allowCreate && (
-                  <button
-                      onClick={() => setIsCreateModalOpen(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary/40 active:scale-95 transition-all text-xs font-medium border border-primary/20"
-                      title="新添商品"
-                    >
-                      <Plus size={14} /> 新添商品
-                  </button>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <button 
@@ -739,14 +666,6 @@ export function ProductSelectionModal({
                </div>
             </div>
           </div>
-          
-          {allowCreate && (
-            <ProductFormModal 
-              isOpen={isCreateModalOpen}
-              onClose={() => setIsCreateModalOpen(false)}
-              onSubmit={handleQuickCreate}
-            />
-          )}
         </>,
     document.body
   );

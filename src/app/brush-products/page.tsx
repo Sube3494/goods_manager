@@ -693,7 +693,6 @@ export default function BrushProductsPage() {
         showSku={true}
         fetchPath="/api/purchase-products"
         title={selectedShop ? `选择要加入 ${selectedShop.name} 的商品` : "先选择店铺"}
-        allowCreate={false}
         showPlatformSelector={false}
         query={selectedShopId ? { shopId: selectedShopId } : undefined}
         emptyStateText={selectedShop ? `${selectedShop.name} 还没有可选商品` : "请先选择店铺"}
