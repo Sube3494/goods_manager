@@ -475,13 +475,44 @@ function SettingsContent() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="min-w-0 space-y-4">
-          <div className="rounded-[24px] md:rounded-[26px] border border-border/60 bg-white/70 dark:bg-white/5 p-3 shadow-sm backdrop-blur-xl">
-            <div className="mb-2 px-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-              设置分区
+      <div className="space-y-5">
+        <section className="rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:bg-white/5 md:p-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                  设置分区
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  把系统能力按用途拆开，先选分区，再在下面集中处理当前内容。
+                </div>
+              </div>
+              {canManageRoles && (
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href="/admin/roles"
+                    className="group inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-background/70 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:border-primary/25 hover:bg-primary/[0.04]"
+                  >
+                    <span className="rounded-xl bg-primary/10 p-1.5 text-primary ring-1 ring-primary/20">
+                      <ShieldAlert size={14} />
+                    </span>
+                    角色管理
+                  </Link>
+                  {canManageMembers && (
+                    <Link
+                      href="/admin/members"
+                      className="group inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-background/70 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:border-sky-500/25 hover:bg-sky-500/[0.04]"
+                    >
+                      <span className="rounded-xl bg-sky-500/10 p-1.5 text-sky-500 ring-1 ring-sky-500/20">
+                        <Users size={14} />
+                      </span>
+                      成员管理
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="px-1">
+
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -493,7 +524,7 @@ function SettingsContent() {
                       "group relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all",
                       isActive
                         ? "border-primary/20 bg-primary/[0.07] shadow-sm"
-                        : "border-transparent hover:border-border/60 hover:bg-black/[0.025] dark:hover:bg-white/[0.03]"
+                        : "border-border/40 bg-background/45 hover:border-border/70 hover:bg-black/[0.025] dark:hover:bg-white/[0.03]"
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -501,7 +532,7 @@ function SettingsContent() {
                         <tab.icon size={16} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className={cn("text-sm font-black shrink-0", isActive ? "text-foreground" : "text-foreground/85")}>{tab.label}</div>
+                        <div className={cn("text-sm font-black", isActive ? "text-foreground" : "text-foreground/85")}>{tab.label}</div>
                         <div className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">{tab.desc}</div>
                       </div>
                     </div>
@@ -516,48 +547,11 @@ function SettingsContent() {
                 );
               })}
             </div>
-            </div>
           </div>
+        </section>
 
-          {canManageRoles && (
-            <div className="rounded-[24px] md:rounded-[26px] border border-border/60 bg-white/70 dark:bg-white/5 p-3 shadow-sm backdrop-blur-xl">
-              <div className="mb-2 px-2 pt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-                管理入口
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-1">
-                <Link
-                  href="/admin/roles"
-                  className="group flex items-start gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3 hover:border-primary/25 hover:bg-primary/[0.04] transition-all"
-                >
-                  <div className="mt-0.5 rounded-xl bg-primary/10 p-2 text-primary ring-1 ring-primary/20">
-                    <ShieldAlert size={15} />
-                  </div>
-                  <div>
-                    <div className="text-sm font-black text-foreground">角色管理</div>
-                    <div className="mt-1 text-xs text-muted-foreground leading-relaxed">维护角色模板、权限矩阵与岗位职责边界。</div>
-                  </div>
-                </Link>
-                {canManageMembers && (
-                  <Link
-                    href="/admin/members"
-                    className="group flex items-start gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3 hover:border-sky-500/25 hover:bg-sky-500/[0.04] transition-all"
-                  >
-                    <div className="mt-0.5 rounded-xl bg-sky-500/10 p-2 text-sky-500 ring-1 ring-sky-500/20">
-                      <Users size={15} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-black text-foreground">成员管理</div>
-                      <div className="mt-1 text-xs text-muted-foreground leading-relaxed">维护成员状态、白名单与邀请准入。</div>
-                    </div>
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-        </aside>
-
-        <div className="min-w-0 overflow-hidden rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 dark:bg-white/5 p-4 md:p-6 shadow-sm backdrop-blur-xl">
-          <div className="grid grid-cols-1 w-full gap-6 min-w-0 overflow-hidden">
+        <div className="min-w-0 overflow-hidden rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:bg-white/5 md:p-6">
+          <div className="grid min-w-0 w-full grid-cols-1 gap-6 overflow-hidden">
         {activeTab === "general" && (
           <GeneralTab
             theme={theme}

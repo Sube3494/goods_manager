@@ -69,7 +69,7 @@ export function StorageTab({
         </div>
         <div className="space-y-3 p-4 md:p-5">
           <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
-            <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
+            <div className="rounded-3xl border border-border/60 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500"><HardDrive size={16} /></div>
                 <div>
@@ -77,7 +77,7 @@ export function StorageTab({
                   <div className="mt-1 text-xs text-muted-foreground">选择系统如何保存附件、图片与其它静态文件。</div>
                 </div>
               </div>
-              <div className="mt-4 inline-flex rounded-2xl border border-border/60 bg-background p-1">
+              <div className="mt-4 inline-flex rounded-2xl border border-border/60 bg-white/75 p-1 dark:bg-white/[0.04]">
                 {[
                   { id: "local", label: "本地" },
                   { id: "minio", label: "MinIO" },
@@ -93,7 +93,7 @@ export function StorageTab({
               </div>
             </div>
 
-            <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
+            <div className="rounded-3xl border border-border/60 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500"><Link2 size={16} /></div>
                 <div>
@@ -104,7 +104,7 @@ export function StorageTab({
               <div className="mt-4">
                 <CustomSelect
                   value={uploadConflictStrategy}
-                  triggerClassName="h-10 w-full rounded-2xl border-border bg-background text-xs font-bold"
+                  triggerClassName="h-10 w-full rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 text-xs font-bold"
                   onChange={(val) => {
                     setUploadConflictStrategy(val as "overwrite" | "rename" | "skip");
                     saveSettings({ uploadConflictStrategy: val });
@@ -120,7 +120,7 @@ export function StorageTab({
           </div>
 
           {storageType === "minio" ? (
-            <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
+            <div className="rounded-3xl border border-border/60 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500"><ShieldCheck size={16} /></div>
                 <div>
@@ -132,45 +132,45 @@ export function StorageTab({
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">服务端点</label>
-                  <input type="text" value={minioEndpoint} onChange={(e) => { setMinioEndpoint(e.target.value); saveSettings({ minioEndpoint: e.target.value }, { silent: true }); }} placeholder="127.0.0.1 或 api.example.com" className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+                  <input type="text" value={minioEndpoint} onChange={(e) => { setMinioEndpoint(e.target.value); saveSettings({ minioEndpoint: e.target.value }, { silent: true }); }} placeholder="127.0.0.1 或 api.example.com" className="h-10 w-full rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">服务端口</label>
-                  <input type="number" value={minioPort} onChange={(e) => { const val = e.target.value === "" ? "" : Number(e.target.value); setMinioPort(val); saveSettings({ minioPort: val }, { silent: true }); }} placeholder="9000" className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm no-spinner" />
+                  <input type="number" value={minioPort} onChange={(e) => { const val = e.target.value === "" ? "" : Number(e.target.value); setMinioPort(val); saveSettings({ minioPort: val }, { silent: true }); }} placeholder="9000" className="h-10 w-full rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 text-sm no-spinner outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">访问密钥</label>
-                  <input type="text" value={minioAccessKey} onChange={(e) => { setMinioAccessKey(e.target.value); saveSettings({ minioAccessKey: e.target.value }, { silent: true }); }} className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-mono" />
+                  <input type="text" value={minioAccessKey} onChange={(e) => { setMinioAccessKey(e.target.value); saveSettings({ minioAccessKey: e.target.value }, { silent: true }); }} className="h-10 w-full rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 text-sm font-mono outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">密钥凭证</label>
-                  <input type="password" value={minioSecretKey} onChange={(e) => { setMinioSecretKey(e.target.value); saveSettings({ minioSecretKey: e.target.value }, { silent: true }); }} className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-mono" />
+                  <input type="password" value={minioSecretKey} onChange={(e) => { setMinioSecretKey(e.target.value); saveSettings({ minioSecretKey: e.target.value }, { silent: true }); }} className="h-10 w-full rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 text-sm font-mono outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">存储桶名称</label>
-                  <input type="text" value={minioBucket} onChange={(e) => { setMinioBucket(e.target.value); saveSettings({ minioBucket: e.target.value }, { silent: true }); }} placeholder="my-bucket" className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+                  <input type="text" value={minioBucket} onChange={(e) => { setMinioBucket(e.target.value); saveSettings({ minioBucket: e.target.value }, { silent: true }); }} placeholder="my-bucket" className="h-10 w-full rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">加密连接</label>
-                  <div className="flex h-10 items-center rounded-xl border border-border bg-background px-3">
+                  <div className="flex h-10 items-center rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3">
                     <Switch checked={minioUseSSL} onChange={(val) => { setMinioUseSSL(val); saveSettings({ minioUseSSL: val }); }} />
                     <span className="ml-3 text-xs text-muted-foreground">{minioUseSSL ? "已启用 HTTPS" : "当前使用 HTTP"}</span>
                   </div>
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">公开访问地址</label>
-                  <input type="text" value={minioPublicUrl} onChange={(e) => { setMinioPublicUrl(e.target.value); saveSettings({ minioPublicUrl: e.target.value }, { silent: true }); }} placeholder="https://static.example.com" className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+                  <input type="text" value={minioPublicUrl} onChange={(e) => { setMinioPublicUrl(e.target.value); saveSettings({ minioPublicUrl: e.target.value }, { silent: true }); }} placeholder="https://static.example.com" className="h-10 w-full rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                 </div>
               </div>
             </div>
           ) : (
-            <div className="rounded-3xl border border-dashed border-border/70 bg-background/60 px-5 py-4">
+            <div className="rounded-3xl border border-dashed border-border/70 bg-white/60 px-5 py-4 dark:bg-white/[0.03]">
               <div className="text-sm font-black text-foreground">本地存储模式</div>
               <div className="mt-1 text-xs text-muted-foreground">当前文件将直接保存在服务器本地目录中，不需要额外配置对象存储连接。</div>
             </div>
           )}
 
-          <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
+          <div className="rounded-3xl border border-border/60 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">

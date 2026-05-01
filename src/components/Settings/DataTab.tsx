@@ -210,7 +210,7 @@ export function DataTab({
                 { label: "本月访问", icon: TrendingUp, color: "text-sky-500", bg: "bg-sky-500/10", pv: analytics?.month.pv ?? 0, uv: analytics?.month.uv ?? 0 },
                 { label: "累计总量", icon: Users, color: "text-emerald-500", bg: "bg-emerald-500/10", pv: analytics?.total.pv ?? 0, uv: analytics?.total.uv ?? 0 },
               ].map((card) => (
-                <div key={card.label} className={cn("min-w-0 rounded-[20px] border border-border/50 bg-background/75 px-4 py-3.5 shadow-sm md:rounded-2xl md:py-4", isLoadingAnalytics && "animate-pulse")}>
+                <div key={card.label} className={cn("min-w-0 rounded-[20px] border border-border/50 bg-white/72 px-4 py-3.5 shadow-sm dark:bg-white/[0.04] md:rounded-2xl md:py-4", isLoadingAnalytics && "animate-pulse")}>
                   <div className="flex items-center gap-2">
                     <div className={cn("rounded-xl p-2", card.bg)}><card.icon size={13} className={card.color} /></div>
                     <div className="text-xs font-black text-muted-foreground">{card.label}</div>
@@ -222,7 +222,7 @@ export function DataTab({
                 </div>
               ))}
             </div>
-            <div className="min-w-0 rounded-[20px] border border-border/50 bg-background/75 px-4 py-3.5 shadow-sm md:rounded-2xl md:py-4">
+            <div className="min-w-0 rounded-[20px] border border-border/50 bg-white/72 px-4 py-3.5 shadow-sm dark:bg-white/[0.04] md:rounded-2xl md:py-4">
               <div className="mb-3 flex flex-wrap items-center gap-4 text-[11px] font-bold text-muted-foreground">
                 <div className="flex items-center gap-1.5"><div className="h-0.5 w-5 rounded bg-violet-500" />页面被查看次数</div>
                 <div className="flex items-center gap-1.5"><div className="w-5 border-t-2 border-dashed border-emerald-500/70" />访问人数</div>
@@ -268,22 +268,22 @@ export function DataTab({
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">把上传、排序和分享时效拆开，避免日常配置和系统恢复混在一起。</p>
             </div>
           </div>
-          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">允许实物照片上传</div><div className="mt-1 text-xs text-muted-foreground">开启后，应用前端及管理台会允许用户向后端存储上传物理文件。</div></div>
             <Switch checked={allowGalleryUpload} onChange={toggleGalleryUpload} />
           </div>
-          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">灯箱预览需要登录</div><div className="mt-1 text-xs text-muted-foreground">开启后，游客仍可浏览实物相册列表，但点击进入灯箱大图或视频预览时会先跳转登录。</div></div>
             <Switch checked={requireLoginForLightbox} onChange={toggleRequireLoginForLightbox} />
           </div>
-          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">实物相册排序方式</div><div className="mt-1 text-xs text-muted-foreground">决定实物相册中商品组默认按编号升序还是降序排列。</div></div>
             <CustomSelect value={gallerySortDesc ? "desc" : "asc"} triggerClassName="h-10 w-32 rounded-xl border-border bg-background text-xs font-bold" onChange={(val) => { const next = val === "desc"; setGallerySortDesc(next); saveSettings({ gallerySortDesc: next }); }} options={[{ value: "desc", label: "编号降序" }, { value: "asc", label: "编号升序" }]} />
           </div>
-          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">分享链接时效</div><div className="mt-1 text-xs text-muted-foreground">配置分享给外部的图片及视频链接在多长时间后自动失效。</div></div>
             <div className="flex items-center gap-2">
-              <input type="number" min="1" value={shareExpireDuration ?? ""} onChange={(e) => { const val = e.target.value; if (val === "") return setShareExpireDuration(""); const num = parseInt(val); setShareExpireDuration(isNaN(num) ? "" : num); if (!isNaN(num)) saveSettings({ shareExpireDuration: num }, { silent: true }); }} onBlur={() => { if (shareExpireDuration === "" || (typeof shareExpireDuration === "number" && shareExpireDuration <= 0)) { setShareExpireDuration(1); saveSettings({ shareExpireDuration: 1 }); } }} className="h-10 w-16 rounded-xl border border-border bg-background px-2 text-center text-sm font-bold" />
+              <input type="number" min="1" value={shareExpireDuration ?? ""} onChange={(e) => { const val = e.target.value; if (val === "") return setShareExpireDuration(""); const num = parseInt(val); setShareExpireDuration(isNaN(num) ? "" : num); if (!isNaN(num)) saveSettings({ shareExpireDuration: num }, { silent: true }); }} onBlur={() => { if (shareExpireDuration === "" || (typeof shareExpireDuration === "number" && shareExpireDuration <= 0)) { setShareExpireDuration(1); saveSettings({ shareExpireDuration: 1 }); } }} className="h-10 w-16 rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-2 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
               <CustomSelect value={shareExpireUnit} triggerClassName="h-10 w-24 rounded-xl border-border bg-background text-xs font-bold" onChange={(val) => { setShareExpireUnit(val as "minutes" | "hours" | "days"); saveSettings({ shareExpireUnit: val }); }} options={[{ value: "minutes", label: "分钟" }, { value: "hours", label: "小时" }, { value: "days", label: "天" }]} />
             </div>
           </div>
@@ -292,181 +292,185 @@ export function DataTab({
 
       <section className="space-y-4 overflow-hidden rounded-[26px] border border-border/60 bg-white/75 p-4 shadow-sm dark:bg-white/5 md:p-5">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/25"><Database size={17} /></div>
+          <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/25"><Database size={17} /></div>
           <div>
             <h3 className="text-base font-black text-foreground">备份与恢复</h3>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{showDangerZone ? "安全操作和危险操作拆开展示，导出、计划备份和云端同步各归其位。" : "你可以在这里导出数据、查看归档并下载已有备份文件。"}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{showDangerZone ? "恢复、导出、自动备份和云端同步都集中在这里。" : "你可以在这里导出数据、查看归档并下载已有备份文件。"}</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <div className="overflow-hidden rounded-[32px] border border-emerald-500/15 bg-[radial-gradient(circle_at_top_left,rgba(110,231,183,0.18),transparent_34%),linear-gradient(140deg,rgba(236,253,245,0.96),rgba(255,255,255,0.98)_52%,rgba(15,23,42,0.05))] shadow-[0_24px_60px_-36px_rgba(16,185,129,0.38)] dark:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.18),transparent_30%),linear-gradient(140deg,rgba(6,78,59,0.32),rgba(255,255,255,0.04)_56%,rgba(15,23,42,0.2))]">
-            <div className="flex h-full flex-col justify-between gap-6 p-5 lg:p-6">
-              <div className="space-y-5">
-                <div className="flex items-start gap-4">
-                  <div className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-[22px] bg-emerald-500/12 text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
-                    <Database size={19} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-lg font-black tracking-tight text-foreground">{showDangerZone ? "数据迁移与恢复中心" : "归档下载与离线导出"}</div>
-                    <div className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
-                      {showDangerZone ? "把恢复、导出和归档查看收进一个主操作区。常用动作放前面，说明收短一点，出问题时你能直接下手处理。" : "用于查看当前可见归档、下载备份文件，并按需导出一份新的离线备份。"}
-                    </div>
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-white/[0.05]">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">导入恢复</div>
-                    <div className="mt-2 text-sm font-black text-foreground">支持自动识别</div>
-                    <div className="mt-1 text-xs leading-6 text-muted-foreground">系统自动备份和手动导出包都能直接走这条入口。</div>
-                  </div>
-                  <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-white/[0.05]">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">手动导出</div>
-                    <div className="mt-2 text-sm font-black text-foreground">适合留档快照</div>
-                    <div className="mt-1 text-xs leading-6 text-muted-foreground">迁移设备或做高风险操作前，先留一份完整备份更稳妥。</div>
-                  </div>
-                  <div className="rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)] dark:border-white/10 dark:bg-white/[0.05]">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">云端归档</div>
-                    <div className="mt-2 text-sm font-black text-foreground">{cloudBackupCount > 0 ? `${cloudBackupCount} 份已同步` : "可并入历史列表"}</div>
-                    <div className="mt-1 text-xs leading-6 text-muted-foreground">本地和 WebDAV 归档会合并展示，不再只看见单边记录。</div>
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div className="rounded-3xl border border-border/60 bg-white/75 p-4 shadow-sm dark:bg-white/5 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
+                <Database size={16} />
               </div>
-              <div className={cn("grid gap-3", showDangerZone ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
-                {showDangerZone && (
+              <div className="min-w-0">
+                <div className="text-sm font-black text-foreground">快速操作</div>
+                <div className="mt-1 text-xs leading-6 text-muted-foreground">常用动作放这里，恢复和导出分开处理。</div>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {showDangerZone && (
+                <div className="rounded-2xl border border-border/50 bg-white/72 p-3.5 dark:bg-white/[0.04]">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-sm font-black text-foreground">导入恢复</div>
+                      <div className="mt-1 text-xs text-muted-foreground">从已有备份包恢复系统数据。</div>
+                    </div>
+                    <button
+                      onClick={openBackupImport}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border/60 bg-white/84 px-4 text-sm font-black text-foreground transition-all hover:border-primary/25 hover:text-primary dark:bg-white/[0.06]"
+                    >
+                      <Upload size={14} />
+                      选择备份包
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="rounded-2xl border border-border/50 bg-white/72 p-3.5 dark:bg-white/[0.04]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-black text-foreground">手动导出</div>
+                    <div className="mt-1 text-xs text-muted-foreground">导出当前系统快照，方便留档或迁移。</div>
+                  </div>
                   <button
-                    onClick={openBackupImport}
-                    className="inline-flex h-14 items-center justify-center gap-2 rounded-[22px] border border-emerald-500/20 bg-white/88 px-5 text-sm font-black text-emerald-700 shadow-[0_16px_40px_-28px_rgba(16,185,129,0.55)] transition-all hover:-translate-y-0.5 hover:border-emerald-500/35 hover:bg-emerald-50 dark:bg-white/[0.06] dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                    onClick={() => setBackupConfig({ isOpen: true, type: "export" })}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-foreground px-4 text-sm font-black text-background transition-all hover:opacity-95 dark:bg-white dark:text-slate-950"
                   >
-                    <Upload size={16} />
-                    导入恢复
+                    <Download size={14} />
+                    立即导出
                   </button>
-                )}
-                <button
-                  onClick={() => setBackupConfig({ isOpen: true, type: "export" })}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-[22px] bg-slate-950 px-5 text-sm font-black text-white shadow-[0_20px_50px_-28px_rgba(15,23,42,0.8)] transition-all hover:-translate-y-0.5 hover:opacity-95 dark:bg-white dark:text-slate-950"
-                >
-                  <Download size={16} />
-                  手动导出
-                </button>
+                </div>
               </div>
             </div>
           </div>
-          <div className="rounded-[32px] border border-border/60 bg-background/80 p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
+
+          <div className="rounded-3xl border border-border/60 bg-white/75 p-4 shadow-sm dark:bg-white/5 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-sm font-black text-foreground">备份历史摘要</div>
-                <div className="mt-1 text-xs leading-6 text-muted-foreground">先看现在有多少归档、最近一次是什么时候，再决定恢复还是清理。</div>
+                <div className="text-sm font-black text-foreground">备份概览</div>
+                <div className="mt-1 text-xs leading-6 text-muted-foreground">这里看数量、最近时间和当前模式。</div>
               </div>
-              <div className="rounded-full border border-border/60 bg-background px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
+              <div className="inline-flex w-fit rounded-full border border-border/60 bg-white/72 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70 dark:bg-white/[0.04]">
                 配额 {backups.length} / {backupRetention}
               </div>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[24px] border border-border/50 bg-background px-4 py-4">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-border/50 bg-white/72 px-4 py-4 dark:bg-white/[0.04]">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">可见归档</div>
                 <div className="mt-2 text-3xl font-black tracking-tight text-foreground">{backups.length}</div>
-                <div className="mt-2 text-xs text-muted-foreground">本地 {localBackupCount} 份，云端 {cloudBackupCount} 份</div>
+                <div className="mt-2 text-xs text-muted-foreground">本地 {localBackupCount}，云端 {cloudBackupCount}</div>
               </div>
-              <div className="rounded-[24px] border border-border/50 bg-background px-4 py-4">
+              <div className="rounded-2xl border border-border/50 bg-white/72 px-4 py-4 dark:bg-white/[0.04]">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">最近归档</div>
-                <div className="mt-2 text-base font-black tracking-tight text-foreground">
+                <div className="mt-2 text-sm font-black leading-6 text-foreground">
                   {latestBackup ? formatLocalDateTime(new Date(latestBackup.createdAt)) : "暂无记录"}
                 </div>
                 <div className="mt-2 text-xs text-muted-foreground">
-                  {latestBackup ? `${latestBackup.source === "webdav" ? "云端" : "本地"} · ${(latestBackup.size / 1024 / 1024).toFixed(2)} MB` : "创建或同步后会显示在这里"}
+                  {latestBackup ? `${latestBackup.source === "webdav" ? "云端" : "本地"} · ${(latestBackup.size / 1024 / 1024).toFixed(2)} MB` : "创建后会显示在这里"}
                 </div>
               </div>
-            </div>
-            <div className="mt-3 rounded-[24px] border border-border/50 bg-background px-4 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">当前策略</div>
-                  <div className="mt-2 text-sm font-black text-foreground">{backupEnabled ? `自动备份已开启` : "当前为手动备份模式"}</div>
-                </div>
-                <div className={cn("rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em]", backupEnabled ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+              <div className="rounded-2xl border border-border/50 bg-white/72 px-4 py-4 dark:bg-white/[0.04]">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">当前模式</div>
+                <div className="mt-2 text-sm font-black text-foreground">{backupEnabled ? "自动备份" : "手动备份"}</div>
+                <div className={cn("mt-2 inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]", backupEnabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
                   {backupEnabled ? `每 ${backupIntervalValue}${backupIntervalUnit}` : "Manual"}
                 </div>
-              </div>
-              <div className="mt-3 text-xs leading-6 text-muted-foreground">
-                {webdavEnabled ? "自动备份到期时会补跑，并尝试同步到 WebDAV；历史列表会合并展示两边归档。" : "自动备份会在到期时补跑；如果要同时保留云端副本，可以在下方开启 WebDAV。"}
               </div>
             </div>
           </div>
         </div>
 
         {showDangerZone ? (
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
+          <div className="space-y-4">
+            <div className="rounded-3xl border border-border/60 bg-white/75 p-4 shadow-sm dark:bg-white/5 sm:p-5">
               <div className="flex items-start justify-between gap-4">
-                <div><div className="text-sm font-black text-foreground">自动备份计划</div><div className="mt-1 text-xs text-muted-foreground">配置定期全量备份、保留数量和手动触发方式。</div></div>
+                <div>
+                  <div className="text-sm font-black text-foreground">自动备份计划</div>
+                  <div className="mt-1 text-xs text-muted-foreground">频率、保留份数和手动触发统一管理。</div>
+                </div>
                 <Switch checked={backupEnabled} onChange={(val) => { setBackupEnabled(val); saveSettings({ backupEnabled: val }); }} />
               </div>
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-border/50 bg-background px-4 py-4">
-                  <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">备份频率</div>
-                  <div className="flex items-center gap-2">
-                    <input type="number" min="1" value={backupIntervalValue} onChange={(e) => { const val = e.target.value; if (val === "") return setBackupIntervalValue(""); const num = parseInt(val); setBackupIntervalValue(isNaN(num) ? "" : num); if (!isNaN(num)) saveSettings({ backupIntervalValue: num }, { silent: true }); }} onBlur={() => { if (backupIntervalValue === "" || (typeof backupIntervalValue === "number" && backupIntervalValue <= 0)) { setBackupIntervalValue(1); saveSettings({ backupIntervalValue: 1 }); } }} className="h-9 w-16 rounded-xl border border-border bg-background px-2 text-center text-sm font-bold" />
-                    <CustomSelect value={backupIntervalUnit} triggerClassName="h-9 w-24 rounded-xl border-border bg-background text-xs font-bold" onChange={(val) => { setBackupIntervalUnit(val); saveSettings({ backupIntervalUnit: val }); }} options={[{ value: "hours", label: "小时" }, { value: "days", label: "天" }, { value: "weeks", label: "周" }]} />
+              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <div className="rounded-2xl border border-border/50 bg-white/72 p-4 dark:bg-white/[0.04]">
+                  <div className="text-sm font-black text-foreground">备份频率</div>
+                  <div className="mt-1 text-xs text-muted-foreground">设置自动备份执行间隔。</div>
+                  <div className="mt-4 flex items-center gap-2">
+                    <input type="number" min="1" value={backupIntervalValue} onChange={(e) => { const val = e.target.value; if (val === "") return setBackupIntervalValue(""); const num = parseInt(val); setBackupIntervalValue(isNaN(num) ? "" : num); if (!isNaN(num)) saveSettings({ backupIntervalValue: num }, { silent: true }); }} onBlur={() => { if (backupIntervalValue === "" || (typeof backupIntervalValue === "number" && backupIntervalValue <= 0)) { setBackupIntervalValue(1); saveSettings({ backupIntervalValue: 1 }); } }} className="h-11 w-24 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+                    <CustomSelect value={backupIntervalUnit} triggerClassName="h-11 w-24 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 text-sm font-bold focus:ring-2 focus:ring-primary/20 transition-all" onChange={(val) => { setBackupIntervalUnit(val); saveSettings({ backupIntervalUnit: val }); }} options={[{ value: "hours", label: "小时" }, { value: "days", label: "天" }, { value: "weeks", label: "周" }]} />
                   </div>
                 </div>
-                <div className="rounded-2xl border border-border/50 bg-background px-4 py-4">
-                  <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">保留份数</div>
-                  <div className="relative">
-                    <input type="number" min="1" max="100" value={backupRetention} onChange={(e) => { const val = e.target.value; if (val === "") return setBackupRetention(""); const num = parseInt(val); setBackupRetention(isNaN(num) ? "" : num); if (!isNaN(num)) saveSettings({ backupRetention: num }, { silent: true }); }} onBlur={() => { if (backupRetention === "" || (typeof backupRetention === "number" && backupRetention <= 0)) { setBackupRetention(10); saveSettings({ backupRetention: 10 }); } }} className="h-9 w-full rounded-xl border border-border bg-background pl-3 pr-10 text-sm font-bold" />
+                <div className="rounded-2xl border border-border/50 bg-white/72 p-4 dark:bg-white/[0.04]">
+                  <div className="text-sm font-black text-foreground">保留份数</div>
+                  <div className="mt-1 text-xs text-muted-foreground">超过数量后自动清理旧归档。</div>
+                  <div className="mt-4 relative w-full max-w-[140px]">
+                    <input type="number" min="1" max="100" value={backupRetention} onChange={(e) => { const val = e.target.value; if (val === "") return setBackupRetention(""); const num = parseInt(val); setBackupRetention(isNaN(num) ? "" : num); if (!isNaN(num)) saveSettings({ backupRetention: num }, { silent: true }); }} onBlur={() => { if (backupRetention === "" || (typeof backupRetention === "number" && backupRetention <= 0)) { setBackupRetention(10); saveSettings({ backupRetention: 10 }); } }} className="h-10 w-full rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 pl-3 pr-8 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground/50">份</span>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-border/50 bg-background px-4 py-4">
-                  <div className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">立即执行</div>
-                  <button onClick={handleManualBackup} disabled={isCreatingBackup} className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[11px] font-black text-primary-foreground disabled:opacity-50">
-                    {isCreatingBackup ? <div className="h-3 w-3 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" /> : <Zap size={12} fill="currentColor" />}
-                    立即触发备份
-                  </button>
+                <div className="rounded-2xl border border-border/50 bg-white/72 p-4 dark:bg-white/[0.04]">
+                  <div className="text-sm font-black text-foreground">立即执行</div>
+                  <div className="mt-1 text-xs text-muted-foreground">马上生成一份新备份。</div>
+                  <div className="mt-4">
+                    <button onClick={handleManualBackup} disabled={isCreatingBackup} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground disabled:opacity-50">
+                      {isCreatingBackup ? <div className="h-3 w-3 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" /> : <Zap size={14} fill="currentColor" />}
+                      立即触发备份
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-border/60 bg-background/75 p-5 shadow-sm">
+            <div className="rounded-3xl border border-border/60 bg-white/75 p-4 shadow-sm dark:bg-white/5 sm:p-5">
               <div role="button" tabIndex={0} onClick={() => setWebdavOpen(!webdavOpen)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setWebdavOpen(!webdavOpen); } }} className="flex flex-col gap-4 cursor-pointer sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Cloud size={16} /></div>
+                  <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Cloud size={16} />
+                  </div>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2"><div className="text-sm font-black text-foreground">WebDAV 云端同步</div>{!webdavEnabled && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">已禁用</span>}</div>
-                    <div className="mt-1 text-xs leading-relaxed text-muted-foreground">将备份自动同步至远程 WebDAV 服务器，减少单机归档风险。</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-black text-foreground">WebDAV 云端同步</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void handleTestWebDAV(); }}
+                        disabled={isTestingWebDAV}
+                        title="测试 WebDAV 连接"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-white/84 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 dark:bg-white/[0.05]"
+                      >
+                        {isTestingWebDAV ? <div className="h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" /> : <Cloud size={12} />}
+                      </button>
+                      {!webdavEnabled && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">已禁用</span>}
+                    </div>
+                    <div className="mt-1 text-xs leading-relaxed text-muted-foreground">把备份同步到远程存储，避免只留单机归档。</div>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-3 sm:justify-normal">
                   <div onClick={(e) => e.stopPropagation()}><Switch checked={webdavEnabled} onChange={(checked) => { setWebdavEnabled(checked); saveSettings({ webdavEnabled: checked }); if (checked) setWebdavOpen(true); }} /></div>
-                  <div className="rounded-lg border border-border/50 bg-background p-1 text-muted-foreground/50">{webdavOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</div>
+                  <div className="rounded-lg border border-border/50 bg-white/72 p-1 text-muted-foreground/50 dark:bg-white/[0.04]">{webdavOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</div>
                 </div>
               </div>
               {webdavOpen && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} transition={{ duration: 0.2 }} className="mt-4 space-y-3 border-t border-border/40 pt-4">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <input type="text" value={webdavUrl} onChange={(e) => { setWebdavUrl(e.target.value); saveSettings({ webdavUrl: e.target.value }, { silent: true }); }} placeholder="https://nas.example.com/dav" className="h-10 rounded-xl border border-border bg-background px-4 text-xs md:col-span-2" />
-                    <input type="text" value={webdavUser} onChange={(e) => { setWebdavUser(e.target.value); saveSettings({ webdavUser: e.target.value }, { silent: true }); }} placeholder="账号" className="h-10 rounded-xl border border-border bg-background px-4 text-xs" />
-                    <input type="password" value={webdavPassword} onChange={(e) => { setWebdavPassword(e.target.value); saveSettings({ webdavPassword: e.target.value }, { silent: true }); }} placeholder="密码" className="h-10 rounded-xl border border-border bg-background px-4 text-xs" />
-                    <input type="text" value={webdavPath} onChange={(e) => { setWebdavPath(e.target.value); saveSettings({ webdavPath: e.target.value }, { silent: true }); }} placeholder="/PickNote/Backups" className="h-10 rounded-xl border border-border bg-background px-4 text-xs md:col-span-2" />
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} transition={{ duration: 0.2 }} className="mt-4 border-t border-border/40 pt-4">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <input type="text" value={webdavUrl} onChange={(e) => { setWebdavUrl(e.target.value); saveSettings({ webdavUrl: e.target.value }, { silent: true }); }} placeholder="https://nas.example.com/dav" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all lg:col-span-2" />
+                    <input type="text" value={webdavUser} onChange={(e) => { setWebdavUser(e.target.value); saveSettings({ webdavUser: e.target.value }, { silent: true }); }} placeholder="账号" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+                    <input type="password" value={webdavPassword} onChange={(e) => { setWebdavPassword(e.target.value); saveSettings({ webdavPassword: e.target.value }, { silent: true }); }} placeholder="密码" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+                    <input type="text" value={webdavPath} onChange={(e) => { setWebdavPath(e.target.value); saveSettings({ webdavPath: e.target.value }, { silent: true }); }} placeholder="/PickNote/Backups" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all lg:col-span-2" />
                   </div>
-                  <button onClick={handleTestWebDAV} disabled={isTestingWebDAV} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 text-xs font-black text-foreground disabled:opacity-50">
-                    {isTestingWebDAV ? <div className="h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" /> : <Cloud size={12} />}
-                    测试 WebDAV 连接
-                  </button>
                 </motion.div>
               )}
             </div>
           </div>
         ) : (
-          <div className="rounded-3xl border border-dashed border-border/70 bg-background/60 px-5 py-4">
+          <div className="rounded-3xl border border-dashed border-border/70 bg-white/60 px-5 py-4 dark:bg-white/[0.03]">
             <div className="text-sm font-black text-foreground">自动备份与远程同步</div>
-            <div className="mt-1 text-xs text-muted-foreground">这部分涉及全局计划任务、远程存储与系统恢复能力，仅超级管理员可调整。你仍然可以手动导出并下载现有归档。</div>
+            <div className="mt-1 text-xs text-muted-foreground">这部分涉及计划任务、远程存储与系统恢复能力，仅超级管理员可调整。</div>
           </div>
         )}
 
-        <div className="overflow-hidden rounded-3xl border border-border/60 bg-background/75 shadow-sm">
+        <div className="overflow-hidden rounded-3xl border border-border/60 bg-white/75 shadow-sm dark:bg-white/5">
           <div className="flex flex-col gap-2 border-b border-border/50 bg-white/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between dark:bg-white/[0.03]">
-            <div><div className="text-sm font-black text-foreground">备份历史记录</div><div className="mt-1 text-xs text-muted-foreground">查看服务器已有归档，按需下载、恢复或删除。</div></div>
-            <div className="rounded-full border border-border/60 bg-background px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/70">配额 {backups.length} / {backupRetention}</div>
+            <div><div className="text-sm font-black text-foreground">备份历史记录</div><div className="mt-1 text-xs text-muted-foreground">下载、恢复或删除已有归档。</div></div>
+            <div className="rounded-full border border-border/60 bg-white/72 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/70 dark:bg-white/[0.04]">配额 {backups.length} / {backupRetention}</div>
           </div>
           <div className="block sm:hidden">
             {isLoadingBackups ? (
@@ -489,7 +493,7 @@ export function DataTab({
             ) : (
               <div className="space-y-3 p-4">
                 {backups.map((item) => (
-                  <div key={item.name} className="rounded-2xl border border-border/50 bg-background px-4 py-4">
+                  <div key={item.name} className="rounded-2xl border border-border/50 bg-background/70 px-4 py-4 dark:bg-background/70">
                     <div className="flex items-start justify-between gap-3">
                       <div className="text-xs font-black text-foreground break-all">{item.name}</div>
                       <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black", item.source === "webdav" ? "bg-sky-500/10 text-sky-600 dark:text-sky-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")}>
@@ -507,7 +511,7 @@ export function DataTab({
                       </div>
                     </div>
                     <div className="mt-4 flex items-center gap-2">
-                      <button onClick={() => downloadBackupFile(item.name)} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-background text-xs font-black text-primary">
+                      <button onClick={() => downloadBackupFile(item.name)} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-white/84 text-xs font-black text-primary dark:bg-white/[0.05]">
                         <Download size={13} />
                         下载
                       </button>

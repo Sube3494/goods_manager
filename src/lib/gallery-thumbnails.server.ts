@@ -33,6 +33,26 @@ function resolveLocalUploadPath(relativeUrl: string) {
   return join(baseDir, normalized);
 }
 
+function normalizeStoragePath(input: string) {
+  let normalized = input.trim();
+
+  if (!normalized) return "";
+
+  if (/^https?:\/\//i.test(normalized)) {
+    try {
+      const url = new URL(normalized);
+      normalized = url.pathname;
+    } catch {
+      return normalized;
+    }
+  }
+
+  normalized = normalized.replace(/^\/+/, "");
+  normalized = normalized.replace(/^uploads\//, "");
+
+  return normalized;
+}
+
 async function readLocalFile(relativeUrl: string) {
   const filePath = resolveLocalUploadPath(relativeUrl);
   await access(filePath);
@@ -54,7 +74,11 @@ async function readMinioObject(objectName: string) {
   });
 
   const bucketName = settings.minioBucket || "goods-manager";
-  const stream = await client.getObject(bucketName, objectName.replace(/^\/+/, ""));
+  const normalizedObjectName = normalizeStoragePath(objectName);
+  if (!normalizedObjectName) {
+    throw new Error(`Invalid MinIO object name: ${objectName}`);
+  }
+  const stream = await client.getObject(bucketName, normalizedObjectName);
   const chunks: Buffer[] = [];
 
   await new Promise<void>((resolve, reject) => {
@@ -67,10 +91,20 @@ async function readMinioObject(objectName: string) {
 }
 
 function buildThumbnailName(relativeUrl: string) {
-  const clean = relativeUrl.replace(/^\/+/, "");
+  const clean = normalizeStoragePath(relativeUrl);
   const extIndex = clean.lastIndexOf(".");
   const base = extIndex === -1 ? clean : clean.substring(0, extIndex);
   return `${base}_thumb.jpg`;
+}
+
+function buildThumbnailFolder(url: string) {
+  const clean = normalizeStoragePath(url);
+  const segments = clean.split("/").filter(Boolean);
+  if (segments.length <= 1) {
+    return "thumbs";
+  }
+
+  return [...segments.slice(0, -1), "thumbs"].join("/");
 }
 
 function canBackfillThumbnail(url: string, type?: string | null) {
@@ -164,9 +198,7 @@ export async function backfillGalleryThumbnails(limit = 60) {
       const source = await loadOriginalBuffer(item.url);
       const thumbnailBuffer = await createThumbnailBuffer(source);
       const thumbnailName = buildThumbnailName(item.url).split("/").pop() || `thumb-${item.id}.jpg`;
-      const uploadFolder = item.url.startsWith("/uploads/")
-        ? item.url.replace(/^\/uploads\//, "").split("/").slice(0, -1).concat("thumbs").join("/")
-        : item.url.split("/").slice(0, -1).concat("thumbs").join("/");
+      const uploadFolder = buildThumbnailFolder(item.url);
 
       const uploadResult = await storage.upload(thumbnailBuffer, {
         name: thumbnailName,

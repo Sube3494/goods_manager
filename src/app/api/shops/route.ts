@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
 
     const scope = request.nextUrl.searchParams.get("scope");
     const source = request.nextUrl.searchParams.get("source");
+    const shouldSyncProfileAddresses = source === "shipping-addresses";
     const canViewAllShops = user.role === "SUPER_ADMIN" && scope === "all";
 
     if (canViewAllShops) {
@@ -45,6 +46,19 @@ export async function GET(request: NextRequest) {
       where: { id: user.id },
       select: { shippingAddresses: true },
     });
+
+    const existingShops = await prisma.shop.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!shouldSyncProfileAddresses) {
+      return NextResponse.json({
+        shops: existingShops,
+        source: "shop-table",
+        needsAddress: existingShops.length === 0,
+      });
+    }
 
     const shippingAddresses = Array.isArray(dbUser?.shippingAddresses)
       ? (dbUser.shippingAddresses as ShippingAddress[])
@@ -63,13 +77,12 @@ export async function GET(request: NextRequest) {
       .filter((item) => item.name && item.address);
 
     if (normalizedAddresses.length === 0) {
-      return NextResponse.json({ shops: [], source: "shipping-addresses", needsAddress: true });
+      return NextResponse.json({
+        shops: existingShops,
+        source: "shop-table",
+        needsAddress: true,
+      });
     }
-
-    const existingShops = await prisma.shop.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-    });
 
     const createdShops: typeof existingShops = [];
     const touchedShopIds = new Set<string>();

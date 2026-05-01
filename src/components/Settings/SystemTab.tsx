@@ -51,13 +51,13 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
         <div className="space-y-4 p-4 md:p-5">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             {overview.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-border/50 bg-background/75 px-4 py-4 shadow-sm">
+              <div key={item.label} className="rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04]">
                 <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">{item.label}</div>
                 <div className={cn("mt-2 text-sm font-black", item.tone)}>{item.value}</div>
               </div>
             ))}
           </div>
-          <div className="rounded-3xl border border-amber-500/15 bg-amber-500/5 px-5 py-4">
+          <div className="rounded-3xl border border-amber-500/15 bg-white/72 px-5 py-4 shadow-sm dark:bg-white/[0.04]">
             <div className="flex items-start gap-3">
               <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" />
               <div>
@@ -82,7 +82,7 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 p-4 md:p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="rounded-3xl border border-border/50 bg-background/75 p-5 shadow-sm">
+          <div className="rounded-3xl border border-border/50 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
             <div className="text-sm font-black text-foreground">技术栈</div>
             <div className="mt-1 text-xs text-muted-foreground">系统构建依赖的主要框架、运行库和数据层。</div>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -96,7 +96,7 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
                 { name: "Lucide Icons", desc: "图标库", color: "text-pink-500", bg: "bg-pink-500/5" },
                 { name: "MinIO", desc: "对象存储 (可选)", color: "text-amber-500", bg: "bg-amber-500/5" },
               ].map((tech) => (
-                <div key={tech.name} className={cn("rounded-2xl border border-border/40 px-4 py-3", tech.bg)}>
+                <div key={tech.name} className={cn("rounded-2xl border border-border/40 bg-white/68 px-4 py-3 shadow-sm dark:bg-white/[0.04]", tech.bg)}>
                   <div className={cn("text-sm font-black", tech.color)}>{tech.name}</div>
                   <div className="mt-1 text-xs text-muted-foreground">{tech.desc}</div>
                 </div>
@@ -104,7 +104,7 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-border/50 bg-background/75 p-5 shadow-sm">
+          <div className="rounded-3xl border border-border/50 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
             <div className="text-sm font-black text-foreground">功能模块</div>
             <div className="mt-1 text-xs text-muted-foreground">当前系统覆盖的业务能力与主要管理边界。</div>
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -118,7 +118,7 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
                 { name: "刷单管理", desc: "计划与订单", icon: BookOpen },
                 { name: "系统设置", desc: "全局配置中心", icon: Shield },
               ].map((mod) => (
-                <div key={mod.name} className="rounded-2xl border border-border/40 bg-background px-4 py-3">
+                <div key={mod.name} className="rounded-2xl border border-border/40 bg-white/68 px-4 py-3 shadow-sm dark:bg-white/[0.04]">
                   <div className="flex items-center gap-2">
                     <mod.icon size={13} className="text-muted-foreground/70" />
                     <div className="text-sm font-black text-foreground">{mod.name}</div>
@@ -144,7 +144,7 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
           </div>
         </div>
         <div className="space-y-4 p-4 md:p-5">
-          <div className="rounded-3xl border border-border/50 bg-background/75 p-5 shadow-sm">
+          <div className="rounded-3xl border border-border/50 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <Shield size={20} />
@@ -160,7 +160,7 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-3xl border border-border/50 bg-background/75 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-3xl border border-border/50 bg-white/72 px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-white/[0.04]">
             <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
               <BookOpen size={13} />
               文档与帮助

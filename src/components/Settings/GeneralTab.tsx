@@ -68,7 +68,7 @@ export function GeneralTab({ theme, setTheme, lowStockThreshold, setLowStockThre
                 }}
                 className={cn(
                   "rounded-3xl border px-5 py-5 text-left transition-all",
-                  theme === option.id ? "border-primary/25 bg-primary/[0.07] shadow-sm" : "border-border/60 bg-background/70 hover:border-border hover:bg-background"
+                  theme === option.id ? "border-primary/25 bg-primary/[0.07] shadow-sm" : "border-border/60 bg-white/72 shadow-sm hover:border-border dark:bg-white/[0.04]"
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -99,7 +99,7 @@ export function GeneralTab({ theme, setTheme, lowStockThreshold, setLowStockThre
           </div>
         </div>
         <div className="p-4 md:p-5">
-          <div className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-background/75 px-5 py-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-white/72 px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between dark:bg-white/[0.04]">
             <div className="max-w-xl">
               <div className="text-sm font-black text-foreground">库存低位预警阈值</div>
               <div className="mt-1 text-xs leading-relaxed text-muted-foreground">当商品库存数量低于这个值时，系统会在首页及库存列表中标记为“预警”状态。</div>
@@ -124,7 +124,7 @@ export function GeneralTab({ theme, setTheme, lowStockThreshold, setLowStockThre
                     saveSettings({ lowStockThreshold: 10 });
                   }
                 }}
-                className="h-11 w-full rounded-2xl border border-border bg-background px-3 pr-10 text-center text-base font-black outline-none no-spinner"
+                className="h-11 w-full rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-3 pr-10 text-center text-base font-black outline-none no-spinner focus:ring-2 focus:ring-primary/20 transition-all"
               />
               <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/50">件</div>
             </div>
