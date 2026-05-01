@@ -876,32 +876,34 @@ export function PurchaseOrderModal({
 
                                 <div className="rounded-2xl border border-border/50 bg-white/70 p-4 shadow-sm dark:bg-white/5">
                                     <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                        <MapPin size={13} /> 归属店铺
+                                        <MapPin size={13} /> 收货地址
                                     </div>
                                     {readOnly ? (
                                         <div className="flex min-h-[42px] items-center text-sm font-semibold text-foreground">
-                                            {formData.shopName || "未指定店铺"}
+                                            {formData.shippingAddress || "未设置地址"}
                                         </div>
                                     ) : (
                                         <CustomSelect 
-                                            value={formData.shopName || ""}
+                                            value={formData.shippingAddress || ""}
                                             onChange={(val) => {
-                                                const matched = addressList.find(a => a.label === val);
+                                                const matched = addressList.find(a => a.address === val);
                                                 setFormData({
                                                     ...formData,
-                                                    shopName: val,
-                                                    shippingAddress: matched?.address || formData.shippingAddress || ""
+                                                    shippingAddress: val,
+                                                    shopName: matched?.label || formData.shopName || ""
                                                 });
                                             }}
-                                            options={shops.map((shop) => ({
-                                                value: shop.name,
-                                                label: shop.name
-                                            }))}
-                                            placeholder="选择店铺..."
+                                            options={addressList
+                                                .filter((item) => !!item.address)
+                                                .map((item) => ({
+                                                    value: item.address || "",
+                                                    label: item.label || item.address || "未命名地址"
+                                                }))}
+                                            placeholder="选择个人资料里的收货地址..."
                                             className="h-[42px]"
                                             triggerClassName="h-[42px] rounded-xl"
-                                            onAddNew={() => router.push("/distance-calc")}
-                                            addNewLabel="管理店铺"
+                                            onAddNew={() => router.push("/profile#address-library")}
+                                            addNewLabel="管理地址"
                                         />
                                     )}
                                 </div>
