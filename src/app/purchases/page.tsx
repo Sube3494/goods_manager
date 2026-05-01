@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -9,6 +9,7 @@ import { PurchaseOrder, User as UserType } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Pagination } from "@/components/ui/Pagination";
+import { ActionBar } from "@/components/ui/ActionBar";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
@@ -114,6 +115,7 @@ function PurchasesContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<string[]>([]);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     onConfirm: () => void;
@@ -264,6 +266,12 @@ function PurchasesContent() {
     });
   };
 
+  const togglePurchaseSelection = useCallback((id: string) => {
+    setSelectedPurchaseIds((prev) => (
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    ));
+  }, []);
+
 
 
 
@@ -350,6 +358,7 @@ function PurchasesContent() {
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
+  const selectedPurchases = purchases.filter((purchase) => selectedPurchaseIds.includes(purchase.id));
 
   useEffect(() => {
     setCurrentPage(1);
@@ -360,6 +369,55 @@ function PurchasesContent() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  const handleBatchDelete = useCallback(() => {
+    if (selectedPurchases.length === 0) return;
+
+    const receivedCount = selectedPurchases.filter((purchase) => purchase.status === "Received").length;
+    const message = receivedCount > 0
+      ? `已选 ${selectedPurchases.length} 张采购单，其中 ${receivedCount} 张已入库。批量删除不会回滚库存，确定继续吗？`
+      : `确定删除已选中的 ${selectedPurchases.length} 张采购单吗？此操作不可恢复。`;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: "批量删除采购单",
+      message,
+      onConfirm: async () => {
+        try {
+          const results = await Promise.allSettled(
+            selectedPurchases.map((purchase) =>
+              fetch(`/api/purchases/${purchase.id}`, { method: "DELETE" }).then(async (res) => {
+                if (!res.ok) {
+                  const data = await res.json().catch(() => ({}));
+                  throw new Error(data.error || `删除失败: ${purchase.id}`);
+                }
+                return purchase.id;
+              })
+            )
+          );
+
+          const successIds = results
+            .filter((result): result is PromiseFulfilledResult<string> => result.status === "fulfilled")
+            .map((result) => result.value);
+          const failedCount = results.length - successIds.length;
+
+          if (successIds.length > 0) {
+            setPurchases((prev) => prev.filter((purchase) => !successIds.includes(purchase.id)));
+            setSelectedPurchaseIds([]);
+          }
+
+          if (failedCount > 0) {
+            showToast(`已删除 ${successIds.length} 张，失败 ${failedCount} 张`, "error");
+          } else {
+            showToast(`已删除 ${successIds.length} 张采购单`, "success");
+          }
+        } catch (error) {
+          console.error("Batch delete purchases failed:", error);
+          showToast("批量删除失败", "error");
+        }
+      }
+    });
+  }, [selectedPurchases, showToast]);
 
   const handleExport = useCallback(async (specificPO?: PurchaseOrder) => {
     const targets = specificPO ? [specificPO] : filteredPurchases;
@@ -694,7 +752,32 @@ function PurchasesContent() {
           <table className="w-full text-left border-collapse min-w-200 table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">序号</th>
+                <th className="w-[52px] px-0 py-3 text-center align-middle">
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedPurchaseIds.length === filteredPurchases.length) {
+                          setSelectedPurchaseIds([]);
+                        } else {
+                          setSelectedPurchaseIds(filteredPurchases.map((purchase) => purchase.id));
+                        }
+                      }}
+                      className={`relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                        selectedPurchaseIds.length === filteredPurchases.length && filteredPurchases.length > 0
+                          ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
+                          : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
+                      }`}
+                    >
+                      {selectedPurchaseIds.length === filteredPurchases.length && filteredPurchases.length > 0 ? (
+                        <Check size={12} strokeWidth={4} />
+                      ) : null}
+                    </button>
+                  </div>
+                </th>
+                <th className="w-[64px] px-0 py-3 text-xs font-bold text-foreground text-center whitespace-nowrap align-middle">
+                  <div className="flex justify-center">序号</div>
+                </th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">归属店铺</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">商品与数量</th>
                 <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">交易金额</th>
@@ -717,10 +800,30 @@ function PurchasesContent() {
                     transition={{ duration: 0.2 }}
                     className="hover:bg-muted/20 transition-colors group"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="text-xs font-bold text-muted-foreground">
-                        {(currentPage - 1) * pageSize + index + 1}
-                      </span>
+                    <td className="w-[52px] px-0 py-3 text-center align-middle">
+                      <div className="flex justify-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePurchaseSelection(po.id);
+                          }}
+                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                            selectedPurchaseIds.includes(po.id)
+                              ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
+                              : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
+                          }`}
+                        >
+                          {selectedPurchaseIds.includes(po.id) ? <Check size={12} strokeWidth={4} /> : null}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="w-[64px] px-0 py-3 whitespace-nowrap text-center align-middle">
+                      <div className="flex justify-center">
+                        <span className="text-xs font-bold text-muted-foreground">
+                          {(currentPage - 1) * pageSize + index + 1}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {po.shopName ? (
@@ -1001,6 +1104,21 @@ function PurchasesContent() {
         isOpen={overviewPurchases.length > 0}
         onClose={() => setOverviewPurchases([])}
         purchases={overviewPurchases}
+      />
+
+      <ActionBar
+        selectedCount={selectedPurchaseIds.length}
+        totalCount={filteredPurchases.length}
+        onToggleSelectAll={() => {
+          if (selectedPurchaseIds.length === filteredPurchases.length) {
+            setSelectedPurchaseIds([]);
+          } else {
+            setSelectedPurchaseIds(filteredPurchases.map((purchase) => purchase.id));
+          }
+        }}
+        onClear={() => setSelectedPurchaseIds([])}
+        label="张采购单"
+        onDelete={canEdit ? handleBatchDelete : undefined}
       />
 
     </div>
