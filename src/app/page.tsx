@@ -31,6 +31,7 @@ export default function Home() {
   const [endDate, setEndDate] = useState("");
   const [shopOptions, setShopOptions] = useState<Shop[]>([]);
   const [selectedShopName, setSelectedShopName] = useState("");
+  const todayDate = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -111,6 +112,20 @@ export default function Home() {
   }, [fetchData, startDate, endDate]);
 
   useEffect(() => {
+    if (startDate && startDate > todayDate) {
+      setStartDate(todayDate);
+      return;
+    }
+    if (endDate && endDate > todayDate) {
+      setEndDate(todayDate);
+      return;
+    }
+    if (startDate && endDate && endDate < startDate) {
+      setEndDate(startDate);
+    }
+  }, [endDate, startDate, todayDate]);
+
+  useEffect(() => {
     if (rangePreset === "custom") return;
     if (rangePreset === "all") {
       const today = new Date();
@@ -141,15 +156,12 @@ export default function Home() {
 
   return (
     <div className="relative px-2 sm:px-1">
-      <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 duration-700 sm:space-y-8">
+      <div className="animate-in fade-in slide-in-from-bottom-4 space-y-5 duration-700 sm:space-y-8">
         <section className="overflow-hidden rounded-[24px] border border-black/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,244,245,0.78)_48%,rgba(239,246,255,0.78)_100%)] px-4 py-4 shadow-xs dark:border-white/10 dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03)_48%,rgba(14,165,233,0.05)_100%)] sm:px-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-end justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="inline-flex items-center rounded-full border border-black/8 bg-white/70 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground dark:border-white/10 dark:bg-white/[0.05]">
-                Dashboard
-              </div>
-              <h1 className="mt-3 text-2xl font-black tracking-tight text-foreground sm:text-3xl">概览</h1>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              <h1 className="text-[30px] font-black leading-none tracking-tight text-foreground sm:text-3xl">概览</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
                 经营结果与趋势
               </p>
             </div>
@@ -157,7 +169,7 @@ export default function Home() {
             <button
               onClick={() => fetchData(false)}
               disabled={isLoading}
-              className="group relative flex h-11 shrink-0 items-center gap-3 self-start rounded-2xl border border-black/8 bg-white/75 px-4 transition-all hover:border-primary/30 hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+              className="group relative flex h-11 shrink-0 items-center gap-2.5 rounded-2xl border border-black/8 bg-white/75 px-3 transition-all hover:border-primary/30 hover:bg-white sm:gap-3 sm:px-4 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className={`flex h-6 w-6 items-center justify-center rounded-full ${isLoading ? "bg-primary/20" : "bg-black/5 transition-colors group-hover:bg-primary/15 dark:bg-white/10"}`}>
                 <RefreshCw
@@ -170,10 +182,10 @@ export default function Home() {
               </div>
 
               <div className="flex flex-col items-start leading-none">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                   {isLoading ? "同步中..." : "系统同步"}
                 </span>
-                <span className="mt-1 text-xs font-mono tabular-nums text-foreground/80">
+                <span className="mt-1 text-[11px] font-mono tabular-nums text-foreground/80 sm:text-xs">
                   {lastSynced && !isLoading ? format(lastSynced, "HH:mm:ss") : "点击刷新"}
                 </span>
               </div>

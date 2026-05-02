@@ -62,6 +62,12 @@ type OrderResponse = {
     itemCount: number;
     totalDeliveryFee: number;
   };
+  overview?: {
+    totalCount: number;
+    trueOrderCount: number;
+    brushCount: number;
+    cancelledCount: number;
+  };
 };
 
 type LocalShopOption = {
@@ -158,6 +164,25 @@ function getExpectedIncome(expectedIncome: number | null | undefined, actualPaid
   const paid = Number(actualPaid || 0);
   const commission = Number(platformCommission || 0);
   return paid - commission;
+}
+
+function summarizeOrders(orders: AutoPickOrder[]) {
+  return orders.reduce((acc, order) => {
+    if (!isCancelledStatus(order.status)) {
+      acc.receivedAmount += Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
+      acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
+      acc.validOrderCount += 1;
+    }
+    acc.itemCount += getItemCount(order.items);
+    acc.totalDeliveryFee += getDeliveryFee(order.delivery);
+    return acc;
+  }, {
+    receivedAmount: 0,
+    platformCommission: 0,
+    validOrderCount: 0,
+    itemCount: 0,
+    totalDeliveryFee: 0,
+  });
 }
 
 function getOrderActionErrorMessage(raw: unknown) {
@@ -1590,6 +1615,12 @@ export default function OrdersPage() {
     itemCount: 0,
     totalDeliveryFee: 0,
   });
+  const [overview, setOverview] = useState<NonNullable<OrderResponse["overview"]>>({
+    totalCount: 0,
+    trueOrderCount: 0,
+    brushCount: 0,
+    cancelledCount: 0,
+  });
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<OrdersTab>("today");
@@ -1672,6 +1703,20 @@ export default function OrdersPage() {
       documentElement.style.overflow = previousHtmlOverflow;
     };
   }, [isBrushSyncPickerOpen, isIntegrationOpen]);
+
+  useEffect(() => {
+    if (startDate && startDate > todayDate) {
+      setStartDate(todayDate);
+      return;
+    }
+    if (endDate && endDate > todayDate) {
+      setEndDate(todayDate);
+      return;
+    }
+    if (startDate && endDate && endDate < startDate) {
+      setEndDate(startDate);
+    }
+  }, [endDate, startDate, todayDate]);
 
   const fetchIntegrationConfig = useCallback(async () => {
     try {
@@ -1763,6 +1808,7 @@ export default function OrdersPage() {
       setPlatforms(Array.isArray(payload.filters?.platforms) ? payload.filters.platforms : []);
       setStatuses(Array.isArray(payload.filters?.statuses) ? payload.filters.statuses : []);
       setSummary(payload.summary || { receivedAmount: 0, platformCommission: 0, validOrderCount: 0, itemCount: 0, totalDeliveryFee: 0 });
+      setOverview(payload.overview || { totalCount: payload.meta?.total || 0, trueOrderCount: 0, brushCount: 0, cancelledCount: 0 });
     } catch (error) {
       console.error("Failed to fetch orders:", error);
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
@@ -2269,10 +2315,19 @@ export default function OrdersPage() {
     [activeTab, filteredOrders, todayCompletedOrders]
   );
   const brushSyncSelectionPool = eligibleBrushSyncOrders;
-  const ordersForOverview = activeTab === "today" ? filteredOrders : visibleOrders;
+  const overviewOrderCount = activeTab === "today" ? filteredOrders.length : meta.total;
   const orderOverviewCounts = useMemo(() => {
-    const cancelledCount = ordersForOverview.filter((item) => isCancelledStatus(item.status)).length;
-    const validOrders = ordersForOverview.filter((item) => !isCancelledStatus(item.status));
+    if (activeTab === "all" && shop === "all") {
+      return {
+        validCount: Math.max(0, overview.totalCount - overview.cancelledCount),
+        trueOrderCount: overview.trueOrderCount,
+        brushCount: overview.brushCount,
+        cancelledCount: overview.cancelledCount,
+      };
+    }
+    const sourceOrders = activeTab === "today" ? filteredOrders : visibleOrders;
+    const cancelledCount = sourceOrders.filter((item) => isCancelledStatus(item.status)).length;
+    const validOrders = sourceOrders.filter((item) => !isCancelledStatus(item.status));
     const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery).length;
     const trueOrderCount = Math.max(0, validOrders.length - brushCount);
     return {
@@ -2281,7 +2336,14 @@ export default function OrdersPage() {
       brushCount,
       cancelledCount,
     };
-  }, [ordersForOverview]);
+  }, [activeTab, filteredOrders, overview, shop, visibleOrders]);
+  const remainingOrderCount = Math.max(0, meta.total - visibleOrders.length);
+  const displayedSummary = useMemo(() => {
+    if (shop === "all") {
+      return summary;
+    }
+    return summarizeOrders(activeTab === "today" ? filteredOrders : visibleOrders);
+  }, [activeTab, filteredOrders, shop, summary, visibleOrders]);
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || startDate || endDate);
 
   const openBrushSyncPicker = useCallback(() => {
@@ -2485,8 +2547,8 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                   <div className="min-w-0">
                     <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
-                    <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{ordersForOverview.length}</div>
-                    <p className="mt-2 text-xs text-muted-foreground">{activeTab === "today" ? "今日订单分布" : "当前结果页分布"}</p>
+                    <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{overviewOrderCount}</div>
+                    <p className="mt-2 text-xs text-muted-foreground">{activeTab === "today" ? "今日订单分布" : (shop === "all" ? `当前筛选共 ${meta.total} 单` : `当前筛选共 ${meta.total} 单，分类为已加载店铺部分`)}</p>
                   </div>
                   <div className="flex min-w-24.5 max-w-31.5 flex-col items-stretch gap-1">
                     <div className="inline-flex items-center justify-between rounded-full border border-sky-500/18 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400">
@@ -2506,13 +2568,13 @@ export default function OrdersPage() {
               </div>
               <MetricCard
                 label="商家实收"
-                value={toCurrency(summary.receivedAmount)}
-                hint={`有效订单 ${summary.validOrderCount} 单`}
+                value={toCurrency(displayedSummary.receivedAmount)}
+                hint={`有效订单 ${displayedSummary.validOrderCount} 单`}
               />
               <MetricCard
                 label="总配送费"
-                value={toCurrency(summary.totalDeliveryFee)}
-                hint="当前结果页汇总"
+                value={toCurrency(displayedSummary.totalDeliveryFee)}
+                hint={activeTab === "today" ? "今日订单汇总" : (shop === "all" ? "当前筛选汇总" : "当前已加载店铺汇总")}
               />
             </div>
 
@@ -2576,6 +2638,7 @@ export default function OrdersPage() {
                     value={startDate}
                     onChange={setStartDate}
                     placeholder="开始日期"
+                    maxDate={endDate || todayDate}
                     className="h-11 w-full"
                     triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
                   />
@@ -2583,6 +2646,8 @@ export default function OrdersPage() {
                     value={endDate}
                     onChange={setEndDate}
                     placeholder="结束日期"
+                    minDate={startDate || undefined}
+                    maxDate={todayDate}
                     className="h-11 w-full"
                     triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
                   />
@@ -2590,17 +2655,6 @@ export default function OrdersPage() {
               )}
             </div>
 
-            {activeTab === "today" ? null : (
-              <div className="flex flex-col gap-3 rounded-[20px] border border-black/8 bg-white/70 px-4 py-3 dark:border-white/10 dark:bg-white/3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">连续浏览</div>
-                  <p className="mt-1 text-xs text-muted-foreground">全部订单不再分页截断，向下浏览时按批次继续加载。</p>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  已加载 <span className="font-semibold text-foreground">{visibleOrders.length}</span> / {meta.total}
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
@@ -2681,7 +2735,7 @@ export default function OrdersPage() {
                   className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-5 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
                   {isLoadingMore ? <Loader2 size={15} className="animate-spin" /> : <ChevronDown size={15} />}
-                  {isLoadingMore ? "加载中..." : "加载更多"}
+                  {isLoadingMore ? "加载中..." : `继续加载 ${remainingOrderCount} 单`}
                 </button>
               ) : (
                 <div className="text-sm text-muted-foreground">全部订单已加载完成</div>

@@ -71,8 +71,8 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
     activeTab === "inbound"
       ? {
           icon: <BadgePlus size={14} />,
-          title: "最近入库",
-          subtitle: "最近入库商品",
+          title: "最近出库",
+          subtitle: "最近出库商品",
           actionLabel: "历史记录",
           onAction: () => router.push("/inbound"),
         }
@@ -99,7 +99,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
       return (
         <div className="flex flex-col items-center justify-center py-10 text-center opacity-35">
           <Package size={34} className="text-muted-foreground" />
-          <p className="mt-3 text-[11px] font-bold tracking-widest text-muted-foreground">暂无入库记录</p>
+          <p className="mt-3 text-[11px] font-bold tracking-widest text-muted-foreground">暂无出库记录</p>
         </div>
       );
     }
@@ -140,7 +140,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
               </div>
               <div className="flex items-center justify-between gap-3 border-t border-black/6 pt-2 dark:border-white/8 sm:w-[88px] sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-3 sm:text-right">
                 <div className="text-[10px] font-bold text-muted-foreground sm:w-full sm:text-right">
-                  最近入库
+                  最近出库
                 </div>
                 <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground sm:mt-1 sm:w-full sm:justify-end sm:text-[9px]">
                   <Clock size={10} strokeWidth={3} className="shrink-0" />
@@ -189,7 +189,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
         <AnimatePresence initial={false}>
           {topItems.map((item, index) => (
             <motion.div
-              key={item.productId}
+              key={`${item.productId}-${item.latestOutboundAt || "unknown"}-${index}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
@@ -297,7 +297,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
                 : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
             )}
           >
-            最近入库
+            最近出库
           </button>
           <button
             type="button"

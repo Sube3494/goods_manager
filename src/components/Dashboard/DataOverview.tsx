@@ -13,17 +13,19 @@ function Panel({
   action,
   children,
   className,
+  actionMobileStack = false,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  actionMobileStack?: boolean;
 }) {
   return (
     <section className={cn("rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5", className)}>
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
+      <div className={cn("mb-4 flex gap-4", actionMobileStack ? "flex-col sm:flex-row sm:items-start sm:justify-between" : "items-start justify-between")}>
+        <div className="min-w-0">
           <h2 className="text-base font-black tracking-tight text-foreground sm:text-lg">{title}</h2>
           {subtitle ? <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</p> : null}
         </div>
@@ -46,11 +48,11 @@ function HeroMetric({
   tone?: "default" | "danger" | "success";
 }) {
   return (
-    <div className="rounded-[22px] border border-black/8 bg-white/80 px-4 py-4 dark:border-white/10 dark:bg-white/[0.05]">
+    <div className="rounded-[20px] border border-black/8 bg-white/80 px-3.5 py-3.5 dark:border-white/10 dark:bg-white/[0.05] sm:px-4 sm:py-4">
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
       <div
         className={cn(
-          "mt-2 text-2xl font-black tracking-tight tabular-nums sm:text-3xl",
+          "mt-2 text-[28px] font-black leading-none tracking-tight tabular-nums sm:text-3xl",
           tone === "danger" ? "text-red-500" : tone === "success" ? "text-emerald-500" : "text-foreground"
         )}
       >
@@ -61,10 +63,38 @@ function HeroMetric({
   );
 }
 
+function CompactMetric({
+  label,
+  value,
+  hint,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "default" | "danger" | "success";
+}) {
+  return (
+    <div className="rounded-[18px] border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04] sm:px-4 sm:py-3.5">
+      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div
+        className={cn(
+          "mt-2 text-lg font-black tracking-tight tabular-nums sm:text-xl",
+          tone === "danger" ? "text-red-500" : tone === "success" ? "text-emerald-500" : "text-foreground"
+        )}
+      >
+        {value}
+      </div>
+      {hint ? <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
 const money = (value: number | undefined) =>
   `${Number(value || 0) < 0 ? "-" : ""}¥${Math.abs(Number(value || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const int = (value: number | undefined) => Number(value || 0).toLocaleString();
+const percent = (value: number) => `${value.toFixed(1)}%`;
 
 function countDays(startDate: string, endDate: string) {
   if (!startDate || !endDate) return 0;
@@ -142,8 +172,10 @@ export function DataOverview({
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
 }) {
+  const todayDate = new Date().toISOString().slice(0, 10);
   const [profitPlatform, setProfitPlatform] = useState("all");
   const [orderPlatform, setOrderPlatform] = useState("all");
+  const [orderScope, setOrderScope] = useState<"all" | "true">("all");
   const businessTrend = data?.businessTrend || [];
   const rangeDays = useMemo(() => countDays(startDate, endDate), [endDate, startDate]);
   const matrix = data?.platformMatrix;
@@ -157,12 +189,24 @@ export function DataOverview({
   ];
   const profitTrend = profitPlatform === "all" ? businessTrend : (platformBusinessTrend[profitPlatform] || []);
   const orderTrend = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);
+  const orderSeriesKey = orderScope === "true" ? "trueOrderCount" : "orderCount";
+  const orderSeriesColor = orderScope === "true" ? "#10b981" : "#0ea5e9";
+  const orderTooltipNameMap = orderScope === "true"
+    ? { trueOrderCount: "真单数" }
+    : { orderCount: "订单数" };
+  const totalOrders = matrix?.grandTotal || 0;
+  const trueOrders = matrix?.trueOrderTotal || 0;
+  const brushOrders = matrix?.brushOrderTotal || 0;
+  const cancelledLikeGap = Math.max(0, totalOrders - trueOrders - brushOrders);
+  const trueShare = totalOrders > 0 ? (trueOrders / totalOrders) * 100 : 0;
+  const brushShare = totalOrders > 0 ? (brushOrders / totalOrders) * 100 : 0;
+  const contextLabel = selectedShopName ? `${selectedShopName} · ${int(rangeDays)} 天` : `全部店铺 · ${int(rangeDays)} 天`;
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <section className="rounded-[24px] border border-black/8 bg-zinc-50/45 px-4 py-3 shadow-xs dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div className="col-span-1 space-y-2">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">店铺范围</label>
             <CustomSelect
               value={selectedShopName}
@@ -172,7 +216,7 @@ export function DataOverview({
               triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
             />
           </div>
-          <div className="space-y-2">
+          <div className="col-span-1 space-y-2">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">时间范围</label>
             <CustomSelect
               value={rangePreset}
@@ -188,18 +232,18 @@ export function DataOverview({
               triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
             />
           </div>
-          <div className="space-y-2">
+          <div className="col-span-1 space-y-2">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">起始日期</label>
             <DatePicker
               value={startDate}
               onChange={onStartDateChange}
-              maxDate={endDate}
+              maxDate={endDate || todayDate}
               showClear={false}
               className="h-11 w-full"
               triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
             />
           </div>
-          <div className="space-y-2">
+          <div className="col-span-1 space-y-2">
             <div className="flex items-center justify-between gap-3">
               <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">结束日期</label>
               <span className="text-[11px] font-bold text-primary">共 {int(rangeDays)} 天</span>
@@ -208,6 +252,7 @@ export function DataOverview({
               value={endDate}
               onChange={onEndDateChange}
               minDate={startDate}
+              maxDate={todayDate}
               showClear={false}
               className="h-11 w-full"
               triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
@@ -216,23 +261,74 @@ export function DataOverview({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[32px] border border-black/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.96),rgba(244,244,245,0.8)_45%,rgba(236,253,245,0.68)_100%)] p-4 shadow-sm dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),rgba(255,255,255,0.04)_40%,rgba(16,185,129,0.06)_100%)] sm:p-5 lg:p-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <HeroMetric
-            label="总净利润"
-            value={money(data?.netProfit)}
-            hint="当前时间范围"
-            tone={Number(data?.netProfit || 0) >= 0 ? "success" : "danger"}
-          />
-          <HeroMetric
-            label="用户实付"
-            value={money(data?.userPaid)}
-            hint="当前时间范围"
-          />
+      <section className="overflow-hidden rounded-[28px] border border-black/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.97),rgba(244,244,245,0.82)_45%,rgba(240,253,244,0.72)_100%)] p-3.5 shadow-sm dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),rgba(255,255,255,0.04)_40%,rgba(16,185,129,0.06)_100%)] sm:p-5 lg:p-6">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
+          <div className="rounded-[24px] border border-black/8 bg-white/86 p-4 shadow-xs dark:border-white/10 dark:bg-white/[0.05] sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">经营概述</div>
+                <h2 className="mt-2 text-[40px] font-black leading-none tracking-tight text-foreground sm:text-[40px]">
+                  {money(data?.netProfit)}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {contextLabel}
+                </p>
+              </div>
+              <div className={cn(
+                "inline-flex self-start rounded-full px-3 py-1 text-xs font-black",
+                Number(data?.netProfit || 0) >= 0
+                  ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                  : "bg-red-500/12 text-red-500"
+              )}>
+                {Number(data?.netProfit || 0) >= 0 ? "净利润为正" : "净利润承压"}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+              <HeroMetric label="用户实付" value={money(data?.userPaid)} hint="当前范围收入" />
+              <HeroMetric label="商品成本" value={money(data?.productCost)} hint="已出库商品成本" />
+              <HeroMetric label="刷单支出" value={money(data?.brushExpense)} hint="刷单相关支出" tone={Number(data?.brushExpense || 0) > 0 ? "danger" : "default"} />
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-black/8 bg-black/[0.02] p-4 shadow-xs dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">订单结构</div>
+                <div className="mt-2 text-[32px] font-black leading-none tracking-tight text-foreground">{int(totalOrders)}</div>
+                <p className="mt-2 text-sm text-muted-foreground">当前范围累计订单</p>
+              </div>
+              <div className="rounded-2xl border border-black/8 bg-white/85 px-3 py-2 text-right dark:border-white/10 dark:bg-white/[0.05]">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">真单占比</div>
+                <div className="mt-1 text-lg font-black text-emerald-500">{percent(trueShare)}</div>
+              </div>
+            </div>
+
+            <div className="mt-5 h-3 overflow-hidden rounded-full bg-black/6 dark:bg-white/10">
+              <div className="flex h-full">
+                <div className="bg-emerald-500" style={{ width: `${trueShare}%` }} />
+                <div className="bg-rose-500" style={{ width: `${brushShare}%` }} />
+                <div className="bg-slate-300 dark:bg-slate-600" style={{ width: `${Math.max(0, 100 - trueShare - brushShare)}%` }} />
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2.5">
+              <CompactMetric label="真单" value={int(trueOrders)} hint={`占比 ${percent(trueShare)}`} tone="success" />
+              <CompactMetric label="刷单" value={int(brushOrders)} hint={`占比 ${percent(brushShare)}`} tone="danger" />
+              <CompactMetric label="其他" value={int(cancelledLikeGap)} hint="取消/未归类" />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+          <CompactMetric label="平台扣费" value={money(data?.platformCommission)} hint="平台佣金与扣点" />
+          <CompactMetric label="配送支出" value={money(data?.deliveryExpense)} hint="配送相关成本" />
+          <CompactMetric label="推广支出" value={money(data?.promotionExpense)} hint="活动与推广消耗" />
+          <CompactMetric label="活跃店铺" value={int(data?.activeShopCount)} hint="当前范围有动销的店铺" />
         </div>
       </section>
 
-      <Panel title="平台矩阵" subtitle="平台订单分布">
+      <Panel title="平台结构" subtitle="按平台查看真单与刷单的订单构成">
         <div className="space-y-3 sm:hidden">
           {[
             {
@@ -356,15 +452,28 @@ export function DataOverview({
 
         <Panel
           title="订单波动"
-          subtitle="按日期查看订单变化"
+          subtitle={orderScope === "true" ? "按日期查看真单变化" : "按日期查看订单变化"}
+          actionMobileStack
           action={(
-            <CustomSelect
-              value={orderPlatform}
-              onChange={setOrderPlatform}
-              options={platformOptions}
-              className="h-9 min-w-[116px]"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
-            />
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm.items-center">
+              <CustomSelect
+                value={orderScope}
+                onChange={(value) => setOrderScope(value as "all" | "true")}
+                options={[
+                  { value: "all", label: "全部订单" },
+                  { value: "true", label: "去除刷单" },
+                ]}
+                className="h-9 min-w-0 sm:min-w-[116px]"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              />
+              <CustomSelect
+                value={orderPlatform}
+                onChange={setOrderPlatform}
+                options={platformOptions}
+                className="h-9 min-w-0 sm:min-w-[116px]"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              />
+            </div>
           )}
         >
           <div className="h-[260px] sm:h-[290px] [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
@@ -373,8 +482,8 @@ export function DataOverview({
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={40} allowDecimals={false} />
-                <Tooltip content={<ChartTooltip valueFormatter={countTooltip} nameMap={{ orderCount: "订单数" }} />} />
-                <Line type="monotone" dataKey="orderCount" name="orderCount" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+                <Tooltip content={<ChartTooltip valueFormatter={countTooltip} nameMap={orderTooltipNameMap} />} />
+                <Line type="monotone" dataKey={orderSeriesKey} name={orderSeriesKey} stroke={orderSeriesColor} strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

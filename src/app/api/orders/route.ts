@@ -568,7 +568,9 @@ export async function GET(request: NextRequest) {
       ...(platform ? { platform } : {}),
     };
 
-    const [orders, total, platformRows, statusRows, userProfile] = await Promise.all([
+    const cancelledWhere = buildStatusWhere("已取消");
+
+    const [orders, total, platformRows, statusRows, userProfile, cancelledTotal, brushTotal, summaryOrders] = await Promise.all([
       prisma.autoPickOrder.findMany({
         where,
         select: {
@@ -639,6 +641,36 @@ export async function GET(request: NextRequest) {
         where: { id: session.id },
         select: { permissions: true },
       }),
+      prisma.autoPickOrder.count({
+        where: {
+          ...where,
+          ...(cancelledWhere || {}),
+        },
+      }),
+      prisma.autoPickOrder.count({
+        where: {
+          ...where,
+          ...(cancelledWhere ? { NOT: cancelledWhere } : {}),
+          rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true },
+        },
+      }),
+      prisma.autoPickOrder.findMany({
+        where,
+        select: {
+          platform: true,
+          status: true,
+          actualPaid: true,
+          expectedIncome: true,
+          platformCommission: true,
+          delivery: true,
+          rawPayload: true,
+          items: {
+            select: {
+              quantity: true,
+            },
+          },
+        },
+      }),
     ]);
 
     const outboundNoteNeedles = orders
@@ -674,7 +706,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const summary = orders.reduce((acc, order) => {
+    const summary = summaryOrders.reduce((acc, order) => {
       const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
       const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
       const cancelled = isAutoPickOrderCancelledStatus(order.status);
@@ -693,6 +725,12 @@ export async function GET(request: NextRequest) {
       itemCount: 0,
       totalDeliveryFee: 0,
     });
+    const overview = {
+      totalCount: total,
+      cancelledCount: cancelledTotal,
+      brushCount: brushTotal,
+      trueOrderCount: Math.max(0, total - cancelledTotal - brushTotal),
+    };
 
     const productNames = Array.from(new Set(
       orders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
@@ -816,6 +854,7 @@ export async function GET(request: NextRequest) {
         statuses: statusRows.map((item) => item.status).filter((item): item is string => Boolean(item)),
       },
       summary,
+      overview,
     });
   } catch (error) {
     console.error("Failed to fetch auto-pick orders:", error);
