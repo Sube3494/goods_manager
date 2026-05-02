@@ -191,7 +191,7 @@ export function DataOverview({
   const orderTrend = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);
   const orderSeriesKey = orderScope === "true" ? "trueOrderCount" : "orderCount";
   const orderSeriesColor = orderScope === "true" ? "#10b981" : "#0ea5e9";
-  const orderTooltipNameMap = orderScope === "true"
+  const orderTooltipNameMap: Record<string, string> = orderScope === "true"
     ? { trueOrderCount: "真单数" }
     : { orderCount: "订单数" };
   const totalOrders = matrix?.grandTotal || 0;
