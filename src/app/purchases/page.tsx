@@ -752,7 +752,7 @@ function PurchasesContent() {
           <table className="w-full text-left border-collapse min-w-200 table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="w-[52px] px-0 py-3 text-center align-middle">
+                <th className="w-[44px] px-1 py-3 text-center align-middle lg:w-[52px] lg:px-0">
                   <div className="flex justify-center">
                     <button
                       type="button"
@@ -763,7 +763,7 @@ function PurchasesContent() {
                           setSelectedPurchaseIds(filteredPurchases.map((purchase) => purchase.id));
                         }
                       }}
-                      className={`relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                      className={`relative flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 transition-all duration-300 lg:h-5 lg:w-5 ${
                         selectedPurchaseIds.length === filteredPurchases.length && filteredPurchases.length > 0
                           ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
                           : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
@@ -775,15 +775,15 @@ function PurchasesContent() {
                     </button>
                   </div>
                 </th>
-                <th className="w-[64px] px-0 py-3 text-xs font-bold text-foreground text-center whitespace-nowrap align-middle">
+                <th className="w-[52px] px-1 py-3 text-xs font-bold text-foreground text-center whitespace-nowrap align-middle lg:w-[64px] lg:px-0">
                   <div className="flex justify-center">序号</div>
                 </th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">归属店铺</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">商品与数量</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">交易金额</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">状态</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">下单时间</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">操作</th>
+                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">归属店铺</th>
+                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">商品与数量</th>
+                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">交易金额</th>
+                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">状态</th>
+                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">下单时间</th>
+                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -800,7 +800,7 @@ function PurchasesContent() {
                     transition={{ duration: 0.2 }}
                     className="hover:bg-muted/20 transition-colors group"
                   >
-                    <td className="w-[52px] px-0 py-3 text-center align-middle">
+                    <td className="w-[44px] px-1 py-3 text-center align-middle lg:w-[52px] lg:px-0">
                       <div className="flex justify-center">
                         <button
                           type="button"
@@ -808,7 +808,7 @@ function PurchasesContent() {
                             e.stopPropagation();
                             togglePurchaseSelection(po.id);
                           }}
-                          className={`relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                          className={`relative flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 transition-all duration-300 lg:h-5 lg:w-5 ${
                             selectedPurchaseIds.includes(po.id)
                               ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
                               : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
@@ -818,14 +818,14 @@ function PurchasesContent() {
                         </button>
                       </div>
                     </td>
-                    <td className="w-[64px] px-0 py-3 whitespace-nowrap text-center align-middle">
+                    <td className="w-[52px] px-1 py-3 whitespace-nowrap text-center align-middle lg:w-[64px] lg:px-0">
                       <div className="flex justify-center">
                         <span className="text-xs font-bold text-muted-foreground">
                           {(currentPage - 1) * pageSize + index + 1}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-3 py-4 whitespace-nowrap text-center lg:px-6">
                       {po.shopName ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/5 text-primary text-[10px] font-bold border border-primary/10">
                               <Store size={10} />
@@ -833,7 +833,7 @@ function PurchasesContent() {
                           </span>
                       ) : <span className="text-[10px] text-muted-foreground/30 italic">未归属</span>}
                     </td>
-                    <td className="px-6 py-4 text-sm text-center">
+                    <td className="px-3 py-4 text-sm text-center lg:px-6">
                       {(() => {
                         const summary = formatPurchaseItemsSummary(po);
                         return (
@@ -873,25 +873,25 @@ function PurchasesContent() {
                         );
                       })()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-3 py-4 whitespace-nowrap text-center lg:px-6">
                       <div className="flex items-center justify-center text-foreground font-bold">
                         <span className="mr-0.5 opacity-60">￥</span>
                         {po.totalAmount.toLocaleString()}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-3 py-4 whitespace-nowrap text-center lg:px-6">
                       <PurchaseStatusBadge status={po.status} />
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="px-3 py-4 text-sm text-muted-foreground whitespace-nowrap text-center lg:px-6">
+                      <div className="flex items-center justify-center gap-1.5 lg:gap-2">
                           <Calendar size={14} />
                           <span className="font-mono">
                               {formatLocalDateTime(po.date)}
                           </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center whitespace-nowrap">
-                      <div className="flex justify-center items-center gap-3">
+                    <td className="px-3 py-4 text-center whitespace-nowrap lg:px-6">
+                      <div className="flex justify-center items-center gap-2 lg:gap-3">
                         {/* Unified Detail/Manage Button */}
                         <button 
                             onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
