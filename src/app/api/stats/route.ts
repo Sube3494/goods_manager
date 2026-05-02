@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { FinanceMath } from "@/lib/math";
+import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
+import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
+import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
 
 function startOfDay(input: Date) {
   const date = new Date(input);
@@ -39,6 +42,149 @@ function extractShopNameFromNote(note: string | null | undefined) {
   return String(match?.[1] || "").trim();
 }
 
+function readAutoPickSystemMeta(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const candidate = (rawPayload as Record<string, unknown>).systemMeta;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+  return candidate as Record<string, unknown>;
+}
+
+function readResolvedAutoPickShop(rawPayload: unknown) {
+  const systemMeta = readAutoPickSystemMeta(rawPayload);
+  const resolvedShop = systemMeta?.resolvedShop;
+  if (!resolvedShop || typeof resolvedShop !== "object" || Array.isArray(resolvedShop)) {
+    return null;
+  }
+  const id = String((resolvedShop as Record<string, unknown>).id || "").trim();
+  const name = String((resolvedShop as Record<string, unknown>).name || "").trim();
+  if (!id && !name) {
+    return null;
+  }
+  return { id: id || null, name: name || null };
+}
+
+function readShopNameFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const extend = record.extend && typeof record.extend === "object" && !Array.isArray(record.extend)
+    ? record.extend as Record<string, unknown>
+    : null;
+  const candidates = [
+    record.rawShopName,
+    extend?.channel_name,
+    record.channel_name,
+    record.shop_name,
+    record.shopName,
+    record.storeName,
+    record.merchantName,
+    record.merchant_name,
+  ];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function readShopAddressFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const candidates = [
+    record.rawShopAddress,
+    record.shopAddress,
+    record.storeAddress,
+    record.merchantAddress,
+    record.store_address,
+    record.merchant_address,
+  ];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function readShopIdFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const delivery = record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
+    ? record.delivery as Record<string, unknown>
+    : null;
+  const candidates = [record.shop_id, delivery?.shop_id];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
+  const systemMeta = readAutoPickSystemMeta(rawPayload);
+  const marker = systemMeta?.mainSystemSelfDelivery;
+  if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
+    return false;
+  }
+  return Boolean((marker as Record<string, unknown>).triggered);
+}
+
+function findMappedShopNameFromIntegrationConfig(
+  maiyatianShopId: string | null,
+  rawShopName: string | null,
+  rawShopAddress: string | null,
+  permissions: unknown
+) {
+  const config = normalizeAutoPickIntegrationConfig(permissions);
+  if (config.maiyatianShopMappings.length === 0) {
+    return null;
+  }
+  const normalizedShopId = normalizeExternalId(maiyatianShopId);
+  if (normalizedShopId) {
+    const matchedById = config.maiyatianShopMappings.find((item) => String(item.maiyatianShopId || "").trim() === normalizedShopId);
+    if (matchedById?.localShopName) {
+      return matchedById.localShopName;
+    }
+  }
+  const targetKey = buildShopDedupeKey({ name: rawShopName, address: rawShopAddress });
+  const matchedByIdentity = config.maiyatianShopMappings.find((item) => {
+    const mappingKey = buildShopDedupeKey({
+      name: item.maiyatianShopName,
+      address: item.maiyatianShopAddress,
+    });
+    if (mappingKey && mappingKey === targetKey) {
+      return true;
+    }
+    return normalizeShopNameKey(item.maiyatianShopName) === normalizeShopNameKey(rawShopName);
+  });
+  return matchedByIdentity?.localShopName || null;
+}
+
+function resolveAutoPickMatchedShopName(order: { shopId?: string | null; rawPayload?: unknown }, permissions: unknown) {
+  const resolved = readResolvedAutoPickShop(order.rawPayload);
+  const resolvedName = String(resolved?.name || "").trim();
+  if (resolvedName) {
+    return resolvedName;
+  }
+  const rawShopName = readShopNameFromRawPayload(order.rawPayload);
+  const rawShopAddress = readShopAddressFromRawPayload(order.rawPayload);
+  const mappedName = findMappedShopNameFromIntegrationConfig(
+    order.shopId || readShopIdFromRawPayload(order.rawPayload),
+    rawShopName,
+    rawShopAddress,
+    permissions
+  );
+  return String(mappedName || rawShopName || "").trim() || null;
+}
+
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "其他"] as const;
 
 export async function GET(request: NextRequest) {
@@ -64,7 +210,7 @@ export async function GET(request: NextRequest) {
       : startOfDay(new Date(endDate.getTime() - 29 * 24 * 60 * 60 * 1000));
 
     if (rangeMode === "all") {
-      const [firstPurchase, firstOutbound, firstBrush, firstSettlement, firstShopProduct] = await Promise.all([
+      const [firstPurchase, firstOutbound, firstBrush, firstSettlement, firstShopProduct, firstAutoPickOrder] = await Promise.all([
         prisma.purchaseOrder.findFirst({
           where: {
             userId: user.id,
@@ -114,6 +260,17 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: "asc" },
           select: { createdAt: true },
         }),
+        prisma.autoPickOrder.findFirst({
+          where: {
+            userId: user.id,
+          },
+          orderBy: { orderTime: "asc" },
+          select: {
+            orderTime: true,
+            shopId: true,
+            rawPayload: true,
+          },
+        }),
       ]);
 
       const candidates = [
@@ -122,6 +279,9 @@ export async function GET(request: NextRequest) {
         firstBrush?.date,
         firstSettlement?.date,
         firstShopProduct?.createdAt,
+        !shopName || resolveAutoPickMatchedShopName(firstAutoPickOrder || {}, user.permissions) === shopName
+          ? firstAutoPickOrder?.orderTime
+          : null,
       ].filter((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime()));
 
       if (candidates.length > 0) {
@@ -129,7 +289,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const [shopCount, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders] = await Promise.all([
+    const [shopCount, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders, autoPickOrdersInRange] = await Promise.all([
       prisma.shop.count({
         where: {
           userId: user.id,
@@ -214,6 +374,21 @@ export async function GET(request: NextRequest) {
           totalAmount: true,
         },
       }),
+      prisma.autoPickOrder.findMany({
+        where: {
+          userId: user.id,
+          orderTime: { gte: startDate, lte: endDate },
+        },
+        select: {
+          id: true,
+          platform: true,
+          status: true,
+          orderTime: true,
+          shopId: true,
+          rawPayload: true,
+        },
+        orderBy: { orderTime: "asc" },
+      }),
     ]);
 
     const [brushOrdersInRange, settlementsInRange] = await Promise.all([
@@ -261,6 +436,10 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
+
+    const filteredAutoPickOrdersInRange = shopName
+      ? autoPickOrdersInRange.filter((order) => resolveAutoPickMatchedShopName(order, user.permissions) === shopName)
+      : autoPickOrdersInRange;
 
     const pendingOrderCount = pendingOrders.length;
     const pendingInboundAmount = pendingOrders.reduce(
@@ -350,6 +529,7 @@ export async function GET(request: NextRequest) {
     const createTrendBucket = () => ({
       trueOrderCount: 0,
       brushOrderCount: 0,
+      otherOrderCount: 0,
       productCost: 0,
       brushExpense: 0,
       netProfit: 0,
@@ -358,6 +538,7 @@ export async function GET(request: NextRequest) {
     const businessTrendMap = new Map<string, {
       trueOrderCount: number;
       brushOrderCount: number;
+      otherOrderCount: number;
       productCost: number;
       brushExpense: number;
       netProfit: number;
@@ -391,19 +572,38 @@ export async function GET(request: NextRequest) {
       platformTrendMaps.set(platform, trendMap);
     });
 
-    outboundOrdersInRange.forEach((order) => {
-      const key = formatDateKey(new Date(order.date));
+    filteredAutoPickOrdersInRange.forEach((order) => {
+      const key = formatDateKey(new Date(order.orderTime));
       const point = businessTrendMap.get(key);
-      const platform = extractPlatformFromNote((order as { note?: string | null }).note);
+      const platform = normalizePlatform(order.platform);
       const platformPoint = platformTrendMaps.get(platform)?.get(key);
+      const current = platformBuckets.get(platform) || { trueOrderCount: 0, brushOrderCount: 0 };
+      const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+      const isOther = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+
       if (point) {
-        point.trueOrderCount += 1;
+        if (isBrush) {
+          point.brushOrderCount += 1;
+        } else if (isOther) {
+          point.otherOrderCount += 1;
+        } else {
+          point.trueOrderCount += 1;
+        }
       }
       if (platformPoint) {
-        platformPoint.trueOrderCount += 1;
+        if (isBrush) {
+          platformPoint.brushOrderCount += 1;
+        } else if (isOther) {
+          platformPoint.otherOrderCount += 1;
+        } else {
+          platformPoint.trueOrderCount += 1;
+        }
       }
-      const current = platformBuckets.get(platform) || { trueOrderCount: 0, brushOrderCount: 0 };
-      current.trueOrderCount += 1;
+      if (isBrush) {
+        current.brushOrderCount += 1;
+      } else if (!isOther) {
+        current.trueOrderCount += 1;
+      }
       platformBuckets.set(platform, current);
     });
 
@@ -466,7 +666,7 @@ export async function GET(request: NextRequest) {
       let cumulativeOrders = 0;
       return dateSeries.map((item) => {
         const point = source.get(item.date);
-        const orderCount = (point?.trueOrderCount || 0) + (point?.brushOrderCount || 0);
+        const orderCount = (point?.trueOrderCount || 0) + (point?.brushOrderCount || 0) + (point?.otherOrderCount || 0);
         cumulativeOrders += orderCount;
         return {
           date: item.date,
@@ -549,7 +749,7 @@ export async function GET(request: NextRequest) {
       purchaseAmount,
       outboundAmount,
       purchaseOrderCount: purchaseOrdersInRange.length,
-      outboundOrderCount: outboundOrdersInRange.length,
+      outboundOrderCount: filteredAutoPickOrdersInRange.length,
       activeShopCount,
       zeroCostProductCount,
       zeroStockProductCount,
