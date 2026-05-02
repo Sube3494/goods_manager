@@ -166,6 +166,14 @@ function getExpectedIncome(expectedIncome: number | null | undefined, actualPaid
   return paid - commission;
 }
 
+function getDeliveryFee(delivery: unknown) {
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return 0;
+  }
+  const value = Number((delivery as Record<string, unknown>).sendFee || 0);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
 function summarizeOrders(orders: AutoPickOrder[]) {
   return orders.reduce((acc, order) => {
     if (!isCancelledStatus(order.status)) {
