@@ -34,6 +34,11 @@ function buildDateSeries(start: Date, end: Date) {
   return list;
 }
 
+function extractShopNameFromNote(note: string | null | undefined) {
+  const match = String(note || "").match(/\[店铺:([^\]]+)\]/);
+  return String(match?.[1] || "").trim();
+}
+
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "其他"] as const;
 
 export async function GET(request: NextRequest) {
@@ -173,6 +178,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           date: true,
+          shopName: true,
           totalAmount: true,
           status: true,
         },
@@ -220,6 +226,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           date: true,
+          shopName: true,
           type: true,
           paymentAmount: true,
           receivedAmount: true,
@@ -268,7 +275,23 @@ export async function GET(request: NextRequest) {
       (sum, item) => FinanceMath.add(sum, FinanceMath.multiply(item.costPrice || 0, item.stock || 0)),
       0
     );
-    const activeShopCount = new Set(shopProductRows.filter((item) => (item.stock || 0) > 0).map((item) => item.shopId)).size;
+    const activeShopNames = new Set<string>();
+    purchaseOrdersInRange.forEach((order) => {
+      const name = String(order.shopName || "").trim();
+      if (name) activeShopNames.add(name);
+    });
+    outboundOrdersInRange.forEach((order) => {
+      const name = extractShopNameFromNote(order.note);
+      if (name) activeShopNames.add(name);
+    });
+    brushOrdersInRange.forEach((order) => {
+      const name = String(order.shopName || "").trim();
+      if (name) activeShopNames.add(name);
+    });
+    if (activeShopNames.size === 0 && shopName) {
+      activeShopNames.add(shopName);
+    }
+    const activeShopCount = activeShopNames.size;
     const zeroCostProductCount = shopProductRows.filter((item) => Number(item.costPrice || 0) <= 0).length;
     const zeroStockProductCount = shopProductRows.filter((item) => Number(item.stock || 0) <= 0).length;
 
