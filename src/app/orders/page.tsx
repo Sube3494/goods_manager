@@ -11,6 +11,8 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  Eye,
+  EyeOff,
   Loader2,
   MapPin,
   Package2,
@@ -107,8 +109,10 @@ function readIntegrationConfigResponse(data: unknown): AutoPickIntegrationConfig
   };
 }
 
-function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "maiyatianCookie" | "maiyatianShopMappings" | "selfDeliveryTiming">) {
+function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "pluginBaseUrl" | "inboundApiKey" | "maiyatianCookie" | "maiyatianShopMappings" | "selfDeliveryTiming">) {
   return JSON.stringify({
+    pluginBaseUrl: String(config.pluginBaseUrl || ""),
+    inboundApiKey: String(config.inboundApiKey || ""),
     maiyatianCookie: String(config.maiyatianCookie || ""),
     maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : [],
     selfDeliveryTiming: normalizeSelfDeliveryTiming(config.selfDeliveryTiming),
@@ -253,6 +257,10 @@ function isTerminalStatus(status?: string | null) {
 
 function isDeliveringStatus(status?: string | null) {
   return isAutoPickOrderDeliveringStatus(status);
+}
+
+function isBrushSyncEligibleOrder(order: Pick<AutoPickOrder, "status" | "isPickup" | "isMainSystemSelfDelivery">) {
+  return isCompletedStatus(order.status) && !order.isPickup && !order.isMainSystemSelfDelivery;
 }
 
 function getStatusTone(display: string) {
@@ -1022,6 +1030,7 @@ function IntegrationModal({
 }) {
   const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
+  const [showInboundApiKey, setShowInboundApiKey] = useState(false);
   const [copiedCallback, setCopiedCallback] = useState(false);
   const pillButtonClass = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 sm:min-h-9 sm:rounded-full sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-white/5 dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
@@ -1177,18 +1186,24 @@ function IntegrationModal({
                     {isRegeneratingInboundApiKey ? "生成中..." : "重新生成"}
                   </button>
                 </div>
-                <div
-                  onCopy={(event) => event.preventDefault()}
-                  onCut={(event) => event.preventDefault()}
-                  className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827]"
-                >
-                  <div className="text-sm font-medium text-foreground">已保存唯一密钥</div>
-                  <div className="mt-1 text-xs text-muted-foreground">默认隐藏，重新生成后系统会自动复制到剪贴板。</div>
-                  <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
-                    {"•".repeat(28)}
-                  </div>
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
+                  <input
+                    type={showInboundApiKey ? "text" : "password"}
+                    value={integrationConfig.inboundApiKey}
+                    onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
+                    placeholder="输入或粘贴回调密钥"
+                    className="h-11 w-full bg-transparent font-mono text-sm font-medium outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowInboundApiKey((current) => !current)}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground dark:hover:bg-white/6"
+                    title={showInboundApiKey ? "隐藏回调密钥" : "显示回调密钥"}
+                  >
+                    {showInboundApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本上报订单时使用这个值区分用户。</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本上报订单时使用这个值区分用户。你可以直接输入，也可以点“重新生成”拿一个新密钥。</p>
               </div>
             </div>
 
@@ -1356,6 +1371,200 @@ function IntegrationModal({
   );
 }
 
+function BrushSyncPickerModal({
+  orders,
+  selectedIds,
+  isSubmitting,
+  modalRef,
+  onClose,
+  onToggle,
+  onSetSelected,
+  onConfirm,
+}: {
+  orders: AutoPickOrder[];
+  selectedIds: string[];
+  isSubmitting: boolean;
+  modalRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onToggle: (id: string) => void;
+  onSetSelected: (ids: string[]) => void;
+  onConfirm: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const filteredOrders = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) {
+      return orders;
+    }
+    return orders.filter((order) => {
+      const haystacks = [
+        String(order.dailyPlatformSequence || ""),
+        order.orderNo,
+        order.matchedShopName || "",
+        order.userAddress || "",
+        ...order.items.map((item) => `${item.productName} ${item.productNo || ""}`),
+      ];
+      return haystacks.some((item) => item.toLowerCase().includes(keyword));
+    });
+  }, [orders, query]);
+  const selectedCount = selectedIds.length;
+  const visibleIds = filteredOrders.map((order) => order.id);
+  const allVisibleSelected = filteredOrders.length > 0 && filteredOrders.every((order) => selectedIds.includes(order.id));
+  const toggleVisibleSelection = () => {
+    if (visibleIds.length === 0) {
+      return;
+    }
+
+    if (allVisibleSelected) {
+      onSetSelected(selectedIds.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+
+    onSetSelected(Array.from(new Set([...selectedIds, ...visibleIds])));
+  };
+
+  return (
+    <div className="fixed inset-0 z-100000 flex items-center justify-center px-3 py-3 sm:p-4">
+      <div className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm" onClick={onClose} />
+      <div
+        ref={modalRef}
+        className="relative flex h-[88dvh] w-full max-w-220 flex-col overflow-hidden rounded-[28px] border border-black/8 bg-white/95 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:rounded-[36px]"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-black/6 px-4 py-4 dark:border-white/6 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">同步刷单</div>
+            <h2 className="mt-1.5 text-xl font-black tracking-tight text-foreground sm:mt-2 sm:text-2xl">选择要纳入刷单的订单</h2>
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:mt-2 sm:text-sm">优先按流水号挑单，也可以搜订单号、店铺、地址或商品名。</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground dark:border-white/10 dark:bg-white/4 sm:h-10 sm:w-10"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_88px_88px] gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-3 sm:items-center">
+            <label className="flex h-11 flex-1 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3">
+              <Search size={16} className="text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索流水号、订单号、店铺、地址、商品"
+                className="w-full bg-transparent text-sm outline-none"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={toggleVisibleSelection}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 sm:px-4 sm:text-sm"
+            >
+              {allVisibleSelected ? "取消当前" : "全选当前"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetSelected([])}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 sm:px-4 sm:text-sm"
+            >
+              清空
+            </button>
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-black/8 bg-black/2 px-3.5 py-3 text-sm dark:border-white/10 dark:bg-white/3 sm:px-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-muted-foreground">当前可选 {orders.length} 单</span>
+              <span className="font-semibold text-foreground">已选 {selectedCount} 单</span>
+            </div>
+            <div className="mt-1 text-[11px] leading-5 text-muted-foreground">只显示已完成且符合刷单同步条件的订单</div>
+          </div>
+
+          <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-2">
+            {filteredOrders.length > 0 ? filteredOrders.map((order) => {
+              const selected = selectedIds.includes(order.id);
+              return (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => onToggle(order.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-[20px] border px-3.5 py-3 text-left transition-all sm:rounded-[22px] sm:px-4",
+                    selected
+                      ? "border-primary/25 bg-primary/8"
+                      : "border-black/8 bg-white/80 hover:border-black/12 dark:border-white/10 dark:bg-white/4"
+                  )}
+                >
+                  <span className={cn(
+                    "mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-black/12 bg-white dark:border-white/12 dark:bg-white/4"
+                  )}>
+                    {selected ? <Check size={12} /> : null}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span className="inline-flex h-6 items-center rounded-full border border-black/8 bg-black/3 px-2 text-[12px] font-black text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-sm">
+                        流水 #{order.dailyPlatformSequence || 0}
+                      </span>
+                      {order.matchedShopName ? (
+                        <span className="inline-flex h-6 max-w-full items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 dark:text-sky-400 sm:h-7 sm:px-2.5 sm:text-xs">
+                          {order.matchedShopName}
+                        </span>
+                      ) : null}
+                      {order.isMainSystemSelfDelivery ? (
+                        <span className="inline-flex h-6 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-semibold text-rose-600 dark:text-rose-400 sm:h-7 sm:px-2.5 sm:text-xs">
+                          已标记刷单
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1.5 line-clamp-2 text-[12px] leading-5 text-foreground/78 sm:text-[13px]">
+                      {order.items.slice(0, 2).map((item) => item.productName).join(" / ") || "暂无商品"}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>共 {getItemCount(order.items)} 件</span>
+                      <span>{formatLocalDateTime(order.orderTime)}</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            }) : (
+              <div className="rounded-[22px] border border-dashed border-black/8 bg-white/65 px-4 py-8 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/3">
+                没有找到匹配的可刷单订单。
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-black/6 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] dark:border-white/6 sm:px-6 sm:py-4 sm:pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">已选 <span className="font-black text-foreground">{selectedCount}</span> 单</div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-4 text-sm font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={selectedCount === 0 || isSubmitting}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-foreground px-4 text-sm font-black text-background transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
+            >
+              {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              同步所选
+            </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrdersPage() {
   const { showToast } = useToast();
   const todayDate = formatLocalDate(new Date());
@@ -1409,13 +1618,17 @@ export default function OrdersPage() {
   const [maiyatianShops, setMaiyatianShops] = useState<AutoPickMaiyatianShop[]>([]);
   const [localShops, setLocalShops] = useState<LocalShopOption[]>([]);
   const [isIntegrationOpen, setIsIntegrationOpen] = useState(false);
+  const [isBrushSyncPickerOpen, setIsBrushSyncPickerOpen] = useState(false);
   const [isTestingPlugin, setIsTestingPlugin] = useState(false);
   const [isTestingCookie, setIsTestingCookie] = useState(false);
   const [isRegeneratingInboundApiKey, setIsRegeneratingInboundApiKey] = useState(false);
   const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const [isBulkBrushSyncing, setIsBulkBrushSyncing] = useState(false);
+  const [selectedBrushOrderIds, setSelectedBrushOrderIds] = useState<string[]>([]);
   const [savedIntegrationDigest, setSavedIntegrationDigest] = useState(() => serializeIntegrationConfig({
+    pluginBaseUrl: "",
+    inboundApiKey: "",
     maiyatianCookie: "",
     maiyatianShopMappings: [],
     selfDeliveryTiming: createDefaultSelfDeliveryTiming(),
@@ -1443,7 +1656,7 @@ export default function OrdersPage() {
   }, [isIntegrationOpen]);
 
   useEffect(() => {
-    if (!isIntegrationOpen) {
+    if (!isIntegrationOpen && !isBrushSyncPickerOpen) {
       return;
     }
 
@@ -1458,7 +1671,7 @@ export default function OrdersPage() {
       body.style.overflow = previousBodyOverflow;
       documentElement.style.overflow = previousHtmlOverflow;
     };
-  }, [isIntegrationOpen]);
+  }, [isBrushSyncPickerOpen, isIntegrationOpen]);
 
   const fetchIntegrationConfig = useCallback(async () => {
     try {
@@ -1471,6 +1684,8 @@ export default function OrdersPage() {
       const nextConfig = readIntegrationConfigResponse(data);
       setIntegrationConfig(nextConfig);
       setSavedIntegrationDigest(serializeIntegrationConfig({
+        pluginBaseUrl: nextConfig.pluginBaseUrl,
+        inboundApiKey: nextConfig.inboundApiKey,
         maiyatianCookie: nextConfig.maiyatianCookie,
         maiyatianShopMappings: nextConfig.maiyatianShopMappings,
         selfDeliveryTiming: nextConfig.selfDeliveryTiming,
@@ -1567,6 +1782,10 @@ export default function OrdersPage() {
     setCurrentPage(1);
     fetchOrders();
   }, [activeTab, endDate, fetchOrders, platform, query, shop, startDate, status]);
+
+  useEffect(() => {
+    setSelectedBrushOrderIds([]);
+  }, [activeTab, endDate, platform, query, shop, startDate, status]);
 
   useEffect(() => {
     fetchIntegrationConfig();
@@ -1716,6 +1935,8 @@ export default function OrdersPage() {
       const savedConfig = readIntegrationConfigResponse(data);
       setIntegrationConfig(savedConfig);
       setSavedIntegrationDigest(serializeIntegrationConfig({
+        pluginBaseUrl: savedConfig.pluginBaseUrl,
+        inboundApiKey: savedConfig.inboundApiKey,
         maiyatianCookie: savedConfig.maiyatianCookie,
         maiyatianShopMappings: savedConfig.maiyatianShopMappings,
         selfDeliveryTiming: savedConfig.selfDeliveryTiming,
@@ -1754,6 +1975,8 @@ export default function OrdersPage() {
       const nextConfig = readIntegrationConfigResponse(data);
       setIntegrationConfig(nextConfig);
       setSavedIntegrationDigest(serializeIntegrationConfig({
+        pluginBaseUrl: nextConfig.pluginBaseUrl,
+        inboundApiKey: nextConfig.inboundApiKey,
         maiyatianCookie: nextConfig.maiyatianCookie,
         maiyatianShopMappings: nextConfig.maiyatianShopMappings,
         selfDeliveryTiming: nextConfig.selfDeliveryTiming,
@@ -1967,8 +2190,12 @@ export default function OrdersPage() {
     }
   };
 
-  const syncBrushOrders = async () => {
-    const targetOrders = eligibleBrushSyncOrders
+  const syncBrushOrders = async (targetIds?: string[]) => {
+    const scopedIds = Array.isArray(targetIds) ? targetIds.filter(Boolean) : [];
+    const sourceOrders = scopedIds.length > 0
+      ? brushSyncSelectionPool.filter((item) => scopedIds.includes(item.id))
+      : eligibleBrushSyncOrders;
+    const targetOrders = sourceOrders
       .map((item) => ({
         id: item.id,
         matchedShopName: item.matchedShopName || null,
@@ -2017,6 +2244,8 @@ export default function OrdersPage() {
           : `已同步 ${syncedCount} 单，已更新 ${updatedCount} 单`,
         "success"
       );
+      setSelectedBrushOrderIds([]);
+      setIsBrushSyncPickerOpen(false);
       await fetchOrders({ silent: true });
     } catch (error) {
       console.error("Failed to sync brush orders:", error);
@@ -2036,11 +2265,10 @@ export default function OrdersPage() {
   const todayCompletedOrders = useMemo(() => filteredOrders.filter((item) => isTerminalStatus(item.status)), [filteredOrders]);
   const visibleOrders = activeTab === "today" ? todayPendingOrders : filteredOrders;
   const eligibleBrushSyncOrders = useMemo(
-    () => (activeTab === "today" ? todayCompletedOrders : filteredOrders).filter(
-      (item) => isCompletedStatus(item.status) && !item.isPickup && !item.isMainSystemSelfDelivery
-    ),
+    () => (activeTab === "today" ? todayCompletedOrders : filteredOrders).filter(isBrushSyncEligibleOrder),
     [activeTab, filteredOrders, todayCompletedOrders]
   );
+  const brushSyncSelectionPool = eligibleBrushSyncOrders;
   const ordersForOverview = activeTab === "today" ? filteredOrders : visibleOrders;
   const orderOverviewCounts = useMemo(() => {
     const cancelledCount = ordersForOverview.filter((item) => isCancelledStatus(item.status)).length;
@@ -2055,6 +2283,28 @@ export default function OrdersPage() {
     };
   }, [ordersForOverview]);
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || startDate || endDate);
+
+  const openBrushSyncPicker = useCallback(() => {
+    if (eligibleBrushSyncOrders.length === 0) {
+      showToast("当前筛选范围没有可同步刷单的已完成配送单", "error");
+      return;
+    }
+    setIsBrushSyncPickerOpen(true);
+  }, [eligibleBrushSyncOrders.length, showToast]);
+
+  useEffect(() => {
+    const availableIds = new Set(brushSyncSelectionPool.map((item) => item.id));
+    setSelectedBrushOrderIds((current) => current.filter((id) => availableIds.has(id)));
+  }, [brushSyncSelectionPool]);
+
+  const toggleBrushSyncSelection = useCallback((orderId: string) => {
+    setSelectedBrushOrderIds((current) => (
+      current.includes(orderId)
+        ? current.filter((id) => id !== orderId)
+        : [...current, orderId]
+    ));
+  }, []);
+
   useEffect(() => {
     if (!isMounted) {
       return;
@@ -2185,7 +2435,7 @@ export default function OrdersPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={syncBrushOrders}
+                  onClick={openBrushSyncPicker}
                   disabled={isBulkBrushSyncing || isLoading}
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
@@ -2459,6 +2709,22 @@ export default function OrdersPage() {
                 onTestPlugin={() => void testIntegrationConfig("plugin")}
                 onTestCookie={() => void testIntegrationConfig("cookie")}
               />,
+            document.body
+          )
+        : null}
+
+      {isMounted && isBrushSyncPickerOpen
+        ? createPortal(
+            <BrushSyncPickerModal
+              orders={brushSyncSelectionPool}
+              selectedIds={selectedBrushOrderIds}
+              isSubmitting={isBulkBrushSyncing}
+              modalRef={modalRef}
+              onClose={() => setIsBrushSyncPickerOpen(false)}
+              onToggle={toggleBrushSyncSelection}
+              onSetSelected={setSelectedBrushOrderIds}
+              onConfirm={() => void syncBrushOrders(selectedBrushOrderIds)}
+            />,
             document.body
           )
         : null}
