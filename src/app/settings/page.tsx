@@ -91,6 +91,10 @@ function SettingsContent() {
   const [uploadConflictStrategy, setUploadConflictStrategy] = useState<"overwrite" | "rename" | "skip">("rename");
   const [shareExpireDuration, setShareExpireDuration] = useState<number | "">(1);
   const [shareExpireUnit, setShareExpireUnit] = useState<"minutes" | "hours" | "days">("hours");
+  const [brushCommissionBoostEnabled, setBrushCommissionBoostEnabled] = useState<boolean>(false);
+  const [brushCommissionRateMeituan, setBrushCommissionRateMeituan] = useState<number | "">(0.06);
+  const [brushCommissionRateTaobao, setBrushCommissionRateTaobao] = useState<number | "">(0.06);
+  const [brushCommissionRateJingdong, setBrushCommissionRateJingdong] = useState<number | "">(0.06);
   
   // Use refs to track last saved values to prevent initial auto-save and loops
   const lastSavedSettings = useRef<Record<string, unknown>>({});
@@ -234,6 +238,10 @@ function SettingsContent() {
                 );
                 setShareExpireDuration(data.shareExpireDuration ?? 1);
                 setShareExpireUnit(data.shareExpireUnit || "hours");
+                setBrushCommissionBoostEnabled(data.brushCommissionBoostEnabled ?? false);
+                setBrushCommissionRateMeituan(data.brushCommissionRateMeituan ?? 0.06);
+                setBrushCommissionRateTaobao(data.brushCommissionRateTaobao ?? 0.06);
+                setBrushCommissionRateJingdong(data.brushCommissionRateJingdong ?? 0.06);
 
                 lastSavedSettings.current = data;
             }
@@ -272,6 +280,10 @@ function SettingsContent() {
         uploadConflictStrategy,
         shareExpireDuration,
         shareExpireUnit,
+        brushCommissionBoostEnabled,
+        brushCommissionRateMeituan,
+        brushCommissionRateTaobao,
+        brushCommissionRateJingdong,
         ...newSettings
     };
 
@@ -311,6 +323,10 @@ function SettingsContent() {
     uploadConflictStrategy, 
     shareExpireDuration,
     shareExpireUnit,
+    brushCommissionBoostEnabled,
+    brushCommissionRateMeituan,
+    brushCommissionRateTaobao,
+    brushCommissionRateJingdong,
     showToast
   ]);
 
@@ -603,6 +619,14 @@ function SettingsContent() {
             setShareExpireDuration={setShareExpireDuration}
             shareExpireUnit={shareExpireUnit}
             setShareExpireUnit={setShareExpireUnit}
+            brushCommissionBoostEnabled={brushCommissionBoostEnabled}
+            setBrushCommissionBoostEnabled={setBrushCommissionBoostEnabled}
+            brushCommissionRateMeituan={brushCommissionRateMeituan}
+            setBrushCommissionRateMeituan={setBrushCommissionRateMeituan}
+            brushCommissionRateTaobao={brushCommissionRateTaobao}
+            setBrushCommissionRateTaobao={setBrushCommissionRateTaobao}
+            brushCommissionRateJingdong={brushCommissionRateJingdong}
+            setBrushCommissionRateJingdong={setBrushCommissionRateJingdong}
             saveSettings={saveSettings}
             mode={canManageSettings ? "full" : "backup_only"}
             canManageDangerZone={canManageBackups || canTransferData}

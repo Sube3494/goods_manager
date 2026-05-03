@@ -22,6 +22,50 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 
+type BrushDisplaySettings = {
+  brushCommissionBoostEnabled: boolean;
+  brushCommissionRateMeituan: number;
+  brushCommissionRateTaobao: number;
+  brushCommissionRateJingdong: number;
+};
+
+function normalizeDisplayRate(value: number | null | undefined) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0.06;
+  if (numeric > 1) return numeric / 100;
+  if (numeric < 0) return 0;
+  return numeric;
+}
+
+function resolvePlatformFeeRate(type: string, settings: BrushDisplaySettings) {
+  if (type.includes("美团")) return normalizeDisplayRate(settings.brushCommissionRateMeituan);
+  if (type.includes("淘宝")) return normalizeDisplayRate(settings.brushCommissionRateTaobao);
+  if (type.includes("京东")) return normalizeDisplayRate(settings.brushCommissionRateJingdong);
+  return 0.06;
+}
+
+function getDisplayedMetrics(order: BrushOrder, settings: BrushDisplaySettings, enabled: boolean) {
+  if (!enabled) {
+    return {
+      payment: order.paymentAmount,
+      received: order.receivedAmount,
+      commission: order.commission,
+      simulatedPlatformFee: 0,
+    };
+  }
+
+  const rate = resolvePlatformFeeRate(order.type, settings);
+  const baseReceived = order.receivedAmount + order.commission + Math.max(0, order.paymentAmount - order.receivedAmount);
+  const simulatedPayment = rate > 0 && rate < 1 ? baseReceived / (1 - rate) : baseReceived;
+  const simulatedPlatformFee = Math.max(0, simulatedPayment - baseReceived);
+  return {
+    payment: simulatedPayment,
+    received: baseReceived,
+    commission: order.commission,
+    simulatedPlatformFee,
+  };
+}
+
 export default function BrushOrdersPage() {
   const { showToast } = useToast();
   const { user } = useUser();
@@ -53,6 +97,12 @@ export default function BrushOrdersPage() {
   });
   const [selectedType, setSelectedType] = useState("全部");
   const [selectedShop, setSelectedShop] = useState("全部");
+  const [displaySettings, setDisplaySettings] = useState<BrushDisplaySettings>({
+    brushCommissionBoostEnabled: false,
+    brushCommissionRateMeituan: 0.06,
+    brushCommissionRateTaobao: 0.06,
+    brushCommissionRateJingdong: 0.06,
+  });
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -83,6 +133,7 @@ export default function BrushOrdersPage() {
   };
 
   const hasActiveFilters = searchQuery !== "" || selectedType !== "全部" || selectedShop !== "全部" || startDate !== "" || endDate !== "";
+  const showSimulatedValues = Boolean(displaySettings.brushCommissionBoostEnabled);
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -164,10 +215,11 @@ export default function BrushOrdersPage() {
       }
 
       // 月份统计
+      const displayed = getDisplayedMetrics(order, displaySettings, showSimulatedValues);
       monthGroup.periodStats.count++;
-      monthGroup.periodStats.payment += order.paymentAmount;
-      monthGroup.periodStats.received += order.receivedAmount;
-      monthGroup.periodStats.commission += order.commission;
+      monthGroup.periodStats.payment += displayed.payment;
+      monthGroup.periodStats.received += displayed.received;
+      monthGroup.periodStats.commission += displayed.commission;
 
       // 找具体的天
       let dayGroup = monthGroup.days.find(d => d.date === dateStr);
@@ -183,9 +235,9 @@ export default function BrushOrdersPage() {
       // 添加订单并进行每日统计
       dayGroup.orders.push(order as BrushOrder & { globalIndex: number });
       dayGroup.dailyStats.count++;
-      dayGroup.dailyStats.payment += order.paymentAmount;
-      dayGroup.dailyStats.received += order.receivedAmount;
-      dayGroup.dailyStats.commission += order.commission;
+      dayGroup.dailyStats.payment += displayed.payment;
+      dayGroup.dailyStats.received += displayed.received;
+      dayGroup.dailyStats.commission += displayed.commission;
     });
 
     // 第二步：排序并编序号
@@ -210,16 +262,16 @@ export default function BrushOrdersPage() {
     groups.sort((a, b) => b.month.localeCompare(a.month));
 
     return groups;
-  }, [filteredOrders]);
+  }, [displaySettings, filteredOrders, showSimulatedValues]);
 
   const stats = useMemo(() => {
     return filteredOrders.reduce((acc, curr) => ({
       count: acc.count + 1,
-      payment: acc.payment + curr.paymentAmount,
-      received: acc.received + curr.receivedAmount,
-      commission: acc.commission + curr.commission,
+      payment: acc.payment + getDisplayedMetrics(curr, displaySettings, showSimulatedValues).payment,
+      received: acc.received + getDisplayedMetrics(curr, displaySettings, showSimulatedValues).received,
+      commission: acc.commission + getDisplayedMetrics(curr, displaySettings, showSimulatedValues).commission,
     }), { count: 0, payment: 0, received: 0, commission: 0 });
-  }, [filteredOrders]);
+  }, [displaySettings, filteredOrders, showSimulatedValues]);
 
   const showToastRef = useRef(showToast);
   useEffect(() => {
@@ -233,6 +285,9 @@ export default function BrushOrdersPage() {
       if (res.ok) {
         const data = await res.json();
         setOrders(data.data || []); 
+        if (data.displaySettings) {
+          setDisplaySettings(data.displaySettings);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch brush orders:", error);
@@ -791,7 +846,9 @@ export default function BrushOrdersPage() {
                                              <th className="px-6 py-3 text-xs font-bold text-orange-500 uppercase text-center whitespace-nowrap">佣金</th>
                                              <th className="px-6 py-3 text-xs font-bold text-muted-foreground uppercase text-center whitespace-nowrap">备注</th>
                                          </tr>
-                                         {dayGroup.orders.map(order => (
+                                         {dayGroup.orders.map(order => {
+                                    const displayed = getDisplayedMetrics(order, displaySettings, showSimulatedValues);
+                                    return (
                                     <tr 
                                      key={order.id}
                                      onClick={() => handleEdit(order)}
@@ -859,16 +916,16 @@ export default function BrushOrdersPage() {
                                                   <span className="text-muted-foreground/50">-</span>
                                               )}
                                        </td>
-                                      <td className="px-6 py-4 font-number font-medium text-center text-sm whitespace-nowrap">¥{order.paymentAmount.toFixed(2)}</td>
-                                      <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm whitespace-nowrap">¥{order.receivedAmount.toFixed(2)}</td>
-                                      <td className="px-6 py-4 font-number font-bold text-orange-500 text-center text-sm whitespace-nowrap">¥{order.commission.toFixed(2)}</td>
+                                      <td className="px-6 py-4 font-number font-medium text-center text-sm whitespace-nowrap">¥{displayed.payment.toFixed(2)}</td>
+                                      <td className="px-6 py-4 font-number font-bold text-emerald-500 text-center text-sm whitespace-nowrap">¥{displayed.received.toFixed(2)}</td>
+                                      <td className="px-6 py-4 font-number font-bold text-orange-500 text-center text-sm whitespace-nowrap">¥{displayed.commission.toFixed(2)}</td>
                                       <td className="px-6 py-4 text-center whitespace-nowrap">
                                          <p className="text-xs text-muted-foreground line-clamp-1 max-w-[150px] mx-auto whitespace-normal" title={order.note}>
                                              {order.note || "-"}
                                           </p>
                                       </td>
                                     </tr>
-                                         ))}
+                                         )})}
                                      </>
                                  )}
                              </Fragment>
@@ -975,7 +1032,9 @@ export default function BrushOrdersPage() {
 
                             {expandedDate === dayGroup.date && (
                                 <div className="space-y-2 mt-2">
-                                    {dayGroup.orders.map(order => (
+                                    {dayGroup.orders.map(order => {
+                                        const displayed = getDisplayedMetrics(order, displaySettings, showSimulatedValues);
+                                        return (
                                         <div 
                                             key={order.id} 
                                             onClick={() => handleEdit(order)}
@@ -1041,20 +1100,20 @@ export default function BrushOrdersPage() {
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="text-[9px] text-muted-foreground uppercase font-bold">实付</span>
                                                             <span className="text-[10px] font-mono font-bold text-foreground">
-                                                                ¥{order.paymentAmount.toFixed(2)}
+                                                                ¥{displayed.payment.toFixed(2)}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-1.5">
                                                             <span className="text-[9px] text-emerald-500 uppercase font-bold">到手</span>
                                                             <span className="text-[10px] font-mono font-bold text-emerald-500">
-                                                                ¥{order.receivedAmount.toFixed(2)}
+                                                                ¥{displayed.received.toFixed(2)}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             )}
                         </div>

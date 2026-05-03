@@ -31,7 +31,11 @@ export async function GET() {
         backupIntervalUnit: "days",
         backupIntervalValue: 1,
         backupRetention: 10,
-        webdavEnabled: false
+        webdavEnabled: false,
+        brushCommissionBoostEnabled: false,
+        brushCommissionRateMeituan: 0.06,
+        brushCommissionRateTaobao: 0.06,
+        brushCommissionRateJingdong: 0.06,
       }
     });
     
@@ -75,7 +79,11 @@ export async function POST(request: Request) {
       webdavUrl,
       webdavUser,
       webdavPassword,
-      webdavPath
+      webdavPath,
+      brushCommissionBoostEnabled,
+      brushCommissionRateMeituan,
+      brushCommissionRateTaobao,
+      brushCommissionRateJingdong,
     } = body;
 
     const updateData: Prisma.SystemSettingUpdateInput = {};
@@ -106,6 +114,10 @@ export async function POST(request: Request) {
     if (webdavUser !== undefined) updateData.webdavUser = webdavUser;
     if (webdavPassword !== undefined) updateData.webdavPassword = webdavPassword;
     if (webdavPath !== undefined) updateData.webdavPath = webdavPath;
+    if (brushCommissionBoostEnabled !== undefined) updateData.brushCommissionBoostEnabled = Boolean(brushCommissionBoostEnabled);
+    if (brushCommissionRateMeituan !== undefined) updateData.brushCommissionRateMeituan = Number(brushCommissionRateMeituan);
+    if (brushCommissionRateTaobao !== undefined) updateData.brushCommissionRateTaobao = Number(brushCommissionRateTaobao);
+    if (brushCommissionRateJingdong !== undefined) updateData.brushCommissionRateJingdong = Number(brushCommissionRateJingdong);
 
     const settings = await prisma.systemSetting.upsert({
       where: { id: "system" },
@@ -137,6 +149,10 @@ export async function POST(request: Request) {
         webdavUser: webdavUser || null,
         webdavPassword: webdavPassword || null,
         webdavPath: webdavPath || null,
+        brushCommissionBoostEnabled: (typeof brushCommissionBoostEnabled === "boolean") ? brushCommissionBoostEnabled : false,
+        brushCommissionRateMeituan: brushCommissionRateMeituan !== undefined ? Number(brushCommissionRateMeituan) : 0.06,
+        brushCommissionRateTaobao: brushCommissionRateTaobao !== undefined ? Number(brushCommissionRateTaobao) : 0.06,
+        brushCommissionRateJingdong: brushCommissionRateJingdong !== undefined ? Number(brushCommissionRateJingdong) : 0.06,
       }
     });
 

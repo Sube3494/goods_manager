@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const skip = (page - 1) * limit;
 
   try {
-    const [orders, total] = await Promise.all([
+    const [orders, total, displaySettings] = await Promise.all([
       prisma.brushOrder.findMany({
         where: { userId: session.id },
         skip,
@@ -31,6 +31,15 @@ export async function GET(req: NextRequest) {
       }),
       prisma.brushOrder.count({
         where: { userId: session.id }
+      }),
+      prisma.systemSetting.findUnique({
+        where: { id: "system" },
+        select: {
+          brushCommissionBoostEnabled: true,
+          brushCommissionRateMeituan: true,
+          brushCommissionRateTaobao: true,
+          brushCommissionRateJingdong: true,
+        },
       }),
     ]);
 
@@ -48,6 +57,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       data: resolvedOrders,
+      displaySettings: {
+        brushCommissionBoostEnabled: displaySettings?.brushCommissionBoostEnabled ?? false,
+        brushCommissionRateMeituan: displaySettings?.brushCommissionRateMeituan ?? 0.06,
+        brushCommissionRateTaobao: displaySettings?.brushCommissionRateTaobao ?? 0.06,
+        brushCommissionRateJingdong: displaySettings?.brushCommissionRateJingdong ?? 0.06,
+      },
       meta: {
         total,
         page,
