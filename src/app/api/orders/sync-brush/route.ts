@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       const result = await syncBrushOrderFromCompletedAutoPickOrder(session.id, target.id, {
         allowSelfDeliveryFallback: true,
         fallbackOnly: true,
+        forceInclude: true,
         preferredMappedShopName: target.matchedShopName,
         overwriteExisting: true,
       }).catch((error) => ({

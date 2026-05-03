@@ -14,6 +14,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const { id } = await context.params;
     const result = await syncBrushOrderFromCompletedAutoPickOrder(session.id, id, {
       allowSelfDeliveryFallback: true,
+      forceInclude: true,
     });
 
     if (result.ok) {

@@ -3839,6 +3839,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
   options?: {
     allowSelfDeliveryFallback?: boolean;
     fallbackOnly?: boolean;
+    forceInclude?: boolean;
     preferredMappedShopName?: string | null;
     overwriteExisting?: boolean;
   }
@@ -3871,7 +3872,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
       delivery: order.delivery,
     });
 
-  if (!triggeredByMainSystem && !fallbackMatched) {
+  if (!triggeredByMainSystem && !fallbackMatched && options?.forceInclude !== true) {
     return {
       ok: false,
       skipped: true,
@@ -3920,6 +3921,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     ? Number(order.expectedIncome || 0)
     : Number(order.actualPaid || 0);
   const receivedAmount = FinanceMath.add(receivedBase / 100, 0);
+  const brushImportNote = options?.forceInclude === true ? "人工纳入刷单" : "推送导入";
 
   if (existing && options?.overwriteExisting === true) {
     const brushOrder = await prisma.$transaction(async (tx) => {
@@ -3940,7 +3942,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
           paymentAmount,
           receivedAmount,
           commission: 0,
-          note: "推送导入",
+          note: brushImportNote,
           shopName: resolved.mappedShopName,
           items: {
             create: resolved.items.map((item) => ({
@@ -3979,7 +3981,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
       paymentAmount,
       receivedAmount,
       commission: 0,
-      note: "推送导入",
+      note: brushImportNote,
       shopName: resolved.mappedShopName,
       platformOrderId: order.orderNo,
       items: {

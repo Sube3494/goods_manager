@@ -2246,9 +2246,12 @@ export default function OrdersPage() {
 
   const syncBrushOrders = async (targetIds?: string[]) => {
     const scopedIds = Array.isArray(targetIds) ? targetIds.filter(Boolean) : [];
-    const sourceOrders = scopedIds.length > 0
-      ? brushSyncSelectionPool.filter((item) => scopedIds.includes(item.id))
-      : eligibleBrushSyncOrders;
+    if (scopedIds.length === 0) {
+      showToast("请先选择要同步刷单的订单", "error");
+      return;
+    }
+
+    const sourceOrders = brushSyncSelectionPool.filter((item) => scopedIds.includes(item.id));
     const targetOrders = sourceOrders
       .map((item) => ({
         id: item.id,
@@ -2359,6 +2362,7 @@ export default function OrdersPage() {
       showToast("当前筛选范围没有可同步刷单的已完成配送单", "error");
       return;
     }
+    setSelectedBrushOrderIds([]);
     setIsBrushSyncPickerOpen(true);
   }, [eligibleBrushSyncOrders.length, showToast]);
 
