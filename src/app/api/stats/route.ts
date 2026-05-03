@@ -614,16 +614,11 @@ export async function GET(request: NextRequest) {
       const platform = normalizePlatform(order.type);
       const platformPoint = platformTrendMaps.get(platform)?.get(key);
       if (point) {
-        point.brushOrderCount += 1;
         point.brushExpense = FinanceMath.add(point.brushExpense, expense);
       }
       if (platformPoint) {
-        platformPoint.brushOrderCount += 1;
         platformPoint.brushExpense = FinanceMath.add(platformPoint.brushExpense, expense);
       }
-      const current = platformBuckets.get(platform) || { trueOrderCount: 0, brushOrderCount: 0 };
-      current.brushOrderCount += 1;
-      platformBuckets.set(platform, current);
     });
 
     outboundProductCost.forEach((item) => {
