@@ -28,9 +28,8 @@ interface PlatformData {
 interface ShopGroup {
   shopName: string;
   serviceFeeRate: number;
-  entries: Array<PlatformData & { net: number; fee: number; alreadyReceivedAmount: number }>;
+  entries: Array<PlatformData & { net: number; fee: number }>;
   totalReceived: number;
-  totalToCard: number;
   totalNet: number;
   totalServiceFee: number;
   totalAlreadyReceived: number;
