@@ -8,6 +8,53 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 
+async function resolvePurchaseOrderResponse<T extends {
+  paymentVouchers?: unknown;
+  trackingData?: unknown;
+  items: Array<{
+    shopProduct?: {
+      productImage?: string | null;
+    } | null;
+    product?: {
+      image?: string | null;
+    } | null;
+  }>;
+}>(purchase: T) {
+  const storage = await getStorageStrategy();
+
+  return {
+    ...purchase,
+    paymentVouchers: Array.isArray(purchase.paymentVouchers)
+      ? purchase.paymentVouchers.map((voucher) => typeof voucher === "string" ? storage.resolveUrl(voucher) : voucher)
+      : purchase.paymentVouchers,
+    trackingData: Array.isArray(purchase.trackingData)
+      ? (purchase.trackingData as (TrackingInfo & { url?: string })[]).map((tracking) => ({
+          ...tracking,
+          url: tracking.url ? storage.resolveUrl(tracking.url) : tracking.url,
+          waybillImage: tracking.waybillImage ? storage.resolveUrl(tracking.waybillImage) : tracking.waybillImage,
+          waybillImages: Array.isArray(tracking.waybillImages)
+            ? tracking.waybillImages.map((image) => storage.resolveUrl(image))
+            : tracking.waybillImages,
+        }))
+      : purchase.trackingData,
+    items: purchase.items.map((item) => ({
+      ...item,
+      shopProduct: item.shopProduct
+        ? {
+            ...item.shopProduct,
+            image: item.shopProduct.productImage ? storage.resolveUrl(item.shopProduct.productImage) : null,
+          }
+        : null,
+      product: item.product
+        ? {
+            ...item.product,
+            image: item.product.image ? storage.resolveUrl(item.product.image) : null,
+          }
+        : null,
+    })),
+  };
+}
+
 // 获取所有采购订单
 export async function GET(request: Request) {
   const session = await getFreshSession() as SessionUser | null;
@@ -96,28 +143,7 @@ export async function GET(request: Request) {
         }
       })
     ]);
-    const storage = await getStorageStrategy();
-    const resolvedPurchases = purchases.map(po => ({
-      ...po,
-      paymentVouchers: Array.isArray(po.paymentVouchers) ? po.paymentVouchers.map(v => typeof v === 'string' ? storage.resolveUrl(v) : v) : po.paymentVouchers,
-      trackingData: Array.isArray(po.trackingData) ? (po.trackingData as unknown as (TrackingInfo & { url?: string })[]).map(t => ({ 
-        ...t, 
-        url: t.url ? storage.resolveUrl(t.url) : t.url,
-        waybillImage: t.waybillImage ? storage.resolveUrl(t.waybillImage) : t.waybillImage,
-        waybillImages: Array.isArray(t.waybillImages) ? t.waybillImages.map(img => storage.resolveUrl(img)) : t.waybillImages
-      })) : po.trackingData,
-      items: po.items.map(item => ({
-        ...item,
-        shopProduct: item.shopProduct ? {
-          ...item.shopProduct,
-          image: item.shopProduct.productImage ? storage.resolveUrl(item.shopProduct.productImage) : null
-        } : null,
-        product: item.product ? {
-          ...item.product,
-          image: item.product.image ? storage.resolveUrl(item.product.image) : null
-        } : null
-      }))
-    }));
+    const resolvedPurchases = await Promise.all(purchases.map((purchase) => resolvePurchaseOrderResponse(purchase)));
 
     return NextResponse.json({
       items: resolvedPurchases,
@@ -203,6 +229,8 @@ export async function POST(request: Request) {
         include: {
           items: {
             include: {
+              product: true,
+              shopProduct: true,
               supplier: true
             }
           }
@@ -233,7 +261,7 @@ export async function POST(request: Request) {
       return p;
     });
 
-    return NextResponse.json(purchase);
+    return NextResponse.json(await resolvePurchaseOrderResponse(purchase));
   } catch (error) {
     console.error("Failed to create purchase order:", error);
     return NextResponse.json({ error: "Failed to create purchase order" }, { status: 500 });
