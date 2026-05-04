@@ -15,6 +15,7 @@ import {
   Search,
   RotateCcw,
   Eye,
+  Edit2,
 } from "lucide-react";
 import Link from "next/link";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from "date-fns";
@@ -273,21 +274,42 @@ export default function SettlementHistoryPage() {
         </div>
       </div>
 
-      {/* Filter Toolbar - Optimized Layout */}
-      <div className="flex flex-col gap-3 mb-6 md:mb-8">
-        {/* Row 1: Search & Shop Selector */}
-        <div className="flex flex-row items-center gap-2 h-10 sm:h-11">
-          <div className="flex-1 h-full px-4 sm:px-5 rounded-full bg-white/70 dark:bg-white/5 border border-border dark:border-white/10 backdrop-blur-md flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10">
-            <Search size={18} className="text-muted-foreground shrink-0" />
-            <input
-              type="text"
-              placeholder="搜索 ID、备注..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+      {/* Filter Toolbar - Consolidated Row */}
+      <div className="flex flex-col md:flex-row items-center gap-2.5 mb-6 md:mb-8">
+        {/* Search Bar */}
+        <div className="w-full md:flex-1 h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white/70 dark:bg-white/5 border border-border dark:border-white/10 backdrop-blur-md flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 group">
+          <Search size={18} className="text-muted-foreground group-focus-within:text-primary transition-colors shrink-0" />
+          <input
+            type="text"
+            placeholder="搜索 ID、备注..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
+          />
+        </div>
+
+        {/* Filters Group */}
+        <div className="flex items-center gap-2 h-10 sm:h-11 w-full md:w-auto">
+          <div className="flex items-center gap-1.5 h-full flex-1 md:flex-none">
+            <DatePicker
+              value={startDate}
+              onChange={setStartDate}
+              placeholder="起始日期"
+              maxDate={today}
+              className="h-full flex-1 md:w-32 lg:w-36"
+              triggerClassName="rounded-full shadow-sm bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
+            />
+            <DatePicker
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="截止日期"
+              maxDate={today}
+              className="h-full flex-1 md:w-32 lg:w-36"
+              triggerClassName="rounded-full shadow-sm bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
             />
           </div>
-          <div className="h-full w-32 sm:w-40 shrink-0 md:hidden">
+          
+          <div className="h-full min-w-[120px] sm:min-w-[140px] md:min-w-[160px]">
             <CustomSelect
               options={[
                 { value: "", label: "全部店铺" },
@@ -298,69 +320,26 @@ export default function SettlementHistoryPage() {
               ]}
               value={filterShop}
               onChange={setFilterShop}
-              placeholder="店铺"
+              placeholder="筛选店铺"
               className="h-full"
-              triggerClassName="h-full rounded-full border shadow-sm px-3 text-xs font-medium bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
+              triggerClassName="h-full rounded-full border shadow-sm px-4 sm:px-5 text-sm font-medium bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
             />
           </div>
-        </div>
 
-        {/* Row 2: Dates & Reset (Mobile) / Full Desktop Row */}
-        <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <div className="flex items-center gap-2 h-10 sm:h-11 w-full md:w-auto">
-            <div className="flex items-center gap-1.5 h-full flex-1 md:flex-none">
-              <DatePicker
-                value={startDate}
-                onChange={setStartDate}
-                placeholder="起始日期"
-                maxDate={today}
-                className="h-full flex-1 md:w-32 lg:w-36"
-                triggerClassName="rounded-full shadow-sm bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
-              />
-              <span className="text-muted-foreground/40 text-[10px] font-medium px-0.5 md:hidden">至</span>
-              <DatePicker
-                value={endDate}
-                onChange={setEndDate}
-                placeholder="截止日期"
-                maxDate={today}
-                className="h-full flex-1 md:w-32 lg:w-36"
-                triggerClassName="rounded-full shadow-sm bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
-              />
-            </div>
-            
-            {/* Desktop only Shop Select */}
-            <div className="hidden md:block h-full md:min-w-[140px] lg:min-w-[160px]">
-              <CustomSelect
-                options={[
-                  { value: "", label: "全部店铺" },
-                  ...availableShopOptions.map((shopName) => ({
-                    value: shopName,
-                    label: shopName,
-                  })),
-                ]}
-                value={filterShop}
-                onChange={setFilterShop}
-                placeholder="筛选店铺"
-                className="h-full"
-                triggerClassName="h-full rounded-full border shadow-sm px-5 text-sm font-medium bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
-              />
-            </div>
-
-            {(searchQuery || filterShop || startDate || endDate) && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setFilterShop("");
-                  setStartDate("");
-                  setEndDate("");
-                }}
-                className="h-full px-4 flex items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0"
-              >
-                <RotateCcw size={14} />
-                <span className="hidden sm:inline">重置</span>
-              </button>
-            )}
-          </div>
+          {(searchQuery || filterShop || startDate || endDate) && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setFilterShop("");
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="h-10 w-10 sm:h-11 sm:w-11 flex items-center justify-center rounded-full bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shrink-0 shadow-sm"
+              title="重置筛选"
+            >
+              <RotateCcw size={16} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -469,6 +448,14 @@ export default function SettlementHistoryPage() {
                           >
                             <Eye size={18} />
                           </button>
+                          <Link
+                            href={`/settlement?editId=${settlement.id}`}
+                            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-muted/80 dark:hover:bg-white/10 hover:text-orange-500"
+                            title="编辑记录"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Edit2 size={18} />
+                          </Link>
                           <button
                             onClick={(e) => exportSingle(settlement, e)}
                             className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-muted/80 dark:hover:bg-white/10 hover:text-blue-500"
@@ -553,6 +540,12 @@ export default function SettlementHistoryPage() {
                       包含 <span className="font-bold text-foreground">{settlement.items.length}</span> 条明细记录
                     </div>
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Link
+                        href={`/settlement?editId=${settlement.id}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground bg-muted/40 dark:bg-white/5"
+                      >
+                        <Edit2 size={14} />
+                      </Link>
                       <button
                         onClick={(e) => exportSingle(settlement, e)}
                         className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground bg-muted/40 dark:bg-white/5"

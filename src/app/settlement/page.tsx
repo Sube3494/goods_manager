@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Loader2, Receipt, RefreshCw, Save, Store, History, Calculator, FileText, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Receipt, RefreshCw, Save, Store, History, Calculator, FileText, CalendarDays, ChevronLeft, ChevronRight, Edit2 } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
+import { FinanceMath } from "@/lib/math";
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
@@ -48,6 +49,11 @@ export default function SettlementPage() {
   const pathname = usePathname();
   const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
 
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("editId");
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [originalData, setOriginalData] = useState<{ entries: PlatformData[], note: string, month: string } | null>(null);
+
   const [activeShop, setActiveShop] = useState<string>("");
   const [entries, setEntries] = useState<PlatformData[]>([]);
   const [note, setNote] = useState("");
@@ -85,9 +91,66 @@ export default function SettlementPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isMonthPickerOpen]);
 
-  // 初始化所有的表单输入数据
+  // 处理编辑模式下的数据加载
   useEffect(() => {
-    if (!shops || shops.length === 0) return;
+    if (!editId || !shops.length) return;
+
+    const fetchSettlementForEdit = async () => {
+      try {
+        setInitialLoading(true);
+        const res = await fetch(`/api/settlements/${editId}`);
+        if (!res.ok) throw new Error("获取记录失败");
+        const data = await res.json();
+
+        // 映射数据到表单状态
+        const monthStr = format(new Date(data.date), "yyyy-MM");
+        setBusinessMonth(monthStr);
+        setNote(data.note || "");
+        
+        // 构建 entries
+        const mappedEntries: PlatformData[] = [];
+        shops.forEach((shop: any) => {
+          const shopName = shop.label;
+          // 查找该店铺的所有平台记录
+          DEFAULT_PLATFORMS.forEach((platformName) => {
+            const match = data.items.find((item: any) => 
+              item.shopName === shopName && item.platformName === platformName
+            );
+
+            mappedEntries.push({
+              id: `${shopName}-${platformName}`,
+              shopName: shopName,
+              platformName,
+              // 优先使用历史记录中的费率，如果没有则回退到店铺当前配置
+              serviceFeeRate: match?.serviceFeeRate ?? (shop.serviceFeeRate ?? 0.06),
+              received: match?.received || 0,
+              brushing: match?.brushing || 0,
+              receivedToCard: match?.receivedToCard || 0
+            });
+          });
+        });
+
+        setEntries(mappedEntries);
+        setOriginalData({ entries: mappedEntries, note: data.note || "", month: monthStr });
+        
+        // 如果有店铺，默认选第一个有数据的
+        const firstWithData = data.items[0]?.shopName;
+        if (firstWithData) setActiveShop(firstWithData);
+        
+      } catch (err) {
+        showToast((err as Error).message, "error");
+        router.replace(pathname);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchSettlementForEdit();
+  }, [editId, shops]);
+
+  // 初始化所有的表单输入数据（非编辑模式）
+  useEffect(() => {
+    if (!shops || shops.length === 0 || editId) return;
     if (!activeShop) setActiveShop(shops[0].label);
 
     setEntries((prev) => {
@@ -109,7 +172,7 @@ export default function SettlementPage() {
       });
       return init;
     });
-  }, [shops, activeShop]);
+  }, [shops, activeShop, editId]);
 
   // 结算计算引擎
   const groups = useMemo<ShopGroup[]>(() => {
@@ -118,20 +181,27 @@ export default function SettlementPage() {
       const entriesForShop = entries.filter((entry) => entry.shopName === shopName);
       
       const entriesWithCalc = entriesForShop.map((e) => {
-        const net = Math.max(0, e.received - e.brushing);
-        const fee = net * e.serviceFeeRate;
+        // 业绩 = 账单入账 - 刷单到手 (财务级减法)
+        const net = Math.max(0, FinanceMath.subtract(e.received, e.brushing));
+        // 抽成 = 账单入账 * 费率 (基于总入账计算，财务级乘法)
+        const fee = FinanceMath.multiply(e.received, e.serviceFeeRate);
         return { ...e, net, fee };
       });
 
-      const totalReceived = entriesWithCalc.reduce((sum, e) => sum + e.received, 0);
-      const totalNet = entriesWithCalc.reduce((sum, e) => sum + e.net, 0);
-      const totalServiceFee = entriesWithCalc.reduce((sum, e) => sum + e.fee, 0);
-      const totalAlreadyReceived = entriesWithCalc.reduce((sum, e) => sum + e.receivedToCard, 0);
-      const finalBalance = totalReceived - totalAlreadyReceived - totalServiceFee;
+      const totalReceived = FinanceMath.sum(...entriesWithCalc.map(e => e.received));
+      const totalNet = FinanceMath.sum(...entriesWithCalc.map(e => e.net));
+      const totalServiceFee = FinanceMath.sum(...entriesWithCalc.map(e => e.fee));
+      const totalAlreadyReceived = FinanceMath.sum(...entriesWithCalc.map(e => e.receivedToCard));
+      
+      // 应补差价 = 账单入账 - 商家实际已收 - 总抽成
+      const finalBalance = FinanceMath.subtract(
+        FinanceMath.subtract(totalReceived, totalAlreadyReceived),
+        totalServiceFee
+      );
 
       return {
         shopName,
-        serviceFeeRate: entriesForShop[0]?.serviceFeeRate || 0.06,
+        serviceFeeRate: entriesForShop[0]?.serviceFeeRate || shop.serviceFeeRate || 0.06,
         entries: entriesWithCalc,
         totalReceived,
         totalNet,
@@ -144,8 +214,16 @@ export default function SettlementPage() {
   }, [entries, shops, note]);
 
   const hasUnsavedChanges = useMemo(() => {
+    if (editId && originalData) {
+      // 在编辑模式下，对比当前数据与原始数据
+      const entriesChanged = JSON.stringify(entries) !== JSON.stringify(originalData.entries);
+      const noteChanged = note !== originalData.note;
+      const monthChanged = businessMonth !== originalData.month;
+      return entriesChanged || noteChanged || monthChanged;
+    }
+    // 在新增模式下，检查是否有任何录入数据
     return groups.some(g => g.hasData);
-  }, [groups]);
+  }, [groups, editId, originalData, entries, note, businessMonth]);
 
   // 拦截应用内侧边栏跳转
   useEffect(() => {
@@ -179,18 +257,15 @@ export default function SettlementPage() {
     setEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, [field]: numeric } : entry)));
   };
 
-  const resetData = () => {
-    setIsConfirmResetOpen(true);
-  };
-
-  const handleConfirmedReset = () => {
-    setEntries((prev) => prev.map((entry) => 
-      entry.shopName === activeShop 
-        ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } 
-        : entry
-    ));
-    setNote("");
-    showToast(`${activeShop} 的输入数据已重置`, "info");
+  // 统一的取消/返回处理
+  const handleCancelEdit = () => {
+    const historyUrl = "/settlement/history";
+    if (hasUnsavedChanges) {
+      setPendingUrl(historyUrl); 
+      setIsConfirmNavOpen(true);
+    } else {
+      router.push(historyUrl);
+    }
   };
 
   const saveSettlement = async () => {
@@ -201,13 +276,16 @@ export default function SettlementPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch("/api/settlements", {
-        method: "POST",
+      const url = editId ? `/api/settlements/${editId}` : "/api/settlements";
+      const method = editId ? "PATCH" : "POST";
+      
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          date: businessMonth ? new Date(`${businessMonth}-01T00:00:00`) : new Date(),
+          date: businessMonth ? new Date(`${businessMonth}-01T12:00:00`) : new Date(),
           totalNet: activeGroup.totalNet,
-          serviceFeeRate: 0, 
+          serviceFeeRate: activeGroup.serviceFeeRate, 
           serviceFee: activeGroup.totalServiceFee,
           totalAlreadyReceived: activeGroup.totalAlreadyReceived,
           finalBalance: activeGroup.finalBalance,
@@ -226,12 +304,18 @@ export default function SettlementPage() {
             }))
         }),
       });
-      if (!response.ok) throw new Error("保存失败");
+      if (!response.ok) throw new Error(editId ? "更新失败" : "保存失败");
       
-      showToast(`${activeGroup.shopName} 结算单已保存至历史记录！`, "success");
-      router.refresh();
-      setEntries((prev) => prev.map((entry) => (entry.shopName === activeShop ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } : entry)));
-      setNote("");
+      showToast(`${activeGroup.shopName} 结算单已${editId ? "更新" : "保存"}至历史记录！`, "success");
+      
+      if (editId) {
+        // 编辑模式下跳转回历史记录
+        router.push("/settlement/history");
+      } else {
+        router.refresh();
+        setEntries((prev) => prev.map((entry) => (entry.shopName === activeShop ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } : entry)));
+        setNote("");
+      }
     } catch (error) {
       console.error(error);
       showToast("保存失败，请重试", "error");
@@ -261,39 +345,64 @@ export default function SettlementPage() {
               <Receipt size={24} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-none">
-                单店对账台
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-none">
+                  单店对账台
+                </h1>
+                {editId && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                    <Edit2 size={10} />
+                    正在编辑历史记录
+                  </div>
+                )}
+              </div>
               <p className="hidden sm:block text-sm text-muted-foreground font-medium opacity-80">
-                专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。
+                {editId ? "正在修改已保存的结算单。更新后将同步至历史记录。" : "专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。"}
               </p>
             </div>
           </div>
-          <button 
-            onClick={handleHistoryClick}
-            className="flex h-10 items-center justify-center gap-2 rounded-full border border-border/50 bg-white dark:bg-white/5 text-foreground px-5 text-sm font-bold transition-all hover:bg-muted/50 dark:hover:bg-white/10 shadow-sm active:scale-95"
-          >
-            <History size={16} />
-            历史记录
-          </button>
+          <div className="flex items-center gap-2">
+            {editId && (
+              <button 
+                onClick={handleCancelEdit}
+                className="flex h-10 items-center justify-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/5 text-rose-600 dark:text-rose-400 px-4 text-sm font-bold transition-all hover:bg-rose-500/10 active:scale-95"
+              >
+                <ChevronLeft size={16} strokeWidth={3} />
+                返回历史
+              </button>
+            )}
+            <button 
+              onClick={handleHistoryClick}
+              className="flex h-10 items-center justify-center gap-2 rounded-full border border-border/50 bg-white dark:bg-white/5 text-foreground px-5 text-sm font-bold transition-all hover:bg-muted/50 dark:hover:bg-white/10 shadow-sm active:scale-95"
+            >
+              <History size={16} />
+              历史记录
+            </button>
+          </div>
         </div>
         <p className="sm:hidden text-xs text-muted-foreground font-medium opacity-80 pl-1">
           专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。
         </p>
 
         {/* Shop Segmented Control */}
-        <div className="p-1 rounded-[20px] bg-white dark:bg-white/5 border border-border/40 inline-flex flex-wrap gap-1 shadow-inner backdrop-blur-md">
+        <div className="p-1 rounded-[20px] bg-white dark:bg-white/5 border border-border/40 inline-flex flex-wrap gap-1 shadow-inner backdrop-blur-md relative overflow-hidden">
+          {editId && (
+            <div className="absolute inset-0 z-20 bg-white/20 dark:bg-black/20 backdrop-blur-[1px] flex items-center justify-center cursor-not-allowed group">
+               <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] px-3 py-1 rounded-full font-bold">编辑模式下锁定切换</div>
+            </div>
+          )}
           {shops.map((shop) => {
             const isActive = shop.label === activeShop;
             const hasData = groups.find(g => g.shopName === shop.label)?.hasData;
             return (
               <button
                 key={shop.id}
-                onClick={() => setActiveShop(shop.label)}
+                onClick={() => !editId && setActiveShop(shop.label)}
+                disabled={!!editId && !isActive}
                 className={`relative flex items-center gap-2 rounded-[14px] px-5 py-2 text-sm font-bold transition-all duration-300 ${
                   isActive
                     ? "bg-white dark:bg-white/10 text-primary shadow-sm ring-1 ring-black/5 dark:ring-white/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30 dark:hover:bg-white/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30 dark:hover:bg-white/5 disabled:opacity-40"
                 }`}
               >
                 <Store size={14} className={isActive ? "text-primary" : "text-muted-foreground/60"} />
@@ -367,14 +476,28 @@ export default function SettlementPage() {
                     </span>
                   </div>
                 </button>
-                <button onClick={resetData} title="重置本店数据" className="h-10 w-10 flex items-center justify-center rounded-xl border border-border/10 bg-white dark:bg-white/5 shadow-sm text-muted-foreground hover:dark:bg-white/10 transition-colors shrink-0">
+                <button 
+                  onClick={() => setIsConfirmResetOpen(true)} 
+                  disabled={!!editId}
+                  title={editId ? "编辑模式无法重置" : "重置本店数据"} 
+                  className="h-10 w-10 flex items-center justify-center rounded-xl border border-border/10 bg-white dark:bg-white/5 shadow-sm text-muted-foreground hover:dark:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
                   <RefreshCw size={16} />
                 </button>
 
                 <ConfirmModal 
                   isOpen={isConfirmResetOpen}
                   onClose={() => setIsConfirmResetOpen(false)}
-                  onConfirm={handleConfirmedReset}
+                  onConfirm={() => {
+                    setIsConfirmResetOpen(false);
+                    setEntries((prev) => prev.map((entry) => 
+                      entry.shopName === activeShop 
+                        ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } 
+                        : entry
+                    ));
+                    setNote("");
+                    showToast(`${activeShop} 的输入数据已重置`, "info");
+                  }}
                   title="确认清空数据"
                   message={`确定要清空 ${activeShop} 的输入数据吗？该操作不可撤销。`}
                   variant="danger"
@@ -570,7 +693,7 @@ export default function SettlementPage() {
                     ) : (
                       <>
                         <Save size={18} className="z-10" />
-                        <span className="z-10 tracking-wide">存入本店结算单</span>
+                        <span className="z-10 tracking-wide">{editId ? "更新当前结算单" : "存入本店结算单"}</span>
                         <div className="absolute inset-0 z-0 bg-linear-to-r from-transparent via-white/15 to-transparent translate-x-[-100%] transition-transform duration-700 ease-in-out group-hover:translate-x-[100%]" />
                       </>
                     )}
