@@ -1,9 +1,8 @@
 "use client";
 
-import { Download, FileText, TrendingUp, X, Receipt, Wallet, Calendar } from "lucide-react";
+import { FileText, TrendingUp, X, Receipt, Wallet, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import * as XLSX from "xlsx";
 import { Settlement } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
 
@@ -27,51 +26,6 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
     totalToCard: settlement.items.reduce((sum, item) => sum + item.receivedToCard, 0),
   };
 
-  const exportToExcel = () => {
-    try {
-      showToast("正在生成报表...", "info");
-      const wb = XLSX.utils.book_new();
-      const itemData = settlement.items.map((item) => ({
-        店铺: item.shopName || "未指定",
-        平台名称: item.platformName,
-        账单到手: item.received,
-        扣除刷单: item.brushing,
-        已打款到卡: item.receivedToCard,
-        真实业绩: item.net,
-      }));
-
-      itemData.push({
-        店铺: "合计汇总",
-        平台名称: "---",
-        账单到手: stats.totalReceived,
-        扣除刷单: stats.totalBrushing,
-        已打款到卡: stats.totalToCard,
-        真实业绩: settlement.totalNet,
-      });
-
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itemData), "平台明细");
-
-      const summaryData = [
-        { 项目: "业务日期", 数值: format(new Date(settlement.date), "yyyy-MM") },
-        { 项目: "合计：账单到手 (A)", 数值: stats.totalReceived },
-        { 项目: "合计：刷单到手 (B)", 数值: stats.totalBrushing },
-        { 项目: "合计：已打本人卡 (A3)", 数值: stats.totalToCard },
-        { 项目: "---", 数值: "---" },
-        { 项目: "合计真实总业绩", 数值: settlement.totalNet },
-        { 项目: `平台抽成 (${(settlement.serviceFeeRate * 100).toFixed(1)}%)`, 数值: settlement.serviceFee },
-        { 项目: "已打款到卡 (扣除)", 数值: settlement.totalAlreadyReceived },
-        { 项目: "最终实补 / 应得", 数值: settlement.finalBalance },
-        { 项目: "备注说明", 数值: settlement.note || "无" },
-      ];
-
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "对账摘要");
-      XLSX.writeFile(wb, `结算对账单_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
-      showToast("报表导出成功", "success");
-    } catch (err) {
-      console.error(err);
-      showToast("导出失败，请重试", "error");
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-6">
@@ -143,13 +97,6 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
                 <div className="h-4 w-1 rounded-full bg-primary" />
                 <h4 className="font-black tracking-tight text-sm sm:text-base">平台明细</h4>
               </div>
-              <button
-                onClick={exportToExcel}
-                className="flex items-center gap-2 rounded-full border border-border bg-white dark:bg-white/5 px-3 sm:px-4 py-1.5 text-[10px] sm:text-xs font-bold transition-all hover:bg-muted dark:hover:bg-white/10 active:scale-95 shadow-sm"
-              >
-                <Download size={14} />
-                导出报表
-              </button>
             </div>
             
             {/* Desktop Table View */}

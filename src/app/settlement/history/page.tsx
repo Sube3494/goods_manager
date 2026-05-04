@@ -4,11 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Calendar,
-  Download,
   FileText,
-  Loader2,
-  Receipt,
-  Store,
+  Percent,
   Trash2,
   TrendingUp,
   Wallet,
@@ -16,11 +13,13 @@ import {
   RotateCcw,
   Eye,
   Edit2,
+  Loader2,
+  Receipt,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import * as XLSX from "xlsx";
 
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -152,10 +151,17 @@ export default function SettlementHistoryPage() {
   }, [settlements, profileShopLabels]);
 
   const historyStats = useMemo(() => {
+    const totalNet = filteredSettlements.reduce((sum, item) => sum + item.totalNet, 0);
+    const totalServiceFee = filteredSettlements.reduce((sum, item) => sum + item.serviceFee, 0);
     return {
       count: filteredSettlements.length,
-      totalNet: filteredSettlements.reduce((sum, item) => sum + item.totalNet, 0),
+      totalNet,
+      totalServiceFee,
+      totalIncome: totalNet - totalServiceFee,
       totalFinalBalance: filteredSettlements.reduce((sum, item) => sum + item.finalBalance, 0),
+      totalBrushing: filteredSettlements.reduce((sum, item) => {
+        return sum + item.items.reduce((iSum, i) => iSum + i.brushing, 0);
+      }, 0),
       totalItems: filteredSettlements.reduce((sum, item) => sum + item.items.length, 0),
     };
   }, [filteredSettlements]);
@@ -191,58 +197,6 @@ export default function SettlementHistoryPage() {
     }
   };
 
-  const exportSingle = (settlement: Settlement, event: React.MouseEvent) => {
-    event.stopPropagation();
-    try {
-      showToast("正在生成报表...", "info");
-      const wb = XLSX.utils.book_new();
-      const stats = {
-        totalReceived: settlement.items.reduce((sum, item) => sum + item.received, 0),
-        totalBrushing: settlement.items.reduce((sum, item) => sum + item.brushing, 0),
-        totalToCard: settlement.items.reduce((sum, item) => sum + item.receivedToCard, 0),
-      };
-
-      const itemData = settlement.items.map((item) => ({
-        店铺: item.shopName || "未指定",
-        平台名称: item.platformName,
-        账单到手: item.received,
-        扣除刷单: item.brushing,
-        已打款到卡: item.receivedToCard,
-        真实业绩: item.net,
-      }));
-
-      itemData.push({
-        店铺: "合计汇总",
-        平台名称: "---",
-        账单到手: stats.totalReceived,
-        扣除刷单: stats.totalBrushing,
-        已打款到卡: stats.totalToCard,
-        真实业绩: settlement.totalNet,
-      });
-
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itemData), "平台明细");
-
-      const summaryData = [
-        { 项目: "业务日期", 数值: format(new Date(settlement.date), "yyyy-MM") },
-        { 项目: "合计：账单到手 (A)", 数值: stats.totalReceived },
-        { 项目: "合计：刷单到手 (B)", 数值: stats.totalBrushing },
-        { 项目: "合计：已打本人卡 (A3)", 数值: stats.totalToCard },
-        { 项目: "---", 数值: "---" },
-        { 项目: "合计真实总业绩", 数值: settlement.totalNet },
-        { 项目: `平台抽成 (${(settlement.serviceFeeRate * 100).toFixed(1)}%)`, 数值: settlement.serviceFee },
-        { 项目: "已打款到卡 (扣除)", 数值: settlement.totalAlreadyReceived },
-        { 项目: "最终实补 / 应得", 数值: settlement.finalBalance },
-        { 项目: "备注说明", 数值: settlement.note || "无" },
-      ];
-
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "对账摘要");
-      XLSX.writeFile(wb, `结算对账单_${format(new Date(), "yyyyMMdd_HHmmss")}.xlsx`);
-      showToast("报表导出成功", "success");
-    } catch (err) {
-      console.error(err);
-      showToast("导出失败，请重试", "error");
-    }
-  };
 
   if (loading) {
     return (
@@ -361,17 +315,17 @@ export default function SettlementHistoryPage() {
         </div>
         <div className="rounded-2xl border border-border bg-white p-3 sm:p-5 shadow-sm dark:bg-white/5 dark:hover:bg-white/10 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">累计应补差价</span>
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">累计收入</span>
             <Wallet size={14} className="text-primary/40 sm:w-4 sm:h-4" />
           </div>
-          <p className="mt-1 sm:mt-3 text-lg sm:text-2xl font-bold tracking-tight">{formatCurrency(historyStats.totalFinalBalance)}</p>
+          <p className="mt-1 sm:mt-3 text-lg sm:text-2xl font-bold tracking-tight text-foreground">{formatCurrency(historyStats.totalIncome)}</p>
         </div>
         <div className="rounded-2xl border border-border bg-white p-3 sm:p-5 shadow-sm dark:bg-white/5 dark:hover:bg-white/10 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">当前筛选</span>
-            <Store size={14} className="text-primary/40 sm:w-4 sm:h-4" />
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-muted-foreground">累计抽成</span>
+            <Percent size={14} className="text-orange-500/40 sm:w-4 sm:h-4" />
           </div>
-          <p className="mt-1 sm:mt-3 text-sm sm:text-xl font-bold tracking-tight truncate">{filterShop || "全部店铺"}</p>
+          <p className="mt-1 sm:mt-3 text-lg sm:text-2xl font-bold tracking-tight text-orange-500">{formatCurrency(historyStats.totalServiceFee)}</p>
         </div>
       </div>
 
@@ -457,13 +411,6 @@ export default function SettlementHistoryPage() {
                             <Edit2 size={18} />
                           </Link>
                           <button
-                            onClick={(e) => exportSingle(settlement, e)}
-                            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-muted/80 dark:hover:bg-white/10 hover:text-blue-500"
-                            title="导出报表"
-                          >
-                            <Download size={18} />
-                          </button>
-                          <button
                             onClick={(e) => handleDeleteClick(settlement.id, e)}
                             className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-rose-500/10 dark:hover:bg-rose-500/20 hover:text-rose-500"
                             disabled={deletingId === settlement.id}
@@ -546,12 +493,6 @@ export default function SettlementHistoryPage() {
                       >
                         <Edit2 size={14} />
                       </Link>
-                      <button
-                        onClick={(e) => exportSingle(settlement, e)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground bg-muted/40 dark:bg-white/5"
-                      >
-                        <Download size={14} />
-                      </button>
                       <button
                         onClick={(e) => handleDeleteClick(settlement.id, e)}
                         className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground bg-muted/40 dark:bg-white/5"

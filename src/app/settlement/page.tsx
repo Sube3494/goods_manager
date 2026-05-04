@@ -181,10 +181,10 @@ export default function SettlementPage() {
       const entriesForShop = entries.filter((entry) => entry.shopName === shopName);
       
       const entriesWithCalc = entriesForShop.map((e) => {
-        // 业绩 = 账单入账 - 刷单到手 (财务级减法)
+        // 真实业绩 = 账单入账 - 刷单到手 (财务级减法)
         const net = Math.max(0, FinanceMath.subtract(e.received, e.brushing));
-        // 抽成 = 账单入账 * 费率 (基于总入账计算，财务级乘法)
-        const fee = FinanceMath.multiply(e.received, e.serviceFeeRate);
+        // 抽成 = 真实业绩 * 费率 (基于扣除刷单后的实收计算，财务级乘法)
+        const fee = FinanceMath.multiply(net, e.serviceFeeRate);
         return { ...e, net, fee };
       });
 
@@ -371,13 +371,15 @@ export default function SettlementPage() {
                 返回历史
               </button>
             )}
-            <button 
-              onClick={handleHistoryClick}
-              className="flex h-10 items-center justify-center gap-2 rounded-full border border-border/50 bg-white dark:bg-white/5 text-foreground px-5 text-sm font-bold transition-all hover:bg-muted/50 dark:hover:bg-white/10 shadow-sm active:scale-95"
-            >
-              <History size={16} />
-              历史记录
-            </button>
+            {!editId && (
+              <button 
+                onClick={handleHistoryClick}
+                className="flex h-10 items-center justify-center gap-2 rounded-full border border-border/50 bg-white dark:bg-white/5 text-foreground px-5 text-sm font-bold transition-all hover:bg-muted/50 dark:hover:bg-white/10 shadow-sm active:scale-95"
+              >
+                <History size={16} />
+                历史记录
+              </button>
+            )}
           </div>
         </div>
         <p className="sm:hidden text-xs text-muted-foreground font-medium opacity-80 pl-1">
@@ -446,7 +448,7 @@ export default function SettlementPage() {
           <p className="text-sm font-bold text-muted-foreground">未选中或暂无店铺配置。</p>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           {/* 左侧：主工作台 */}
           <main className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 p-4 shadow-sm transition-colors hover:border-border/80">
@@ -604,25 +606,25 @@ export default function SettlementPage() {
                         <span className="text-orange-500/80"><span className="text-[10px] tracking-wider uppercase font-sans mr-1">抽成</span>{money(entry.fee)}</span>
                       </div>
                     </div>
-                    {/* 输入区 - 移动端水平布局压缩空间 */}
+                    {/* 输入区 - 响应式栅格：窄屏单列，中屏双列，宽屏三列 */}
                     <div className="flex flex-col md:grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
                       <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">账单入账(A)</label>
-                        <div className="relative w-36 md:w-full">
+                        <div className="relative w-full">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium group-focus-within:text-primary transition-colors">¥</span>
                           <input type="number" inputMode="decimal" value={entry.received || ""} onChange={(e) => handleInputChange(entry.id, "received", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
                         </div>
                       </div>
                       <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">刷单到手</label>
-                        <div className="relative w-36 md:w-full">
+                        <div className="relative w-full">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium group-focus-within:text-rose-500 transition-colors">¥</span>
                           <input type="number" inputMode="decimal" value={entry.brushing || ""} onChange={(e) => handleInputChange(entry.id, "brushing", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-rose-500/20" />
                         </div>
                       </div>
                       <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">商家已收</label>
-                        <div className="relative w-36 md:w-full">
+                        <div className="relative w-full">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-orange-500/50 font-medium group-focus-within:text-orange-500 transition-colors">¥</span>
                           <input type="number" inputMode="decimal" value={entry.receivedToCard || ""} onChange={(e) => handleInputChange(entry.id, "receivedToCard", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-orange-500/5 dark:bg-orange-500/5 pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold text-orange-600 dark:text-orange-400 outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-orange-500/20" />
                         </div>
@@ -639,8 +641,8 @@ export default function SettlementPage() {
             </div>
           </main>
 
-          {/* 右侧：单店结算看板 */}
-          <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          {/* 右侧：单店结算看板 - 在 xl 以下会自动堆叠到下方 */}
+          <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
             <section className="overflow-hidden rounded-[28px] border border-border/50 bg-white shadow-xl shadow-primary/5 dark:bg-white/5 dark:shadow-none flex flex-col relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2" />
               <div className="px-6 pt-7 pb-5 text-center border-b border-border/30 relative z-10">
