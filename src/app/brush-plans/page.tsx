@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw, ArrowLeft } from "lucide-react";
+import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw, ArrowLeft, Package, Eye } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
@@ -131,7 +131,8 @@ export default function BrushPlansPage() {
     };
 
     const filteredPlans = useMemo(() => {
-        return plans.filter(p => {
+        return plans
+            .filter(p => {
             const matchesSearch = !searchQuery || (
                 (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
                 p.items.some((i: BrushOrderPlanItem) => i.productName?.toLowerCase().includes(searchQuery.toLowerCase()) || i.product?.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -140,8 +141,49 @@ export default function BrushPlansPage() {
             const matchesShop = !filterShop || p.shopName === filterShop;
             const matchesPlatform = !filterPlatform || p.items.some((item: BrushOrderPlanItem) => item.platform === filterPlatform);
             return matchesSearch && matchesDate && matchesShop && matchesPlatform;
-        });
+            })
+            .sort((a, b) => new Date(String(b.date)).getTime() - new Date(String(a.date)).getTime());
     }, [plans, searchQuery, filterDate, filterShop, filterPlatform]);
+
+    const planStats = useMemo(() => {
+        const shopCount = new Set(filteredPlans.map((plan) => plan.shopName || "通用店铺")).size;
+        const taskCount = filteredPlans.reduce((sum, plan) => sum + plan.items.length, 0);
+        const quantityCount = filteredPlans.reduce(
+            (sum, plan) => sum + plan.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0),
+            0
+        );
+        const todayLabel = formatLocalDate(new Date().toISOString());
+        const todayCount = filteredPlans.filter((plan) => formatLocalDate(plan.date) === todayLabel).length;
+
+        return {
+            planCount: filteredPlans.length,
+            shopCount,
+            taskCount,
+            quantityCount,
+            todayCount,
+        };
+    }, [filteredPlans]);
+
+    const groupedPlans = useMemo(() => {
+        const groups = new Map<string, BrushOrderPlan[]>();
+
+        filteredPlans.forEach((plan) => {
+            const dateKey = formatLocalDate(plan.date);
+            const current = groups.get(dateKey) || [];
+            current.push(plan);
+            groups.set(dateKey, current);
+        });
+
+        return Array.from(groups.entries()).map(([date, items]) => ({
+            date,
+            items,
+            totalTasks: items.reduce((sum, plan) => sum + plan.items.length, 0),
+            totalQuantity: items.reduce(
+                (sum, plan) => sum + plan.items.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0),
+                0
+            ),
+        }));
+    }, [filteredPlans]);
 
     if (!mounted) return null;
 
@@ -159,8 +201,8 @@ export default function BrushPlansPage() {
 
     return (
         <div className="space-y-6 sm:space-y-8">
-            <div className="mb-5 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="min-w-0 flex-1">
+            <div className="mb-5 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+                <div className="min-w-0 flex-1 space-y-4">
                     <Link
                         href="/brush"
                         className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
@@ -168,8 +210,28 @@ export default function BrushPlansPage() {
                         <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
                         <span>返回刷单中心</span>
                     </Link>
-                    <h1 className="mt-3 text-2xl sm:text-3xl font-black tracking-tight text-foreground truncate">刷单安排表</h1>
-                    <p className="text-muted-foreground mt-1 text-[10px] sm:text-sm font-medium truncate">规划及管理刷单任务</p>
+                    <div className="space-y-1">
+                        <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">刷单安排表</h1>
+                        <p className="text-muted-foreground text-xs sm:text-sm font-medium">按日期统筹计划，先看节奏，再看每家店的商品安排。</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">计划数</div>
+                            <div className="mt-1 text-xl font-black text-foreground">{planStats.planCount}</div>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">今日计划</div>
+                            <div className="mt-1 text-xl font-black text-foreground">{planStats.todayCount}</div>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">任务份数</div>
+                            <div className="mt-1 text-xl font-black text-foreground">{planStats.quantityCount}</div>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">涉及店铺</div>
+                            <div className="mt-1 text-xl font-black text-foreground">{planStats.shopCount}</div>
+                        </div>
+                    </div>
                 </div>
                 {canManage && (
                     <button
@@ -177,147 +239,231 @@ export default function BrushPlansPage() {
                         className="h-11 sm:h-12 w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black px-4 sm:px-6 text-xs sm:text-sm font-black shadow-xl hover:-translate-y-0.5 transition-all shrink-0 active:scale-95 sm:self-auto"
                     >
                         <Plus size={16} />
-                        <span className="hidden sm:inline">新建计划</span>
-                        <span className="inline sm:hidden">新建</span>
+                        <span>新建计划</span>
                     </button>
                 )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <div className="col-span-2 h-12 px-5 min-w-0 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-                    <Search size={18} className="text-muted-foreground" />
-                    <input
-                        type="text"
-                        placeholder="搜索标题、商品名称..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-transparent border-none outline-none w-full text-sm font-medium"
-                    />
+            <div className="rounded-[28px] border border-border/70 bg-white/70 p-3 shadow-sm dark:bg-white/5 sm:p-4">
+                <div className="mb-3 flex items-center justify-between">
+                    <div>
+                        <div className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">筛选工作区</div>
+                        <div className="mt-1 text-sm font-medium text-foreground/75">先按日期、店铺、平台缩小范围，再看每一天的安排。</div>
+                    </div>
+                    {(searchQuery || filterDate || filterShop || filterPlatform) && (
+                        <button
+                            onClick={resetFilters}
+                            className="h-10 px-4 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+                        >
+                            <RotateCcw size={14} /> 重置
+                        </button>
+                    )}
                 </div>
-                <div className="h-12 min-w-0">
-                    <DatePicker
-                        value={filterDate}
-                        onChange={setFilterDate}
-                        placeholder="日期筛选"
-                        className="h-full w-full"
-                        triggerClassName="rounded-full h-full text-sm"
-                    />
-                </div>
-                {user?.shippingAddresses && user.shippingAddresses.length > 0 ? (
+
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-[1.4fr_0.9fr_0.9fr_0.9fr]">
+                    <div className="col-span-2 h-12 px-5 min-w-0 rounded-full bg-white dark:bg-white/5 border border-border flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/10 transition-all xl:col-span-1">
+                        <Search size={18} className="text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="搜索标题、商品名称..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-transparent border-none outline-none w-full text-sm font-medium"
+                        />
+                    </div>
+                    <div className="col-span-2 h-12 min-w-0 xl:col-span-1">
+                        <DatePicker
+                            value={filterDate}
+                            onChange={setFilterDate}
+                            placeholder="日期筛选"
+                            className="h-full w-full"
+                            triggerClassName="rounded-full h-full text-sm"
+                        />
+                    </div>
+                    {user?.shippingAddresses && user.shippingAddresses.length > 0 ? (
+                        <div className="h-12 min-w-0">
+                            <CustomSelect
+                                options={[
+                                    { value: "", label: "所有店铺" },
+                                    ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
+                                ]}
+                                value={filterShop}
+                                onChange={(val) => setFilterShop(val)}
+                                className="h-full w-full"
+                                triggerClassName="rounded-full h-full text-sm font-medium"
+                            />
+                        </div>
+                    ) : null}
                     <div className="h-12 min-w-0">
                         <CustomSelect
                             options={[
-                                { value: "", label: "所有店铺" },
-                                ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
+                                { value: "", label: "所有平台" },
+                                { value: "美团", label: "美团" },
+                                { value: "淘宝", label: "淘宝" },
+                                { value: "京东", label: "京东" },
                             ]}
-                            value={filterShop}
-                            onChange={(val) => setFilterShop(val)}
+                            value={filterPlatform}
+                            onChange={(val) => setFilterPlatform(val)}
                             className="h-full w-full"
                             triggerClassName="rounded-full h-full text-sm font-medium"
                         />
                     </div>
-                ) : (
-                    <div className="hidden sm:block" />
-                )}
-                <div className={cn("h-12 min-w-0", (searchQuery || filterDate || filterShop || filterPlatform) ? "" : "col-span-2 sm:col-span-1")}>
-                    <CustomSelect
-                        options={[
-                            { value: "", label: "所有平台" },
-                            { value: "美团", label: "美团" },
-                            { value: "淘宝", label: "淘宝" },
-                            { value: "京东", label: "京东" },
-                        ]}
-                        value={filterPlatform}
-                        onChange={(val) => setFilterPlatform(val)}
-                        className="h-full w-full"
-                        triggerClassName="rounded-full h-full text-sm font-medium"
-                    />
                 </div>
-                {(searchQuery || filterDate || filterShop || filterPlatform) && (
-                    <button
-                        onClick={resetFilters}
-                        className="h-12 px-5 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-                    >
-                        <RotateCcw size={14} /> 重置
-                    </button>
-                )}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-                {filteredPlans.map(plan => {
-                    const platforms = Array.from(new Set(plan.items.map((i: BrushOrderPlanItem) => i.platform).filter((p): p is string => !!p)));
-
-                    return (
-                        <div key={plan.id} className="group relative flex flex-col rounded-[20px] sm:rounded-[24px] border border-border bg-white dark:bg-gray-900/60 p-3.5 sm:p-4 shadow-sm hover:border-primary/25 hover:shadow-xl transition-all duration-300">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className={cn(
-                                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 shadow-sm border border-transparent",
-                                        "bg-primary/10 text-primary border-primary/20"
-                                    )}>
-                                        <Calendar className="w-5 h-5" strokeWidth={2} />
+            <div className="space-y-5">
+                {groupedPlans.map((group) => (
+                    <section key={group.date} className="space-y-3">
+                        <div className="flex flex-col gap-2 rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                    <Calendar size={20} />
+                                </div>
+                                <div>
+                                    <div className="text-lg font-black tracking-tight text-foreground">{group.date}</div>
+                                    <div className="text-xs font-medium text-muted-foreground">
+                                        {group.items.length} 份计划 · {group.totalTasks} 个商品任务 · {group.totalQuantity} 份安排
                                     </div>
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <h3 className="text-base sm:text-lg font-black tracking-tight text-foreground leading-tight truncate">
-                                                {plan.shopName || "通用店铺"}
-                                            </h3>
-                                            <span className="text-xs font-bold text-muted-foreground">·</span>
-                                            <span className="text-sm font-bold text-muted-foreground">
-                                                {formatLocalDate(plan.date)}
-                                            </span>
+                                </div>
+                            </div>
+                            <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">按店铺查看当天节奏</div>
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            {group.items.map(plan => {
+                                const platforms = Array.from(new Set(plan.items.map((i: BrushOrderPlanItem) => i.platform).filter((p): p is string => !!p)));
+                                const totalQuantity = plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+                                return (
+                                    <div key={plan.id} className="group relative flex flex-col xl:flex-row gap-0 rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 shadow-sm transition-all duration-300 hover:border-primary/25 hover:shadow-xl dark:hover:bg-white/10 overflow-hidden">
+                                        <div className="w-full xl:w-[320px] p-4 sm:p-5 border-b xl:border-b-0 xl:border-r border-border/40 flex flex-col justify-between">
+                                            <div>
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <h3 className="text-lg font-black tracking-tight text-foreground truncate">
+                                                            {plan.shopName || "通用店铺"}
+                                                        </h3>
+                                                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted-foreground">
+                                                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary uppercase tracking-wider">{totalQuantity} 份</span>
+                                                            <span className="opacity-40">•</span>
+                                                            <span>{plan.items.length} 个任务</span>
+                                                            <span className="opacity-40">•</span>
+                                                            <span>{platforms.length || 1} 个平台</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0 bg-white dark:bg-white/10 rounded-xl p-1 shadow-sm border border-border/50 dark:border-white/10">
+                                                        <Link
+                                                            href={`/brush-plans/share/${plan.id}`}
+                                                            target="_blank"
+                                                            className="p-1.5 rounded-lg text-muted-foreground hover:bg-blue-500 hover:text-white transition-all"
+                                                            title="预览对外分享页/详情"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5" />
+                                                        </Link>
+                                                        <button 
+                                                            onClick={() => { 
+                                                                const shareUrl = `${window.location.origin}/brush-plans/share/${plan.id}`;
+                                                                copyToClipboard(shareUrl).then((success) => {
+                                                                    if (success) showToast("链接已复制，去发给刷单员吧", "success");
+                                                                    else showToast("复制失败，请尝试长按并手动复制", "error");
+                                                                });
+                                                            }}
+                                                            className="p-1.5 rounded-lg text-muted-foreground hover:bg-primary hover:text-white dark:hover:bg-white dark:hover:text-zinc-950 transition-all"
+                                                            title="分享链接"
+                                                        >
+                                                            <Share2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        {canManage && (
+                                                            <>
+                                                                <button onClick={() => handleEdit(plan)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-zinc-800 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all">
+                                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button onClick={() => handleDelete(plan.id)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-500 hover:text-white transition-all">
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {plan.note && (
+                                                    <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-500 text-xs font-medium leading-relaxed max-h-[120px] overflow-y-auto no-scrollbar">
+                                                        <span className="font-bold opacity-70">备注：</span>{plan.note}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                            <span className="text-[11px] font-bold text-muted-foreground">
-                                                {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份任务
-                                            </span>
-                                            <span className="text-[11px] font-bold text-muted-foreground/50">·</span>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {platforms.map((platform: string) => {
-                                                    let platformStyle = "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:border-white/10";
-                                                    if (platform === "美团") platformStyle = "bg-[#FFD000]/10 text-[#222222] border-[#FFD000]/20 dark:text-[#FFD000]";
-                                                    if (platform === "淘宝") platformStyle = "bg-[#FF5000]/10 text-[#FF5000] border-[#FF5000]/20";
-                                                    if (platform === "京东") platformStyle = "bg-[#E1251B]/10 text-[#E1251B] border-[#E1251B]/20";
-                                                    
+
+                                        <div className="flex-1 p-4 sm:p-5 min-w-0">
+                                            <div className="flex items-center justify-between gap-3 mb-3">
+                                                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">商品安排</div>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {platforms.map((platform: string) => {
+                                                        let platformStyle = "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:border-white/10";
+                                                        if (platform === "美团") platformStyle = "bg-[#FFD000]/10 text-[#222222] border-[#FFD000]/20 dark:text-[#FFD000]";
+                                                        if (platform === "淘宝") platformStyle = "bg-[#FF5000]/10 text-[#FF5000] border-[#FF5000]/20";
+                                                        if (platform === "京东") platformStyle = "bg-[#E1251B]/10 text-[#E1251B] border-[#E1251B]/20";
+
+                                                        return (
+                                                            <div key={platform} className={cn("px-2 py-0.5 rounded-lg text-[10px] font-black border", platformStyle)}>
+                                                                {platform}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-2.5">
+                                                {plan.items.map((item, index) => {
+                                                    const imageUrl = item.product?.image 
+                                                        ? (item.product.image.startsWith('http') || item.product.image.startsWith('/') 
+                                                            ? item.product.image 
+                                                            : `/api/uploads/${item.product.image.replace(/^\/?uploads\//, '')}`)
+                                                        : null;
+
                                                     return (
-                                                        <div key={platform} className={cn("px-2 py-0.5 rounded-lg text-[10px] font-black border", platformStyle)}>
-                                                            {platform}
+                                                        <div 
+                                                            key={`${plan.id}-item-${index}`} 
+                                                            className="group relative flex items-center gap-2 rounded-full bg-white dark:bg-white/[0.06] border border-border/60 dark:border-white/10 p-1 pr-3.5 shadow-sm transition-all hover:shadow-md hover:border-primary/40 dark:hover:bg-white/10 cursor-default"
+                                                            title={`商品：${item.productName || item.product?.name || "未命名"}\n关键词：${item.searchKeyword || "无"}\n平台：${item.platform || "无"}`}
+                                                        >
+                                                            {/* 小圆图 */}
+                                                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-muted/50 shrink-0 shadow-inner">
+                                                                {imageUrl ? (
+                                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                                    <img src={imageUrl} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
+                                                                        <Package className="w-4 h-4" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            {/* 简要信息：仅展示关键词和数量 */}
+                                                            <div className="flex flex-col max-w-[100px] sm:max-w-[140px]">
+                                                                <div className="truncate text-[11px] font-bold text-foreground">
+                                                                    {item.searchKeyword || item.productName || item.product?.name || "未设置"}
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                    <span className="text-[9px] font-black uppercase text-muted-foreground opacity-70">
+                                                                        {item.platform || "未知"}
+                                                                    </span>
+                                                                    <span className="text-[9px] font-black text-primary">
+                                                                        x{item.quantity || 1}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
-                                    <button 
-                                        onClick={() => { 
-                                            const shareUrl = `${window.location.origin}/brush-plans/share/${plan.id}`;
-                                            copyToClipboard(shareUrl).then((success) => {
-                                                if (success) showToast("链接已复制，去发给刷单员吧", "success");
-                                                else showToast("复制失败，请尝试长按并手动复制", "error");
-                                            });
-                                        }}
-                                        className="p-2 rounded-xl bg-muted/70 text-foreground hover:bg-primary hover:text-white dark:hover:bg-white dark:hover:text-zinc-950 transition-all shadow-sm"
-                                        title="分享链接"
-                                    >
-                                        <Share2 className="w-4 h-4" />
-                                    </button>
-                                    {canManage && (
-                                        <>
-                                            <button onClick={() => handleEdit(plan)} className="p-2 rounded-xl bg-muted/70 text-foreground hover:bg-zinc-800 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all shadow-sm">
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => handleDelete(plan.id)} className="p-2 rounded-xl bg-muted/70 text-foreground hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
+                                );
+                            })}
                         </div>
-                    );
-                })}
+                    </section>
+                ))}
             </div>
 
             {!isLoading && filteredPlans.length === 0 && (

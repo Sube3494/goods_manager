@@ -23,6 +23,7 @@ interface ProductSelectionModalProps {
   selectedBadgeLabel?: string;
   unselectedOnlyLabel?: string;
   unselectedOnlyTitle?: string;
+  hideUnselectedOnlyToggle?: boolean;
   singleSelect?: boolean;
   showPrice?: boolean;
   showSku?: boolean;
@@ -62,6 +63,7 @@ export function ProductSelectionModal({
   selectedBadgeLabel = "已在计划中",
   unselectedOnlyLabel = "显示未复制",
   unselectedOnlyTitle = "切换是否只显示未复制商品",
+  hideUnselectedOnlyToggle = false,
   singleSelect = false,
   showPrice = true,
   showSku = true,
@@ -78,8 +80,7 @@ export function ProductSelectionModal({
 }: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
-  const [showImageName, setShowImageName] = useState(true);
-  const [showImageSupplier, setShowImageSupplier] = useState(true);
+
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -120,8 +121,7 @@ export function ProductSelectionModal({
       setSelectedProducts([]);
       setSearchQuery("");
       setSelectedSupplierId("");
-      setShowImageName(true);
-      setShowImageSupplier(true);
+
       setShowUnselectedOnly(true);
       setIsLoading(usesPrefetchedData ? externalLoading : products.length === 0);
       pageRef.current = 1;
@@ -403,19 +403,21 @@ export function ProductSelectionModal({
 
               <div className="flex min-h-[36px] items-center justify-between gap-3 shrink-0">
                 <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowUnselectedOnly((prev) => !prev)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
-                      showUnselectedOnly
-                        ? "border-primary/30 bg-primary/10 text-primary"
-                        : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10"
-                    )}
-                    title={unselectedOnlyTitle}
-                  >
-                    {unselectedOnlyLabel}
-                  </button>
+                  {!hideUnselectedOnlyToggle && (
+                    <button
+                      type="button"
+                      onClick={() => setShowUnselectedOnly((prev) => !prev)}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
+                        showUnselectedOnly
+                          ? "border-primary/30 bg-primary/10 text-primary"
+                          : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                      )}
+                      title={unselectedOnlyTitle}
+                    >
+                      {unselectedOnlyLabel}
+                    </button>
+                  )}
                 </div>
                 {!singleSelect ? (
                   <button
@@ -431,34 +433,7 @@ export function ProductSelectionModal({
                 )}
               </div>
 
-              {imageOnly && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowImageName(prev => !prev)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
-                      showImageName
-                        ? "border-primary/30 bg-primary/10 text-primary"
-                        : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    名称
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowImageSupplier(prev => !prev)}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
-                      showImageSupplier
-                        ? "border-primary/30 bg-primary/10 text-primary"
-                        : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    供应商
-                  </button>
-                </div>
-              )}
+
 
               <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", imageOnly ? "" : "space-y-2")}>
                  {(showInitialSkeleton && products.length === 0) ? (
@@ -577,16 +552,14 @@ export function ProductSelectionModal({
                                   {selectedBadgeLabel}
                                 </div>
                               )}
-                              {showImageName && (
-                                <div className="line-clamp-2 text-xs font-bold leading-snug text-white/95">
-                                  {product.name}
-                                </div>
-                              )}
-                              {(product.sku || product.category?.name) && (showImageName || showImageSupplier) && (
+                              <div className="line-clamp-2 text-xs font-bold leading-snug text-white/95">
+                                {product.name}
+                              </div>
+                              {(product.sku || product.category?.name) && (
                                 <div className="mt-1 line-clamp-1 text-[10px] text-white/65">
                                   {[
-                                    showImageName ? product.sku : null,
-                                    showImageSupplier ? product.category?.name : null
+                                    product.sku,
+                                    product.category?.name
                                   ].filter(Boolean).join(" · ")}
                                 </div>
                               )}
