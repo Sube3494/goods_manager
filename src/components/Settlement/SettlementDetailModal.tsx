@@ -24,7 +24,12 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
     totalReceived: settlement.items.reduce((sum, item) => sum + item.received, 0),
     totalBrushing: settlement.items.reduce((sum, item) => sum + item.brushing, 0),
     totalToCard: settlement.items.reduce((sum, item) => sum + item.receivedToCard, 0),
+    totalNet: settlement.items.reduce((sum, item) => sum + Math.max(0, item.received - item.brushing), 0),
   };
+
+  // 实时校准抽成和补差（防止历史数据错误）
+  const correctedServiceFee = Number((stats.totalNet * settlement.serviceFeeRate).toFixed(2));
+  const correctedFinalBalance = Number((stats.totalReceived - stats.totalToCard - correctedServiceFee).toFixed(2));
 
 
   return (
@@ -40,13 +45,19 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
             </div>
             <div>
               <h3 className="text-lg sm:text-2xl font-bold tracking-tight">结算单详情</h3>
-              <div className="flex items-center gap-2 mt-0.5 sm:mt-1">
-                <span className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-widest font-black">
-                  RECORD ID: {settlement.id.slice(-8).toUpperCase()}
-                </span>
-                <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
-                <span className="text-[9px] sm:text-[10px] text-primary/70 font-bold uppercase tracking-widest">
-                  Verified
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1 sm:mt-1.5">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                  <span className="text-[10px] sm:text-xs font-black text-primary uppercase tracking-wider">
+                    {Array.from(new Set(settlement.items.map(i => i.shopName))).join(" / ")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Calendar size={12} className="opacity-60" />
+                  <span className="text-[10px] sm:text-xs font-bold">{settlement.businessMonth}</span>
+                </div>
+                <div className="hidden sm:block h-1 w-1 rounded-full bg-muted-foreground/30" />
+                <span className="text-[9px] sm:text-[10px] text-muted-foreground/60 uppercase tracking-widest font-black">
+                  ID: {settlement.id.slice(-8).toUpperCase()}
                 </span>
               </div>
             </div>
@@ -86,7 +97,7 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
                 <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest text-primary/70">真实业绩</span>
                 <TrendingUp size={12} className="text-primary/40 sm:w-4 sm:h-4" />
               </div>
-              <div className="text-sm sm:text-xl font-black text-primary">{formatCurrency(settlement.totalNet)}</div>
+              <div className="text-sm sm:text-xl font-black text-primary">{formatCurrency(stats.totalNet)}</div>
             </div>
           </div>
 
@@ -174,12 +185,12 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
                 </div>
                 <div className="flex justify-between text-sm">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground font-medium">平台服务抽成</span>
+                    <span className="text-muted-foreground font-medium">抽成</span>
                     <span className="text-[10px] bg-orange-500/10 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded font-bold">
                       {(settlement.serviceFeeRate * 100).toFixed(1)}%
                     </span>
                   </div>
-                  <span className="font-bold text-orange-500">-{formatCurrency(settlement.serviceFee)}</span>
+                  <span className="font-bold text-orange-500">-{formatCurrency(correctedServiceFee)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground font-medium">已打款到卡 (本人账户)</span>
@@ -192,7 +203,7 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-2xl sm:text-4xl font-black text-primary tracking-tighter drop-shadow-sm transition-all group-hover:scale-105 origin-right">
-                      {formatCurrency(settlement.finalBalance)}
+                      {formatCurrency(correctedFinalBalance)}
                     </span>
                   </div>
                 </div>

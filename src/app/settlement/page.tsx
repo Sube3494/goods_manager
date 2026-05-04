@@ -180,20 +180,26 @@ export default function SettlementPage() {
       const shopName = shop.label;
       const entriesForShop = entries.filter((entry) => entry.shopName === shopName);
       
+      const groupRate = entriesForShop[0]?.serviceFeeRate || shop.serviceFeeRate || 0.06;
+      
       const entriesWithCalc = entriesForShop.map((e) => {
-        // 真实业绩 = 账单入账 - 刷单到手 (财务级减法)
+        // 1. 计算本行真实业绩：入账 - 刷单
         const net = Math.max(0, FinanceMath.subtract(e.received, e.brushing));
-        // 抽成 = 真实业绩 * 费率 (基于扣除刷单后的实收计算，财务级乘法)
-        const fee = FinanceMath.multiply(net, e.serviceFeeRate);
-        return { ...e, net, fee };
+        // 2. 计算本行抽成：必须基于真实业绩 * 统一费率
+        const fee = FinanceMath.multiply(net, groupRate);
+        return { ...e, net, fee, serviceFeeRate: groupRate };
       });
 
       const totalReceived = FinanceMath.sum(...entriesWithCalc.map(e => e.received));
       const totalNet = FinanceMath.sum(...entriesWithCalc.map(e => e.net));
-      const totalServiceFee = FinanceMath.sum(...entriesWithCalc.map(e => e.fee));
+      
+      // 3. 总抽成计算：为了防止由于每行四舍五入累计产生的细微误差，
+      // 我们直接使用总真实业绩乘以费率，确保与界面显示的 6.0% 逻辑对齐
+      const totalServiceFee = FinanceMath.multiply(totalNet, groupRate);
+      
       const totalAlreadyReceived = FinanceMath.sum(...entriesWithCalc.map(e => e.receivedToCard));
       
-      // 应补差价 = 账单入账 - 商家实际已收 - 总抽成
+      // 4. 最终补差：入账总额 - 已打款总额 - 总平台抽成
       const finalBalance = FinanceMath.subtract(
         FinanceMath.subtract(totalReceived, totalAlreadyReceived),
         totalServiceFee
@@ -201,7 +207,7 @@ export default function SettlementPage() {
 
       return {
         shopName,
-        serviceFeeRate: entriesForShop[0]?.serviceFeeRate || shop.serviceFeeRate || 0.06,
+        serviceFeeRate: groupRate,
         entries: entriesWithCalc,
         totalReceived,
         totalNet,
