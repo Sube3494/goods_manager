@@ -69,8 +69,15 @@ export default function ShopGoodsPage() {
   );
 
   const templateCatalogQuery = useMemo(
-    () => ({ includeShopOnly: "true", includePublic: "true" }),
-    []
+    () => {
+      const nextQuery: Record<string, string> = { includePublic: "true" };
+      if (selectedShopId) {
+        nextQuery.shopId = selectedShopId;
+        nextQuery.shopFilterMode = "unassigned";
+      }
+      return nextQuery;
+    },
+    [selectedShopId]
   );
 
   const displayedItems = useMemo(
@@ -285,8 +292,8 @@ export default function ShopGoodsPage() {
           all: "true",
           page: "1",
           pageSize: "2000",
-          includeShopOnly: "true",
           includePublic: "true",
+          ...(selectedShopId ? { shopId: selectedShopId, shopFilterMode: "unassigned" } : {}),
         });
         const res = await fetch(`/api/products?${params.toString()}`);
         const data = await res.json().catch(() => ({}));
@@ -313,7 +320,7 @@ export default function ShopGoodsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selectedShopId]);
 
   useEffect(() => {
     const fetchCategoryOptions = async () => {

@@ -503,6 +503,7 @@ export async function POST(
       where: {
         id: { in: productIds },
         isPublic: true,
+        isShopOnly: false,
       },
       select: {
         id: true,
@@ -525,30 +526,37 @@ export async function POST(
       return NextResponse.json({ error: "没有可加入店铺的公开商品" }, { status: 404 });
     }
 
-    const existingSkuRows = await prisma.shopProduct.findMany({
+    const existingAssignments = await prisma.shopProduct.findMany({
       where: {
         shopId,
-        sku: { in: products.map((product) => product.sku).filter((value): value is string => Boolean(value)) },
+        OR: [
+          { productId: { in: products.map((product) => product.id) } },
+          { sourceProductId: { in: products.map((product) => product.id) } },
+        ],
       },
       select: {
-        sku: true,
+        productId: true,
+        sourceProductId: true,
       },
     });
-    const existingSkuSet = new Set(existingSkuRows.map((item) => item.sku).filter((value): value is string => Boolean(value)));
+    const existingAssignmentSet = new Set(
+      existingAssignments.flatMap((item) => [item.productId, item.sourceProductId]).filter((value): value is string => Boolean(value))
+    );
 
     const categoryMap = await ensureUserCategories(
       shop.userId,
       products.map((product) => product.category?.name || "").filter(Boolean)
     );
 
+    const productsToCreate = products.filter((product) => !existingAssignmentSet.has(product.id));
+    const skippedCount = products.length - productsToCreate.length;
+
     const result = await prisma.shopProduct.createMany({
-      data: products
-        .filter((product) => !product.sku || !existingSkuSet.has(product.sku))
-        .map((product) => ({
+      data: productsToCreate.map((product) => ({
         shopId,
         productId: product.id,
         sourceProductId: product.id,
-        sku: product.sku || null,
+        sku: null,
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
         productImage: product.image,
@@ -568,7 +576,10 @@ export async function POST(
     return NextResponse.json({
       success: true,
       count: result.count,
-      message: `成功加入 ${shop.name}`,
+      skipped: skippedCount,
+      message: skippedCount > 0
+        ? `成功加入 ${shop.name} ${result.count} 条，跳过 ${skippedCount} 条已复制商品`
+        : `成功加入 ${shop.name}`,
     });
   } catch (error) {
     console.error("Failed to assign products to shop:", error);
