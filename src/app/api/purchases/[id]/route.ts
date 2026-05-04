@@ -271,21 +271,86 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    
-    // 显式删除关联明细（由于 schema 有 onDelete: Cascade，此步通常是多余的，但保留作为保险）
-    await prisma.purchaseOrderItem.deleteMany({
-      where: { purchaseOrderId: id }
-    });
-    
-    await prisma.purchaseOrder.delete({
-      where: { id }
+
+    await prisma.$transaction(async (tx) => {
+      const existingPurchase = await tx.purchaseOrder.findUnique({
+        where: { id },
+        include: { items: true },
+      });
+
+      if (!existingPurchase) {
+        throw new Error("采购单不存在");
+      }
+
+      if (existingPurchase.status === "Received") {
+        for (const item of existingPurchase.items) {
+          const currentRemaining = Number(item.remainingQuantity ?? 0);
+          const originalQuantity = Number(item.quantity || 0);
+
+          if (currentRemaining < originalQuantity) {
+            throw new Error("该采购单已有商品被后续出库或占用，暂时不能删除");
+          }
+
+          if (item.shopProductId) {
+            const shopProduct = await tx.shopProduct.findUnique({
+              where: { id: item.shopProductId },
+            });
+
+            if (!shopProduct || Number(shopProduct.stock || 0) < originalQuantity) {
+              throw new Error("店铺商品当前库存不足，无法删除这张已入库采购单");
+            }
+
+            await tx.shopProduct.update({
+              where: { id: item.shopProductId },
+              data: {
+                stock: { decrement: originalQuantity },
+                costPrice: calculateRevertedCostPrice(
+                  Number(shopProduct.stock || 0),
+                  Number(shopProduct.costPrice || 0),
+                  originalQuantity,
+                  Number(item.costPrice || 0)
+                ),
+              },
+            });
+          } else if (item.productId) {
+            const product = await tx.product.findUnique({
+              where: { id: item.productId },
+            });
+
+            if (!product || Number(product.stock || 0) < originalQuantity) {
+              throw new Error("主商品当前库存不足，无法删除这张已入库采购单");
+            }
+
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: { decrement: originalQuantity },
+                costPrice: calculateRevertedCostPrice(
+                  Number(product.stock || 0),
+                  Number(product.costPrice || 0),
+                  originalQuantity,
+                  Number(item.costPrice || 0)
+                ),
+              },
+            });
+          }
+        }
+      }
+
+      await tx.purchaseOrderItem.deleteMany({
+        where: { purchaseOrderId: id }
+      });
+
+      await tx.purchaseOrder.delete({
+        where: { id }
+      });
     });
 
     return NextResponse.json({ success: true, message: "Purchase order deleted successfully" });
   } catch (error) {
     console.error("Failed to delete purchase order:", error);
     return NextResponse.json(
-      { error: "Failed to delete purchase order", details: error instanceof Error ? error.message : String(error) }, 
+      { error: error instanceof Error ? error.message : "Failed to delete purchase order", details: error instanceof Error ? error.message : String(error) }, 
       { status: 500 }
     );
   }

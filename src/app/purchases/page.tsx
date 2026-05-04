@@ -252,12 +252,12 @@ function PurchasesContent() {
     
     let message = `确定要删除单号为 ${id} 的采购单吗？此操作将移除所有关联的采购项目，且不可恢复。`;
     if (isReceived) {
-      message = `警告：该采购单 [${id}] 已入库。删除此单据不会自动回滚已增加的商品库存。您确定要强制删除吗？此操作不可逆。`;
+      message = `该采购单 [${id}] 已入库。删除时会同步回滚这张单带来的入库库存；如果这批货已经被后续出库或占用，系统会阻止删除。确定继续吗？`;
     }
 
     setConfirmConfig({
       isOpen: true,
-      title: isReceived ? "强制删除已入库单据" : "删除采购单",
+      title: isReceived ? "删除已入库单据" : "删除采购单",
       message,
       onConfirm: async () => {
         try {
@@ -267,7 +267,7 @@ function PurchasesContent() {
             showToast("采购单已删除", "success");
             setIsModalOpen(false); // Close modal if delete was triggered from inside
           } else {
-            const errData = await res.json();
+            const errData = await res.json().catch(() => ({}));
             showToast(errData.error || "删除失败", "error");
           }
         } catch (error) {
@@ -388,7 +388,7 @@ function PurchasesContent() {
 
     const receivedCount = selectedPurchases.filter((purchase) => purchase.status === "Received").length;
     const message = receivedCount > 0
-      ? `已选 ${selectedPurchases.length} 张采购单，其中 ${receivedCount} 张已入库。批量删除不会回滚库存，确定继续吗？`
+      ? `已选 ${selectedPurchases.length} 张采购单，其中 ${receivedCount} 张已入库。删除时会自动回滚这些单据带来的库存；若其中有商品已被后续出库或占用，对应单据会删除失败。确定继续吗？`
       : `确定删除已选中的 ${selectedPurchases.length} 张采购单吗？此操作不可恢复。`;
 
     setConfirmConfig({
