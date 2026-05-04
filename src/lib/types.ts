@@ -536,3 +536,28 @@ export interface BrushOrderPlanItem {
   done: boolean;
   sortOrder?: number;
 }
+
+export interface SettlementItem {
+  id: string;
+  platformName: string;
+  shopName: string | null;
+  serviceFeeRate?: number;
+  received: number;
+  brushing: number;
+  receivedToCard: number;
+  net: number;
+}
+
+export interface Settlement {
+  id: string;
+  date: string | Date;
+  totalNet: number;
+  serviceFeeRate: number;
+  serviceFee: number;
+  totalAlreadyReceived: number;
+  finalBalance: number;
+  note: string | null;
+  shopName: string | null;
+  items: SettlementItem[];
+  createdAt: string;
+}

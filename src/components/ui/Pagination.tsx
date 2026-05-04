@@ -40,7 +40,7 @@ export function Pagination({
                     "rounded-full px-3 py-1.5 text-[10px] font-bold transition-all sm:text-xs",
                     pageSize === size
                       ? "bg-white dark:bg-white/10 text-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-white/50 hover:text-foreground dark:hover:bg-white/5"
+                      : "text-muted-foreground hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10"
                   )}
                 >
                   {size}

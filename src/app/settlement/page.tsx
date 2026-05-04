@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, History, Loader2, Percent, Receipt, RefreshCw, Save, Store, TrendingUp, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { Loader2, Receipt, RefreshCw, Save, Store, History, Calculator, FileText, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
+import { zhCN } from "date-fns/locale/zh-CN";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 
-import { DatePicker } from "@/components/ui/DatePicker";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
@@ -32,8 +35,7 @@ interface ShopGroup {
   totalServiceFee: number;
   totalAlreadyReceived: number;
   finalBalance: number;
-  filledCount: number;
-  isConfirmed: boolean;
+  hasData: boolean;
 }
 
 const DEFAULT_PLATFORMS = ["美团闪购", "京东秒送", "淘宝闪购"];
@@ -44,144 +46,157 @@ export default function SettlementPage() {
   const shops = useMemo(() => (user as unknown as User)?.shippingAddresses || [], [user]);
   const { showToast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
   const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
 
-  const [selectedShops, setSelectedShops] = useState<string[]>([]);
-  const [activeShop, setActiveShop] = useState("");
-  const [confirmedShops, setConfirmedShops] = useState<string[]>([]);
+  const [activeShop, setActiveShop] = useState<string>("");
   const [entries, setEntries] = useState<PlatformData[]>([]);
   const [note, setNote] = useState("");
-  const [businessDate, setBusinessDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [businessMonth, setBusinessMonth] = useState(format(new Date(), "yyyy-MM"));
   const [isSaving, setIsSaving] = useState(false);
 
+  // Month Picker State
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(parseInt(format(new Date(), "yyyy")));
+  const monthPickerContainerRef = useRef<HTMLDivElement>(null);
+  const pickerPanelRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [isConfirmResetOpen, setIsConfirmResetOpen] = useState(false);
+  const [isConfirmNavOpen, setIsConfirmNavOpen] = useState(false);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+
   useEffect(() => {
-    if (selectedShops.length === 0) {
-      setEntries([]);
-      setActiveShop("");
-      setConfirmedShops([]);
-      return;
+    setMounted(true);
+  }, []);
+
+  // 点击外部关闭月份选择器
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      const isInsideTrigger = monthPickerContainerRef.current?.contains(target);
+      const isInsidePicker = pickerPanelRef.current?.contains(target);
+      
+      if (!isInsideTrigger && !isInsidePicker) {
+        setIsMonthPickerOpen(false);
+      }
     }
+    if (isMonthPickerOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMonthPickerOpen]);
+
+  // 初始化所有的表单输入数据
+  useEffect(() => {
+    if (!shops || shops.length === 0) return;
+    if (!activeShop) setActiveShop(shops[0].label);
 
     setEntries((prev) => {
-      const next: PlatformData[] = [];
-      selectedShops.forEach((shopLabel) => {
-        const rate = shops.find((item) => item.label === shopLabel)?.serviceFeeRate ?? 0.06;
+      if (prev.length > 0) return prev; 
+      const init: PlatformData[] = [];
+      shops.forEach((shop: any) => {
+        const rate = shop.serviceFeeRate ?? 0.06;
         DEFAULT_PLATFORMS.forEach((platformName) => {
-          const id = `${shopLabel}-${platformName}`;
-          const existing = prev.find((entry) => entry.id === id);
-          next.push(
-            existing
-              ? { ...existing, serviceFeeRate: rate }
-              : { id, shopName: shopLabel, platformName, serviceFeeRate: rate, received: 0, brushing: 0, receivedToCard: 0 }
-          );
+          init.push({
+            id: `${shop.label}-${platformName}`,
+            shopName: shop.label,
+            platformName,
+            serviceFeeRate: rate,
+            received: 0,
+            brushing: 0,
+            receivedToCard: 0
+          });
         });
       });
-      return next;
+      return init;
     });
-  }, [selectedShops, shops]);
+  }, [shops, activeShop]);
 
-  useEffect(() => {
-    if (selectedShops.length > 0 && (!activeShop || !selectedShops.includes(activeShop))) {
-      setActiveShop(selectedShops[0]);
-    }
-  }, [activeShop, selectedShops]);
-
+  // 结算计算引擎
   const groups = useMemo<ShopGroup[]>(() => {
-    return selectedShops.map((shopName) => {
-      const shopEntries = entries.filter((entry) => entry.shopName === shopName).map((entry) => {
-        const net = entry.received - entry.brushing;
-        const fee = net * entry.serviceFeeRate;
-        const alreadyReceivedAmount = entry.receivedToCard;
-        return { ...entry, net, fee, alreadyReceivedAmount };
+    return shops.map((shop: any) => {
+      const shopName = shop.label;
+      const entriesForShop = entries.filter((entry) => entry.shopName === shopName);
+      
+      const entriesWithCalc = entriesForShop.map((e) => {
+        const net = Math.max(0, e.received - e.brushing);
+        const fee = net * e.serviceFeeRate;
+        return { ...e, net, fee };
       });
-      const totalReceived = shopEntries.reduce((sum, entry) => sum + entry.received, 0);
-      const totalToCard = shopEntries.reduce((sum, entry) => sum + entry.receivedToCard, 0);
-      const totalNet = shopEntries.reduce((sum, entry) => sum + entry.net, 0);
-      const totalServiceFee = shopEntries.reduce((sum, entry) => sum + entry.fee, 0);
-      const totalAlreadyReceived = shopEntries.reduce((sum, entry) => sum + entry.alreadyReceivedAmount, 0);
+
+      const totalReceived = entriesWithCalc.reduce((sum, e) => sum + e.received, 0);
+      const totalNet = entriesWithCalc.reduce((sum, e) => sum + e.net, 0);
+      const totalServiceFee = entriesWithCalc.reduce((sum, e) => sum + e.fee, 0);
+      const totalAlreadyReceived = entriesWithCalc.reduce((sum, e) => sum + e.receivedToCard, 0);
+      const finalBalance = totalReceived - totalAlreadyReceived - totalServiceFee;
+
       return {
         shopName,
-        serviceFeeRate: shopEntries[0]?.serviceFeeRate ?? 0,
-        entries: shopEntries,
+        serviceFeeRate: entriesForShop[0]?.serviceFeeRate || 0.06,
+        entries: entriesWithCalc,
         totalReceived,
-        totalToCard,
         totalNet,
         totalServiceFee,
         totalAlreadyReceived,
-        finalBalance: totalNet - totalServiceFee - totalAlreadyReceived,
-        filledCount: shopEntries.filter((entry) => entry.received > 0 || entry.brushing > 0 || entry.receivedToCard > 0).length,
-        isConfirmed: confirmedShops.includes(shopName),
+        finalBalance,
+        hasData: totalReceived > 0 || totalAlreadyReceived > 0 || note.length > 0,
       };
     });
-  }, [confirmedShops, entries, selectedShops]);
+  }, [entries, shops, note]);
 
-  const activeGroup = groups.find((group) => group.shopName === activeShop) ?? null;
-  const confirmedGroups = groups.filter((group) => group.isConfirmed);
-  const hasSettlementInProgress = selectedShops.length > 0 || confirmedGroups.length > 0;
-  const summary = {
-    shopCount: confirmedGroups.length,
-    totalReceived: confirmedGroups.reduce((sum, group) => sum + group.totalReceived, 0),
-    totalNet: confirmedGroups.reduce((sum, group) => sum + group.totalNet, 0),
-    totalServiceFee: confirmedGroups.reduce((sum, group) => sum + group.totalServiceFee, 0),
-    totalAlreadyReceived: confirmedGroups.reduce((sum, group) => sum + group.totalAlreadyReceived, 0),
-    totalToCard: confirmedGroups.reduce((sum, group) => sum + group.totalToCard, 0),
-    finalBalance: confirmedGroups.reduce((sum, group) => sum + group.finalBalance, 0),
-  };
+  const hasUnsavedChanges = useMemo(() => {
+    return groups.some(g => g.hasData);
+  }, [groups]);
+
+  // 拦截应用内侧边栏跳转
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      if (!hasUnsavedChanges) return;
+
+      const target = (e.target as HTMLElement).closest("a");
+      if (!target) return;
+
+      const href = target.getAttribute("href");
+      if (!href || href.startsWith("#") || href.startsWith("javascript:") || href === pathname) return;
+
+      const isSidebarLink = target.closest("aside") || target.closest(".sidebar-link");
+      
+      if (isSidebarLink) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPendingUrl(href);
+        setIsConfirmNavOpen(true);
+      }
+    };
+
+    document.addEventListener("click", handleGlobalClick, true);
+    return () => document.removeEventListener("click", handleGlobalClick, true);
+  }, [hasUnsavedChanges, pathname]);
+
+  const activeGroup = groups.find((g) => g.shopName === activeShop);
 
   const handleInputChange = (id: string, field: "received" | "brushing" | "receivedToCard", value: string) => {
-    const changed = entries.find((entry) => entry.id === id);
-    if (changed && confirmedShops.includes(changed.shopName)) {
-      setConfirmedShops((prev) => prev.filter((shopName) => shopName !== changed.shopName));
-    }
     const numeric = Number.parseFloat(value) || 0;
     setEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, [field]: numeric } : entry)));
   };
 
-  const toggleShop = (shopLabel: string) => {
-    setSelectedShops((prev) => {
-      const exists = prev.includes(shopLabel);
-      const next = exists ? prev.filter((item) => item !== shopLabel) : [...prev, shopLabel];
-      if (exists) {
-        setConfirmedShops((confirmed) => confirmed.filter((item) => item !== shopLabel));
-      } else {
-        setActiveShop(shopLabel);
-      }
-      return next;
-    });
-  };
-
-  const handleShopCardClick = (shopLabel: string) => {
-    if (selectedShops.includes(shopLabel)) {
-      setActiveShop(shopLabel);
-      return;
-    }
-    toggleShop(shopLabel);
-  };
-
-  const confirmActiveShop = () => {
-    if (!activeGroup || activeGroup.totalNet === 0) {
-      showToast("当前店铺暂无可结算数据", "error");
-      return;
-    }
-    setConfirmedShops((prev) => (prev.includes(activeGroup.shopName) ? prev : [...prev, activeGroup.shopName]));
-    showToast(`${activeGroup.shopName} 已确认结算`, "success");
-  };
-
   const resetData = () => {
-    setEntries((prev) => prev.map((entry) => ({ ...entry, received: 0, brushing: 0, receivedToCard: 0 })));
-    setConfirmedShops([]);
+    setIsConfirmResetOpen(true);
+  };
+
+  const handleConfirmedReset = () => {
+    setEntries((prev) => prev.map((entry) => 
+      entry.shopName === activeShop 
+        ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } 
+        : entry
+    ));
     setNote("");
-    setBusinessDate(format(new Date(), "yyyy-MM-dd"));
-    showToast("本页录入数据已清空", "success");
+    showToast(`${activeShop} 的输入数据已重置`, "info");
   };
 
   const saveSettlement = async () => {
-    if (selectedShops.length === 0 || confirmedGroups.length === 0) {
-      showToast("请先完成至少一家店铺的结算", "error");
-      return;
-    }
-    if (confirmedGroups.length !== selectedShops.length) {
-      showToast("还有店铺未确认结算，暂不能保存总单", "error");
+    if (!activeGroup || !activeGroup.hasData) {
+      showToast("未填写任何有效账单金额，无法保存", "error");
       return;
     }
 
@@ -191,16 +206,17 @@ export default function SettlementPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          date: businessDate ? new Date(`${businessDate}T00:00:00`) : new Date(),
-          totalNet: summary.totalNet,
-          serviceFeeRate: 0,
-          serviceFee: summary.totalServiceFee,
-          totalAlreadyReceived: summary.totalAlreadyReceived,
-          finalBalance: summary.finalBalance,
+          date: businessMonth ? new Date(`${businessMonth}-01T00:00:00`) : new Date(),
+          totalNet: activeGroup.totalNet,
+          serviceFeeRate: 0, 
+          serviceFee: activeGroup.totalServiceFee,
+          totalAlreadyReceived: activeGroup.totalAlreadyReceived,
+          finalBalance: activeGroup.finalBalance,
           note,
-          shopName: confirmedGroups.map((group) => group.shopName).join(", "),
-          items: confirmedGroups.flatMap((group) =>
-            group.entries.map((entry) => ({
+          shopName: activeGroup.shopName,
+          items: activeGroup.entries
+            .filter(entry => entry.received > 0 || entry.brushing > 0 || entry.receivedToCard > 0)
+            .map((entry) => ({
               platformName: entry.platformName,
               shopName: entry.shopName,
               serviceFeeRate: entry.serviceFeeRate,
@@ -209,18 +225,14 @@ export default function SettlementPage() {
               receivedToCard: entry.receivedToCard,
               net: entry.net,
             }))
-          ),
         }),
       });
       if (!response.ok) throw new Error("保存失败");
-      showToast("结算单已存入历史记录", "success");
+      
+      showToast(`${activeGroup.shopName} 结算单已保存至历史记录！`, "success");
       router.refresh();
-      setSelectedShops([]);
-      setConfirmedShops([]);
-      setEntries([]);
-      setActiveShop("");
+      setEntries((prev) => prev.map((entry) => (entry.shopName === activeShop ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } : entry)));
       setNote("");
-      setBusinessDate(format(new Date(), "yyyy-MM-dd"));
     } catch (error) {
       console.error(error);
       showToast("保存失败，请重试", "error");
@@ -229,357 +241,350 @@ export default function SettlementPage() {
     }
   };
 
+  const handleHistoryClick = () => {
+    if (hasUnsavedChanges) {
+      setIsConfirmNavOpen(true);
+    } else {
+      router.push("/settlement/history");
+    }
+  };
+
   if (userLoading) return null;
   if (!canManage) return null;
 
   return (
-    <div className="w-full space-y-6 pb-20 2xl:px-4">
-      <div className="relative overflow-hidden rounded-[28px] border border-border/60 bg-white/85 p-5 shadow-sm dark:bg-white/5">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-56 bg-linear-to-l from-primary/8 via-primary/4 to-transparent" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">
-              <Receipt size={14} className="text-primary" />
-              逐店结算
+    <div className="w-full space-y-6 pb-20 px-2 sm:px-4 max-w-7xl mx-auto">
+      {/* Unified Dashboard Header */}
+      <div className="relative space-y-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2 rounded-xl text-primary shrink-0">
+              <Receipt size={24} />
             </div>
-            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">计算对账</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              左侧选店和切换，中间处理当前店，右侧看已确认总单。
-            </p>
+            <div className="flex flex-col gap-1.5">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-none">
+                单店对账台
+              </h1>
+              <p className="hidden sm:block text-sm text-muted-foreground font-medium opacity-80">
+                专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。
+              </p>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link href="/settlement/history" className="flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/90 px-5 text-sm font-bold transition-all hover:bg-muted">
-              <History size={16} />
-              历史记录
-            </Link>
-            <button onClick={resetData} className="flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/90 px-5 text-sm font-bold transition-all hover:bg-muted">
-              <RefreshCw size={16} />
-              清空本页
-            </button>
-          </div>
+          <button 
+            onClick={handleHistoryClick}
+            className="flex h-10 items-center justify-center gap-2 rounded-full border border-border/50 bg-white dark:bg-white/5 text-foreground px-5 text-sm font-bold transition-all hover:bg-muted/50 dark:hover:bg-white/10 shadow-sm active:scale-95"
+          >
+            <History size={16} />
+            历史记录
+          </button>
+        </div>
+        <p className="sm:hidden text-xs text-muted-foreground font-medium opacity-80 pl-1">
+          专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。
+        </p>
+
+        {/* Shop Segmented Control */}
+        <div className="p-1 rounded-[20px] bg-white dark:bg-white/5 border border-border/40 inline-flex flex-wrap gap-1 shadow-inner backdrop-blur-md">
+          {shops.map((shop) => {
+            const isActive = shop.label === activeShop;
+            const hasData = groups.find(g => g.shopName === shop.label)?.hasData;
+            return (
+              <button
+                key={shop.id}
+                onClick={() => setActiveShop(shop.label)}
+                className={`relative flex items-center gap-2 rounded-[14px] px-5 py-2 text-sm font-bold transition-all duration-300 ${
+                  isActive
+                    ? "bg-white dark:bg-white/10 text-primary shadow-sm ring-1 ring-black/5 dark:ring-white/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30 dark:hover:bg-white/5"
+                }`}
+              >
+                <Store size={14} className={isActive ? "text-primary" : "text-muted-foreground/60"} />
+                {shop.label}
+                {hasData && !isActive && (
+                  <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-orange-500 rounded-full shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
+                )}
+                {isActive && (
+                  <motion.div layoutId="active-shop-pill" className="absolute inset-0 rounded-[14px] border border-primary/20 pointer-events-none" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className={`grid gap-6 ${hasSettlementInProgress ? "2xl:grid-cols-[280px_minmax(0,1fr)_320px]" : "xl:grid-cols-[320px_minmax(0,1fr)]"}`}>
-        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
-          <section className="rounded-[24px] border border-border/60 bg-white p-4 shadow-sm dark:bg-white/5">
-            <div className="mb-4 flex items-center gap-2">
-              <Store size={18} className="text-primary" />
-              <h2 className="text-sm font-black uppercase tracking-[0.2em]">店铺结算列表</h2>
-            </div>
-            <div className="grid gap-2.5 sm:grid-cols-2 2xl:grid-cols-1">
-              {shops.map((shop) => {
-                const selected = selectedShops.includes(shop.label);
-                const focused = activeShop === shop.label;
-                const confirmed = confirmedShops.includes(shop.label);
-                return (
-                  <button
-                    key={shop.id}
-                    type="button"
-                    onClick={() => handleShopCardClick(shop.label)}
-                    className={`relative w-full rounded-[20px] border p-3 text-left transition-all ${
-                      focused
-                        ? "border-transparent bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                        : selected
-                          ? "border-primary/40 bg-primary/6 shadow-sm ring-1 ring-primary/15"
-                          : "border-border/60 bg-background hover:border-primary/30"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className={`text-sm font-black ${focused ? "text-primary-foreground" : "text-foreground"}`}>{shop.label}</div>
-                        <div className={`mt-1 text-xs font-bold ${focused ? "text-primary-foreground/80" : "text-muted-foreground"}`}>费率 {(shop.serviceFeeRate ?? 0.06) * 100}%</div>
+      <ConfirmModal 
+        isOpen={isConfirmNavOpen}
+        onClose={() => {
+          setIsConfirmNavOpen(false);
+          setPendingUrl(null);
+        }}
+        onConfirm={() => {
+          setIsConfirmNavOpen(false);
+          if (pendingUrl) {
+            router.push(pendingUrl);
+          } else {
+            router.push("/settlement/history");
+          }
+          setPendingUrl(null);
+        }}
+        title="数据尚未保存"
+        message="当前有录入的数据尚未保存，离开此页面将导致数据丢失。确定要离开吗？"
+        variant="warning"
+        confirmLabel="离开页面"
+        cancelLabel="留在此页"
+      />
+
+      {!activeGroup ? (
+        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-border/70 bg-white/50 dark:bg-white/5">
+          <p className="text-sm font-bold text-muted-foreground">未选中或暂无店铺配置。</p>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+          {/* 左侧：主工作台 */}
+          <main className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 p-4 shadow-sm transition-colors hover:border-border/80">
+              <div className="flex items-center gap-4">
+                <div className="bg-white dark:bg-white/5 p-2.5 rounded-2xl shadow-sm">
+                  <FileText size={20} className="text-primary" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">当前结算单基准</div>
+                  <div className="font-bold tracking-tight text-foreground mt-0.5">{activeGroup.shopName} · 综合抽成费率 {(activeGroup.serviceFeeRate * 100).toFixed(1)}%</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto relative" ref={monthPickerContainerRef}>
+                <button 
+                  onClick={() => {
+                    setPickerYear(parseInt(businessMonth.split('-')[0]));
+                    setIsMonthPickerOpen(!isMonthPickerOpen);
+                  }}
+                  className={`flex items-center justify-between gap-2 h-10 w-full sm:w-[150px] rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm transition-all outline-none ${
+                    isMonthPickerOpen ? "ring-2 ring-primary/20 border-primary/20 shadow-lg" : "hover:bg-muted/50 dark:hover:bg-white/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
+                    <CalendarDays size={14} className={businessMonth ? "text-primary" : "text-muted-foreground"} />
+                    <span className="truncate text-foreground font-medium">
+                      {businessMonth ? format(new Date(businessMonth + "-01"), "yyyy-MM") : "选择月份"}
+                    </span>
+                  </div>
+                </button>
+                <button onClick={resetData} title="重置本店数据" className="h-10 w-10 flex items-center justify-center rounded-xl border border-border/10 bg-white dark:bg-white/5 shadow-sm text-muted-foreground hover:dark:bg-white/10 transition-colors shrink-0">
+                  <RefreshCw size={16} />
+                </button>
+
+                <ConfirmModal 
+                  isOpen={isConfirmResetOpen}
+                  onClose={() => setIsConfirmResetOpen(false)}
+                  onConfirm={handleConfirmedReset}
+                  title="确认清空数据"
+                  message={`确定要清空 ${activeShop} 的输入数据吗？该操作不可撤销。`}
+                  variant="danger"
+                  confirmLabel="确定清空"
+                  cancelLabel="保留数据"
+                />
+
+                {mounted && isMonthPickerOpen && createPortal(
+                  <AnimatePresence>
+                    <motion.div
+                      ref={pickerPanelRef}
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.15 }}
+                      className="fixed z-[1000001] rounded-[24px] glass p-4 shadow-2xl border border-white/10"
+                      style={{
+                        top: monthPickerContainerRef.current ? monthPickerContainerRef.current.getBoundingClientRect().bottom + 8 : 0,
+                        left: monthPickerContainerRef.current ? monthPickerContainerRef.current.getBoundingClientRect().left : 0,
+                        minWidth: '280px'
+                      }}
+                    >
+                      <div className="max-w-[280px] mx-auto">
+                        <div className="flex items-center justify-between mb-6 px-1">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPickerYear(y => y - 1); }}
+                              className="rounded-lg p-1 hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-all"
+                            >
+                              <ChevronLeft size={14} strokeWidth={3} />
+                            </button>
+                            <h4 className="text-sm font-bold text-foreground tracking-widest">{pickerYear}年</h4>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPickerYear(y => y + 1); }}
+                              className="rounded-lg p-1 hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-all"
+                            >
+                              <ChevronRight size={14} strokeWidth={3} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
+                            const monthStr = `${pickerYear}-${m.toString().padStart(2, '0')}`;
+                            const isSelected = businessMonth === monthStr;
+                            return (
+                              <button
+                                key={m}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBusinessMonth(monthStr);
+                                  setIsMonthPickerOpen(false);
+                                }}
+                                className={`h-11 rounded-xl text-xs font-bold transition-all ${
+                                  isSelected 
+                                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-105" 
+                                    : "text-foreground hover:bg-primary/10 hover:text-primary"
+                                }`}
+                              >
+                                {m}月
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setBusinessMonth(format(new Date(), "yyyy-MM")); setIsMonthPickerOpen(false); }}
+                                className="text-[10px] font-bold text-primary hover:underline px-2 py-1"
+                            >
+                                本月
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setIsMonthPickerOpen(false); }}
+                              className="text-[10px] font-bold text-muted-foreground hover:text-foreground px-2 py-1"
+                            >
+                                关闭
+                            </button>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        {selected ? (
-                          <CheckCircle2 size={16} className={focused ? "text-primary-foreground" : confirmed ? "text-primary" : "text-muted-foreground"} />
-                        ) : (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-                            未加入
-                          </span>
-                        )}
-                        {selected && (
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] ${
-                            confirmed
-                                ? "bg-primary/10 text-primary"
-                                : "bg-muted text-muted-foreground"
-                          }`}>
-                            {confirmed ? "已确认" : "待结算"}
-                          </span>
-                        )}
+                    </motion.div>
+                  </AnimatePresence>,
+                  document.body
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {activeGroup.entries.map((entry) => {
+                const isRowActive = entry.received > 0 || entry.brushing > 0 || entry.receivedToCard > 0;
+                let brandBadge = "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300";
+                if (entry.platformName.includes('美团')) brandBadge = "bg-[#FFD000]/15 text-[#b39200] dark:text-[#FFD000]";
+                if (entry.platformName.includes('淘宝')) brandBadge = "bg-[#FF5000]/10 text-[#FF5000]";
+                if (entry.platformName.includes('京东')) brandBadge = "bg-[#E1251B]/10 text-[#E1251B]";
+
+                return (
+                  <div key={entry.id} className={`overflow-hidden rounded-[24px] border transition-all duration-300 shadow-sm ${
+                    isRowActive ? "border-primary/30 bg-primary/[0.02]" : "border-border/50 bg-white dark:bg-white/5 hover:border-border/80"
+                  }`}>
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-white dark:bg-white/5">
+                      <div className={`px-2.5 py-1 rounded-md text-[11px] font-black tracking-widest ${brandBadge}`}>
+                        {entry.platformName}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs font-mono">
+                        <span className="text-muted-foreground"><span className="text-[10px] tracking-wider uppercase font-sans mr-1">业绩</span>{money(entry.net)}</span>
+                        <span className="text-orange-500/80"><span className="text-[10px] tracking-wider uppercase font-sans mr-1">抽成</span>{money(entry.fee)}</span>
                       </div>
                     </div>
-                    {selected && (
-                      <div className="mt-3 flex items-center justify-between">
-                        <div className={`text-xs ${focused ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-                          {focused ? "当前处理店铺" : "点击切到这家店"}
+                    {/* 输入区 - 移动端水平布局压缩空间 */}
+                    <div className="flex flex-col md:grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">账单入账(A)</label>
+                        <div className="relative w-36 md:w-full">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium group-focus-within:text-primary transition-colors">¥</span>
+                          <input type="number" inputMode="decimal" value={entry.received || ""} onChange={(e) => handleInputChange(entry.id, "received", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
                         </div>
-                        <span
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            toggleShop(shop.label);
-                          }}
-                          className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
-                            focused
-                              ? "bg-white/15 text-primary-foreground/85 hover:text-primary-foreground"
-                              : "bg-background text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          移除
-                        </span>
                       </div>
-                    )}
-                    {!selected && <div className="mt-3 text-xs text-muted-foreground">点击加入本次结算</div>}
-                  </button>
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">刷单到手</label>
+                        <div className="relative w-36 md:w-full">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium group-focus-within:text-rose-500 transition-colors">¥</span>
+                          <input type="number" inputMode="decimal" value={entry.brushing || ""} onChange={(e) => handleInputChange(entry.id, "brushing", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-rose-500/20" />
+                        </div>
+                      </div>
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">商家已收</label>
+                        <div className="relative w-36 md:w-full">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-orange-500/50 font-medium group-focus-within:text-orange-500 transition-colors">¥</span>
+                          <input type="number" inputMode="decimal" value={entry.receivedToCard || ""} onChange={(e) => handleInputChange(entry.id, "receivedToCard", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-orange-500/5 dark:bg-orange-500/5 pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold text-orange-600 dark:text-orange-400 outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-orange-500/20" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-              {shops.length === 0 && <p className="text-sm text-muted-foreground">暂无店铺配置，请先去个人资料补充店铺和费率。</p>}
             </div>
-          </section>
-        </aside>
 
-        <main className="min-w-0 space-y-6">
-          {activeGroup ? (
-            <>
-              <section className="rounded-[26px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
-                <div className="border-b border-border/60 bg-muted/10 px-5 py-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <div className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">当前店铺工作区</div>
-                      <h2 className="mt-1 text-2xl font-black tracking-tight">{activeGroup.shopName}</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">只处理这一家店，确认后再进入总单。</p>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[340px]">
-                      <div className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2.5">
-                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店到账</div>
-                        <div className="mt-1.5 text-lg font-black">{money(activeGroup.totalReceived)}</div>
-                      </div>
-                      <div className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2.5">
-                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店真业绩</div>
-                        <div className="mt-1.5 text-lg font-black text-primary">{money(activeGroup.totalNet)}</div>
-                      </div>
-                      <div className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2.5">
-                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店应补</div>
-                        <div className="mt-1.5 text-lg font-black text-primary">{money(activeGroup.finalBalance)}</div>
-                      </div>
-                    </div>
+            <div className="rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 p-4 shadow-sm">
+               <label htmlFor="settlement-note" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-3 block">单据备注</label>
+               <textarea id="settlement-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder={`补充 ${activeGroup.shopName} 的特殊结账说明（选填）...`} className="h-20 w-full resize-none rounded-xl bg-transparent hover:bg-white dark:hover:bg-white/5 border border-transparent hover:border-border/50 px-4 py-3 text-sm outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
+            </div>
+          </main>
+
+          {/* 右侧：单店结算看板 */}
+          <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+            <section className="overflow-hidden rounded-[28px] border border-border/50 bg-white shadow-xl shadow-primary/5 dark:bg-white/5 dark:shadow-none flex flex-col relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2" />
+              <div className="px-6 pt-7 pb-5 text-center border-b border-border/30 relative z-10">
+                <div className="mx-auto w-12 h-12 bg-white dark:bg-white/5 border border-border/30 text-foreground rounded-full flex items-center justify-center mb-3 ring-4 ring-muted/30 dark:ring-white/5 shadow-sm">
+                  <Calculator size={20} />
+                </div>
+                <div className="text-[11px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1">本店应补差价</div>
+                <div className={`text-4xl lg:text-5xl font-black tracking-tighter ${activeGroup.finalBalance > 0 ? "text-primary" : "text-foreground"}`}>
+                  {money(activeGroup.finalBalance)}
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 flex-1 relative z-10">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm py-1 border-b border-border/30 border-dashed">
+                    <span className="font-bold text-muted-foreground">账单总入账 (A)</span>
+                    <span className="font-mono font-bold text-foreground">{money(activeGroup.totalReceived)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm py-1 border-b border-border/30 border-dashed">
+                    <span className="font-bold text-muted-foreground">总抽成</span>
+                    <span className="font-mono font-bold text-rose-500">-{money(activeGroup.totalServiceFee)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm py-1 border-b border-border/30 border-dashed">
+                    <span className="font-bold text-muted-foreground">商家实际已收</span>
+                    <span className="font-mono font-bold text-orange-500">-{money(activeGroup.totalAlreadyReceived)}</span>
                   </div>
                 </div>
 
-                <div className="space-y-3 p-4 sm:p-5">
-                  {activeGroup.entries.map((entry) => (
-                    <div key={entry.id} className="rounded-[22px] border border-border/60 bg-background/90 p-4 shadow-sm transition-all hover:border-primary/20">
-                      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">平台</div>
-                          <div className="mt-1 text-xl font-black tracking-tight">{entry.platformName}</div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
-                            <Percent size={12} />
-                            费率 {(entry.serviceFeeRate * 100).toFixed(1)}%
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 px-3 py-1 text-xs font-bold text-primary">
-                            <TrendingUp size={12} />
-                            真实业绩 {money(entry.net)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 xl:grid-cols-3">
-                        <label className="space-y-2">
-                          <span className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">账单到手 (A)</span>
-                          <div className="relative">
-                            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
-                            <input type="number" inputMode="decimal" value={entry.received || ""} onChange={(event) => handleInputChange(entry.id, "received", event.target.value)} className="h-[52px] w-full rounded-2xl border border-border bg-white pl-9 pr-4 text-right font-mono text-base font-bold outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:bg-white/5" placeholder="0.00" />
-                          </div>
-                        </label>
-                        <label className="space-y-2">
-                          <span className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">刷单到手 (B)</span>
-                          <div className="relative">
-                            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">¥</span>
-                            <input type="number" inputMode="decimal" value={entry.brushing || ""} onChange={(event) => handleInputChange(entry.id, "brushing", event.target.value)} className="h-[52px] w-full rounded-2xl border border-border bg-white pl-9 pr-4 text-right font-mono text-base font-bold outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:bg-white/5" placeholder="0.00" />
-                          </div>
-                        </label>
-                        <label className="space-y-2">
-                          <span className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">已打款到卡</span>
-                          <div className="relative">
-                            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-orange-500">¥</span>
-                            <input type="number" inputMode="decimal" value={entry.receivedToCard || ""} onChange={(event) => handleInputChange(entry.id, "receivedToCard", event.target.value)} className="h-[52px] w-full rounded-2xl border border-orange-500/20 bg-orange-500/5 pl-9 pr-4 text-right font-mono text-base font-bold text-rose-500 outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10" placeholder="0.00" />
-                          </div>
-                        </label>
-                      </div>
-
-                      <div className="mt-3 grid gap-3 rounded-[18px] bg-muted/20 p-3 sm:grid-cols-2">
-                        <div>
-                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">真实业绩</div>
-                          <div className="mt-1 font-mono text-lg font-black text-primary">{money(entry.net)}</div>
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">预计服务费</div>
-                          <div className="mt-1 font-mono text-lg font-black text-orange-500">{money(entry.fee)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-[24px] border border-border/60 bg-white p-5 shadow-sm dark:bg-white/5">
-                <div className="grid gap-3 md:grid-cols-4">
-                  <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店真实业绩</div>
-                    <div className="mt-1.5 font-mono text-xl font-black text-primary">{money(activeGroup.totalNet)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店服务费</div>
-                    <div className="mt-1.5 font-mono text-xl font-black text-orange-500">{money(activeGroup.totalServiceFee)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店已打款到卡</div>
-                    <div className="mt-1.5 font-mono text-xl font-black text-rose-500">{money(activeGroup.totalAlreadyReceived)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店最终应补</div>
-                    <div className="mt-1.5 font-mono text-xl font-black text-primary">{money(activeGroup.finalBalance)}</div>
+                <div className="mt-2 rounded-2xl bg-muted/50 dark:bg-white/5 p-3 border border-border/30">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1.5 opacity-70">计算逻辑</div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground/80 overflow-x-auto no-scrollbar whitespace-nowrap">
+                    <span>账单入账</span>
+                    <span className="text-primary">-</span>
+                    <span>总抽成</span>
+                    <span className="text-primary">-</span>
+                    <span>实际已收</span>
+                    <span className="text-primary">=</span>
+                    <span className="text-primary">应补差价</span>
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-3 rounded-[20px] border border-dashed border-border/70 bg-muted/10 p-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">本店结算动作</div>
-                    <div className={`mt-1.5 text-lg font-black ${activeGroup.isConfirmed ? "text-primary" : "text-foreground"}`}>
-                      {activeGroup.isConfirmed ? "已确认，已进入右侧总单" : "确认本店后，右侧总单才会计入这家店"}
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">如果继续修改这家店的金额，会自动回到待确认状态。</p>
-                  </div>
-                  <button type="button" onClick={confirmActiveShop} disabled={activeGroup.totalNet === 0} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40">
-                    <CheckCircle2 size={16} />
-                    确认 {activeGroup.shopName} 结算
+                <div className="pt-4">
+                  <button 
+                    onClick={saveSettlement} 
+                    disabled={isSaving || !activeGroup.hasData} 
+                    className="group relative flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-[20px] bg-primary text-base font-black text-primary-foreground shadow-lg transition-all hover:scale-[1.01] hover:shadow-xl hover:shadow-primary/25 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 disabled:grayscale"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="animate-spin" size={20} />
+                    ) : (
+                      <>
+                        <Save size={18} className="z-10" />
+                        <span className="z-10 tracking-wide">存入本店结算单</span>
+                        <div className="absolute inset-0 z-0 bg-linear-to-r from-transparent via-white/15 to-transparent translate-x-[-100%] transition-transform duration-700 ease-in-out group-hover:translate-x-[100%]" />
+                      </>
+                    )}
                   </button>
-                </div>
-              </section>
-            </>
-          ) : (
-            <section className="rounded-[30px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
-              <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] xl:p-8">
-                <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[26px] border-2 border-dashed border-border bg-muted/8 px-6 text-center">
-                  <div className="flex h-18 w-18 items-center justify-center rounded-full bg-primary/8">
-                    <Store size={34} className="text-primary" />
-                  </div>
-                  <p className="mt-5 text-xl font-black tracking-tight">先在左侧选择要结算的店铺</p>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">选中后，中间区域只处理当前店铺，确认后再进入总单，避免多家店的数据混在一起。</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-[24px] border border-border/60 bg-background/80 p-5">
-                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-muted-foreground">
-                      <Wallet size={14} className="text-primary" />
-                      本次总单预览
-                    </div>
-                    <div className="mt-4 text-3xl font-black tracking-tight text-primary">{money(summary.finalBalance)}</div>
-                    <p className="mt-2 text-sm text-muted-foreground">还没选店前，不生成总单；这里先给你看当前汇总状态。</p>
-                  </div>
-
-                  <div className="rounded-[24px] border border-border/60 bg-background/80 p-5">
-                    <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">推荐顺序</div>
-                    <div className="mt-4 space-y-3">
-                      <div className="rounded-2xl bg-muted/20 px-4 py-3 text-sm text-muted-foreground">1. 左侧选择要结算的店铺</div>
-                      <div className="rounded-2xl bg-muted/20 px-4 py-3 text-sm text-muted-foreground">2. 在中间录入当前店铺的平台金额</div>
-                      <div className="rounded-2xl bg-muted/20 px-4 py-3 text-sm text-muted-foreground">3. 确认本店后，再汇总到总单保存</div>
-                    </div>
-                  </div>
+                  {!activeGroup.hasData && (
+                    <p className="mt-3 text-center text-xs text-muted-foreground">填入金额后方可保存账单</p>
+                  )}
                 </div>
               </div>
             </section>
-          )}
-        </main>
-
-        {hasSettlementInProgress && (
-        <aside className="space-y-6 2xl:sticky 2xl:top-6 2xl:self-start">
-          <section className="overflow-hidden rounded-[24px] border border-border/60 bg-white shadow-sm dark:bg-white/5">
-            <div className="border-b border-border/60 bg-muted/10 px-5 py-4">
-              <div className="relative">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-muted-foreground">
-                  <Wallet size={14} className="text-primary" />
-                  汇总总单
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">这里只统计已经确认结算的店铺。</p>
-                <div className="mt-3 text-3xl font-black tracking-tight text-primary">{money(summary.finalBalance)}</div>
-              </div>
-            </div>
-
-            <div className="space-y-5 p-5">
-              <div className="space-y-3">
-                <label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">业务日期</label>
-                <div className="h-[52px]">
-                  <DatePicker value={businessDate} onChange={setBusinessDate} placeholder="选择业务日期" showClear={false} triggerClassName="h-[52px] rounded-2xl bg-background" />
-                </div>
-              </div>
-
-                <div className="grid gap-2.5">
-                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
-                  <span className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
-                    <CalendarDays size={15} />
-                    已确认店铺
-                  </span>
-                  <span className="font-mono text-sm font-black">{summary.shopCount}/{selectedShops.length} 家</span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
-                  <span className="text-sm font-bold text-muted-foreground">汇总到账</span>
-                  <span className="font-mono text-sm font-black">{money(summary.totalReceived)}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
-                  <span className="text-sm font-bold text-muted-foreground">汇总真实业绩</span>
-                  <span className="font-mono text-sm font-black">{money(summary.totalNet)}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
-                  <span className="text-sm font-bold text-muted-foreground">汇总服务费</span>
-                  <span className="font-mono text-sm font-black text-orange-500">-{money(summary.totalServiceFee)}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-muted/20 px-4 py-3">
-                  <span className="text-sm font-bold text-muted-foreground">汇总已打款到卡</span>
-                  <span className="font-mono text-sm font-black text-rose-500">-{money(summary.totalAlreadyReceived)}</span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label htmlFor="settlement-note" className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">总单备注</label>
-                <textarea id="settlement-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="补充这次整单结算的说明..." className="h-32 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10" />
-              </div>
-
-              <div className="rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 text-sm text-muted-foreground">
-                顺序是：左侧选店，处理中间当前店，确认本店后，再进入右侧总单。
-              </div>
-
-              <button onClick={saveSettlement} disabled={isSaving || summary.shopCount === 0 || summary.shopCount !== selectedShops.length} className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40">
-                {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                保存结算单
-              </button>
-            </div>
-          </section>
-
-          <section className="rounded-[24px] border border-border/60 bg-white p-4 shadow-sm dark:bg-white/5">
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">已确认店铺</div>
-            <div className="mt-3 space-y-2.5">
-              {confirmedGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground">确认后的店铺会出现在这里，准备进入保存总单。</p>
-              ) : (
-                confirmedGroups.map((group) => (
-                  <div key={group.shopName} className="rounded-2xl border border-border/60 bg-background p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-black">{group.shopName}</div>
-                      <span className="rounded-full bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-primary">已确认</span>
-                    </div>
-                    <div className="mt-2 text-sm text-muted-foreground">本店应补 {money(group.finalBalance)}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        </aside>
-        )}
-      </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
