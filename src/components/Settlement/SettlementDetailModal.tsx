@@ -53,7 +53,9 @@ export function SettlementDetailModal({ isOpen, onClose, settlement }: Settlemen
                 </div>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Calendar size={12} className="opacity-60" />
-                  <span className="text-[10px] sm:text-xs font-bold">{settlement.businessMonth}</span>
+                  <span className="text-[10px] sm:text-xs font-bold">
+                    {format(new Date(settlement.date), "yyyy-MM")}
+                  </span>
                 </div>
                 <div className="hidden sm:block h-1 w-1 rounded-full bg-muted-foreground/30" />
                 <span className="text-[9px] sm:text-[10px] text-muted-foreground/60 uppercase tracking-widest font-black">
