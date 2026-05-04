@@ -3,6 +3,19 @@ import prisma from "@/lib/prisma";
 import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 import { FinanceMath } from "@/lib/math";
 
+function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
+  const nextStock = currentStock - revertQty;
+  if (nextStock <= 0) {
+    return 0;
+  }
+
+  const currentTotalValue = FinanceMath.multiply(currentStock, currentCost || 0);
+  const revertTotalValue = FinanceMath.multiply(revertQty, revertCost || 0);
+  const nextTotalValue = FinanceMath.add(currentTotalValue, -revertTotalValue);
+
+  return Math.max(0, FinanceMath.divide(nextTotalValue, nextStock));
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -24,14 +37,56 @@ export async function PUT(
       shopName
     } = body;
 
-
-    // 使用事务确保更新和库存调整的原子性
     const purchase = await prisma.$transaction(async (tx) => {
-      // 1. 更新采购订单
+      const existingPurchase = await tx.purchaseOrder.findUnique({
+        where: { id },
+        include: {
+          items: true,
+        },
+      });
+
+      if (!existingPurchase) {
+        throw new Error("采购单不存在");
+      }
+
+      const previousStatus = existingPurchase.status;
+      const nextStatus = typeof status === "string" && status.trim() ? status : previousStatus;
+      const isReceivingNow = previousStatus !== "Received" && nextStatus === "Received";
+      const isRevokingReceived = previousStatus === "Received" && nextStatus !== "Received";
+
+      if (isRevokingReceived) {
+        for (const item of existingPurchase.items) {
+          const currentRemaining = Number(item.remainingQuantity ?? 0);
+          const originalQuantity = Number(item.quantity || 0);
+
+          if (currentRemaining < originalQuantity) {
+            throw new Error("该采购单已有商品被后续出库或占用，暂时不能撤销入库");
+          }
+
+          if (item.shopProductId) {
+            const shopProduct = await tx.shopProduct.findUnique({
+              where: { id: item.shopProductId },
+            });
+
+            if (!shopProduct || Number(shopProduct.stock || 0) < originalQuantity) {
+              throw new Error("店铺商品当前库存不足，无法撤销这张已入库采购单");
+            }
+          } else if (item.productId) {
+            const product = await tx.product.findUnique({
+              where: { id: item.productId },
+            });
+
+            if (!product || Number(product.stock || 0) < originalQuantity) {
+              throw new Error("主商品当前库存不足，无法撤销这张已入库采购单");
+            }
+          }
+        }
+      }
+
       const p = await tx.purchaseOrder.update({
         where: { id },
         data: {
-          status,
+          status: nextStatus,
           totalAmount: totalAmount !== undefined ? FinanceMath.add(Number(totalAmount), 0) : undefined,
           shippingFees: shippingFees !== undefined ? FinanceMath.add(Number(shippingFees), 0) : undefined,
           extraFees: extraFees !== undefined ? FinanceMath.add(Number(extraFees), 0) : undefined,
@@ -50,7 +105,7 @@ export async function PUT(
                 shopProductId: item.shopProductId || null,
                 supplierId: item.supplierId,
                 quantity: Number(item.quantity) || 0,
-                remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
+                remainingQuantity: nextStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
                 costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
               }))
             }
@@ -67,8 +122,7 @@ export async function PUT(
         } as any // eslint-disable-line @typescript-eslint/no-explicit-any
       });
 
-      // 2. 如果状态变为 "Received"，自动增加商品库存并计算加权平均成本
-      if (status === "Received") {
+      if (isReceivingNow) {
         const orderItems = await tx.purchaseOrderItem.findMany({
           where: { purchaseOrderId: id }
         });
@@ -147,6 +201,56 @@ export async function PUT(
             });
           }
         }
+      } else if (isRevokingReceived) {
+        for (const item of existingPurchase.items) {
+          const revertQty = Number(item.quantity || 0);
+          const revertCost = Number(item.costPrice || 0);
+
+          if (item.shopProductId) {
+            const shopProduct = await tx.shopProduct.findUnique({
+              where: { id: item.shopProductId }
+            });
+
+            if (shopProduct) {
+              await tx.shopProduct.update({
+                where: { id: item.shopProductId },
+                data: {
+                  stock: { decrement: revertQty },
+                  costPrice: calculateRevertedCostPrice(
+                    Number(shopProduct.stock || 0),
+                    Number(shopProduct.costPrice || 0),
+                    revertQty,
+                    revertCost
+                  ),
+                }
+              });
+            }
+          } else if (item.productId) {
+            const product = await tx.product.findUnique({
+              where: { id: item.productId }
+            });
+
+            if (product) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: {
+                  stock: { decrement: revertQty },
+                  costPrice: calculateRevertedCostPrice(
+                    Number(product.stock || 0),
+                    Number(product.costPrice || 0),
+                    revertQty,
+                    revertCost
+                  ),
+                }
+              });
+            }
+          }
+        }
+
+        await tx.purchaseOrderItem.updateMany({
+          where: { purchaseOrderId: id },
+          data: { remainingQuantity: null },
+        });
       }
       return p;
     });
@@ -154,7 +258,10 @@ export async function PUT(
     return NextResponse.json(purchase);
   } catch (error) {
     console.error("Failed to update purchase order:", error);
-    return NextResponse.json({ error: "Failed to update purchase order" }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to update purchase order" },
+      { status: 500 }
+    );
   }
 }
 

@@ -75,7 +75,7 @@ export async function GET(request: Request) {
     const search = searchParams.get("search") || "";
     const categoryName = searchParams.get("category") || "all";
     const status = searchParams.get("status") || "all";
-    const sortByParam = searchParams.get("sortBy") || "sku-asc";
+    const sortByParam = searchParams.get("sortBy") || "sku-desc";
     const idsOnly = searchParams.get("idsOnly") === "true";
     const supplierId = searchParams.get("supplierId") || "all";
     const includePublic = searchParams.get("includePublic") === "true";

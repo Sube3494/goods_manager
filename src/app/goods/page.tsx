@@ -68,7 +68,7 @@ export default function GoodsPage() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<string>("sku-asc");
+  const [sortBy, setSortBy] = useState<string>("sku-desc");
 
   const debouncedSearch = useDebounce(searchQuery, 500);
 
@@ -77,14 +77,14 @@ export default function GoodsPage() {
     selectedCategory !== "all" || 
     selectedStatus !== "all" || 
     selectedSupplier !== "all" || 
-    sortBy !== "sku-asc";
+    sortBy !== "sku-desc";
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     setSelectedCategory("all");
     setSelectedStatus("all");
     setSelectedSupplier("all");
-    setSortBy("sku-asc");
+    setSortBy("sku-desc");
   }, []);
 
   const { showToast } = useToast();

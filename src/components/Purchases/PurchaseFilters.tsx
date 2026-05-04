@@ -67,7 +67,7 @@ export function PurchaseFilters({
             placeholder="单据状态"
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
+              "h-full rounded-full border shadow-sm transition-all text-[13px] sm:text-sm",
               statusFilter !== "All"
                 ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium"
                 : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
@@ -83,7 +83,7 @@ export function PurchaseFilters({
             placeholder="全部店铺"
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
+              "h-full rounded-full border shadow-sm transition-all text-[13px] sm:text-sm",
               shopFilter !== "All"
                 ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium"
                 : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"

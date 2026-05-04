@@ -12,7 +12,7 @@ function buildOrderBy(sortBy: string) {
   if (sortBy === "shop-asc") return [{ shop: { name: "asc" as const } }, { id: "asc" as const }];
   if (sortBy === "shop-desc") return [{ shop: { name: "desc" as const } }, { id: "asc" as const }];
   if (sortBy === "sku-desc") return [{ sku: "desc" as const }, { id: "asc" as const }];
-  return [{ sku: "asc" as const }, { id: "asc" as const }];
+  return [{ sku: "desc" as const }, { id: "asc" as const }];
 }
 
 export async function GET(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const supplierId = request.nextUrl.searchParams.get("supplierId") || "all";
     const shopId = request.nextUrl.searchParams.get("shopId") || "all";
     const scope = request.nextUrl.searchParams.get("scope");
-    const sortBy = request.nextUrl.searchParams.get("sortBy") || "sku-asc";
+    const sortBy = request.nextUrl.searchParams.get("sortBy") || "sku-desc";
     const idsParam = request.nextUrl.searchParams.get("ids") || "";
     const explicitIds = idsParam.split(",").map((id) => id.trim()).filter(Boolean);
     const page = Math.max(1, parseInt(request.nextUrl.searchParams.get("page") || "1", 10));

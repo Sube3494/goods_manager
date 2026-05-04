@@ -41,7 +41,7 @@ export default function ShopGoodsPage() {
   const debouncedSearch = useDebounce(searchQuery, 400);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSupplier, setSelectedSupplier] = useState("all");
-  const [sortBy, setSortBy] = useState("sku-asc");
+  const [sortBy, setSortBy] = useState("sku-desc");
   const [categoryOptions, setCategoryOptions] = useState([{ value: "all", label: "全部分类" }]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [assignedTemplateIds, setAssignedTemplateIds] = useState<string[]>([]);

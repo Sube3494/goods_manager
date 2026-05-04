@@ -685,6 +685,16 @@ export function PurchaseOrderModal({
     });
   };
 
+  const handleRevokeReceived = useCallback(() => {
+    if (formData.status !== "Received") return;
+
+    onSubmit({
+      ...formData,
+      totalAmount: calculateTotal(),
+      status: "Confirmed",
+    });
+  }, [formData, onSubmit]);
+
   const handleFileUpload = useCallback(async (files: FileList | File[], type: 'payment' | 'waybill', rowIndex?: number) => {
     if (!files || files.length === 0) return;
 
@@ -1183,6 +1193,15 @@ export function PurchaseOrderModal({
                             {/* Actions Container */}
                             {!readOnly && (
                                 <div className="flex items-center gap-2 sm:border-l sm:border-border/10 sm:pl-6 h-9 sm:h-10">
+                                    {formData.status === "Received" && !isSystemGenerated && (
+                                        <button
+                                            type="button"
+                                            onClick={handleRevokeReceived}
+                                            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-sm bg-amber-500/12 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
+                                        >
+                                            撤销入库
+                                        </button>
+                                    )}
                                     {(formData.status === "Draft" || (formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered" || formData.status === "Shipped") && (
                                         <>
                                             <button

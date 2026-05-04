@@ -115,7 +115,7 @@ export async function GET(
     const search = request.nextUrl.searchParams.get("search") || "";
     const categoryName = request.nextUrl.searchParams.get("categoryName") || "all";
     const supplierId = request.nextUrl.searchParams.get("supplierId") || "all";
-    const sortBy = request.nextUrl.searchParams.get("sortBy") || "sku-asc";
+    const sortBy = request.nextUrl.searchParams.get("sortBy") || "sku-desc";
     const page = Math.max(1, parseInt(request.nextUrl.searchParams.get("page") || "1", 10));
     const allMode = request.nextUrl.searchParams.get("all") === "true";
     const idsOnly = request.nextUrl.searchParams.get("idsOnly") === "true";
@@ -241,7 +241,7 @@ export async function GET(
           sortBy === "stock-desc" ? { stock: "desc" } :
           sortBy === "stock-asc" ? { stock: "asc" } :
           sortBy === "name-asc" ? { productName: "asc" } :
-          { sku: "asc" },
+          { sku: "desc" },
       });
       return NextResponse.json({ ids: ids.map((item) => item.id), total: ids.length });
     }
@@ -268,7 +268,7 @@ export async function GET(
           sortBy === "stock-desc" ? { stock: "desc" } :
           sortBy === "stock-asc" ? { stock: "asc" } :
           sortBy === "name-asc" ? { productName: "asc" } :
-          { sku: "asc" },
+          { sku: "desc" },
         skip,
         take: pageSize,
       }),

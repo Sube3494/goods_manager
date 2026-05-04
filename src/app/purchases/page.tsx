@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
 import { PurchaseOrder, User as UserType } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Pagination } from "@/components/ui/Pagination";
 import { ActionBar } from "@/components/ui/ActionBar";
@@ -77,14 +78,14 @@ function PurchaseMetricCard({
   accentClassName: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-black/8 bg-white/76 px-3.5 py-3 shadow-xs dark:border-white/10 dark:bg-white/5">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-[18px] border border-black/8 bg-white/76 px-3 py-2.5 shadow-xs dark:border-white/10 dark:bg-white/5 sm:px-3.5 sm:py-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-          <div className="mt-1.5 text-[24px] font-black leading-none tracking-tight text-foreground">{value}</div>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p>
+          <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px] sm:tracking-[0.14em]">{label}</div>
+          <div className="mt-1 text-[18px] font-black leading-none tracking-tight text-foreground sm:mt-1.5 sm:text-[24px]">{value}</div>
+          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-muted-foreground sm:mt-1.5 sm:text-[11px]">{hint}</p>
         </div>
-        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", accentClassName)}>
+        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border sm:h-9 sm:w-9", accentClassName)}>
           {icon}
         </div>
       </div>
@@ -116,6 +117,7 @@ function PurchasesContent() {
   const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<string[]>([]);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     onConfirm: () => void;
@@ -143,6 +145,16 @@ function PurchasesContent() {
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(handle);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+      setShowScrollTop(scrollTop > 240);
+    };
+
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
   }, []);
 
   const fetchData = useCallback(async (silent = false) => {
@@ -321,7 +333,8 @@ function PurchasesContent() {
         showToast(msg, "success");
         setIsModalOpen(false);
       } else {
-        showToast("保存失败", "error");
+        const errorData = await res.json().catch(() => ({}));
+        showToast(errorData?.error || "保存失败", "error");
       }
     } catch (error) {
       console.error("Purchase save failed:", error);
@@ -418,6 +431,82 @@ function PurchasesContent() {
       }
     });
   }, [selectedPurchases, showToast]);
+
+  const handleBatchReceive = useCallback(() => {
+    if (selectedPurchases.length === 0) return;
+
+    const eligiblePurchases = selectedPurchases.filter((purchase) => purchase.status !== "Received");
+    const skippedCount = selectedPurchases.length - eligiblePurchases.length;
+
+    if (eligiblePurchases.length === 0) {
+      showToast("所选采购单都已经入库，无需重复操作", "info");
+      return;
+    }
+
+    const message = skippedCount > 0
+      ? `将批量入库 ${eligiblePurchases.length} 张采购单，另外 ${skippedCount} 张已入库会自动跳过。确定继续吗？`
+      : `确定将已选中的 ${eligiblePurchases.length} 张采购单批量入库吗？`;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: "批量确认入库",
+      message,
+      onConfirm: async () => {
+        try {
+          const results = await Promise.allSettled(
+            eligiblePurchases.map((purchase) =>
+              fetch(`/api/purchases/${purchase.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "Received" }),
+              }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  throw new Error(data?.error || `入库失败: ${purchase.id}`);
+                }
+                return { id: purchase.id, data };
+              })
+            )
+          );
+
+          const successIds = results
+            .filter((result): result is PromiseFulfilledResult<{ id: string; data: PurchaseOrder }> => result.status === "fulfilled")
+            .map((result) => result.value.id);
+          const failedMessages = results
+            .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+            .map((result) => result.reason instanceof Error ? result.reason.message : String(result.reason));
+
+          if (successIds.length > 0) {
+            setPurchases((prev) => sortPurchasesByRecency(
+              prev.map((purchase) => (
+                successIds.includes(purchase.id)
+                  ? { ...purchase, status: "Received" }
+                  : purchase
+              ))
+            ));
+            setSelectedPurchaseIds([]);
+            void fetchData(true);
+          }
+
+          if (failedMessages.length > 0) {
+            showToast(`已入库 ${successIds.length} 张，失败 ${failedMessages.length} 张`, successIds.length > 0 ? "info" : "error");
+            console.error("Batch receive purchase failures:", failedMessages);
+            return;
+          }
+
+          showToast(
+            skippedCount > 0
+              ? `已入库 ${successIds.length} 张，跳过 ${skippedCount} 张已入库采购单`
+              : `已成功入库 ${successIds.length} 张采购单`,
+            "success"
+          );
+        } catch (error) {
+          console.error("Batch receive purchases failed:", error);
+          showToast("批量入库失败", "error");
+        }
+      }
+    });
+  }, [fetchData, selectedPurchases, showToast]);
 
   const handleExport = useCallback(async (specificPO?: PurchaseOrder) => {
     const targets = specificPO ? [specificPO] : filteredPurchases;
@@ -666,6 +755,12 @@ function PurchasesContent() {
     }
   }, [filteredPurchases, showToast, typedUser?.shippingAddresses]);
 
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   if (!mounted) return null;
 
   return (
@@ -695,32 +790,32 @@ function PurchasesContent() {
       </div>
 
       <section className="mb-5 md:mb-6">
-        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           <PurchaseMetricCard
             label="采购单数"
             value={`${purchaseStats.totalCount}`}
-            hint={`覆盖 ${purchaseStats.shopCount} 家店铺，列表和统计同步更新`}
+            hint={`覆盖 ${purchaseStats.shopCount} 家店`}
             icon={<ReceiptText size={18} className="text-sky-600 dark:text-sky-400" />}
             accentClassName="border-sky-500/15 bg-sky-500/10"
           />
           <PurchaseMetricCard
             label="采购总金额"
             value={formatCurrency(purchaseStats.totalAmount)}
-            hint={`当前筛选结果共 ${purchaseStats.totalCount} 单`}
+            hint={`当前共 ${purchaseStats.totalCount} 单`}
             icon={<Wallet size={18} className="text-emerald-600 dark:text-emerald-400" />}
             accentClassName="border-emerald-500/15 bg-emerald-500/10"
           />
           <PurchaseMetricCard
             label="待入库金额"
             value={formatCurrency(purchaseStats.pendingAmount)}
-            hint={`还有 ${purchaseStats.pendingCount} 单待入库`}
+            hint={`待入库 ${purchaseStats.pendingCount} 单`}
             icon={<Package size={18} className="text-amber-600 dark:text-amber-400" />}
             accentClassName="border-amber-500/15 bg-amber-500/10"
           />
           <PurchaseMetricCard
             label="已入库金额"
             value={formatCurrency(purchaseStats.receivedAmount)}
-            hint={`已完成 ${purchaseStats.receivedCount} 单采购入库`}
+            hint={`已完成 ${purchaseStats.receivedCount} 单`}
             icon={<Archive size={18} className="text-violet-600 dark:text-violet-400" />}
             accentClassName="border-violet-500/15 bg-violet-500/10"
           />
@@ -934,7 +1029,7 @@ function PurchasesContent() {
 
       {/* Mobile Card View */}
       <div className={cn(
-        "grid grid-cols-1 gap-4 md:hidden pb-20 transition-opacity duration-300",
+        "grid grid-cols-1 gap-3 md:hidden pb-24 transition-opacity duration-300",
         (isPending || (isLoading && purchases.length > 0)) && "opacity-50"
       )}>
         <AnimatePresence mode="popLayout">
@@ -951,35 +1046,56 @@ function PurchasesContent() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="rounded-[22px] border border-border/70 bg-white p-3.5 shadow-sm dark:border-white/10 dark:bg-[#161b2b]"
+                className="rounded-[22px] border border-border/70 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-[#161b2b]"
               >
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-black text-foreground dark:bg-white/8 dark:text-white">
-                        {(currentPage - 1) * pageSize + index + 1}
-                      </span>
-                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-1 text-xs font-bold text-primary dark:bg-white/6 dark:text-white">
-                      <Store size={12} />
-                      <span className="truncate">{po.shopName || "未指定店铺"}</span>
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePurchaseSelection(po.id);
+                      }}
+                      className={`relative flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                        selectedPurchaseIds.includes(po.id)
+                          ? "scale-110 border-foreground bg-foreground text-background dark:text-black"
+                          : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
+                      }`}
+                      aria-label={selectedPurchaseIds.includes(po.id) ? "取消勾选采购单" : "勾选采购单"}
+                    >
+                      {selectedPurchaseIds.includes(po.id) ? <Check size={12} strokeWidth={4} /> : null}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-black text-foreground dark:bg-white/8 dark:text-white">
+                          {(currentPage - 1) * pageSize + index + 1}
+                        </span>
+                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-1 text-[11px] font-bold text-primary dark:bg-white/6 dark:text-white">
+                          <Store size={12} />
+                          <span className="max-w-[180px] truncate">{po.shopName || "未指定店铺"}</span>
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 text-[10px] font-mono text-foreground/60">
+                          <Calendar size={11} className="shrink-0" />
+                          <span>{formatLocalDateTime(po.date)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                   <PurchaseStatusBadge status={po.status} />
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                     <div className="rounded-[18px] border border-border/40 bg-muted/25 p-2.5 dark:border-white/6 dark:bg-white/[0.04]">
                       <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">商品与数量</div>
                       {(() => {
                         const summary = formatPurchaseItemsSummary(po);
                         return (
                           <div className="space-y-2">
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="grid grid-cols-2 gap-1.5">
                               {summary.items.length > 0 ? summary.items.map((item) => (
                                 <div
                                   key={item.key}
-                                  className="flex max-w-[150px] items-center gap-1.5 rounded-full border border-border/50 bg-white/70 p-0.5 pr-2 shadow-sm dark:border-white/8 dark:bg-white/[0.06]"
+                                  className="flex min-w-0 items-center gap-1.5 rounded-full border border-border/50 bg-white/70 p-0.5 pr-2 shadow-sm dark:border-white/8 dark:bg-white/[0.06]"
                                   title={item.name}
                                 >
                                   <div className="relative flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
@@ -989,7 +1105,7 @@ function PurchasesContent() {
                                       <Package size={10} className="text-muted-foreground/50" />
                                     )}
                                   </div>
-                                  <span className="truncate text-[10px] font-medium leading-none text-foreground/85">
+                                  <span className="max-w-[140px] truncate text-[10px] font-medium leading-none text-foreground/85">
                                     {item.name}
                                   </span>
                                   <span className="shrink-0 text-[10px] font-black leading-none text-primary">
@@ -997,16 +1113,14 @@ function PurchasesContent() {
                                   </span>
                                 </div>
                               )) : (
-                                <div className="text-xs text-muted-foreground">暂无商品</div>
-                              )}
-                              {summary.hasMore && (
-                                <div className="flex h-6 items-center justify-center rounded-full border border-border/50 bg-muted/50 px-2 text-[10px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/[0.05]">
-                                  +{po.items.length - summary.items.length}
-                                </div>
+                                <div className="col-span-2 text-xs text-muted-foreground">暂无商品</div>
                               )}
                             </div>
                             <div className="flex items-center justify-between rounded-xl bg-white/70 px-2.5 py-2 text-[10px] font-bold text-muted-foreground dark:bg-white/[0.06]">
-                              <span>共 {po.items.length} 项</span>
+                              <span>
+                                共 {po.items.length} 项
+                                {summary.hasMore ? ` · 另有 ${po.items.length - summary.items.length} 项` : ""}
+                              </span>
                               <span>数量 {summary.totalQuantity}</span>
                             </div>
                           </div>
@@ -1014,26 +1128,16 @@ function PurchasesContent() {
                       })()}
                     </div>
 
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                      <div className="rounded-2xl border border-border/40 bg-muted/25 px-3 py-2.5 dark:border-white/6 dark:bg-white/[0.04]">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">交易金额</div>
-                        <div className="mt-1 text-[22px] font-black leading-none tracking-tight text-foreground">
+                    <div className="flex items-center gap-2 border-t border-border/30 pt-2 dark:border-white/6">
+                      <div className="flex h-12 min-w-0 flex-1 flex-col justify-center rounded-2xl border border-border/40 bg-muted/25 px-3 dark:border-white/6 dark:bg-white/[0.04]">
+                        <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">交易金额</div>
+                        <div className="mt-0.5 text-[18px] font-black leading-none tracking-tight text-foreground">
                           {formatCurrency(po.totalAmount)}
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-border/40 bg-muted/25 px-3 py-2.5 text-right dark:border-white/6 dark:bg-white/[0.04]">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/75">下单时间</div>
-                        <div className="mt-1 flex items-center justify-end gap-1.5 text-[11px] font-mono text-foreground/70">
-                          <Calendar size={12} />
-                          <span>{formatLocalDateTime(po.date)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 border-t border-border/30 pt-2 dark:border-white/6">
                       <button 
                           onClick={() => handleEdit(po)}
-                          className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 shadow-sm transition-all active:scale-95 hover:bg-blue-500 hover:text-white dark:bg-blue-500/12 dark:text-blue-300"
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 shadow-sm transition-all active:scale-95 hover:bg-blue-500 hover:text-white dark:bg-blue-500/12 dark:text-blue-300"
                           title="详细管理"
                       >
                           <Eye size={18} />
@@ -1042,7 +1146,7 @@ function PurchasesContent() {
                       {canEdit && (
                           <button 
                               onClick={() => handleDelete(po.id)}
-                              className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-600 shadow-sm transition-all active:scale-95 hover:bg-red-500 hover:text-white dark:bg-red-500/12 dark:text-red-300"
+                              className="flex h-12 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-500/10 text-red-600 shadow-sm transition-all active:scale-95 hover:bg-red-500 hover:text-white dark:bg-red-500/12 dark:text-red-300"
                               title="删除"
                           >
                               <Trash2 size={18} />
@@ -1119,7 +1223,30 @@ function PurchasesContent() {
         onClear={() => setSelectedPurchaseIds([])}
         label="张采购单"
         onDelete={canEdit ? handleBatchDelete : undefined}
+        extraActions={canEdit ? [{
+          label: "批量入库",
+          icon: <Archive size={16} />,
+          onClick: handleBatchReceive,
+        }] : []}
       />
+
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.5, y: 20 }}
+              onClick={scrollToTop}
+              className="fixed bottom-24 right-4 z-9999 flex h-11 w-11 items-center justify-center rounded-full bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground transition-all active:scale-95 sm:bottom-12 sm:right-12 sm:h-12 sm:w-12 hover:scale-110 group"
+              aria-label="返回顶部"
+            >
+              <ArrowUp size={20} className="group-hover:-translate-y-1 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
     </div>
 
