@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Search, Package, Calendar } from "lucide-react";
+import { Search, Package, Calendar, Store } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { BrushOrderPlan } from "@/lib/types";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function SharedPlanPage() {
     const params = useParams();
@@ -72,9 +73,12 @@ export default function SharedPlanPage() {
                         <div className="flex-1">
                             <div className="flex items-center justify-between gap-4 mb-2">
                                 <h1 className="text-xl font-black tracking-tight truncate">{plan.title || "刷单任务清单"}</h1>
+                                <ThemeToggle />
                             </div>
-                            <div className="flex items-center gap-3 text-[11px] font-bold text-muted-foreground opacity-60">
+                            <div className="flex items-center flex-wrap gap-2 text-[11px] font-bold text-muted-foreground opacity-70">
                                 <span className="flex items-center gap-1"><Calendar size={12} /> {formatLocalDate(plan.date)}</span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1"><Store size={12} /> {plan.shopName || "通用店铺"}</span>
                                 <span>•</span>
                                 <span>共 {plan.items.length} 项，合计 {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份</span>
                             </div>
@@ -139,12 +143,12 @@ export default function SharedPlanPage() {
                                                         <span className={cn("inline-block w-2 h-2 rounded-full mr-2", dotColor)} />
                                                         {platformName}
                                                     </div>
-                                                    <span className="text-xs font-black text-muted-foreground opacity-40">
+                                                    <span className="text-xs font-black text-slate-500 dark:text-slate-400">
                                                         {platformItems.length} 项
                                                     </span>
                                                 </div>
                                                 <div className="h-px flex-1 bg-zinc-200 dark:bg-white/5 mx-6 hidden sm:block" />
-                                                <div className="hidden sm:block text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">
+                                                <div className="hidden sm:block text-[10px] font-black text-slate-500/60 dark:text-slate-400/60 uppercase tracking-[0.2em]">
                                                     {platformName === "美团" ? "美团订单" : platformName === "淘宝" ? "淘宝订单" : platformName === "京东" ? "京东订单" : "其他任务"}
                                                 </div>
                                             </div>
@@ -193,7 +197,7 @@ function ItemCard({ item, index }: { item: BrushOrderPlan["items"][number]; inde
             {/* Image Area */}
             <div className="relative aspect-square w-full bg-zinc-100 dark:bg-zinc-800/40 overflow-hidden">
                 {/* 悬浮暗色渐变蒙层，确保即使是白色商品图，也能看清白色文字徽章 */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30 z-10 opacity-50 mix-blend-multiply pointer-events-none transition-opacity group-hover:opacity-30" />
+                <div className="absolute inset-0 bg-linear-to-b from-black/20 via-transparent to-black/30 z-10 opacity-50 mix-blend-multiply pointer-events-none transition-opacity group-hover:opacity-30" />
 
                 {/* Number Badge: 圆形毛玻璃 */}
                 <div className="absolute top-2.5 left-2.5 z-20 w-6 h-6 rounded-full bg-white/20 dark:bg-black/40 backdrop-blur-md border border-white/20 text-white text-[11px] font-black shadow-sm flex items-center justify-center pointer-events-none">
@@ -230,7 +234,7 @@ function ItemCard({ item, index }: { item: BrushOrderPlan["items"][number]; inde
                 <div className="flex items-start gap-2.5">
                     <Search className="w-3.5 h-3.5 mt-[3px] text-primary opacity-60 shrink-0" strokeWidth={3} />
                     <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-bold text-muted-foreground opacity-50 uppercase tracking-widest leading-none">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none">
                             搜索词
                         </span>
                         <span className="text-[13px] sm:text-[14px] font-black text-zinc-800 dark:text-zinc-100 leading-snug line-clamp-2 break-all group-hover:text-primary transition-colors">

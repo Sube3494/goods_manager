@@ -205,7 +205,7 @@ export default function BrushPlansPage() {
                 <div className="min-w-0 flex-1 space-y-4">
                     <Link
                         href="/brush"
-                        className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
+                        className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/90 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
                     >
                         <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
                         <span>返回刷单中心</span>
@@ -215,19 +215,19 @@ export default function BrushPlansPage() {
                         <p className="text-muted-foreground text-xs sm:text-sm font-medium">按日期统筹计划，先看节奏，再看每家店的商品安排。</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                        <div className="rounded-2xl border border-border/70 bg-white/90 px-3 py-2 dark:bg-white/5">
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">计划数</div>
                             <div className="mt-1 text-xl font-black text-foreground">{planStats.planCount}</div>
                         </div>
-                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                        <div className="rounded-2xl border border-border/70 bg-white/90 px-3 py-2 dark:bg-white/5">
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">今日计划</div>
                             <div className="mt-1 text-xl font-black text-foreground">{planStats.todayCount}</div>
                         </div>
-                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                        <div className="rounded-2xl border border-border/70 bg-white/90 px-3 py-2 dark:bg-white/5">
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">任务份数</div>
                             <div className="mt-1 text-xl font-black text-foreground">{planStats.quantityCount}</div>
                         </div>
-                        <div className="rounded-2xl border border-border/70 bg-white/70 px-3 py-2 dark:bg-white/5">
+                        <div className="rounded-2xl border border-border/70 bg-white/90 px-3 py-2 dark:bg-white/5">
                             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">涉及店铺</div>
                             <div className="mt-1 text-xl font-black text-foreground">{planStats.shopCount}</div>
                         </div>
@@ -244,7 +244,7 @@ export default function BrushPlansPage() {
                 )}
             </div>
 
-            <div className="rounded-[28px] border border-border/70 bg-white/70 p-3 shadow-sm dark:bg-white/5 sm:p-4">
+            <div className="rounded-[28px] border border-border/70 bg-white/90 p-3 shadow-sm dark:bg-white/5 sm:p-4">
                 <div className="mb-3 flex items-center justify-between">
                     <div>
                         <div className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">筛选工作区</div>
@@ -314,7 +314,7 @@ export default function BrushPlansPage() {
             <div className="space-y-5">
                 {groupedPlans.map((group) => (
                     <section key={group.date} className="space-y-3">
-                        <div className="flex flex-col gap-2 rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-col gap-2 rounded-[24px] border border-border/50 bg-white/90 dark:bg-white/5 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                                     <Calendar size={20} />
@@ -335,7 +335,7 @@ export default function BrushPlansPage() {
                                 const totalQuantity = plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
                                 return (
-                                    <div key={plan.id} className="group relative flex flex-col xl:flex-row gap-0 rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 shadow-sm transition-all duration-300 hover:border-primary/25 hover:shadow-xl dark:hover:bg-white/10 overflow-hidden">
+                                    <div key={plan.id} className="group relative flex flex-col xl:flex-row gap-0 rounded-[24px] border border-border/50 bg-white/90 dark:bg-white/5 shadow-sm transition-all duration-300 hover:border-primary/25 hover:shadow-xl dark:hover:bg-white/10 overflow-hidden">
                                         <div className="w-full xl:w-[320px] p-4 sm:p-5 border-b xl:border-b-0 xl:border-r border-border/40 flex flex-col justify-between">
                                             <div>
                                                 <div className="flex items-start justify-between gap-3">
@@ -424,7 +424,7 @@ export default function BrushPlansPage() {
                                                     return (
                                                         <div 
                                                             key={`${plan.id}-item-${index}`} 
-                                                            className="group relative flex items-center gap-2 rounded-full bg-white dark:bg-white/[0.06] border border-border/60 dark:border-white/10 p-1 pr-3.5 shadow-sm transition-all hover:shadow-md hover:border-primary/40 dark:hover:bg-white/10 cursor-default"
+                                                            className="group relative flex items-center gap-2 rounded-full bg-white dark:bg-white/6 border border-border/60 dark:border-white/10 p-1 pr-3.5 shadow-sm transition-all hover:shadow-md hover:border-primary/40 dark:hover:bg-white/10 cursor-default"
                                                             title={`商品：${item.productName || item.product?.name || "未命名"}\n关键词：${item.searchKeyword || "无"}\n平台：${item.platform || "无"}`}
                                                         >
                                                             {/* 小圆图 */}

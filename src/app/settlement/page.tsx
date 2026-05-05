@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Loader2, Receipt, RefreshCw, Save, Store, History, Calculator, FileText, CalendarDays, ChevronLeft, ChevronRight, Edit2 } from "lucide-react";
 import { format } from "date-fns";
-import { zhCN } from "date-fns/locale/zh-CN";
-import Link from "next/link";
+
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
@@ -51,7 +50,7 @@ export default function SettlementPage() {
 
   const searchParams = useSearchParams();
   const editId = searchParams.get("editId");
-  const [initialLoading, setInitialLoading] = useState(false);
+
   const [originalData, setOriginalData] = useState<{ entries: PlatformData[], note: string, month: string } | null>(null);
 
   const [activeShop, setActiveShop] = useState<string>("");
@@ -97,7 +96,7 @@ export default function SettlementPage() {
 
     const fetchSettlementForEdit = async () => {
       try {
-        setInitialLoading(true);
+
         const res = await fetch(`/api/settlements/${editId}`);
         if (!res.ok) throw new Error("获取记录失败");
         const data = await res.json();
@@ -109,11 +108,11 @@ export default function SettlementPage() {
         
         // 构建 entries
         const mappedEntries: PlatformData[] = [];
-        shops.forEach((shop: any) => {
+        shops.forEach((shop: { label: string; serviceFeeRate?: number }) => {
           const shopName = shop.label;
           // 查找该店铺的所有平台记录
           DEFAULT_PLATFORMS.forEach((platformName) => {
-            const match = data.items.find((item: any) => 
+            const match = data.items.find((item: { shopName: string; platformName: string; serviceFeeRate?: number; received?: number; brushing?: number; receivedToCard?: number }) => 
               item.shopName === shopName && item.platformName === platformName
             );
 
@@ -140,13 +139,11 @@ export default function SettlementPage() {
       } catch (err) {
         showToast((err as Error).message, "error");
         router.replace(pathname);
-      } finally {
-        setInitialLoading(false);
       }
     };
 
     fetchSettlementForEdit();
-  }, [editId, shops]);
+  }, [editId, shops, pathname, router, showToast]);
 
   // 初始化所有的表单输入数据（非编辑模式）
   useEffect(() => {
@@ -156,7 +153,7 @@ export default function SettlementPage() {
     setEntries((prev) => {
       if (prev.length > 0) return prev; 
       const init: PlatformData[] = [];
-      shops.forEach((shop: any) => {
+      shops.forEach((shop: { label: string; serviceFeeRate?: number }) => {
         const rate = shop.serviceFeeRate ?? 0.06;
         DEFAULT_PLATFORMS.forEach((platformName) => {
           init.push({
@@ -176,7 +173,7 @@ export default function SettlementPage() {
 
   // 结算计算引擎
   const groups = useMemo<ShopGroup[]>(() => {
-    return shops.map((shop: any) => {
+    return shops.map((shop: { label: string; serviceFeeRate?: number }) => {
       const shopName = shop.label;
       const entriesForShop = entries.filter((entry) => entry.shopName === shopName);
       
@@ -362,7 +359,7 @@ export default function SettlementPage() {
                   </div>
                 )}
               </div>
-              <p className="hidden sm:block text-sm text-muted-foreground font-medium opacity-80">
+              <p className="hidden sm:block text-sm text-slate-500 dark:text-slate-400 font-medium">
                 {editId ? "正在修改已保存的结算单。更新后将同步至历史记录。" : "专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。"}
               </p>
             </div>
@@ -388,15 +385,18 @@ export default function SettlementPage() {
             )}
           </div>
         </div>
-        <p className="sm:hidden text-xs text-muted-foreground font-medium opacity-80 pl-1">
+        <p className="sm:hidden text-xs text-slate-500 dark:text-slate-400 font-medium pl-1">
           专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。
         </p>
 
         {/* Shop Segmented Control */}
         <div className="p-1 rounded-[20px] bg-white dark:bg-white/5 border border-border/40 inline-flex flex-wrap gap-1 shadow-inner backdrop-blur-md relative overflow-hidden">
           {editId && (
-            <div className="absolute inset-0 z-20 bg-white/20 dark:bg-black/20 backdrop-blur-[1px] flex items-center justify-center cursor-not-allowed group">
-               <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] px-3 py-1 rounded-full font-bold">编辑模式下锁定切换</div>
+            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" />
+          )}
+          {editId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+               <div className="bg-black/80 text-white text-[10px] px-3 py-1 rounded-full font-bold">编辑模式下锁定切换</div>
             </div>
           )}
           {shops.map((shop) => {
@@ -450,20 +450,20 @@ export default function SettlementPage() {
       />
 
       {!activeGroup ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-border/70 bg-white/50 dark:bg-white/5">
+        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-border/70 bg-white/80 dark:bg-white/5">
           <p className="text-sm font-bold text-muted-foreground">未选中或暂无店铺配置。</p>
         </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           {/* 左侧：主工作台 */}
           <main className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 p-4 shadow-sm transition-colors hover:border-border/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[24px] border border-border/50 bg-white/90 dark:bg-white/5 p-4 shadow-sm transition-colors hover:border-border/80">
               <div className="flex items-center gap-4">
                 <div className="bg-white dark:bg-white/5 p-2.5 rounded-2xl shadow-sm">
                   <FileText size={20} className="text-primary" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">当前结算单基准</div>
+                  <div className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">当前结算单基准</div>
                   <div className="font-bold tracking-tight text-foreground mt-0.5">{activeGroup.shopName} · 综合抽成费率 {(activeGroup.serviceFeeRate * 100).toFixed(1)}%</div>
                 </div>
               </div>
@@ -521,7 +521,7 @@ export default function SettlementPage() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -10 }}
                       transition={{ duration: 0.15 }}
-                      className="fixed z-[1000001] rounded-[24px] glass p-4 shadow-2xl border border-white/10"
+                      className="fixed z-1000001 rounded-[24px] glass p-4 shadow-2xl border border-white/10"
                       style={{
                         top: monthPickerContainerRef.current ? monthPickerContainerRef.current.getBoundingClientRect().bottom + 8 : 0,
                         left: monthPickerContainerRef.current ? monthPickerContainerRef.current.getBoundingClientRect().left : 0,
@@ -593,7 +593,6 @@ export default function SettlementPage() {
 
             <div className="space-y-4">
               {activeGroup.entries.map((entry) => {
-                const isRowActive = entry.received > 0 || entry.brushing > 0 || entry.receivedToCard > 0;
                 let brandBadge = "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300";
                 if (entry.platformName.includes('美团')) brandBadge = "bg-[#FFD000]/15 text-[#b39200] dark:text-[#FFD000]";
                 if (entry.platformName.includes('淘宝')) brandBadge = "bg-[#FF5000]/10 text-[#FF5000]";
@@ -601,7 +600,7 @@ export default function SettlementPage() {
 
                 return (
                   <div key={entry.id} className={`overflow-hidden rounded-[24px] border transition-all duration-300 shadow-sm ${
-                    isRowActive ? "border-primary/30 bg-primary/[0.02]" : "border-border/50 bg-white dark:bg-white/5 hover:border-border/80"
+                    entry.received > 0 ? "border-primary/20 bg-primary/5" : "border-border/50 bg-white/70 dark:bg-white/5"
                   }`}>
                     <div className="flex items-center justify-between px-5 py-3 border-b border-border/30 bg-white dark:bg-white/5">
                       <div className={`px-2.5 py-1 rounded-md text-[11px] font-black tracking-widest ${brandBadge}`}>
@@ -614,25 +613,25 @@ export default function SettlementPage() {
                     </div>
                     {/* 输入区 - 响应式栅格：窄屏单列，中屏双列，宽屏三列 */}
                     <div className="flex flex-col md:grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/30">
-                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">账单入账(A)</label>
                         <div className="relative w-full">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium group-focus-within:text-primary transition-colors">¥</span>
-                          <input type="number" inputMode="decimal" value={entry.received || ""} onChange={(e) => handleInputChange(entry.id, "received", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
+                          <input type="number" step="0.01" value={entry.received || ""} onChange={(e) => handleInputChange(entry.id, "received", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right text-base font-bold text-foreground transition-colors hover:bg-muted/30 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
                         </div>
                       </div>
-                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">刷单到手</label>
                         <div className="relative w-full">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium group-focus-within:text-rose-500 transition-colors">¥</span>
-                          <input type="number" inputMode="decimal" value={entry.brushing || ""} onChange={(e) => handleInputChange(entry.id, "brushing", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-rose-500/20" />
+                          <input type="number" step="0.01" value={entry.brushing || ""} onChange={(e) => handleInputChange(entry.id, "brushing", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right text-base font-bold text-foreground transition-colors hover:bg-muted/30 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
                         </div>
                       </div>
-                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/[0.02]">
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">商家已收</label>
                         <div className="relative w-full">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-orange-500/50 font-medium group-focus-within:text-orange-500 transition-colors">¥</span>
-                          <input type="number" inputMode="decimal" value={entry.receivedToCard || ""} onChange={(e) => handleInputChange(entry.id, "receivedToCard", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-orange-500/5 dark:bg-orange-500/5 pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold text-orange-600 dark:text-orange-400 outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-orange-500/20" />
+                          <input type="number" step="0.01" value={entry.receivedToCard || ""} onChange={(e) => handleInputChange(entry.id, "receivedToCard", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-orange-500/5 dark:bg-orange-500/5 pl-8 pr-3 text-right font-mono text-sm md:text-base font-bold text-orange-600 dark:text-orange-400 outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-orange-500/20" />
                         </div>
                       </div>
                     </div>
@@ -641,8 +640,8 @@ export default function SettlementPage() {
               })}
             </div>
 
-            <div className="rounded-[24px] border border-border/50 bg-white/70 dark:bg-white/5 p-4 shadow-sm">
-               <label htmlFor="settlement-note" className="text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-3 block">单据备注</label>
+            <div className="rounded-[24px] border border-border/50 bg-white/90 dark:bg-white/5 p-4 shadow-sm">
+               <label htmlFor="settlement-note" className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3 block">单据备注</label>
                <textarea id="settlement-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder={`补充 ${activeGroup.shopName} 的特殊结账说明（选填）...`} className="h-20 w-full resize-none rounded-xl bg-transparent hover:bg-white dark:hover:bg-white/5 border border-transparent hover:border-border/50 px-4 py-3 text-sm outline-none transition-all focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
             </div>
           </main>
@@ -655,7 +654,7 @@ export default function SettlementPage() {
                 <div className="mx-auto w-12 h-12 bg-white dark:bg-white/5 border border-border/30 text-foreground rounded-full flex items-center justify-center mb-3 ring-4 ring-muted/30 dark:ring-white/5 shadow-sm">
                   <Calculator size={20} />
                 </div>
-                <div className="text-[11px] font-black uppercase tracking-[0.25em] text-muted-foreground mb-1">本店应补差价</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400 mb-1">本店应补差价</div>
                 <div className={`text-4xl lg:text-5xl font-black tracking-tighter ${activeGroup.finalBalance > 0 ? "text-primary" : "text-foreground"}`}>
                   {money(activeGroup.finalBalance)}
                 </div>
@@ -702,7 +701,7 @@ export default function SettlementPage() {
                       <>
                         <Save size={18} className="z-10" />
                         <span className="z-10 tracking-wide">{editId ? "更新当前结算单" : "存入本店结算单"}</span>
-                        <div className="absolute inset-0 z-0 bg-linear-to-r from-transparent via-white/15 to-transparent translate-x-[-100%] transition-transform duration-700 ease-in-out group-hover:translate-x-[100%]" />
+                        <ChevronRight className="w-5 h-5 absolute right-4 opacity-0 -translate-x-full group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-primary" strokeWidth={3} />
                       </>
                     )}
                   </button>

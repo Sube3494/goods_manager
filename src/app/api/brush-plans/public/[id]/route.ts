@@ -86,6 +86,7 @@ export async function GET(
       title: plan.title,
       note: plan.note,
       status: plan.status,
+      shopName: plan.shopName,
       items: await Promise.all(plan.items.map(async (item) => {
         const image = await resolvePlanProductImage(plan.userId, plan.shopName, item.productId);
         return ({
