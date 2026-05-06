@@ -25,14 +25,6 @@ interface DataTabProps {
   setShareExpireDuration: (val: number | "") => void;
   shareExpireUnit: "minutes" | "hours" | "days";
   setShareExpireUnit: (val: "minutes" | "hours" | "days") => void;
-  brushCommissionBoostEnabled: boolean;
-  setBrushCommissionBoostEnabled: (val: boolean) => void;
-  brushCommissionRateMeituan: number | "";
-  setBrushCommissionRateMeituan: (val: number | "") => void;
-  brushCommissionRateTaobao: number | "";
-  setBrushCommissionRateTaobao: (val: number | "") => void;
-  brushCommissionRateJingdong: number | "";
-  setBrushCommissionRateJingdong: (val: number | "") => void;
   saveSettings: (newSettings: Record<string, unknown>, options?: { silent?: boolean }) => Promise<void>;
   mode?: "full" | "backup_only";
   canManageDangerZone?: boolean;
@@ -41,10 +33,6 @@ interface DataTabProps {
 export function DataTab({
   allowGalleryUpload, toggleGalleryUpload, requireLoginForLightbox, toggleRequireLoginForLightbox, gallerySortDesc, setGallerySortDesc,
   shareExpireDuration, setShareExpireDuration, shareExpireUnit, setShareExpireUnit,
-  brushCommissionBoostEnabled, setBrushCommissionBoostEnabled,
-  brushCommissionRateMeituan, setBrushCommissionRateMeituan,
-  brushCommissionRateTaobao, setBrushCommissionRateTaobao,
-  brushCommissionRateJingdong, setBrushCommissionRateJingdong,
   saveSettings, mode = "full", canManageDangerZone = true,
 }: DataTabProps) {
   const { showToast } = useToast();
@@ -298,39 +286,6 @@ export function DataTab({
               <input type="number" min="1" value={shareExpireDuration ?? ""} onChange={(e) => { const val = e.target.value; if (val === "") return setShareExpireDuration(""); const num = parseInt(val); setShareExpireDuration(isNaN(num) ? "" : num); if (!isNaN(num)) saveSettings({ shareExpireDuration: num }, { silent: true }); }} onBlur={() => { if (shareExpireDuration === "" || (typeof shareExpireDuration === "number" && shareExpireDuration <= 0)) { setShareExpireDuration(1); saveSettings({ shareExpireDuration: 1 }); } }} className="h-10 w-16 rounded-xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-2 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
               <CustomSelect value={shareExpireUnit} triggerClassName="h-10 w-24 rounded-xl border-border bg-background text-xs font-bold" onChange={(val) => { setShareExpireUnit(val as "minutes" | "hours" | "days"); saveSettings({ shareExpireUnit: val }); }} options={[{ value: "minutes", label: "分钟" }, { value: "hours", label: "小时" }, { value: "days", label: "天" }]} />
             </div>
-          </div>
-          <div className="rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04]">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="text-sm font-black text-foreground">刷单模拟显示</div>
-                <div className="mt-1 text-xs text-muted-foreground">这里只控制刷单页默认是否显示模拟值，不会修改任何数据库里的实付、到手或刷单佣金。</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={cn("text-xs font-bold", brushCommissionBoostEnabled ? "text-emerald-500" : "text-muted-foreground")}>
-                  {brushCommissionBoostEnabled ? "已开启" : "已关闭"}
-                </span>
-                <Switch checked={brushCommissionBoostEnabled} onChange={(val) => { setBrushCommissionBoostEnabled(val); saveSettings({ brushCommissionBoostEnabled: val }); }} />
-              </div>
-            </div>
-            {brushCommissionBoostEnabled ? (
-              <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-                  <div className="text-sm font-black text-foreground">美团费率</div>
-                  <div className="mt-1 text-xs text-muted-foreground">支持填 `0.06` 或 `6`。</div>
-                  <input type="number" min="0" step="0.01" value={brushCommissionRateMeituan} onChange={(e) => { const val = e.target.value; if (val === "") return setBrushCommissionRateMeituan(""); const num = Number(val); setBrushCommissionRateMeituan(Number.isFinite(num) ? num : ""); if (Number.isFinite(num)) saveSettings({ brushCommissionRateMeituan: num }, { silent: true }); }} className="mt-3 h-11 w-full rounded-2xl border border-border bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all dark:bg-white/5 dark:border-white/10" />
-                </div>
-                <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-                  <div className="text-sm font-black text-foreground">淘宝费率</div>
-                  <div className="mt-1 text-xs text-muted-foreground">支持填 `0.06` 或 `6`。</div>
-                  <input type="number" min="0" step="0.01" value={brushCommissionRateTaobao} onChange={(e) => { const val = e.target.value; if (val === "") return setBrushCommissionRateTaobao(""); const num = Number(val); setBrushCommissionRateTaobao(Number.isFinite(num) ? num : ""); if (Number.isFinite(num)) saveSettings({ brushCommissionRateTaobao: num }, { silent: true }); }} className="mt-3 h-11 w-full rounded-2xl border border-border bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all dark:bg-white/5 dark:border-white/10" />
-                </div>
-                <div className="rounded-2xl border border-border/50 bg-background/70 p-4">
-                  <div className="text-sm font-black text-foreground">京东费率</div>
-                  <div className="mt-1 text-xs text-muted-foreground">支持填 `0.06` 或 `6`。</div>
-                  <input type="number" min="0" step="0.01" value={brushCommissionRateJingdong} onChange={(e) => { const val = e.target.value; if (val === "") return setBrushCommissionRateJingdong(""); const num = Number(val); setBrushCommissionRateJingdong(Number.isFinite(num) ? num : ""); if (Number.isFinite(num)) saveSettings({ brushCommissionRateJingdong: num }, { silent: true }); }} className="mt-3 h-11 w-full rounded-2xl border border-border bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all dark:bg-white/5 dark:border-white/10" />
-                </div>
-              </div>
-            ) : null}
           </div>
         </section>
       )}

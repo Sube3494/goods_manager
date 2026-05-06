@@ -204,6 +204,7 @@ model User {
   updatedAt          DateTime            @updatedAt
   shippingAddresses  Json?               @default("[]")
   brushShops         Json?               @default("[]")
+  brushCommissionBoostEnabled Boolean     @default(false)
   roleProfileId      String?
   brushOrders        BrushOrder[]
   brushOrderPlans    BrushOrderPlan[]
@@ -340,10 +341,6 @@ model SystemSetting {
   webdavUser             String?
   webdavPassword         String?
   webdavPath             String?
-  brushCommissionBoostEnabled Boolean @default(false)
-  brushCommissionRateMeituan  Float   @default(0.06)
-  brushCommissionRateTaobao   Float   @default(0.06)
-  brushCommissionRateJingdong Float   @default(0.06)
   lastBackup             DateTime?
   updatedAt              DateTime  @updatedAt
   userId                 String?

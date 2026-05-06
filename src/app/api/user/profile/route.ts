@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { SessionUser } from "@/lib/permissions";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 import { canGeocodeAddress, geocodeAddress } from "@/lib/addressGeocode";
 import { buildAddressDisplay, getAddressDetail, normalizeAddressItemParts } from "@/lib/addressBook";
 
@@ -26,7 +26,7 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { name, shippingAddresses, brushShops } = body;
+    const { name, shippingAddresses, brushShops, brushCommissionBoostEnabled } = body;
     let normalizedShippingAddresses = shippingAddresses;
 
     if (Array.isArray(shippingAddresses)) {
@@ -72,12 +72,15 @@ export async function PATCH(req: Request) {
       }
     }
 
+    const canUseBrushSimulation = hasPermission(session, "brush:simulate");
+
     const updatedUser = await prisma.user.update({
       where: { id: session.id },
       data: { 
         name: name || undefined,
         shippingAddresses: normalizedShippingAddresses !== undefined ? normalizedShippingAddresses : undefined,
-        brushShops: brushShops !== undefined ? brushShops : undefined
+        brushShops: brushShops !== undefined ? brushShops : undefined,
+        brushCommissionBoostEnabled: canUseBrushSimulation && typeof brushCommissionBoostEnabled === "boolean" ? brushCommissionBoostEnabled : undefined,
       }
     });
 

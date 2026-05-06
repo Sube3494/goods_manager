@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from '@/lib/storage';
 import { parseAsShanghaiTime } from '@/lib/dateUtils';
+import { hasPermission } from '@/lib/permissions';
 
 export async function GET(req: NextRequest) {
   const session = await getAuthorizedUser("brush:manage");
@@ -15,7 +16,8 @@ export async function GET(req: NextRequest) {
   const skip = (page - 1) * limit;
 
   try {
-    const [orders, total, displaySettings] = await Promise.all([
+    const canUseBrushSimulation = hasPermission(session, "brush:simulate");
+    const [orders, total, profile] = await Promise.all([
       prisma.brushOrder.findMany({
         where: { userId: session.id },
         skip,
@@ -32,14 +34,9 @@ export async function GET(req: NextRequest) {
       prisma.brushOrder.count({
         where: { userId: session.id }
       }),
-      prisma.systemSetting.findUnique({
-        where: { id: "system" },
-        select: {
-          brushCommissionBoostEnabled: true,
-          brushCommissionRateMeituan: true,
-          brushCommissionRateTaobao: true,
-          brushCommissionRateJingdong: true,
-        },
+      prisma.user.findUnique({
+        where: { id: session.id },
+        select: { brushCommissionBoostEnabled: true },
       }),
     ]);
 
@@ -58,10 +55,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       data: resolvedOrders,
       displaySettings: {
-        brushCommissionBoostEnabled: displaySettings?.brushCommissionBoostEnabled ?? false,
-        brushCommissionRateMeituan: displaySettings?.brushCommissionRateMeituan ?? 0.06,
-        brushCommissionRateTaobao: displaySettings?.brushCommissionRateTaobao ?? 0.06,
-        brushCommissionRateJingdong: displaySettings?.brushCommissionRateJingdong ?? 0.06,
+        brushCommissionBoostEnabled: canUseBrushSimulation && (profile?.brushCommissionBoostEnabled ?? false),
       },
       meta: {
         total,

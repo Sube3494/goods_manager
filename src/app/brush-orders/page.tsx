@@ -24,9 +24,6 @@ import { SessionUser } from "@/lib/permissions";
 
 type BrushDisplaySettings = {
   brushCommissionBoostEnabled: boolean;
-  brushCommissionRateMeituan: number;
-  brushCommissionRateTaobao: number;
-  brushCommissionRateJingdong: number;
 };
 
 function normalizeDisplayRate(value: number | null | undefined) {
@@ -37,10 +34,10 @@ function normalizeDisplayRate(value: number | null | undefined) {
   return numeric;
 }
 
-function resolvePlatformFeeRate(type: string, settings: BrushDisplaySettings) {
-  if (type.includes("美团")) return normalizeDisplayRate(settings.brushCommissionRateMeituan);
-  if (type.includes("淘宝")) return normalizeDisplayRate(settings.brushCommissionRateTaobao);
-  if (type.includes("京东")) return normalizeDisplayRate(settings.brushCommissionRateJingdong);
+function resolvePlatformFeeRate(type: string) {
+  if (type.includes("美团")) return normalizeDisplayRate(0.06);
+  if (type.includes("淘宝")) return normalizeDisplayRate(0.06);
+  if (type.includes("京东")) return normalizeDisplayRate(0.06);
   return 0.06;
 }
 
@@ -54,7 +51,7 @@ function getDisplayedMetrics(order: BrushOrder, settings: BrushDisplaySettings, 
     };
   }
 
-  const rate = resolvePlatformFeeRate(order.type, settings);
+  const rate = resolvePlatformFeeRate(order.type);
   const baseReceived = order.receivedAmount + order.commission + Math.max(0, order.paymentAmount - order.receivedAmount);
   const simulatedPayment = rate > 0 && rate < 1 ? baseReceived / (1 - rate) : baseReceived;
   const simulatedPlatformFee = Math.max(0, simulatedPayment - baseReceived);
@@ -71,6 +68,7 @@ export default function BrushOrdersPage() {
   const { user } = useUser();
   const typedUser = user as unknown as UserType;
   const canBrush = hasPermission(user as SessionUser | null, "brush:manage");
+  const canUseBrushSimulation = hasPermission(user as SessionUser | null, "brush:simulate");
   const [orders, setOrders] = useState<BrushOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<BrushOrder | null>(null);
@@ -99,9 +97,6 @@ export default function BrushOrdersPage() {
   const [selectedShop, setSelectedShop] = useState("全部");
   const [displaySettings, setDisplaySettings] = useState<BrushDisplaySettings>({
     brushCommissionBoostEnabled: false,
-    brushCommissionRateMeituan: 0.06,
-    brushCommissionRateTaobao: 0.06,
-    brushCommissionRateJingdong: 0.06,
   });
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<string[]>([]);
@@ -133,7 +128,7 @@ export default function BrushOrdersPage() {
   };
 
   const hasActiveFilters = searchQuery !== "" || selectedType !== "全部" || selectedShop !== "全部" || startDate !== "" || endDate !== "";
-  const showSimulatedValues = Boolean(displaySettings.brushCommissionBoostEnabled);
+  const showSimulatedValues = canUseBrushSimulation && Boolean(displaySettings.brushCommissionBoostEnabled);
 
   const resetFilters = () => {
     setSearchQuery("");

@@ -47,6 +47,7 @@ export interface User {
   shippingAddresses?: AddressItem[];
   shippingAddress?: string | null;
   brushShops?: BrushShopItem[];
+  brushCommissionBoostEnabled?: boolean;
   role: string;
   status: string;
 }

@@ -26,6 +26,7 @@ interface User {
   role: string;
   hasPassword?: boolean;
   brushShops?: BrushShopItem[];
+  brushCommissionBoostEnabled?: boolean;
   shippingAddresses?: AddressItem[];
   roleProfile?: {
     id: string;

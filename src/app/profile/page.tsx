@@ -19,19 +19,23 @@ import {
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/components/ui/Toast";
+import { Switch } from "@/components/ui/Switch";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import md5 from "blueimp-md5";
 import { User as UserType, AddressItem } from "@/lib/types";
 import { buildAddressDisplay, normalizeAddressItemParts } from "@/lib/addressBook";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
   const typedUser = user as unknown as UserType;
   const { showToast } = useToast();
+  const canUseBrushSimulation = hasPermission(user as SessionUser | null, "brush:simulate");
   const [name, setName] = useState("");
   const [addressList, setAddressList] = useState<AddressItem[]>([]);
+  const [brushCommissionBoostEnabled, setBrushCommissionBoostEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -46,10 +50,16 @@ export default function ProfilePage() {
   const lastSavedSnapshotRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const buildProfileSnapshot = (nextName: string, nextAddressList: AddressItem[]) =>
+  const buildProfileSnapshot = (
+    nextName: string,
+    nextAddressList: AddressItem[],
+    nextBrushCommissionBoostEnabled: boolean,
+    nextCanUseBrushSimulation: boolean
+  ) =>
     JSON.stringify({
       name: nextName,
       shippingAddresses: nextAddressList,
+      ...(nextCanUseBrushSimulation ? { brushCommissionBoostEnabled: nextBrushCommissionBoostEnabled } : {}),
     });
 
   useEffect(() => {
@@ -81,13 +91,15 @@ export default function ProfilePage() {
       ];
     }
     setAddressList(nextAddressList);
+    const nextBrushCommissionBoostEnabled = canUseBrushSimulation && Boolean(typedUser.brushCommissionBoostEnabled);
+    setBrushCommissionBoostEnabled(nextBrushCommissionBoostEnabled);
     setExpandedAddressId((current) => current && nextAddressList.some((item) => item.id === current) ? current : null);
-    lastSavedSnapshotRef.current = buildProfileSnapshot(nextName, nextAddressList);
+    lastSavedSnapshotRef.current = buildProfileSnapshot(nextName, nextAddressList, nextBrushCommissionBoostEnabled, canUseBrushSimulation);
     initializedRef.current = true;
     setSaveState("idle");
-  }, [typedUser?.name, typedUser?.shippingAddress, typedUser?.shippingAddresses]);
+  }, [typedUser?.name, typedUser?.shippingAddress, typedUser?.shippingAddresses, typedUser?.brushCommissionBoostEnabled]);
 
-  const saveProfile = async (nextName: string, nextAddressList: AddressItem[], silent = true) => {
+  const saveProfile = async (nextName: string, nextAddressList: AddressItem[], nextBrushCommissionBoostEnabled: boolean, silent = true) => {
     const missingLabel = nextAddressList.find((item) => !String(item.label || "").trim());
     if (missingLabel) {
       setSaveState("invalid");
@@ -106,7 +118,7 @@ export default function ProfilePage() {
       return false;
     }
 
-    const snapshot = buildProfileSnapshot(nextName, nextAddressList);
+    const snapshot = buildProfileSnapshot(nextName, nextAddressList, nextBrushCommissionBoostEnabled, canUseBrushSimulation);
     if (snapshot === lastSavedSnapshotRef.current) {
       setSaveState("saved");
       return true;
@@ -121,6 +133,7 @@ export default function ProfilePage() {
         body: JSON.stringify({
           name: nextName,
           shippingAddresses: nextAddressList,
+          ...(canUseBrushSimulation ? { brushCommissionBoostEnabled: nextBrushCommissionBoostEnabled } : {}),
         }),
       });
 
@@ -148,7 +161,7 @@ export default function ProfilePage() {
       return;
     }
 
-    const snapshot = buildProfileSnapshot(name, addressList);
+    const snapshot = buildProfileSnapshot(name, addressList, brushCommissionBoostEnabled, canUseBrushSimulation);
     if (snapshot === lastSavedSnapshotRef.current) {
       setSaveState("saved");
       return;
@@ -159,7 +172,7 @@ export default function ProfilePage() {
     }
 
     saveTimerRef.current = setTimeout(() => {
-      void saveProfile(name, addressList, true);
+      void saveProfile(name, addressList, brushCommissionBoostEnabled, true);
     }, 900);
 
     return () => {
@@ -167,7 +180,7 @@ export default function ProfilePage() {
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [name, addressList]);
+  }, [name, addressList, brushCommissionBoostEnabled]);
 
   const getPasswordStrength = (value: string) => {
     if (!value) {
@@ -380,6 +393,21 @@ export default function ProfilePage() {
                 />
                 <p className="text-[11px] text-muted-foreground/65">邮箱是账号唯一标识，不支持在这里手动修改。</p>
               </div>
+
+              {canUseBrushSimulation ? (
+              <div className="flex items-start justify-between gap-4 rounded-2xl border border-border/60 bg-white/78 px-4 py-4 shadow-sm dark:bg-white/[0.05]">
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-foreground">刷单模拟显示</div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/70">只影响你自己在刷单页看到的实付和到手模拟值，不会改动订单里的原始金额。</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className={`text-xs font-bold ${brushCommissionBoostEnabled ? "text-emerald-500" : "text-muted-foreground"}`}>
+                    {brushCommissionBoostEnabled ? "已开启" : "已关闭"}
+                  </span>
+                  <Switch checked={brushCommissionBoostEnabled} onChange={setBrushCommissionBoostEnabled} />
+                </div>
+              </div>
+              ) : null}
             </div>
           </motion.section>
 
