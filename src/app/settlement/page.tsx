@@ -37,6 +37,12 @@ interface ShopGroup {
   hasData: boolean;
 }
 
+interface BrushSummaryItem {
+  shopName: string;
+  platformName: string;
+  amount: number;
+}
+
 const DEFAULT_PLATFORMS = ["美团闪购", "京东秒送", "淘宝闪购"];
 const money = (value: number) => `¥${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -171,6 +177,51 @@ export default function SettlementPage() {
     });
   }, [shops, activeShop, editId]);
 
+  useEffect(() => {
+    if (!businessMonth || shops.length === 0) return;
+
+    let cancelled = false;
+
+    const fetchBrushSummary = async () => {
+      try {
+        const response = await fetch(`/api/settlements/brush-summary?month=${businessMonth}`);
+        if (!response.ok) {
+          throw new Error("获取刷单到手汇总失败");
+        }
+
+        const data: { simulated?: boolean; data?: BrushSummaryItem[] } = await response.json();
+        if (cancelled) return;
+
+        const totals = new Map<string, number>();
+        for (const item of data.data || []) {
+          totals.set(`${item.shopName}__${item.platformName}`, item.amount || 0);
+        }
+
+        const applyBrushSummary = (list: PlatformData[]) =>
+          list.map((entry) => ({
+            ...entry,
+            brushing: totals.get(`${entry.shopName}__${entry.platformName}`) ?? 0,
+          }));
+
+        setEntries((prev) => applyBrushSummary(prev));
+        if (editId) {
+          setOriginalData((prev) => (prev ? { ...prev, entries: applyBrushSummary(prev.entries) } : prev));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error);
+          showToast("刷单到手自动获取失败，请稍后重试", "error");
+        }
+      }
+    };
+
+    fetchBrushSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [businessMonth, shops, showToast]);
+
   // 结算计算引擎
   const groups = useMemo<ShopGroup[]>(() => {
     return shops.map((shop: { label: string; serviceFeeRate?: number }) => {
@@ -255,7 +306,7 @@ export default function SettlementPage() {
 
   const activeGroup = groups.find((g) => g.shopName === activeShop);
 
-  const handleInputChange = (id: string, field: "received" | "brushing" | "receivedToCard", value: string) => {
+  const handleInputChange = (id: string, field: "received" | "receivedToCard", value: string) => {
     const numeric = Number.parseFloat(value) || 0;
     setEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, [field]: numeric } : entry)));
   };
@@ -316,7 +367,7 @@ export default function SettlementPage() {
         router.push("/settlement/history");
       } else {
         router.refresh();
-        setEntries((prev) => prev.map((entry) => (entry.shopName === activeShop ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } : entry)));
+        setEntries((prev) => prev.map((entry) => (entry.shopName === activeShop ? { ...entry, received: 0, receivedToCard: 0 } : entry)));
         setNote("");
       }
     } catch (error) {
@@ -500,7 +551,7 @@ export default function SettlementPage() {
                     setIsConfirmResetOpen(false);
                     setEntries((prev) => prev.map((entry) => 
                       entry.shopName === activeShop 
-                        ? { ...entry, received: 0, brushing: 0, receivedToCard: 0 } 
+                        ? { ...entry, received: 0, receivedToCard: 0 } 
                         : entry
                     ));
                     setNote("");
@@ -620,11 +671,11 @@ export default function SettlementPage() {
                           <input type="number" step="0.01" value={entry.received || ""} onChange={(e) => handleInputChange(entry.id, "received", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right text-base font-bold text-foreground transition-colors hover:bg-muted/30 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
                         </div>
                       </div>
-                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">刷单到手</label>
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">刷单到手(自动)</label>
                         <div className="relative w-full">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium group-focus-within:text-rose-500 transition-colors">¥</span>
-                          <input type="number" step="0.01" value={entry.brushing || ""} onChange={(e) => handleInputChange(entry.id, "brushing", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right text-base font-bold text-foreground transition-colors hover:bg-muted/30 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-rose-500/70 font-medium">¥</span>
+                          <input type="number" step="0.01" value={entry.brushing || ""} readOnly placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl border border-rose-500/10 bg-rose-500/[0.06] pl-8 pr-3 text-right text-base font-bold text-foreground outline-none" />
                         </div>
                       </div>
                       <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
