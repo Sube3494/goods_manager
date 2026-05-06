@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
-import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard, Upload } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard, Upload, CircleHelp } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -16,6 +16,7 @@ import { cn, copyToClipboard } from "@/lib/utils";
 import { detectClientPlatform, inferFileExtensionFromUrl, triggerBrowserDownload, triggerFetchedBlobDownload, triggerIOSMediaShare } from "@/lib/download";
 import Image from "next/image";
 import { GestureImage } from "@/components/ui/GestureImage";
+import { ProductFaqPanel } from "@/components/Gallery/ProductFaqPanel";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { Product, GalleryItem, Category, GalleryGroupSummary } from "@/lib/types";
@@ -192,7 +193,7 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMe
 };
 
 function GalleryContent() {
-  const { user } = useUser();
+  const { user, isLoading: isUserLoading } = useUser();
   const isAdmin = !!user;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -269,6 +270,39 @@ function GalleryContent() {
   const { showToast } = useToast();
   
   // 基础权限检查，不再用于隐藏按钮，仅用于业务逻辑拦截
+
+  const canAccessGalleryFaq = useCallback(() => {
+    const sessionUser = user as SessionUser | null;
+    return !!sessionUser && (
+      sessionUser.role === "SUPER_ADMIN" ||
+      hasPermission(sessionUser, "gallery:upload") ||
+      hasPermission(sessionUser, "gallery:download") ||
+      hasPermission(sessionUser, "gallery:share") ||
+      hasPermission(sessionUser, "gallery:copy")
+    );
+  }, [user]);
+
+  const openFaqModal = useCallback(() => {
+    if (!user) {
+      setConfirmConfig({
+        isOpen: true,
+        title: "请登录后继续",
+        message: "常见问题需要登录后查看。",
+        mode: "login",
+        onConfirm: () => {
+          window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+        },
+      });
+      return;
+    }
+
+    if (!canAccessGalleryFaq()) {
+      showToast("当前账号还没有查看常见问题的权限", "error");
+      return;
+    }
+
+    setIsFaqModalOpen(true);
+  }, [canAccessGalleryFaq, showToast, user]);
 
   // 统一权限拦截与游客引导逻辑
   const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:copy", action: () => void) => {
@@ -429,6 +463,7 @@ function GalleryContent() {
   
   // Upload States
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
   // 修改 isUploading 为 string | boolean 以便呈现进度
   const [isUploading, setIsUploading] = useState<boolean | string>(false);
@@ -581,7 +616,7 @@ function GalleryContent() {
 
 
   useEffect(() => {
-    if (selectedImage || isUploadModalOpen) {
+    if (selectedImage || isUploadModalOpen || isFaqModalOpen) {
       document.body.style.overflow = 'hidden';
       document.body.style.overscrollBehavior = 'none';
     } else {
@@ -592,7 +627,7 @@ function GalleryContent() {
       document.body.style.overflow = 'unset';
       document.body.style.overscrollBehavior = 'unset';
     };
-  }, [selectedImage, isUploadModalOpen]);
+  }, [selectedImage, isUploadModalOpen, isFaqModalOpen]);
 
   const processUploadFiles = useCallback(async (incomingFiles: File[] | FileList) => {
     const filesArray = Array.from(incomingFiles);
@@ -1029,15 +1064,26 @@ function GalleryContent() {
         {/* Header section with unified style */}
         <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-4xl sm:text-4xl font-bold tracking-tight text-foreground truncate">实物<span className="text-primary">相册</span></h1>
+            <div className="flex min-w-0 items-center gap-3">
+              <h1 className="text-4xl sm:text-4xl font-bold leading-none tracking-tight text-foreground truncate">实物<span className="text-primary">相册</span></h1>
+              <button
+                type="button"
+                onClick={openFaqModal}
+                className="inline-flex h-9 w-9 sm:w-auto shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-white px-0 sm:px-3 text-sm font-bold leading-none text-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary hover:text-primary-foreground active:scale-95 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
+                title="常见问题解答"
+              >
+                <CircleHelp size={17} />
+                <span className="hidden sm:inline">常见问题</span>
+              </button>
+            </div>
             <p className="block text-muted-foreground mt-1 sm:mt-2 text-[10px] sm:text-lg truncate max-w-2xl opacity-80">
-                {user ? (isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示") : "登录可探索更多实拍详情与下载功能"}
+                {isUserLoading ? "商品实拍图与细节展示" : user ? (isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示") : "登录可探索更多实拍详情与下载功能"}
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0 -translate-y-1">
             {/* Developer & Contributors Avatar Group - Capsule Styled */}
-            {(user === null || user.roleProfile?.name === "基础访客") && (
+            {(!isUserLoading && (user === null || user.roleProfile?.name === "基础访客")) && (
               <div 
                 className={cn(
                     "flex items-center gap-3 px-4 py-2 rounded-full bg-white dark:bg-white/5 border transition-all shadow-sm",
@@ -1333,6 +1379,49 @@ function GalleryContent() {
                     </button>
                 )}
             </div>
+        )}
+
+        {/* Product FAQ Modal */}
+        {mounted && createPortal(
+            <AnimatePresence>
+                {isFaqModalOpen && (
+                    <div className="fixed inset-0 z-50000 flex items-end justify-center p-3 safe-y safe-x sm:items-center sm:p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.1 }}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm touch-none overscroll-none"
+                            onClick={() => setIsFaqModalOpen(false)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.98, y: 12 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.98, y: 12 }}
+                            transition={{ duration: 0.15 }}
+                            className="relative z-10 flex max-h-[calc(100dvh-24px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-2xl dark:border-white/10 dark:bg-[#0b111e]"
+                        >
+                            <div className="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3 dark:border-white/10 sm:px-6 sm:py-4">
+                                <div className="flex items-center gap-2 font-black text-foreground">
+                                    <CircleHelp size={19} />
+                                    常见问题
+                                </div>
+                                <button
+                                    onClick={() => setIsFaqModalOpen(false)}
+                                    className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                                    title="关闭"
+                                >
+                                    <X size={19} />
+                                </button>
+                            </div>
+                            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                                <ProductFaqPanel showBackLink={false} compactHeader />
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>,
+            document.body
         )}
 
         {/* Upload Modal */}

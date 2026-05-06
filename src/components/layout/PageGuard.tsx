@@ -5,7 +5,7 @@ import { useUser } from "@/hooks/useUser";
 import { navItems } from "@/lib/navigation";
 import { canAccessPath, getDefaultAuthorizedPath, hasPermission, SessionUser } from "@/lib/permissions";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, LogOut, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Home, Loader2, LogIn, LogOut, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
@@ -19,8 +19,13 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
 
   const isAuthorized = useMemo(() => {
     // 1. Instant allow for public entry points to prevent flickering while loading user session
-    const publicPaths = ["/login", "/gallery", "/media", "/brush-plans/share"];
-    const isPublicPath = publicPaths.some(p => pathname === p || pathname.startsWith(p + "/"));
+    const isPublicPath =
+      pathname === "/login" ||
+      pathname === "/gallery" ||
+      pathname === "/media" ||
+      pathname.startsWith("/media/") ||
+      pathname === "/brush-plans/share" ||
+      pathname.startsWith("/brush-plans/share/");
     const isStaticFile = pathname.endsWith('.txt');
 
     if (isPublicPath || isStaticFile) {
@@ -102,30 +107,39 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthorized) {
+    const pageName = currentNavItem?.name || "当前页面";
+
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60dvh] p-8 text-center animate-in fade-in zoom-in duration-500">
-        <div className="h-20 w-20 rounded-3xl bg-red-500/10 flex items-center justify-center mb-6 border border-red-500/20">
-          <ShieldAlert size={40} className="text-red-500" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2">{isLoginRequired ? "请先登录" : "访问受限"}</h1>
-        <p className="text-muted-foreground max-w-md mb-8">
-          {isLoginRequired
-            ? `当前页面${currentNavItem ? `“${currentNavItem.name}”` : ""}需要先开通账号后才能访问。请先添加管理员微信 Sube3494 审核，审核通过后登录，系统会自动返回当前页面。`
-            : currentNavItem
-            ? `当前账号尚未获得“${currentNavItem.name}”的访问许可。${currentNavItem.description || "如需开通，请添加管理员微信 Sube3494 审核。"}`
-            : "抱歉，您的账号尚未获得进入该区域的许可。如需开通，请添加管理员微信 Sube3494 审核。"}
-        </p>
+      <div className="flex min-h-[68dvh] items-center justify-center p-4 text-center animate-in fade-in zoom-in duration-500 sm:p-8">
+        <div className="w-full max-w-xl rounded-[28px] border border-border/80 bg-white/75 p-6 shadow-2xl shadow-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-white/5 sm:p-8">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-border bg-background text-foreground shadow-sm dark:border-white/10">
+            {isLoginRequired ? <LogIn size={30} /> : <ShieldAlert size={30} className="text-red-500" />}
+          </div>
+          <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+            {isLoginRequired ? "登录后继续" : "当前账号暂无权限"}
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">
+            {isLoginRequired
+              ? `“${pageName}”需要登录后访问。登录成功后会自动回到这里。`
+              : currentNavItem
+              ? `当前账号尚未开通“${currentNavItem.name}”。${currentNavItem.description || "如需开通，请联系管理员。"}`
+              : "当前账号尚未获得进入该区域的许可。"}
+          </p>
+          <p className="mx-auto mt-3 max-w-md rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-xs font-bold text-muted-foreground dark:border-white/10 dark:bg-black/10">
+            需要开通账号或权限，请添加管理员微信 Sube3494 审核。
+          </p>
         {user && (
-          <p className="mb-6 rounded-full border border-border/70 bg-background/60 px-4 py-2 text-sm text-muted-foreground">
+          <p className="mx-auto mt-4 w-fit rounded-full border border-border/70 bg-background/60 px-4 py-2 text-sm text-muted-foreground">
             当前账号：{user.email}
           </p>
         )}
-        <div className="flex flex-wrap items-center justify-center gap-4">
+        <div className="mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
             {isLoginRequired && (
               <Link
                 href={loginHref}
-                className="px-6 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-6 font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:opacity-90 active:scale-95"
               >
+                <LogIn size={17} />
                 去登录
               </Link>
             )}
@@ -133,7 +147,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => setIsLogoutModalOpen(true)}
                 disabled={isLoggingOut}
-                className="px-6 h-11 rounded-full border border-border bg-background/70 hover:bg-white/5 transition-all active:scale-95 inline-flex items-center justify-center gap-2 disabled:opacity-70"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/70 px-6 font-bold transition-all hover:bg-black/5 active:scale-95 disabled:opacity-70 dark:hover:bg-white/5"
               >
                 {isLoggingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
                 切换账号
@@ -141,16 +155,19 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
             )}
             <button 
                 onClick={() => router.back()}
-                className="px-6 h-11 rounded-full border border-border hover:bg-white/5 transition-all active:scale-95"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border px-6 font-bold transition-all hover:bg-black/5 active:scale-95 dark:hover:bg-white/5"
             >
+                <ArrowLeft size={17} />
                 返回上页
             </button>
             <Link 
                 href={fallbackHref}
-                className="px-6 h-11 rounded-full border border-border bg-background/70 hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/70 px-6 font-bold transition-all hover:bg-black/5 active:scale-95 dark:hover:bg-white/5"
             >
+                <Home size={17} />
                 回到可访问页面
             </Link>
+        </div>
         </div>
         <ConfirmModal
           isOpen={isLogoutModalOpen}
