@@ -100,41 +100,59 @@ export default function ProfilePage() {
   }, [typedUser?.name, typedUser?.shippingAddress, typedUser?.shippingAddresses, typedUser?.brushCommissionBoostEnabled]);
 
   const saveProfile = async (nextName: string, nextAddressList: AddressItem[], nextBrushCommissionBoostEnabled: boolean, silent = true) => {
-    const missingLabel = nextAddressList.find((item) => !String(item.label || "").trim());
-    if (missingLabel) {
-      setSaveState("invalid");
-      if (!silent) {
-        showToast("有门店缺少门店简称", "error");
-      }
-      return false;
-    }
-
-    const missingAddress = nextAddressList.find((item) => !String(item.detailAddress || "").trim());
-    if (missingAddress) {
-      setSaveState("invalid");
-      if (!silent) {
-        showToast("有门店缺少详细地址", "error");
-      }
-      return false;
-    }
-
     const snapshot = buildProfileSnapshot(nextName, nextAddressList, nextBrushCommissionBoostEnabled, canUseBrushSimulation);
     if (snapshot === lastSavedSnapshotRef.current) {
       setSaveState("saved");
       return true;
     }
 
+    const lastSaved = JSON.parse(lastSavedSnapshotRef.current || "{}") as {
+      name?: string;
+      shippingAddresses?: AddressItem[];
+      brushCommissionBoostEnabled?: boolean;
+    };
+    const hasNameChanged = nextName !== (lastSaved.name || "");
+    const hasAddressesChanged = JSON.stringify(nextAddressList) !== JSON.stringify(lastSaved.shippingAddresses || []);
+    const hasBrushSimulationChanged = nextBrushCommissionBoostEnabled !== Boolean(lastSaved.brushCommissionBoostEnabled);
+
+    if (hasAddressesChanged) {
+      const missingLabel = nextAddressList.find((item) => !String(item.label || "").trim());
+      if (missingLabel) {
+        setSaveState("invalid");
+        if (!silent) {
+          showToast("有门店缺少门店简称", "error");
+        }
+        return false;
+      }
+
+      const missingAddress = nextAddressList.find((item) => !String(item.detailAddress || "").trim());
+      if (missingAddress) {
+        setSaveState("invalid");
+        if (!silent) {
+          showToast("有门店缺少详细地址", "error");
+        }
+        return false;
+      }
+    }
+
     setSaveState("saving");
     setIsSaving(true);
     try {
+      const payload: Record<string, unknown> = {};
+      if (hasNameChanged) {
+        payload.name = nextName;
+      }
+      if (hasAddressesChanged) {
+        payload.shippingAddresses = nextAddressList;
+      }
+      if (canUseBrushSimulation && hasBrushSimulationChanged) {
+        payload.brushCommissionBoostEnabled = nextBrushCommissionBoostEnabled;
+      }
+
       const res = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nextName,
-          shippingAddresses: nextAddressList,
-          ...(canUseBrushSimulation ? { brushCommissionBoostEnabled: nextBrushCommissionBoostEnabled } : {}),
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {

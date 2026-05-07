@@ -343,6 +343,7 @@ export interface GalleryGroupSummary {
   totalCount: number;
   imageCount: number;
   videoCount: number;
+  tags?: string[];
 }
 
 export interface RecentInboundItem {

@@ -844,7 +844,17 @@ function PurchasesContent() {
                <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
             </div>
           ) : paginatedPurchases.length > 0 ? (
-          <table className="w-full text-left border-collapse min-w-200 table-auto">
+          <table className="w-full min-w-[1120px] table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[44px]" />
+              <col className="w-[58px]" />
+              <col className="w-[130px]" />
+              <col className="w-[330px]" />
+              <col className="w-[135px]" />
+              <col className="w-[120px]" />
+              <col className="w-[190px]" />
+              <col className="w-[113px]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="w-[44px] px-1 py-3 text-center align-middle lg:w-[52px] lg:px-0">
@@ -873,12 +883,12 @@ function PurchasesContent() {
                 <th className="w-[52px] px-1 py-3 text-xs font-bold text-foreground text-center whitespace-nowrap align-middle lg:w-[64px] lg:px-0">
                   <div className="flex justify-center">序号</div>
                 </th>
-                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">归属店铺</th>
-                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">商品与数量</th>
-                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">交易金额</th>
-                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">状态</th>
-                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">下单时间</th>
-                <th className="px-3 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap lg:px-6">操作</th>
+                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">归属店铺</th>
+                <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">商品与数量</th>
+                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">交易金额</th>
+                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">状态</th>
+                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">下单时间</th>
+                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -920,23 +930,23 @@ function PurchasesContent() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center lg:px-6">
+                    <td className="px-4 py-4 text-center">
                       {po.shopName ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/5 text-primary text-[10px] font-bold border border-primary/10">
+                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1 text-[10px] font-bold text-primary">
                               <Store size={10} />
-                              {po.shopName}
+                              <span className="truncate">{po.shopName}</span>
                           </span>
                       ) : <span className="text-[10px] text-muted-foreground/30 italic">未归属</span>}
                     </td>
-                    <td className="px-3 py-4 text-sm text-center lg:px-6">
+                    <td className="px-5 py-4 text-center text-sm">
                       {(() => {
                         const summary = formatPurchaseItemsSummary(po);
                         return (
-                          <div className="mx-auto flex max-w-[320px] flex-wrap justify-center gap-2">
+                          <div className="mx-auto flex max-w-[300px] flex-wrap justify-center gap-2">
                             {summary.items.length > 0 ? summary.items.map((item) => (
                               <div
                                 key={item.key}
-                                className="flex items-center gap-2 rounded-full border border-border/50 bg-secondary/30 p-0.5 pr-2.5 shadow-sm transition-all hover:border-primary/30 dark:bg-white/5 max-w-[200px]"
+                                className="flex min-w-0 max-w-[220px] items-center gap-2 rounded-full border border-border/50 bg-secondary/30 p-0.5 pr-2.5 shadow-sm transition-all hover:border-primary/30 dark:bg-white/5"
                                 title={item.name}
                               >
                                 <div className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
@@ -968,25 +978,25 @@ function PurchasesContent() {
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center lg:px-6">
+                    <td className="px-4 py-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center text-foreground font-bold">
                         <span className="mr-0.5 opacity-60">￥</span>
                         {po.totalAmount.toLocaleString()}
                       </div>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center lg:px-6">
+                    <td className="px-4 py-4 text-center whitespace-nowrap">
                       <PurchaseStatusBadge status={po.status} />
                     </td>
-                    <td className="px-3 py-4 text-sm text-muted-foreground whitespace-nowrap text-center lg:px-6">
-                      <div className="flex items-center justify-center gap-1.5 lg:gap-2">
+                    <td className="px-4 py-4 text-center text-sm text-muted-foreground whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2">
                           <Calendar size={14} />
                           <span className="font-mono">
                               {formatLocalDateTime(po.date)}
                           </span>
                       </div>
                     </td>
-                    <td className="px-3 py-4 text-center whitespace-nowrap lg:px-6">
-                      <div className="flex justify-center items-center gap-2 lg:gap-3">
+                    <td className="px-4 py-4 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-3">
                         {/* Unified Detail/Manage Button */}
                         <button 
                             onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
