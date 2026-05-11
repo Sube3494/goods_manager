@@ -903,7 +903,7 @@ function GalleryContent() {
 
           setSelectedImage(fallbackImage?.productId === currentProductId ? fallbackImage : null);
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-          invalidateProductMedia(currentProductId);
+          await refreshProductMedia(currentProductId);
           void fetchData(true);
           showToast("已删除当前实拍", "success");
         } catch (error) {
@@ -912,7 +912,7 @@ function GalleryContent() {
         }
       },
     });
-  }, [fetchData, invalidateProductMedia, relatedImages, selectedImage, showToast, user?.role]);
+  }, [fetchData, refreshProductMedia, relatedImages, selectedImage, showToast, user?.role]);
 
   const handleMoveCurrentMedia = useCallback(async (direction: -1 | 1) => {
     if (!selectedImage || !selectedImage.productId) return;
