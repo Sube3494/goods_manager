@@ -6,7 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Check,
+  Copy,
   CircleHelp,
+  Pencil,
   Loader2,
   MessageCircleQuestion,
   Package,
@@ -16,23 +18,40 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
+import { Product } from "@/lib/types";
 
-interface ProductFaqItem {
+interface FaqProduct {
+  id: string;
+  name: string;
+  sku?: string | null;
+  image?: string | null;
+  categoryName?: string;
+}
+
+interface FaqEntry {
   id: string;
   question: string;
   answer: string;
 }
 
-interface ProductFaqGroup {
-  productId: string;
-  productName: string;
-  sku?: string | null;
-  image?: string | null;
-  categoryName?: string;
-  faq: ProductFaqItem[];
+interface GalleryFaqItem {
+  id: string;
+  title: string;
+  entries: FaqEntry[];
+  productIds: string[];
+  products: FaqProduct[];
   canEdit: boolean;
+}
+
+interface FaqDraft {
+  id?: string;
+  title: string;
+  entries: FaqEntry[];
+  productIds: string[];
+  products: FaqProduct[];
 }
 
 interface ProductFaqPanelProps {
@@ -40,33 +59,68 @@ interface ProductFaqPanelProps {
   compactHeader?: boolean;
 }
 
-function createFaqItem(): ProductFaqItem {
+interface FlattenedFaqRow {
+  rowId: string;
+  parentId: string;
+  entry: FaqEntry;
+  productIds: string[];
+  products: FaqProduct[];
+  canEdit: boolean;
+}
+
+function createEntry(seed = 1): FaqEntry {
   return {
-    id: `faq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `entry-${Date.now()}-${seed}`,
     question: "",
     answer: "",
   };
 }
 
-function normalizeFaq(items: ProductFaqItem[]) {
-  return items
-    .map((item) => ({
-      ...item,
-      question: item.question.trim(),
-      answer: item.answer.trim(),
-    }))
-    .filter((item) => item.question || item.answer);
+function createDraft(): FaqDraft {
+  return {
+    entries: [createEntry()],
+    title: "",
+    productIds: [],
+    products: [],
+  };
+}
+
+function productToFaqProduct(product: Product): FaqProduct {
+  return {
+    id: product.id,
+    name: product.name,
+    sku: product.sku,
+    image: product.image,
+    categoryName: product.category?.name,
+  };
+}
+
+function toSingleEntryDraft(item: GalleryFaqItem, entryId?: string): FaqDraft {
+  const targetEntry = item.entries.find((entry) => entry.id === entryId) || item.entries[0] || createEntry();
+  return {
+    id: item.id,
+    title: "",
+    entries: [targetEntry],
+    productIds: item.productIds,
+    products: item.products,
+  };
+}
+
+function getItemTitle(item: Pick<GalleryFaqItem, "title" | "entries"> | Pick<FaqDraft, "title" | "entries">) {
+  return item.entries[0]?.question || item.title.trim() || "未命名问题";
 }
 
 export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: ProductFaqPanelProps) {
   const { showToast } = useToast();
-  const [items, setItems] = useState<ProductFaqGroup[]>([]);
+  const [items, setItems] = useState<GalleryFaqItem[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [canEditAny, setCanEditAny] = useState(false);
-  const [editing, setEditing] = useState<Record<string, ProductFaqItem[]>>({});
+  const [activeDraft, setActiveDraft] = useState<FaqDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -81,8 +135,6 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
       try {
         const params = new URLSearchParams();
         if (debouncedQuery) params.set("search", debouncedQuery);
-        params.set("includeEmpty", "true");
-        params.set("pageSize", "500");
 
         const res = await fetch(`/api/gallery/faq?${params.toString()}`, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load FAQ");
@@ -91,11 +143,10 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
         if (!ignore) {
           setItems(data.items || []);
           setCanEditAny(Boolean(data.canEditAny));
-          setEditing({});
         }
       } catch (error) {
         console.error(error);
-        if (!ignore) showToast("商品问答加载失败", "error");
+        if (!ignore) showToast("常见问题加载失败", "error");
       } finally {
         if (!ignore) setIsLoading(false);
       }
@@ -107,26 +158,111 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
     };
   }, [debouncedQuery, showToast]);
 
-  const stats = useMemo(() => {
-    const productCount = items.filter((item) => item.faq.length > 0).length;
-    const faqCount = items.reduce((sum, item) => sum + item.faq.length, 0);
-    return { productCount, faqCount };
-  }, [items]);
+  const selectedProductIds = activeDraft?.productIds || [];
 
-  const getDraft = (product: ProductFaqGroup) => editing[product.productId] ?? product.faq;
-  const setDraft = (productId: string, nextFaq: ProductFaqItem[]) => {
-    setEditing((prev) => ({ ...prev, [productId]: nextFaq }));
+  const updateDraft = (patch: Partial<FaqDraft>) => {
+    setActiveDraft((draft) => (draft ? { ...draft, ...patch } : draft));
   };
 
-  const handleSave = async (product: ProductFaqGroup) => {
-    const nextFaq = normalizeFaq(getDraft(product));
-    setSavingId(product.productId);
+  const updateEntry = (entryId: string, patch: Partial<FaqEntry>) => {
+    setActiveDraft((draft) => {
+      if (!draft) return draft;
+      return {
+        ...draft,
+        entries: draft.entries.map((entry) => (entry.id === entryId ? { ...entry, ...patch } : entry)),
+      };
+    });
+  };
+
+  const handleSelectProducts = (products: Product[]) => {
+    if (!activeDraft) return;
+
+    const nextProducts = [...activeDraft.products];
+    const nextIds = new Set(activeDraft.productIds);
+
+    for (const product of products) {
+      const id = product.id;
+      if (!id || nextIds.has(id)) continue;
+      nextIds.add(id);
+      nextProducts.push(productToFaqProduct(product));
+    }
+
+    updateDraft({
+      productIds: Array.from(nextIds),
+      products: nextProducts,
+    });
+  };
+
+  const removeProduct = (productId: string) => {
+    if (!activeDraft) return;
+    updateDraft({
+      productIds: activeDraft.productIds.filter((id) => id !== productId),
+      products: activeDraft.products.filter((product) => product.id !== productId),
+    });
+  };
+
+  const handleCopyAnswer = async (answer: string) => {
+    const text = answer.trim();
+    if (!text) {
+      showToast("当前还没有可复制的答案", "error");
+      return;
+    }
 
     try {
+      await navigator.clipboard.writeText(text);
+      showToast("答案已复制", "success");
+    } catch (error) {
+      console.error(error);
+      showToast("复制失败", "error");
+    }
+  };
+
+  const normalizedDraftEntries = useMemo(
+    () =>
+      (activeDraft?.entries || [])
+        .map((entry) => ({
+          ...entry,
+          question: entry.question.trim(),
+          answer: entry.answer.trim(),
+        }))
+        .filter((entry) => entry.question),
+    [activeDraft]
+  );
+
+  const flattenedRows = useMemo<FlattenedFaqRow[]>(
+    () =>
+      items.flatMap((item) =>
+        item.entries.map((entry, index) => ({
+          rowId: `${item.id}-${entry.id}`,
+          parentId: item.id,
+          entry,
+          productIds: item.productIds,
+          products: item.products,
+          canEdit: item.canEdit,
+        }))
+      ),
+    [items]
+  );
+
+  const handleSave = async () => {
+    if (!activeDraft) return;
+
+    if (normalizedDraftEntries.length === 0) {
+      showToast("请至少填写一个问题", "error");
+      return;
+    }
+
+    setSavingId(activeDraft.id || "new");
+    try {
       const res = await fetch("/api/gallery/faq", {
-        method: "PUT",
+        method: activeDraft.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: product.productId, faq: nextFaq }),
+        body: JSON.stringify({
+          id: activeDraft.id,
+          title: "",
+          entries: normalizedDraftEntries,
+          productIds: activeDraft.productIds,
+        }),
       });
 
       if (!res.ok) {
@@ -135,22 +271,43 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
       }
 
       const data = await res.json();
-      setItems((prev) => prev.map((item) => (
-        item.productId === product.productId
-          ? { ...item, faq: data.faq || nextFaq }
-          : item
-      )));
-      setEditing((prev) => {
-        const next = { ...prev };
-        delete next[product.productId];
-        return next;
+      const saved = data.item as GalleryFaqItem;
+      setItems((prev) => {
+        const exists = prev.some((item) => item.id === saved.id);
+        if (exists) {
+          return prev.map((item) => (item.id === saved.id ? saved : item));
+        }
+        return [saved, ...prev];
       });
-      showToast("商品问答已保存", "success");
+      setActiveDraft(null);
+      showToast("常见问题已保存", "success");
     } catch (error) {
       console.error(error);
       showToast(error instanceof Error ? error.message : "保存失败", "error");
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const handleDelete = async (item: GalleryFaqItem) => {
+    if (!window.confirm(`确定删除“${getItemTitle(item)}”吗？`)) return;
+
+    setDeletingId(item.id);
+    try {
+      const res = await fetch(`/api/gallery/faq?id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "删除失败");
+      }
+
+      setItems((prev) => prev.filter((current) => current.id !== item.id));
+      if (activeDraft?.id === item.id) setActiveDraft(null);
+      showToast("常见问题已删除", "success");
+    } catch (error) {
+      console.error(error);
+      showToast(error instanceof Error ? error.message : "删除失败", "error");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -161,183 +318,284 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
           {showBackLink && (
             <Link
               href="/gallery"
-              className="mb-5 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white px-4 text-sm font-bold text-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary hover:text-primary-foreground active:scale-95 dark:border-white/10 dark:bg-white/5"
+              className="mb-5 inline-flex h-10 items-center gap-2 rounded-full border border-border bg-white/90 px-4 text-sm font-bold text-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary hover:text-primary-foreground active:scale-95 dark:border-white/10 dark:bg-white/5"
             >
               <ArrowLeft size={17} />
               返回相册
             </Link>
           )}
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border bg-white text-foreground shadow-sm dark:border-white/10 dark:bg-white/5 sm:h-12 sm:w-12">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] text-foreground shadow-[0_12px_28px_rgba(15,23,42,0.16)] sm:h-12 sm:w-12">
               <MessageCircleQuestion size={23} />
             </div>
             <div className="min-w-0">
-              <h1 className={cn("truncate font-bold tracking-tight text-foreground", compactHeader ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl")}>商品<span className="text-primary">问答</span></h1>
-              <p className={cn("mt-1 truncate text-sm text-muted-foreground", !compactHeader && "md:text-lg")}>给每个商品维护可对外查看的常见问题</p>
+              <h1 className={cn("truncate font-semibold tracking-tight text-foreground", compactHeader ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl")}>常见<span className="text-primary">问题</span></h1>
+              <p className={cn("mt-1 truncate text-sm text-muted-foreground", !compactHeader && "md:text-lg")}>一个问题组里可以维护多个问题，再统一关联商品</p>
             </div>
           </div>
         </div>
-
-        <div className="grid w-full grid-cols-2 gap-2 xl:w-[342px]">
-          <div className="rounded-lg border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-4">
-            <div className="text-2xl font-black text-foreground">{stats.productCount}</div>
-            <div className="mt-1 text-xs font-bold text-muted-foreground">已维护商品</div>
-          </div>
-          <div className="rounded-lg border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-4">
-            <div className="text-2xl font-black text-foreground">{stats.faqCount}</div>
-            <div className="mt-1 text-xs font-bold text-muted-foreground">问答总数</div>
-          </div>
-        </div>
       </div>
 
-      <div className="flex h-11 items-center gap-3 rounded-full border border-border bg-white px-4 shadow-sm transition-all focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:bg-white/5">
-        <Search size={18} className="shrink-0 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索商品名、编号或拼音..."
-          className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-        />
-        {query && (
+      <div className="flex flex-col gap-3 md:flex-row">
+        <div className="flex h-11 flex-1 items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 shadow-[0_8px_24px_rgba(15,23,42,0.14)] transition-all focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20">
+          <Search size={18} className="shrink-0 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索标题、问题或答案..."
+            className="h-full min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+              title="清空搜索"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        {canEditAny && (
           <button
-            onClick={() => setQuery("")}
-            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
-            title="清空搜索"
+            onClick={() => setActiveDraft(createDraft())}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-sky-200/70 bg-[linear-gradient(135deg,rgba(248,250,252,1),rgba(224,242,254,0.98))] px-5 text-sm font-medium text-slate-950 shadow-[0_10px_28px_rgba(96,165,250,0.22)] transition-all hover:brightness-105 active:scale-95"
           >
-            <X size={15} />
+            <Plus size={17} />
+            新建问题
           </button>
         )}
       </div>
+
+      {activeDraft && (
+        <div
+          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 sm:p-6"
+          style={{ paddingLeft: "calc(var(--sidebar-width, 0px) + 1rem)" }}
+        >
+          <button
+            type="button"
+            aria-label="关闭编辑弹窗"
+            onClick={() => setActiveDraft(null)}
+            className="absolute inset-0 bg-[rgba(3,6,14,0.72)] backdrop-blur-md"
+          />
+          <section className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(9,14,24,0.985),rgba(11,17,28,0.975))] shadow-[0_28px_90px_rgba(2,6,23,0.52)]">
+            <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] bg-[linear-gradient(90deg,rgba(255,255,255,0.03),rgba(59,130,246,0.04),transparent_55%)] p-4 sm:p-5">
+              <div>
+                <div className="text-sm font-semibold text-foreground">{activeDraft.id ? "编辑问题" : "新建问题"}</div>
+                <p className="mt-1 text-xs text-muted-foreground">一条记录就是一问一答，直接关联对应商品。</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveDraft(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-white/8 hover:text-foreground"
+                title="关闭"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="custom-scrollbar space-y-4 overflow-y-auto p-4 sm:p-5">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="inline-flex items-center rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-sm font-medium text-sky-100">问题</div>
+                </div>
+                <input
+                  value={activeDraft.entries[0]?.question || ""}
+                  onChange={(event) => activeDraft.entries[0] && updateEntry(activeDraft.entries[0].id, { question: event.target.value })}
+                  placeholder="输入客户常问的问题..."
+                  className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-foreground outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20"
+                />
+                <textarea
+                  value={activeDraft.entries[0]?.answer || ""}
+                  onChange={(event) => activeDraft.entries[0] && updateEntry(activeDraft.entries[0].id, { answer: event.target.value })}
+                  placeholder="输入标准答案或处理建议..."
+                  rows={5}
+                  className="mt-3 w-full resize-y rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-foreground outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">关联商品</div>
+                    <div className="mt-1 text-xs text-muted-foreground">已选择 {activeDraft.productIds.length} 个商品</div>
+                  </div>
+                  <button
+                    onClick={() => setPickerOpen(true)}
+                    className="inline-flex h-8 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 text-sm font-medium transition-all hover:bg-white/10 active:scale-95"
+                  >
+                    <Plus size={16} />
+                    选择商品
+                  </button>
+                </div>
+
+                {activeDraft.products.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-muted-foreground">
+                    还没有关联商品，保存后也可以再补。
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {activeDraft.products.map((product) => (
+                      <div key={product.id} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 p-2">
+                        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                          {product.image ? (
+                            <Image src={product.image} alt={product.name} fill sizes="36px" className="object-cover" />
+                          ) : (
+                            <Package size={16} className="text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium text-foreground">{product.name}</div>
+                          <div className="truncate text-xs text-muted-foreground">{product.sku || product.categoryName || "未编号"}</div>
+                        </div>
+                        <button
+                          onClick={() => removeProduct(product.id)}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500"
+                          title="取消关联"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-white/[0.06] bg-[rgba(255,255,255,0.015)] p-4 sm:p-5">
+              <button
+                onClick={() => setActiveDraft(null)}
+                className="h-10 rounded-full border border-white/10 bg-white/6 px-4 text-sm font-medium transition-all hover:bg-white/10 active:scale-95"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={savingId !== null}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-sky-200/70 bg-[linear-gradient(135deg,rgba(248,250,252,1),rgba(224,242,254,0.98))] px-5 text-sm font-medium text-slate-950 transition-all hover:brightness-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingId ? <Loader2 size={16} className="animate-spin" /> : activeDraft.id ? <Save size={16} /> : <Check size={16} />}
+                保存问题
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
           <Loader2 size={24} className="animate-spin" />
         </div>
       ) : items.length === 0 ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-white/50 p-8 text-center dark:border-white/10 dark:bg-white/5">
+        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
           <CircleHelp size={34} className="mb-3 text-muted-foreground" />
-          <h2 className="text-lg font-black text-foreground">还没有商品问答</h2>
+          <h2 className="text-lg font-semibold text-foreground">还没有常见问题</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-            {canEditAny ? "换个关键词搜索商品，然后添加问题和答案。" : "当前还没有公开的商品问答。"}
+            {canEditAny ? "点击“新建问题”，按一问一答的方式逐条维护，再关联商品。" : "当前还没有公开的常见问题。"}
           </p>
         </div>
       ) : (
         <div className="grid min-w-0 gap-4">
-          {items.map((product) => {
-            const draft = getDraft(product);
-            const isDirty = Boolean(editing[product.productId]);
-            const isSaving = savingId === product.productId;
-            const visibleFaq = product.canEdit ? draft : product.faq;
-
-            if (!product.canEdit && product.faq.length === 0) return null;
-
+          {flattenedRows.map((row) => {
             return (
               <section
-                key={product.productId}
-                className={cn(
-                  "min-w-0 overflow-hidden rounded-lg border border-border bg-white/85 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-4",
-                  isDirty && "ring-2 ring-primary/15"
-                )}
+                key={row.rowId}
+                className="min-w-0 overflow-hidden rounded-[20px] border border-white/10 bg-white/5 shadow-[0_10px_24px_rgba(2,6,23,0.16)] transition-all duration-200 hover:border-white/10"
               >
-                <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted dark:border-white/10 sm:h-14 sm:w-14">
-                      {product.image ? (
-                        <Image src={product.image} alt={product.productName} fill sizes="56px" className="object-cover" />
-                      ) : (
-                        <Package size={22} className="text-muted-foreground" />
-                      )}
+                <div className="flex w-full min-w-0 items-start justify-between gap-3 bg-[linear-gradient(90deg,rgba(59,130,246,0.035),transparent_55%)] px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center justify-between gap-3">
+                      <div className="min-w-0 flex flex-1 items-center gap-3">
+                        <h2 className="truncate text-[17px] font-medium leading-6 text-foreground">{row.entry.question || "未命名问题"}</h2>
+                        {row.products.length > 0 && (
+                          <div className="flex shrink-0 -space-x-2">
+                            {row.products.slice(0, 4).map((product) => (
+                              <div key={product.id} className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-muted">
+                                {product.image ? (
+                                  <Image src={product.image} alt={product.name} fill sizes="28px" className="object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center">
+                                    <Package size={12} className="text-muted-foreground" />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {row.products.length > 4 && (
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-transparent text-[9px] font-medium text-slate-200">
+                                +{row.products.length - 4}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyAnswer(row.entry.answer || "")}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-300/78 transition-all hover:bg-white/[0.06] hover:text-foreground active:scale-95"
+                          title="复制答案"
+                        >
+                          <Copy size={14} />
+                        </button>
+                        {row.canEdit && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setActiveDraft(toSingleEntryDraft(items.find((item) => item.id === row.parentId)!, row.entry.id));
+                              }}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-300/78 transition-all hover:bg-white/[0.06] hover:text-foreground active:scale-95"
+                              title="编辑"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDelete(items.find((item) => item.id === row.parentId)!);
+                              }}
+                              disabled={deletingId === row.parentId}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300 active:scale-95 disabled:opacity-60"
+                              title="删除"
+                            >
+                              {deletingId === row.parentId ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h2 className="truncate text-base font-black text-foreground">{product.productName}</h2>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
-                        {product.sku && <span>编号：{product.sku}</span>}
-                        {product.categoryName && <span>{product.categoryName}</span>}
-                        <span>{visibleFaq.length} 条问答</span>
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3.5 py-2.5">
+                      <div className="text-[11px] font-black tracking-[0.2em] text-slate-300/70">回答</div>
+                      <div className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-slate-300/82">
+                        {row.entry.answer || "暂未填写标准答案"}
                       </div>
                     </div>
                   </div>
-
-                  {product.canEdit && (
-                    <div className="flex w-full shrink-0 items-center justify-end gap-2 md:w-auto">
-                      <button
-                        onClick={() => setDraft(product.productId, [...draft, createFaqItem()])}
-                        className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full border border-border px-3 text-sm font-bold transition-all hover:bg-black/5 active:scale-95 dark:border-white/10 dark:hover:bg-white/10 sm:flex-none"
-                      >
-                        <Plus size={16} />
-                        添加
-                      </button>
-                      <button
-                        onClick={() => handleSave(product)}
-                        disabled={!isDirty || isSaving}
-                        className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full bg-primary px-3 text-sm font-bold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none"
-                      >
-                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : isDirty ? <Save size={16} /> : <Check size={16} />}
-                        保存
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {visibleFaq.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground dark:border-white/10">
-                      暂未添加问答
-                    </div>
-                  ) : visibleFaq.map((faq, index) => (
-                    <div key={faq.id} className="rounded-lg border border-border bg-background/70 p-4 dark:border-white/10 dark:bg-black/10">
-                      {product.canEdit ? (
-                        <div className="space-y-3">
-                          <div className="flex items-start gap-2">
-                            <input
-                              value={faq.question}
-                              onChange={(event) => {
-                                const next = draft.map((item) => (
-                                  item.id === faq.id ? { ...item, question: event.target.value } : item
-                                ));
-                                setDraft(product.productId, next);
-                              }}
-                              placeholder="输入客户常问的问题..."
-                              className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
-                            />
-                            <button
-                              onClick={() => setDraft(product.productId, draft.filter((item) => item.id !== faq.id))}
-                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-red-500 transition-all hover:bg-red-500/10 active:scale-95"
-                              title="删除这一条"
-                            >
-                              <Trash2 size={17} />
-                            </button>
-                          </div>
-                          <textarea
-                            value={faq.answer}
-                            onChange={(event) => {
-                              const next = draft.map((item) => (
-                                item.id === faq.id ? { ...item, answer: event.target.value } : item
-                              ));
-                              setDraft(product.productId, next);
-                            }}
-                            placeholder="输入回答内容..."
-                            rows={3}
-                            className="w-full resize-y rounded-lg border border-border bg-white px-3 py-2 text-sm leading-6 text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
-                          />
-                        </div>
-                      ) : (
-                        <details className="group" open={index === 0}>
-                          <summary className="flex cursor-pointer list-none items-center gap-3 text-sm font-black text-foreground">
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">Q</span>
-                            <span>{faq.question}</span>
-                          </summary>
-                          <p className="mt-3 pl-9 text-sm leading-6 text-muted-foreground">{faq.answer}</p>
-                        </details>
-                      )}
-                    </div>
-                  ))}
                 </div>
               </section>
             );
           })}
         </div>
       )}
+
+      <ProductSelectionModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(products) => handleSelectProducts(products)}
+        selectedIds={selectedProductIds}
+        selectedBadgeLabel="已关联"
+        unselectedOnlyLabel="只看未关联"
+        unselectedOnlyTitle="切换是否只显示未关联商品"
+        title="关联商品"
+        showPlatformSelector={false}
+        showPrice={false}
+        minimalView
+        showCategoryFilter
+        query={{ includePublic: "true" }}
+        loadAllOnOpen
+      />
     </div>
   );
 }

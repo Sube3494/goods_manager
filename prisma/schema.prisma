@@ -64,6 +64,22 @@ model Product {
   @@unique([userId, sourceProductId])
 }
 
+model GalleryFaq {
+  id         String   @id @default(cuid())
+  title      String   @default("")
+  question   String
+  answer     String   @default("")
+  entries    Json     @default("[]")
+  productIds String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
 model ProductJdSku {
   id        String   @id @default(cuid())
   productId String
@@ -211,6 +227,7 @@ model User {
   brushProducts      BrushProduct[]
   categories         Category[]
   galleryItems       GalleryItem[]
+  galleryFaqs        GalleryFaq[]
   outboundOrders     OutboundOrder[]
   products           Product[]
   purchaseOrders     PurchaseOrder[]

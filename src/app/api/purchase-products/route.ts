@@ -36,8 +36,8 @@ const naturalSortCollator = new Intl.Collator("zh-CN", {
 
 function comparePurchasePickerItems(a: PurchasePickerItem, b: PurchasePickerItem) {
   const skuCompare = naturalSortCollator.compare(
-    String(a.sku || "").trim(),
-    String(b.sku || "").trim()
+    String(b.sku || "").trim(),
+    String(a.sku || "").trim()
   );
   if (skuCompare !== 0) {
     return skuCompare;

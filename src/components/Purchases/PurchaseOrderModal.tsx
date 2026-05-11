@@ -43,7 +43,7 @@ const PurchaseItemRow = memo(({
     readOnly: boolean; 
     products: Product[]; 
     suppliers: Supplier[];
-    onUpdate: (productId: string, field: keyof PurchaseOrderItem, value: string | number) => void;
+    onUpdate: (productId: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => void;
     onRemove: (productId: string) => void;
     isChecked?: boolean;
     onToggle?: (productId: string) => void;
@@ -204,10 +204,24 @@ const PurchaseItemRow = memo(({
                 {/* Total Column */}
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">小计</label>
-                    <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs overflow-hidden whitespace-nowrap">
-                        <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
-                        {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1 })}
-                    </div>
+                    {readOnly ? (
+                        <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs overflow-hidden whitespace-nowrap">
+                            <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
+                            {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                        </div>
+                    ) : (
+                        <div className="relative w-full">
+                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.quantity && item.costPrice ? Number((item.quantity * item.costPrice).toFixed(2)) : ""}
+                                onChange={(e) => onUpdate(itemKey, "lineTotal", e.target.value)}
+                                className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs text-right no-spinner"
+                            />
+                        </div>
+                    )}
                 </div>
                 {!readOnly && (
                     <div className="hidden sm:flex w-full sm:w-auto pt-2 sm:pt-0 justify-end">
@@ -631,13 +645,21 @@ export function PurchaseOrderModal({
     setBatchMode(false);
   }, [batchSelected]);
 
-  const updateItem = useCallback((itemKey: string, field: keyof PurchaseOrderItem, value: string | number) => {
+  const updateItem = useCallback((itemKey: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => {
     setFormData(prev => {
       const newItems = [...prev.items];
       const index = newItems.findIndex(item => getPurchaseItemKey(item) === itemKey);
       if (index === -1) return prev;
       
       let processedValue: string | number = value;
+      if (field === "lineTotal") {
+          const subtotal = value === "" ? 0 : parseFloat(value as string);
+          const safeSubtotal = Number.isNaN(subtotal) ? 0 : subtotal;
+          const quantity = Math.max(0, Number(newItems[index].quantity) || 0);
+          const nextCostPrice = quantity > 0 ? Number((safeSubtotal / quantity).toFixed(4)) : 0;
+          newItems[index] = { ...newItems[index], costPrice: nextCostPrice };
+          return { ...prev, items: newItems };
+      }
       if (field === "quantity" || field === "costPrice") {
           if (value === "") {
               processedValue = 0;
@@ -1250,6 +1272,7 @@ export function PurchaseOrderModal({
             fetchPath={purchaseCatalogFetchPath}
             showPlatformSelector={false}
             query={purchaseCatalogQuery}
+            loadAllOnOpen
           />
 
           {/* Image Gallery Preview */}

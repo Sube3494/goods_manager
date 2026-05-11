@@ -880,6 +880,7 @@ export default function GoodsPage() {
         onClose={() => setIsNewProductOpen(false)}
         onSubmit={handleSaveItem}
         initialData={editingProduct}
+        disableHistorySection={true}
         hideStockField={true}
         showJdSkuField={true}
       />

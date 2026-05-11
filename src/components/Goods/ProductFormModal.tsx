@@ -1134,6 +1134,81 @@ export function ProductFormModal({
                         </div>
                     )}
 
+                    {/* Inbound History */}
+                    {initialData && !disableHistorySection && (
+                        <div className="p-4 rounded-2xl bg-muted/20 border border-white/5 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">关联入库记录</h4>
+                                <div className="h-4 w-px bg-white/10" />
+                                <span className="text-[10px] text-primary font-medium">全部历史</span>
+                            </div>
+                            
+                            {/* 进价走势图 */}
+                            {priceChartData.length > 1 && (
+                                <div className="h-32 w-full mt-2 mb-4 border-b border-white/5 pb-4">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={priceChartData}>
+                                            <XAxis dataKey="dateText" tick={{ fontSize: 9, fill: '#888888' }} axisLine={false} tickLine={false} tickMargin={8} />
+                                            <YAxis domain={['auto', 'auto']} hide />
+                                            <Tooltip 
+                                                contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.8)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', fontSize: '12px', color: '#fff' }}
+                                                itemStyle={{ color: '#f97316' }}
+                                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                formatter={(value: any) => [`￥${value}`, '成本进价']}
+                                                labelStyle={{ color: '#aaa', marginBottom: '4px' }}
+                                            />
+                                            <Line type="monotone" dataKey="price" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: '#f97316', strokeWidth: 0 }} activeDot={{ r: 5, stroke: 'rgba(249,115,22,0.3)', strokeWidth: 4 }} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                                {isLoadingBatches ? (
+                                    <div className="py-4 text-center text-[10px] text-muted-foreground">加载记录中...</div>
+                                ) : inboundHistory.length > 0 ? (
+                                    inboundHistory.map((order) => {
+                                        // Find the specific item to get quantity/price for this product
+                                        const item = order.items.find((i: PurchaseOrderItem) => i.productId === initialData.id || i.shopProductId === initialData.id);
+                                        if (!item) return null;
+
+                                        return (
+                                            <div key={order.id} className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-white/5 border border-white/5 hover:border-primary/20 transition-colors">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-mono text-muted-foreground">{new Date(order.date).toLocaleDateString()}</span>
+                                                         <span className={cn(
+                                                            "text-[9px] px-1.5 py-0.5 rounded-md font-medium uppercase",
+                                                            order.status === "Received" ? "bg-green-500/10 text-green-500" : 
+                                                            order.status === "Ordered" ? "bg-blue-500/10 text-blue-500" :
+                                                            "bg-gray-500/10 text-gray-500"
+                                                        )}>
+                                                            {order.status === "Received" ? "已入库" : order.status === "Ordered" ? "待入库" : "草稿"}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-xs font-medium text-foreground">单号: {order.id}</span>
+                                                </div>
+                                                <div className="text-right flex flex-col items-end gap-0.5">
+                                                    <div className="text-xs font-semibold text-foreground">
+                                                        x{item.quantity} 
+                                                        {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
+                                                            <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                                                                 (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground">成本: ￥{item.costPrice}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="py-2 text-center text-[10px] text-muted-foreground">暂无历史记录</div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Remark / 备注 */}
                     {!hideRemarkField && (
                       <div className="space-y-2 pb-2">
@@ -1245,81 +1320,6 @@ export function ProductFormModal({
                       </div>
                     )}
 
-                            {/* Inbound History */}
-                            {initialData && !disableHistorySection && (
-                                <div className="mt-4 p-4 rounded-2xl bg-muted/20 border border-white/5 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">关联入库记录</h4>
-                                        <div className="h-4 w-px bg-white/10" />
-                                        <span className="text-[10px] text-primary font-medium">全部历史</span>
-                                    </div>
-                                    
-                                    {/* 进价走势图 */}
-                                    {priceChartData.length > 1 && (
-                                        <div className="h-32 w-full mt-2 mb-4 border-b border-white/5 pb-4">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={priceChartData}>
-                                                    <XAxis dataKey="dateText" tick={{ fontSize: 9, fill: '#888888' }} axisLine={false} tickLine={false} tickMargin={8} />
-                                                    <YAxis domain={['auto', 'auto']} hide />
-                                                    <Tooltip 
-                                                        contentStyle={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.8)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', fontSize: '12px', color: '#fff' }}
-                                                        itemStyle={{ color: '#f97316' }}
-                                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                        formatter={(value: any) => [`￥${value}`, '成本进价']}
-                                                        labelStyle={{ color: '#aaa', marginBottom: '4px' }}
-                                                    />
-                                                    <Line type="monotone" dataKey="price" stroke="#f97316" strokeWidth={2} dot={{ r: 3, fill: '#f97316', strokeWidth: 0 }} activeDot={{ r: 5, stroke: 'rgba(249,115,22,0.3)', strokeWidth: 4 }} />
-                                                </LineChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-                                        {isLoadingBatches ? (
-                                            <div className="py-4 text-center text-[10px] text-muted-foreground">加载记录中...</div>
-                                        ) : inboundHistory.length > 0 ? (
-                                            inboundHistory.map((order) => {
-                                                // Find the specific item to get quantity/price for this product
-                                                const item = order.items.find((i: PurchaseOrderItem) => i.productId === initialData.id);
-                                                if (!item) return null;
-
-                                                return (
-                                                    <div key={order.id} className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-white/5 border border-white/5 hover:border-primary/20 transition-colors">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[10px] font-mono text-muted-foreground">{new Date(order.date).toLocaleDateString()}</span>
-                                                                 <span className={cn(
-                                                                    "text-[9px] px-1.5 py-0.5 rounded-md font-medium uppercase",
-                                                                    order.status === "Received" ? "bg-green-500/10 text-green-500" : 
-                                                                    order.status === "Ordered" ? "bg-blue-500/10 text-blue-500" :
-                                                                    "bg-gray-500/10 text-gray-500"
-                                                                )}>
-                                                                    {order.status === "Received" ? "已入库" : order.status === "Ordered" ? "待入库" : "草稿"}
-                                                                </span>
-                                                            </div>
-                                                            <span className="text-xs font-medium text-foreground">单号: {order.id}</span>
-                                                        </div>
-                                                        <div className="text-right flex flex-col items-end gap-0.5">
-                                                            <div className="text-xs font-semibold text-foreground">
-                                                                x{item.quantity} 
-                                                                {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
-                                                                    <span className="text-[10px] font-normal text-muted-foreground ml-1">
-                                                                         (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="text-[10px] text-muted-foreground">成本: ￥{item.costPrice}</div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="py-2 text-center text-[10px] text-muted-foreground">暂无历史记录</div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        
                     {/* Specifications */}
                     {!hideSpecsSection && (
                     <div className="space-y-3 pt-2">

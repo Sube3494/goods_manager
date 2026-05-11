@@ -67,6 +67,7 @@ export default function ShopGoodsPage() {
     () => shops.find((shop) => shop.id === selectedShopId) || null,
     [selectedShopId, shops]
   );
+  const hasMultipleShops = shops.length > 1;
 
   const templateCatalogQuery = useMemo(
     () => {
@@ -499,7 +500,7 @@ export default function ShopGoodsPage() {
     setEditingItemId(item.id);
     setEditingShopId(item.shopId || "");
     setEditingProduct({
-      id: "",
+      id: item.id,
       sku: item.sku || "",
       jdSkuId: item.jdSkuId || "",
       name: item.name,
@@ -743,7 +744,7 @@ export default function ShopGoodsPage() {
             <span className="shrink-0 inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 sm:px-4 h-8 sm:h-10 text-sm sm:text-lg font-bold text-primary font-number shadow-sm">{totalResults}</span>
           </div>
           <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
-            当前页面固定按单店铺查看，切换店铺只更新筛选结果。
+            {hasMultipleShops ? "当前页面固定按单店铺查看，切换店铺只更新筛选结果。" : "当前仅有 1 家店铺，页面已自动按该店铺展示。"}
           </p>
         </div>
         {shops.length > 0 && (
@@ -766,9 +767,11 @@ export default function ShopGoodsPage() {
         </div>
 
         <div className="grid grid-cols-2 xl:flex gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
-          <div className="xl:w-52 h-10 sm:h-11">
-            <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={shops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
-          </div>
+          {hasMultipleShops && (
+            <div className="xl:w-52 h-10 sm:h-11">
+              <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={shops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
+            </div>
+          )}
           <div className="xl:w-44 h-10 sm:h-11">
             <CustomSelect value={selectedCategory} onChange={setSelectedCategory} options={categoryOptions} placeholder="全部分类" className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
           </div>
@@ -811,7 +814,7 @@ export default function ShopGoodsPage() {
       <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" prefetchedProducts={templateCatalogProducts} externalLoading={isTemplateCatalogLoading} />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
       <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
-      <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
+      <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
 
       {typeof document !== "undefined" && createPortal(<AnimatePresence>{showScrollTop && <motion.button initial={{ opacity: 0, scale: 0.5, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.5, y: 20 }} onClick={scrollToTop} className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"><ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" /></motion.button>}</AnimatePresence>, document.body)}

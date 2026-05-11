@@ -15,26 +15,14 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { detectClientPlatform, inferFileExtensionFromUrl, triggerBrowserDownload, triggerFetchedBlobDownload, triggerIOSMediaShare } from "@/lib/download";
 import Image from "next/image";
+import Link from "next/link";
 import { GestureImage } from "@/components/ui/GestureImage";
-import { ProductFaqPanel } from "@/components/Gallery/ProductFaqPanel";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { Product, GalleryItem, Category, GalleryGroupSummary } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
 import md5 from "blueimp-md5";
-import { isLighterIssueTag, isLighterLikeProduct, LIGHTER_ISSUE_TAGS } from "@/lib/galleryTags";
-
-const LIGHTER_ISSUE_GUIDES: Record<string, string[]> = {
-  "打不着火": ["这里后面可以放处理建议和标准回复。"],
-  "火焰偏小": ["这里后面可以放处理建议和标准回复。"],
-  "火焰偏斜": ["这里后面可以放处理建议和标准回复。"],
-  "漏气疑虑": ["这里后面可以放处理建议和标准回复。"],
-  "外观瑕疵": ["这里后面可以放处理建议和标准回复。"],
-  "刻字偏差": ["这里后面可以放处理建议和标准回复。"],
-  "运输磕碰": ["这里后面可以放处理建议和标准回复。"],
-  "使用说明": ["这里后面可以放处理建议和标准回复。"],
-};
 
 
 interface LightboxMediaItemProps {
@@ -281,41 +269,6 @@ function GalleryContent() {
   }, []);
   const { showToast } = useToast();
   
-  // 基础权限检查，不再用于隐藏按钮，仅用于业务逻辑拦截
-
-  const canAccessGalleryFaq = useCallback(() => {
-    const sessionUser = user as SessionUser | null;
-    return !!sessionUser && (
-      sessionUser.role === "SUPER_ADMIN" ||
-      hasPermission(sessionUser, "gallery:upload") ||
-      hasPermission(sessionUser, "gallery:download") ||
-      hasPermission(sessionUser, "gallery:share") ||
-      hasPermission(sessionUser, "gallery:copy")
-    );
-  }, [user]);
-
-  const openFaqModal = useCallback(() => {
-    if (!user) {
-      setConfirmConfig({
-        isOpen: true,
-        title: "请登录后继续",
-        message: "常见问题需要登录后查看。",
-        mode: "login",
-        onConfirm: () => {
-          window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
-        },
-      });
-      return;
-    }
-
-    if (!canAccessGalleryFaq()) {
-      showToast("当前账号还没有查看常见问题的权限", "error");
-      return;
-    }
-
-    setIsFaqModalOpen(true);
-  }, [canAccessGalleryFaq, showToast, user]);
-
   // 统一权限拦截与游客引导逻辑
   const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:copy", action: () => void) => {
     if (!user) {
@@ -475,10 +428,7 @@ function GalleryContent() {
   
   // Upload States
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
   const [isProductSelectOpen, setIsProductSelectOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"materials" | "issues">("materials");
-  const [activeIssue, setActiveIssue] = useState<string | null>(null);
   // 修改 isUploading 为 string | boolean 以便呈现进度
   const [isUploading, setIsUploading] = useState<boolean | string>(false);
   const [uploadForm, setUploadForm] = useState<{
@@ -630,7 +580,7 @@ function GalleryContent() {
 
 
   useEffect(() => {
-    if (selectedImage || isUploadModalOpen || isFaqModalOpen) {
+    if (selectedImage || isUploadModalOpen) {
       document.body.style.overflow = 'hidden';
       document.body.style.overscrollBehavior = 'none';
     } else {
@@ -641,7 +591,7 @@ function GalleryContent() {
       document.body.style.overflow = 'unset';
       document.body.style.overscrollBehavior = 'unset';
     };
-  }, [selectedImage, isUploadModalOpen, isFaqModalOpen]);
+  }, [selectedImage, isUploadModalOpen]);
 
   const processUploadFiles = useCallback(async (incomingFiles: File[] | FileList) => {
     const filesArray = Array.from(incomingFiles);
@@ -814,57 +764,7 @@ function GalleryContent() {
   // Server-side filtered items
   const filteredItems = items;
 
-  const lighterGroups = useMemo(() => {
-    return groups.filter((group) =>
-      isLighterLikeProduct({
-        name: group.product.name,
-        categoryName: group.product.category?.name || "",
-        tags: group.tags || [],
-      })
-    );
-  }, [groups]);
-
-  const lighterIssuePanels = useMemo(() => {
-    return LIGHTER_ISSUE_TAGS.map((issue) => {
-      const relatedGroups = lighterGroups.filter((group) =>
-        (group.tags || []).some((tag) => isLighterIssueTag(tag) && tag === issue)
-      );
-
-      return {
-        issue,
-        guide: LIGHTER_ISSUE_GUIDES[issue] || [],
-        groups: relatedGroups.slice(0, 4),
-        total: relatedGroups.length,
-      };
-    });
-  }, [lighterGroups]);
-
-  useEffect(() => {
-    if (activeTab !== "issues") {
-      setActiveIssue(null);
-      return;
-    }
-
-    if (activeIssue && lighterIssuePanels.some((panel) => panel.issue === activeIssue)) {
-      return;
-    }
-
-    const firstNonEmpty = lighterIssuePanels.find((panel) => panel.total > 0);
-    setActiveIssue(firstNonEmpty?.issue || lighterIssuePanels[0]?.issue || null);
-  }, [activeIssue, activeTab, lighterIssuePanels]);
-
-  const activeIssuePanel = useMemo(() => {
-    if (!activeIssue) return null;
-    return lighterIssuePanels.find((panel) => panel.issue === activeIssue) || null;
-  }, [activeIssue, lighterIssuePanels]);
-
-  const groupedProducts = useMemo(() => {
-    if (activeTab === "issues") {
-      if (!activeIssuePanel) return lighterGroups;
-      return lighterGroups.filter((group) => (group.tags || []).some((tag) => tag === activeIssuePanel.issue));
-    }
-    return groups;
-  }, [activeIssuePanel, activeTab, groups, lighterGroups]);
+  const groupedProducts = groups;
 
   const handleOpenProductPreview = async (group: GalleryGroupSummary) => {
     try {
@@ -1130,15 +1030,14 @@ function GalleryContent() {
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-3">
               <h1 className="text-4xl sm:text-4xl font-bold leading-none tracking-tight text-foreground truncate">实物<span className="text-primary">相册</span></h1>
-              <button
-                type="button"
-                onClick={openFaqModal}
+              <Link
+                href="/gallery/faq"
                 className="inline-flex h-9 w-9 sm:w-auto shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-white px-0 sm:px-3 text-sm font-bold leading-none text-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary hover:text-primary-foreground active:scale-95 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
                 title="常见问题解答"
               >
                 <CircleHelp size={17} />
                 <span className="hidden sm:inline">常见问题</span>
-              </button>
+              </Link>
             </div>
             <p className="block text-muted-foreground mt-1 sm:mt-2 text-[10px] sm:text-lg truncate max-w-2xl opacity-80">
                 {isUserLoading ? "商品实拍图与细节展示" : user ? (isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示") : "登录可探索更多实拍详情与下载功能"}
@@ -1196,37 +1095,12 @@ function GalleryContent() {
           </div>
         </div>
 
-        <div className="mb-6 flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab("materials")}
-            className={cn(
-              "h-11 rounded-full border px-5 text-sm font-bold transition-all",
-              activeTab === "materials"
-                ? "border-foreground bg-foreground text-background"
-                : "border-border bg-white dark:bg-white/5 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            实物素材
-          </button>
-          <button
-            onClick={() => setActiveTab("issues")}
-            className={cn(
-              "h-11 rounded-full border px-5 text-sm font-bold transition-all",
-              activeTab === "issues"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-white dark:bg-white/5 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            常见问题处理
-          </button>
-        </div>
-
         <div className="flex flex-row gap-2 items-center w-full transition-all mb-6 md:mb-10">
               <div className="h-10 sm:h-11 px-3 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
                 <Search size={16} className="text-muted-foreground shrink-0 sm:w-[18px] sm:h-[18px]" />
                 <input 
                     type="text" 
-                    placeholder={activeTab === "issues" ? "搜索问题相关素材..." : "搜索商品名..."} 
+                    placeholder="搜索商品名..." 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8"
@@ -1267,118 +1141,6 @@ function GalleryContent() {
                   </button>
               )}
           </div>
-
-        {activeTab === "issues" && (
-          <div className="mb-6 rounded-[24px] border border-border/50 bg-white/90 dark:bg-white/5 p-4 shadow-sm">
-            <div className="mb-4 space-y-1">
-              <div className="text-sm font-black tracking-wide text-foreground">常见问题处理</div>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                这里只先把结构轮廓搭出来：左边问题列表，右边问题答案与素材预览。后面再继续补编辑和标签能力。
-              </p>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-              <div className="space-y-2">
-                {lighterIssuePanels.map((panel) => {
-                  const isActive = activeIssue === panel.issue;
-                  return (
-                    <button
-                      key={panel.issue}
-                      onClick={() => setActiveIssue(panel.issue)}
-                      className={cn(
-                        "flex w-full items-center justify-between gap-3 rounded-[18px] border px-4 py-3 text-left transition-all",
-                        isActive
-                          ? "border-primary/20 bg-primary/5"
-                          : "border-border/50 bg-background/70 hover:bg-muted/30 dark:hover:bg-white/[0.03]"
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-foreground">{panel.issue}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">这里后面放话术和素材归档</div>
-                      </div>
-                      <span className={cn(
-                        "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
-                        isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                      )}>
-                        {panel.total}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="rounded-[20px] border border-border/50 bg-background/70 p-4">
-                {activeIssuePanel ? (
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <div className="text-base font-black text-foreground">{activeIssuePanel.issue}</div>
-                      <div className="text-sm text-muted-foreground">
-                        当前是常见问题处理页的内容区，后面这里会放正式答案和处理建议。
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="text-xs font-black tracking-widest text-muted-foreground">答案占位</div>
-                      <div className="space-y-2">
-                        {activeIssuePanel.guide.map((line) => (
-                          <p key={line} className="text-sm leading-6 text-foreground">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="text-xs font-black tracking-widest text-muted-foreground">素材预览占位</div>
-                      {activeIssuePanel.groups.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                          {activeIssuePanel.groups.map((group) => {
-                            const thumb = group.coverItem?.thumbnailUrl || group.coverItem?.url || group.product.image || "";
-                            if (!thumb) return null;
-
-                            return (
-                              <button
-                                key={group.productId}
-                                onClick={() => { void handleOpenProductPreview(group); }}
-                                className="overflow-hidden rounded-2xl border border-border/50 bg-background text-left transition-all hover:border-primary/30"
-                              >
-                                <div className="relative aspect-square bg-muted">
-                                  <Image
-                                    src={thumb}
-                                    alt={group.product.name}
-                                    fill
-                                    sizes="180px"
-                                    className="object-cover"
-                                  />
-                                </div>
-                                <div className="p-2.5">
-                                  <div className="line-clamp-2 text-xs font-bold leading-5 text-foreground">
-                                    {group.product.name}
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 px-4 py-5 text-sm text-muted-foreground">
-                          这个问题暂时还没有挂上对应素材，等后面补充标签或归档后会显示在这里。
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[18px] border border-dashed border-border/60 bg-background/60 px-6 text-center">
-                    <div className="text-sm font-bold text-foreground">先选一个问题</div>
-                    <div className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-                      这里现在只先做结构轮廓，你看布局顺不顺，后面再继续往里填内容。
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Responsive Grid / Waterfall */}
         <div className="w-full grid gap-3 sm:gap-5 grid-cols-2 lg:grid-cols-5">
@@ -1580,49 +1342,6 @@ function GalleryContent() {
                     </button>
                 )}
             </div>
-        )}
-
-        {/* Product FAQ Modal */}
-        {mounted && createPortal(
-            <AnimatePresence>
-                {isFaqModalOpen && (
-                    <div className="fixed inset-0 z-50000 flex items-end justify-center p-3 safe-y safe-x sm:items-center sm:p-6">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.1 }}
-                            className="fixed inset-0 bg-black/60 backdrop-blur-sm touch-none overscroll-none"
-                            onClick={() => setIsFaqModalOpen(false)}
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.98, y: 12 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.98, y: 12 }}
-                            transition={{ duration: 0.15 }}
-                            className="relative z-10 flex max-h-[calc(100dvh-24px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-2xl dark:border-white/10 dark:bg-[#0b111e]"
-                        >
-                            <div className="flex shrink-0 items-center justify-between border-b border-border/70 px-4 py-3 dark:border-white/10 sm:px-6 sm:py-4">
-                                <div className="flex items-center gap-2 font-black text-foreground">
-                                    <CircleHelp size={19} />
-                                    常见问题
-                                </div>
-                                <button
-                                    onClick={() => setIsFaqModalOpen(false)}
-                                    className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
-                                    title="关闭"
-                                >
-                                    <X size={19} />
-                                </button>
-                            </div>
-                            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-                                <ProductFaqPanel showBackLink={false} compactHeader />
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>,
-            document.body
         )}
 
         {/* Upload Modal */}

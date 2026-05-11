@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { X, Search, Check, Package } from "lucide-react";
-import { Product, Supplier } from "@/lib/types";
+import { X, Search, Check, Loader2, Package } from "lucide-react";
+import { Category, Product } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -13,6 +13,13 @@ import { twMerge } from "tailwind-merge";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+function naturalCompareText(a: string | null | undefined, b: string | null | undefined) {
+  return String(a || "").localeCompare(String(b || ""), "zh-CN", {
+    numeric: true,
+    sensitivity: "base",
+  });
 }
 
 interface ProductSelectionModalProps {
@@ -32,11 +39,12 @@ interface ProductSelectionModalProps {
   showPlatformSelector?: boolean;
   imageOnly?: boolean;
   minimalView?: boolean;
+  showCategoryFilter?: boolean;
   query?: Record<string, string>;
   emptyStateText?: string;
   prefetchedProducts?: Product[];
-  prefetchedSuppliers?: Supplier[];
   externalLoading?: boolean;
+  loadAllOnOpen?: boolean;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -72,11 +80,12 @@ export function ProductSelectionModal({
   showPlatformSelector = true,
   imageOnly = false,
   minimalView = false,
+  showCategoryFilter = false,
   query,
   emptyStateText = "未找到相关商品",
   prefetchedProducts,
-  prefetchedSuppliers,
   externalLoading = false,
+  loadAllOnOpen = false,
 }: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
@@ -85,13 +94,16 @@ export function ProductSelectionModal({
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoadedResults, setHasLoadedResults] = useState(false);
   const [showInitialSkeleton, setShowInitialSkeleton] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const pageRef = useRef(1);
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string>("all");
+  const [loadedCategoryName, setLoadedCategoryName] = useState<string>("all");
+  const [categories, setCategories] = useState<Category[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
@@ -100,13 +112,18 @@ export function ProductSelectionModal({
   const [mounted] = useState(typeof window !== "undefined");
   const [targetPlatform, setTargetPlatform] = useState("美团");
   const PLATFORMS = ["美团", "淘宝", "京东"];
+  const shouldShowCategoryFilter = !imageOnly && (!minimalView || showCategoryFilter);
   const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadedSignatureRef = useRef("");
   const usesPrefetchedData = Array.isArray(prefetchedProducts);
+  const remoteSearch = loadAllOnOpen ? "" : debouncedSearch;
+  const remoteCategoryName = loadAllOnOpen ? "all" : selectedCategoryName;
   const querySignature = JSON.stringify({
     fetchPath,
     minimalView,
     query: query || {},
+    selectedCategoryName: remoteCategoryName,
+    debouncedSearch: remoteSearch,
   });
 
   const getSelectionKey = useCallback((product: Product) => {
@@ -119,11 +136,20 @@ export function ProductSelectionModal({
     if (isOpen) {
       setTempSelectedIds([]);
       setSelectedProducts([]);
+      setProducts([]);
       setSearchQuery("");
-      setSelectedSupplierId("");
+      setSelectedCategoryName("all");
+      setLoadedCategoryName("all");
+      setHasLoadedResults(false);
+      setHasMore(false);
+      setIsNextPageLoading(false);
+      setIsSearching(false);
+      resultsVersion.current += 1;
+      lastLoadedSignatureRef.current = "";
 
       setShowUnselectedOnly(true);
-      setIsLoading(usesPrefetchedData ? externalLoading : products.length === 0);
+      setIsLoading(usesPrefetchedData ? externalLoading : true);
+      setShowInitialSkeleton(!(usesPrefetchedData && !externalLoading));
       pageRef.current = 1;
       setIsInitialized(true);
     } else {
@@ -137,11 +163,6 @@ export function ProductSelectionModal({
     if (!usesPrefetchedData) return;
     setProducts(prefetchedProducts || []);
   }, [prefetchedProducts, usesPrefetchedData]);
-
-  useEffect(() => {
-    if (!usesPrefetchedData || !prefetchedSuppliers) return;
-    setSuppliers(prefetchedSuppliers);
-  }, [prefetchedSuppliers, usesPrefetchedData]);
 
   useEffect(() => {
     if (!usesPrefetchedData) return;
@@ -171,6 +192,7 @@ export function ProductSelectionModal({
     if (mode === 'initial' || mode === 'search') {
       pageRef.current = 1;
       if (mode === 'search') setIsSearching(true);
+      if (mode === 'initial') setIsLoading(true);
     } else {
       setIsNextPageLoading(true);
     }
@@ -179,14 +201,15 @@ export function ProductSelectionModal({
       const targetPage = pageRef.current;
       const queryParams = new URLSearchParams({
         page: targetPage.toString(),
-        pageSize: "20",
-        search: mode === 'initial' ? "" : debouncedSearch,
+        ...(loadAllOnOpen ? { all: "true" } : { pageSize: "20" }),
+        ...(remoteSearch ? { search: remoteSearch } : {}),
         ...(query || {}),
+        ...(remoteCategoryName !== "all" ? { category: remoteCategoryName } : {}),
       });
 
       const [pRes, sRes] = await Promise.all([
         fetch(`${fetchPath}?${queryParams.toString()}`),
-        mode === 'initial' && !minimalView ? fetch("/api/suppliers") : Promise.resolve(null)
+        mode === 'initial' && shouldShowCategoryFilter ? fetch("/api/categories?scope=main-products") : Promise.resolve(null)
       ]);
 
       if (version !== resultsVersion.current) return;
@@ -194,9 +217,11 @@ export function ProductSelectionModal({
       if (pRes.ok) {
         const pData = await pRes.json();
         const newItems = Array.isArray(pData.items) ? pData.items : [];
+        setHasLoadedResults(true);
         
         if (mode === 'initial' || mode === 'search') {
           setProducts(newItems);
+          setLoadedCategoryName(selectedCategoryName);
         } else {
           setProducts(prev => {
             const existingIds = new Set(prev.map(i => i.id));
@@ -204,7 +229,7 @@ export function ProductSelectionModal({
           });
         }
         
-        setHasMore(pData.hasMore);
+        setHasMore(loadAllOnOpen ? false : pData.hasMore);
         pageRef.current = targetPage + 1;
         if (mode === "initial") {
           lastLoadedSignatureRef.current = querySignature;
@@ -212,10 +237,10 @@ export function ProductSelectionModal({
       }
 
       if (sRes && sRes.ok) {
-        setSuppliers(await sRes.json());
+        setCategories(await sRes.json());
       }
     } catch (error) {
-      console.error("Failed to fetch products or suppliers:", error);
+      console.error("Failed to fetch products or categories:", error);
     } finally {
       if (version === resultsVersion.current) {
         setIsLoading(false);
@@ -223,7 +248,7 @@ export function ProductSelectionModal({
         setIsNextPageLoading(false);
       }
     }
-  }, [debouncedSearch, fetchPath, minimalView, query, querySignature]);
+  }, [fetchPath, loadAllOnOpen, query, querySignature, remoteCategoryName, remoteSearch, shouldShowCategoryFilter]);
 
   useEffect(() => {
     if (loadingDelayRef.current) {
@@ -231,7 +256,11 @@ export function ProductSelectionModal({
       loadingDelayRef.current = null;
     }
 
-    if (isLoading && products.length === 0) {
+    if (isLoading && products.length === 0 && !hasLoadedResults) {
+      if (isOpen) {
+        setShowInitialSkeleton(true);
+        return;
+      }
       loadingDelayRef.current = setTimeout(() => {
         setShowInitialSkeleton(true);
       }, 180);
@@ -245,32 +274,22 @@ export function ProductSelectionModal({
         loadingDelayRef.current = null;
       }
     };
-  }, [isLoading, products.length]);
+  }, [hasLoadedResults, isLoading, products.length]);
 
   useEffect(() => {
     if (usesPrefetchedData) return;
     if (!isOpen || !isInitialized) return;
-    const canReuseCurrentResults =
-      products.length > 0 && lastLoadedSignatureRef.current === querySignature;
 
-    if (canReuseCurrentResults) {
+    if (lastLoadedSignatureRef.current === querySignature) {
       setIsLoading(false);
       setShowInitialSkeleton(false);
       return;
     }
 
+    setHasMore(false);
+    pageRef.current = 1;
     fetchData('initial');
-  }, [fetchData, isInitialized, isOpen, products.length, querySignature, usesPrefetchedData]);
-
-  useEffect(() => {
-    if (usesPrefetchedData) return;
-    if (!isOpen || !isInitialized || isLoading) return; 
-    if (debouncedSearch.trim() === "") {
-      fetchData('initial');
-      return;
-    }
-    fetchData('search');
-  }, [debouncedSearch, fetchData, isInitialized, isLoading, isOpen, usesPrefetchedData]);
+  }, [fetchData, isInitialized, isOpen, querySignature, usesPrefetchedData]);
 
   useEffect(() => {
     if (usesPrefetchedData) return;
@@ -292,12 +311,23 @@ export function ProductSelectionModal({
     return () => observer.disconnect();
   }, [fetchData, hasMore, isLoading, isNextPageLoading, isOpen, isSearching, usesPrefetchedData]);
 
-  const filteredProducts = (Array.isArray(products) ? products : []).filter(p => {
-    const isVisible = (p.isPublic ?? true) && !(p.isDiscontinued ?? false);
-    const matchesSupplier = !selectedSupplierId || p.supplierId === selectedSupplierId;
-    const matchesUnselected = !showUnselectedOnly || !selectedIds.includes(getSelectionKey(p));
-    return isVisible && matchesSupplier && matchesUnselected;
-  });
+  const filterVisibleProducts = useCallback((candidates: Product[], categoryName = selectedCategoryName) => {
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
+
+    return candidates.filter((p) => {
+      const isVisible = (p.isPublic ?? true) && !(p.isDiscontinued ?? false);
+      const productCategoryName = p.category?.name || (p as Product & { categoryName?: string | null }).categoryName || "";
+      const matchesCategory = categoryName === "all" || productCategoryName === categoryName;
+      const matchesUnselected = !showUnselectedOnly || !selectedIds.includes(getSelectionKey(p));
+      const searchableText = [p.name, p.sku, p.sourceProductId, p.shopProductId].filter(Boolean).join(" ").toLowerCase();
+      const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
+
+      return isVisible && matchesCategory && matchesUnselected && matchesSearch;
+    });
+  }, [debouncedSearch, getSelectionKey, selectedCategoryName, selectedIds, showUnselectedOnly]);
+
+  const displayCategoryName = usesPrefetchedData || loadAllOnOpen ? selectedCategoryName : loadedCategoryName;
+  const filteredProducts = filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
   const selectableProducts = filteredProducts.filter((product) => !selectedIds.includes(getSelectionKey(product)));
   const allFilteredSelected =
     !singleSelect &&
@@ -315,8 +345,37 @@ export function ProductSelectionModal({
       return;
     }
 
-    setTempSelectedIds(selectableProducts.map((product: Product) => getSelectionKey(product)));
-    setSelectedProducts(selectableProducts);
+    if (usesPrefetchedData || loadAllOnOpen) {
+      setTempSelectedIds(selectableProducts.map((product: Product) => getSelectionKey(product)));
+      setSelectedProducts(selectableProducts);
+      return;
+    }
+
+    setIsSelectingAll(true);
+    try {
+      const queryParams = new URLSearchParams({
+        page: "1",
+        all: "true",
+        search: debouncedSearch,
+        ...(query || {}),
+        category: selectedCategoryName,
+      });
+      const res = await fetch(`${fetchPath}?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch all products");
+
+      const data = await res.json();
+      const allProducts = filterVisibleProducts(Array.isArray(data.items) ? data.items : [], selectedCategoryName);
+      setProducts(allProducts);
+      setLoadedCategoryName(selectedCategoryName);
+      setHasMore(false);
+      setTempSelectedIds(allProducts.map((product: Product) => getSelectionKey(product)));
+      setSelectedProducts(allProducts);
+    } catch (error) {
+      console.error("Failed to select all products:", error);
+      showToast("全选失败，请稍后重试", "error");
+    } finally {
+      setIsSelectingAll(false);
+    }
   };
 
   const toggleProduct = useCallback((product: Product) => {
@@ -381,59 +440,28 @@ export function ProductSelectionModal({
                     placeholder="搜索商品名称或编号..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-11 pl-11 pr-4 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-sm"
+                    className="w-full h-11 pl-11 pr-10 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-sm"
                   />
+                  {(isLoading || isSearching) && products.length > 0 && (
+                    <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
                  </div>
 
-                {!minimalView && (
+                {shouldShowCategoryFilter && (
                   <div className="w-36 sm:w-44 shrink-0">
                     <CustomSelect
                       options={[
-                        { value: "", label: "所有供应商" },
-                        ...suppliers.map(s => ({ value: s.id, label: s.name }))
+                        { value: "all", label: "所有分类" },
+                        ...categories.map(category => ({ value: category.name, label: category.name }))
                       ]}
-                      value={selectedSupplierId}
-                      onChange={setSelectedSupplierId}
-                      placeholder="筛选供应商"
+                      value={selectedCategoryName}
+                      onChange={setSelectedCategoryName}
+                      placeholder="筛选分类"
                       triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                     />
                   </div>
                 )}
               </div>
-
-              <div className="flex min-h-[36px] items-center justify-between gap-3 shrink-0">
-                <div>
-                  {!hideUnselectedOnlyToggle && (
-                    <button
-                      type="button"
-                      onClick={() => setShowUnselectedOnly((prev) => !prev)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
-                        showUnselectedOnly
-                          ? "border-primary/30 bg-primary/10 text-primary"
-                          : "border-border/60 bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10"
-                      )}
-                      title={unselectedOnlyTitle}
-                    >
-                      {unselectedOnlyLabel}
-                    </button>
-                  )}
-                </div>
-                {!singleSelect ? (
-                  <button
-                    type="button"
-                    onClick={handleToggleSelectAll}
-                    className="rounded-full border border-border/60 bg-white/5 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:text-foreground hover:bg-white/10"
-                    disabled={selectableProducts.length === 0}
-                  >
-                    {allFilteredSelected ? "取消全选" : "全选当前结果"}
-                  </button>
-                ) : (
-                  <div className="h-[30px]" />
-                )}
-              </div>
-
-
 
               <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", imageOnly ? "" : "space-y-2")}>
                  {(showInitialSkeleton && products.length === 0) ? (
@@ -443,7 +471,7 @@ export function ProductSelectionModal({
                         ))}
                     </div>
                  ) : (
-                    <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
+                    <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-1.5")}>
                     {filteredProducts.map(product => {
                       const selectionKey = getSelectionKey(product);
                       const isSelected = tempSelectedIds.includes(selectionKey);
@@ -457,7 +485,7 @@ export function ProductSelectionModal({
                             className={cn(
                              imageOnly
                                ? "group relative aspect-square overflow-hidden rounded-2xl border transition-all cursor-pointer"
-                               : "group relative flex w-full items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer min-h-[108px] text-left",
+                               : "group relative flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer min-h-[64px]",
                              isSelected 
                                ? "bg-white dark:bg-white/5 border-primary shadow-md" 
                                : isAlreadySelected
@@ -468,25 +496,27 @@ export function ProductSelectionModal({
                           <div className={cn(
                             imageOnly
                               ? "absolute top-2.5 right-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110"
-                              : "absolute top-3 right-3 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110",
+                              : "order-last ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all",
                             isSelected 
-                              ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20" 
-                              : "bg-black/20 dark:bg-black/40 border-white/50 backdrop-blur-sm"
+                              ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
+                              : isAlreadySelected
+                              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
+                              : "bg-transparent border-muted-foreground/50 text-transparent group-hover:border-foreground/60"
                           )}>
-                            {isSelected && <Check size={12} strokeWidth={4} />}
+                            {(isSelected || isAlreadySelected) && <Check size={12} strokeWidth={4} />}
                           </div>
 
                           <div className={cn(
                             imageOnly
                               ? "h-full w-full overflow-hidden bg-muted relative"
-                              : "h-12 w-12 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
+                              : "h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
                           )}>
                             {product.image ? (
                                 <Image 
-                                    src={product.image} 
-                                    alt={product.name} 
-                                    width={imageOnly ? 240 : 48} 
-                                    height={imageOnly ? 240 : 48} 
+                                   src={product.image} 
+                                   alt={product.name} 
+                                    width={imageOnly ? 240 : 40} 
+                                    height={imageOnly ? 240 : 40} 
                                     className="h-full w-full object-cover" 
                                     unoptimized
                                 />
@@ -498,51 +528,36 @@ export function ProductSelectionModal({
                           </div>
                           
                            {!imageOnly && (
-                           <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5 pr-10">
-                            <div className="flex items-center gap-2">
-                             <span className={cn("text-[15px] font-medium truncate leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
-                             {isAlreadySelected && (
-                                 <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-green-500/10 text-green-500 border border-green-500/20">
-                                     {selectedBadgeLabel}
-                                 </span>
-                             )}
-                            </div>
-                             {(minimalView
-                               ? (product.shopName || product.category?.name)
-                               : (product.shopName || (showSku && product.sku) || (product.supplierId && suppliers.find(s => s.id === product.supplierId)) || product.remark)
-                             ) && (
-                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                                    {product.shopName && (
-                                      <span className="text-[10px] bg-primary/10 px-1.5 py-0.5 rounded text-primary shrink-0">
-                                        {product.shopName}
-                                      </span>
-                                    )}
-                                    {minimalView && product.category?.name && (
-                                      <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0">
-                                        {product.category.name}
-                                      </span>
-                                    )}
-                                    {!minimalView && showSku && product.sku && (
-                                      <span className="text-[10px] bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground font-mono shrink-0">
-                                        {product.sku}
-                                      </span>
-                                    )}
-                                    {!minimalView && product.remark && (
-                                        <span className="flex flex-wrap items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
-                                            <span className="font-bold opacity-70 shrink-0">注:</span>
-                                            <span className="truncate leading-none">{product.remark}</span>
-                                        </span>
-                                    )}
-                                 </div>
-                             )}
-
-                             {showPrice && !minimalView && (
-                                <div className="mt-2">
-                                <span className="text-sm font-medium text-primary">
-                                    ￥{product.costPrice}
-                                </span>
-                                </div>
-                             )}
+                           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
+                             <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
+                             <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                                {showSku && product.sku && (
+                                  <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
+                                    编号：{product.sku}
+                                  </span>
+                                )}
+                                {product.shopName && (
+                                  <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                    {product.shopName}
+                                  </span>
+                                )}
+                                {product.category?.name && (
+                                  <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    {product.category.name}
+                                  </span>
+                                )}
+                                {!minimalView && product.remark && (
+                                    <span className="flex min-w-0 items-center gap-1 truncate rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-500">
+                                        <span className="shrink-0 font-bold opacity-70">注:</span>
+                                        <span className="truncate">{product.remark}</span>
+                                    </span>
+                                )}
+                                {showPrice && !minimalView && (
+                                  <span className="ml-auto shrink-0 text-sm font-semibold text-foreground">
+                                      ￥{product.costPrice}
+                                  </span>
+                                )}
+                             </div>
                           </div>
                            )}
                            {imageOnly && (
@@ -569,20 +584,20 @@ export function ProductSelectionModal({
                       );
                     })}
                     
-                     {filteredProducts.length === 0 && !showInitialSkeleton && (
+                     {filteredProducts.length === 0 && !showInitialSkeleton && !isLoading && !isSearching && !isNextPageLoading && (
                         <div className="py-12 text-center text-muted-foreground">
                             {emptyStateText}
                         </div>
                     )}
                     
                     <div ref={observerTarget} className="flex h-14 items-center justify-center">
-                      {hasMore && !isLoading && !isSearching && isNextPageLoading && (
+                      {filteredProducts.length > 0 && hasMore && !isLoading && !isSearching && isNextPageLoading && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
                           <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                           加载更多...
                         </div>
                       )}
-                      {hasMore && !isLoading && !isSearching && !isNextPageLoading && (
+                      {filteredProducts.length > 0 && hasMore && !isLoading && !isSearching && !isNextPageLoading && (
                         <div className="h-5 opacity-0">占位</div>
                       )}
                     </div>
@@ -628,6 +643,16 @@ export function ProductSelectionModal({
                   >
                     取消
                   </button>
+                  {!singleSelect && (
+                    <button
+                      type="button"
+                      onClick={handleToggleSelectAll}
+                      disabled={selectableProducts.length === 0 || isSelectingAll}
+                      className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-white/10"
+                    >
+                      {isSelectingAll ? "全选中..." : allFilteredSelected ? "取消全选" : "全选"}
+                    </button>
+                  )}
                    <button 
                     onClick={handleConfirm}
                     disabled={tempSelectedIds.length === 0}

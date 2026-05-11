@@ -5,45 +5,63 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../prisma/generated-client";
 
-interface ProductFaqItem {
+type FaqEntry = {
   id: string;
   question: string;
   answer: string;
+};
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function normalizeProductIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const item of value) {
+    const id = normalizeText(item);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
 }
 
-function normalizeFaq(value: unknown): ProductFaqItem[] {
+function normalizeEntries(value: unknown): FaqEntry[] {
   if (!Array.isArray(value)) return [];
 
   return value
     .map((item, index) => {
-      if (!isRecord(item)) return null;
-      const question = typeof item.question === "string" ? item.question.trim() : "";
-      const answer = typeof item.answer === "string" ? item.answer.trim() : "";
-      if (!question && !answer) return null;
+      const raw = item as Record<string, unknown>;
+      const question = normalizeText(raw?.question);
+      const answer = normalizeText(raw?.answer);
+      if (!question) return null;
 
       return {
-        id: typeof item.id === "string" && item.id.trim() ? item.id : `faq-${index + 1}`,
+        id: normalizeText(raw?.id) || `entry-${index + 1}`,
         question,
         answer,
       };
     })
-    .filter((item): item is ProductFaqItem => Boolean(item));
+    .filter((item): item is FaqEntry => Boolean(item));
 }
 
-function readProductFaq(specs: unknown): ProductFaqItem[] {
-  if (!isRecord(specs)) return [];
-  return normalizeFaq(specs.galleryFaq);
-}
+function getFaqEntries(faq: { id: string; question: string; answer: string; entries: Prisma.JsonValue | null }) {
+  const normalized = normalizeEntries(faq.entries);
+  if (normalized.length > 0) return normalized;
 
-function canEditProductFaq(session: SessionUser | null, productUserId?: string | null) {
-  if (!session?.id) return false;
-  if (session.role === "SUPER_ADMIN") return true;
-  if (!hasPermission(session, "product:update") && !hasPermission(session, "gallery:upload")) return false;
-  return productUserId === session.id;
+  const legacyQuestion = normalizeText(faq.question);
+  if (!legacyQuestion) return [];
+
+  return [
+    {
+      id: `legacy-${faq.id}`,
+      question: legacyQuestion,
+      answer: normalizeText(faq.answer),
+    },
+  ];
 }
 
 function canReadGalleryFaq(session: SessionUser | null) {
@@ -57,138 +75,244 @@ function canReadGalleryFaq(session: SessionUser | null) {
   );
 }
 
+function canManageGalleryFaq(session: SessionUser | null) {
+  if (!session?.id) return false;
+  return session.role === "SUPER_ADMIN" || hasPermission(session, "gallery:upload");
+}
+
+function productVisibilityWhere(session: SessionUser | null): Prisma.ProductWhereInput {
+  if (!session?.id) return { isPublic: true };
+  if (session.role === "SUPER_ADMIN") return {};
+  return {
+    OR: [
+      { userId: session.id },
+      { isPublic: true },
+    ],
+  };
+}
+
+async function getVisibleProducts(productIds: string[], session: SessionUser | null) {
+  if (productIds.length === 0) return [];
+
+  const storage = await getStorageStrategy();
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: productIds },
+      ...productVisibilityWhere(session),
+    },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      image: true,
+      category: { select: { name: true } },
+    },
+  });
+  const rank = new Map(productIds.map((id, index) => [id, index]));
+
+  return products
+    .sort((left, right) => (rank.get(left.id) ?? 0) - (rank.get(right.id) ?? 0))
+    .map((product) => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      image: product.image ? storage.resolveUrl(product.image) : null,
+      categoryName: product.category?.name || "",
+    }));
+}
+
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search")?.trim() || "";
-    const includeEmpty = searchParams.get("includeEmpty") === "true";
-    const pageSize = Math.min(Number(searchParams.get("pageSize") || "300") || 300, 1000);
     const session = await getFreshSession() as SessionUser | null;
     if (!canReadGalleryFaq(session)) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: session?.id ? 403 : 401 });
     }
 
-    const canEditAny = !!session?.id && (
-      session.role === "SUPER_ADMIN" ||
-      hasPermission(session, "product:update") ||
-      hasPermission(session, "gallery:upload")
-    );
+    const { searchParams } = new URL(request.url);
+    const search = normalizeText(searchParams.get("search")).toLowerCase();
+    const canEditAny = canManageGalleryFaq(session);
 
-    const andConditions: Prisma.ProductWhereInput[] = [];
+    const where =
+      session?.role === "SUPER_ADMIN"
+        ? undefined
+        : {
+            OR: [
+              { userId: session?.id || null },
+              { userId: null },
+            ],
+          };
 
-    if (!session?.id) {
-      andConditions.push({ isPublic: true });
-    } else if (session.role !== "SUPER_ADMIN") {
-      andConditions.push({
-        OR: [
-          { userId: session.id },
-          { isPublic: true },
-        ],
-      });
-    }
-
-    if (search) {
-      andConditions.push({
-        OR: [
-          { name: { contains: search } },
-          { sku: { contains: search } },
-          { pinyin: { contains: search } },
-        ],
-      });
-    }
-
-    const storage = await getStorageStrategy();
-    const products = await prisma.product.findMany({
-      where: andConditions.length > 0 ? { AND: andConditions } : undefined,
-      take: pageSize,
+    const faqItems = await prisma.galleryFaq.findMany({
+      where,
       orderBy: [
         { updatedAt: "desc" },
         { createdAt: "desc" },
       ],
-      include: {
-        category: { select: { name: true } },
-      },
     });
 
-    const items = products
-      .map((product) => {
-        const faq = readProductFaq(product.specs);
+    const visibleItems = faqItems.filter((faq) => {
+      if (!search) return true;
+      const entries = getFaqEntries(faq);
+      const haystack = [
+        faq.title,
+        faq.question,
+        faq.answer,
+        ...entries.flatMap((entry) => [entry.question, entry.answer]),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(search);
+    });
+
+    const items = await Promise.all(
+      visibleItems.map(async (faq) => {
+        const entries = getFaqEntries(faq);
         return {
-          productId: product.id,
-          productName: product.name,
-          sku: product.sku,
-          image: product.image ? storage.resolveUrl(product.image) : null,
-          categoryName: product.category?.name || "",
-          faq,
-          canEdit: canEditProductFaq(session, product.userId),
-          updatedAt: product.updatedAt,
+          id: faq.id,
+          title: normalizeText(faq.title),
+          entries,
+          productIds: faq.productIds,
+          products: await getVisibleProducts(faq.productIds, session),
+          canEdit: canEditAny && (session?.role === "SUPER_ADMIN" || !faq.userId || faq.userId === session?.id),
+          createdAt: faq.createdAt,
+          updatedAt: faq.updatedAt,
         };
       })
-      .filter((item) => includeEmpty && canEditAny ? true : item.faq.length > 0);
+    );
 
     return NextResponse.json({ items, canEditAny });
   } catch (error) {
-    console.error("Failed to fetch product FAQ:", error);
-    return NextResponse.json({ error: "Failed to fetch product FAQ" }, { status: 500 });
+    console.error("Failed to fetch gallery FAQ:", error);
+    return NextResponse.json({ error: "Failed to fetch gallery FAQ" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!canManageGalleryFaq(session)) {
+      return NextResponse.json({ error: "Permission denied" }, { status: session?.id ? 403 : 401 });
+    }
+
+    const body = await request.json();
+    const title = normalizeText(body.title);
+    const entries = normalizeEntries(body.entries);
+    const productIds = normalizeProductIds(body.productIds);
+
+    if (entries.length === 0) {
+      return NextResponse.json({ error: "至少需要一个问题" }, { status: 400 });
+    }
+
+    const created = await prisma.galleryFaq.create({
+      data: {
+        title,
+        question: entries[0].question,
+        answer: entries[0].answer,
+        entries,
+        productIds,
+        userId: session?.id,
+      },
+    });
+
+    return NextResponse.json({
+      item: {
+        id: created.id,
+        title: created.title,
+        entries,
+        productIds: created.productIds,
+        products: await getVisibleProducts(created.productIds, session),
+        canEdit: true,
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to create gallery FAQ:", error);
+    return NextResponse.json({ error: "Failed to create gallery FAQ" }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!canManageGalleryFaq(session)) {
+      return NextResponse.json({ error: "Permission denied" }, { status: session?.id ? 403 : 401 });
     }
 
     const body = await request.json();
-    const productId = typeof body.productId === "string" ? body.productId : "";
-    const faq = normalizeFaq(body.faq);
+    const id = normalizeText(body.id);
+    const title = normalizeText(body.title);
+    const entries = normalizeEntries(body.entries);
+    const productIds = normalizeProductIds(body.productIds);
 
-    if (!productId) {
-      return NextResponse.json({ error: "Missing productId" }, { status: 400 });
+    if (!id || entries.length === 0) {
+      return NextResponse.json({ error: "Missing id or entries" }, { status: 400 });
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-      select: { id: true, userId: true, specs: true },
-    });
-
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    const existing = await prisma.galleryFaq.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
     }
 
-    if (!canEditProductFaq(session, product.userId)) {
+    if (session?.role !== "SUPER_ADMIN" && existing.userId && existing.userId !== session?.id) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const specs: Record<string, Prisma.JsonValue> = isRecord(product.specs)
-      ? { ...(product.specs as Record<string, Prisma.JsonValue>) }
-      : {};
-    if (faq.length > 0) {
-      specs.galleryFaq = faq.map((item) => ({
-        id: item.id,
-        question: item.question,
-        answer: item.answer,
-      }));
-    } else {
-      delete specs.galleryFaq;
-    }
-
-    const updated = await prisma.product.update({
-      where: { id: productId },
+    const updated = await prisma.galleryFaq.update({
+      where: { id },
       data: {
-        specs: Object.keys(specs).length > 0 ? specs : Prisma.JsonNull,
+        title,
+        question: entries[0].question,
+        answer: entries[0].answer,
+        entries,
+        productIds,
       },
-      select: { id: true, specs: true, updatedAt: true },
     });
 
     return NextResponse.json({
-      productId: updated.id,
-      faq: readProductFaq(updated.specs),
-      updatedAt: updated.updatedAt,
+      item: {
+        id: updated.id,
+        title: updated.title,
+        entries,
+        productIds: updated.productIds,
+        products: await getVisibleProducts(updated.productIds, session),
+        canEdit: true,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+      },
     });
   } catch (error) {
-    console.error("Failed to update product FAQ:", error);
-    return NextResponse.json({ error: "Failed to update product FAQ" }, { status: 500 });
+    console.error("Failed to update gallery FAQ:", error);
+    return NextResponse.json({ error: "Failed to update gallery FAQ" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!canManageGalleryFaq(session)) {
+      return NextResponse.json({ error: "Permission denied" }, { status: session?.id ? 403 : 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = normalizeText(searchParams.get("id"));
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    const existing = await prisma.galleryFaq.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
+    }
+
+    if (session?.role !== "SUPER_ADMIN" && existing.userId && existing.userId !== session?.id) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
+    await prisma.galleryFaq.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to delete gallery FAQ:", error);
+    return NextResponse.json({ error: "Failed to delete gallery FAQ" }, { status: 500 });
   }
 }
