@@ -47,6 +47,13 @@ export async function PATCH(
       },
     });
 
+    if (normalizedUrl && oldItem && oldItem.url !== normalizedUrl) {
+      await prisma.product.updateMany({
+        where: { image: oldItem.url },
+        data: { image: normalizedUrl }
+      });
+    }
+
     // 如果 URL 发生了变化，清理旧物理文件
     if (normalizedUrl && oldItem && oldItem.url !== normalizedUrl) {
       try {

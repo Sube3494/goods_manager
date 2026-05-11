@@ -450,6 +450,7 @@ function GalleryContent() {
 
   const [selectedDeleteIndices, setSelectedDeleteIndices] = useState<number[]>([]);
   const [isUploadDragActive, setIsUploadDragActive] = useState(false);
+  const [isRotatingImageId, setIsRotatingImageId] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const items = useMemo(() => Object.values(productMediaMap).flat(), [productMediaMap]);
@@ -913,6 +914,79 @@ function GalleryContent() {
       },
     });
   }, [fetchData, refreshProductMedia, relatedImages, selectedImage, showToast, user?.role]);
+
+  const handleRotateMediaItem = useCallback(async (image: GalleryItem) => {
+    if (user?.role !== "SUPER_ADMIN") return;
+    if (image.type === "video" || /\.(mp4|webm|ogg|mov)$/i.test(image.url)) {
+      showToast("视频暂不支持旋转", "error");
+      return;
+    }
+
+    try {
+      setIsRotatingImageId(image.id);
+      showToast("正在旋转当前实拍...", "info");
+
+      const imageNode = new window.Image();
+      imageNode.crossOrigin = "anonymous";
+      imageNode.src = image.url;
+      await new Promise((resolve, reject) => {
+        imageNode.onload = resolve;
+        imageNode.onerror = reject;
+      });
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Canvas context error");
+      }
+
+      canvas.width = imageNode.height;
+      canvas.height = imageNode.width;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((90 * Math.PI) / 180);
+      ctx.drawImage(imageNode, -imageNode.width / 2, -imageNode.height / 2);
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((nextBlob) => {
+          if (nextBlob) {
+            resolve(nextBlob);
+            return;
+          }
+          reject(new Error("Failed to export rotated image"));
+        }, "image/jpeg", 0.9);
+      });
+
+      const rotatedFile = new File([blob], `gallery-rotated-${Date.now()}.jpg`, { type: "image/jpeg" });
+      const uploadRes = await uploadGalleryMedia(rotatedFile, "gallery");
+
+      const patchRes = await fetch(`/api/gallery/${image.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: uploadRes.url,
+          path: uploadRes.path,
+          thumbnailUrl: uploadRes.thumbnailUrl,
+          thumbnailPath: uploadRes.thumbnailPath,
+        }),
+      });
+
+      if (!patchRes.ok) {
+        throw new Error("Failed to update gallery item");
+      }
+
+      const refreshedItems = await refreshProductMedia(image.productId);
+      const nextSelectedImage = refreshedItems.find((item) => item.id === image.id) || null;
+
+      setSelectedImage(nextSelectedImage);
+      void fetchData(true);
+      showToast("已旋转当前实拍", "success");
+    } catch (error) {
+      console.error("Failed to rotate gallery item:", error);
+      showToast("旋转失败", "error");
+    } finally {
+      setIsRotatingImageId(null);
+    }
+  }, [fetchData, refreshProductMedia, showToast, user?.role]);
 
   const handleMoveCurrentMedia = useCallback(async (direction: -1 | 1) => {
     if (!selectedImage || !selectedImage.productId) return;
@@ -1818,6 +1892,18 @@ function GalleryContent() {
 
                                     {user?.role === "SUPER_ADMIN" && (
                                     <>
+                                    <button
+                                        onClick={() => {
+                                            if (selectedImage) {
+                                                void handleRotateMediaItem(selectedImage);
+                                            }
+                                        }}
+                                        disabled={isRotatingImageId === selectedImage?.id}
+                                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/60 text-white hover:bg-white hover:text-black transition-all border border-white/10 backdrop-blur-2xl group shadow-xl disabled:opacity-30 disabled:pointer-events-none"
+                                        title="顺时针旋转当前实拍"
+                                    >
+                                        <RotateCcw size={18} className={cn(isRotatingImageId === selectedImage?.id && "animate-spin")} />
+                                    </button>
                                     <button
                                         onClick={() => { void handleMoveCurrentMedia(-1); }}
                                         disabled={!canMoveCurrentMediaBackward}
