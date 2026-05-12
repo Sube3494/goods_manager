@@ -137,21 +137,8 @@ export async function PUT(
             });
 
             if (shopProduct) {
-              const currentStock = shopProduct.stock;
               const currentCost = shopProduct.costPrice || 0;
-              let newCostPrice = currentCost;
-
-              if (incomingCost > 0) {
-                if (currentStock <= 0) {
-                  newCostPrice = incomingCost;
-                } else {
-                  const currentTotalValue = FinanceMath.multiply(currentStock, currentCost);
-                  const incomingTotalValue = FinanceMath.multiply(incomingQty, incomingCost);
-                  const totalValue = FinanceMath.add(currentTotalValue, incomingTotalValue);
-                  const totalQty = currentStock + incomingQty;
-                  newCostPrice = FinanceMath.divide(totalValue, totalQty);
-                }
-              }
+              const newCostPrice = incomingCost > 0 ? incomingCost : currentCost;
 
               await tx.shopProduct.update({
                 where: { id: item.shopProductId },

@@ -241,10 +241,12 @@ export async function POST(request: Request) {
       if (status === "Received") {
         for (const item of items) {
           if (item.shopProductId) {
+            const incomingCost = FinanceMath.add(Number(item.costPrice) || 0, 0);
             await tx.shopProduct.update({
               where: { id: item.shopProductId },
               data: {
-                stock: { increment: Number(item.quantity) || 0 }
+                stock: { increment: Number(item.quantity) || 0 },
+                ...(incomingCost > 0 ? { costPrice: incomingCost } : {}),
               }
             });
           } else if (item.productId) {

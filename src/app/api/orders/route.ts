@@ -132,6 +132,18 @@ function toNormalizedText(value: string | null | undefined) {
     .toLowerCase();
 }
 
+function normalizeSkuDigits(value: string | null | undefined) {
+  const compact = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!compact) {
+    return "";
+  }
+  const digitsOnly = compact.replace(/\D+/g, "");
+  if (digitsOnly) {
+    return digitsOnly;
+  }
+  return compact.replace(/[^A-Z0-9]+/g, "");
+}
+
 function readExpectedIncomeFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -735,12 +747,26 @@ export async function GET(request: NextRequest) {
     const productNames = Array.from(new Set(
       orders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
     ));
+    const productSkuCandidates = Array.from(new Set(
+      orders.flatMap((order) => order.items.flatMap((item) => {
+        const rawSku = String(item.productNo || "").trim();
+        const normalizedSku = normalizeSkuDigits(rawSku);
+        return [
+          rawSku,
+          normalizedSku,
+          normalizedSku ? `B${normalizedSku}` : "",
+        ].filter(Boolean);
+      }))
+    ));
 
-    const shopProducts = productNames.length > 0
+    const shopProducts = (productNames.length > 0 || productSkuCandidates.length > 0)
       ? await prisma.shopProduct.findMany({
             where: {
               shop: { userId: session.id },
-              productName: { in: productNames },
+              OR: [
+                ...(productNames.length > 0 ? [{ productName: { in: productNames } }] : []),
+                ...(productSkuCandidates.length > 0 ? [{ sku: { in: productSkuCandidates } }] : []),
+              ],
             },
             select: {
               id: true,
@@ -757,20 +783,30 @@ export async function GET(request: NextRequest) {
       : [];
 
     const shopProductMap = new Map<string, MatchedCatalogProduct[]>();
+    const shopProductSkuMap = new Map<string, MatchedCatalogProduct[]>();
     for (const item of shopProducts) {
       const normalizedName = toNormalizedText(item.productName);
-      if (!normalizedName) continue;
-
-      const current = shopProductMap.get(normalizedName) || [];
-      current.push({
+      const mappedProduct = {
         id: item.id,
         name: item.productName || "未命名商品",
         sku: item.sku,
         image: item.productImage,
         sourceType: "shopProduct",
         shopName: item.shop?.name || null,
-      });
-      shopProductMap.set(normalizedName, current);
+      } satisfies MatchedCatalogProduct;
+
+      if (normalizedName) {
+        const current = shopProductMap.get(normalizedName) || [];
+        current.push(mappedProduct);
+        shopProductMap.set(normalizedName, current);
+      }
+
+      const normalizedSku = normalizeSkuDigits(item.sku);
+      if (normalizedSku) {
+        const current = shopProductSkuMap.get(normalizedSku) || [];
+        current.push(mappedProduct);
+        shopProductSkuMap.set(normalizedSku, current);
+      }
     }
 
     const enrichedOrders = orders.map((order) => {
@@ -824,15 +860,22 @@ export async function GET(request: NextRequest) {
         autoOutboundResolvedAt: autoOutboundMeta.resolvedAt,
         items: order.items.map((item) => {
           const normalizedProductName = toNormalizedText(item.productName);
+          const normalizedSku = normalizeSkuDigits(item.productNo);
           const matchedShopProducts = normalizedProductName
             ? (shopProductMap.get(normalizedProductName) || [])
+            : [];
+          const matchedSkuProducts = normalizedSku
+            ? (shopProductSkuMap.get(normalizedSku) || [])
             : [];
           const exactShopProduct = matchedShopProducts.find(
             (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
           );
+          const exactSkuProduct = matchedSkuProducts.find(
+            (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
+          );
           const matchedProduct = !normalizedProductName
-            ? null
-            : (exactShopProduct || null);
+            ? (exactSkuProduct || matchedSkuProducts[0] || null)
+            : (exactSkuProduct || exactShopProduct || matchedSkuProducts[0] || matchedShopProducts[0] || null);
           return {
             ...item,
             matchedProduct,

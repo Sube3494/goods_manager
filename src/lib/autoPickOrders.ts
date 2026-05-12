@@ -2628,9 +2628,9 @@ function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
   }
 
   const compact = raw.replace(/\s+/g, "");
-  const digitMatch = compact.match(/^B?(\d+)/);
-  if (digitMatch?.[1]) {
-    return digitMatch[1];
+  const digitsOnly = compact.replace(/\D+/g, "");
+  if (digitsOnly) {
+    return digitsOnly;
   }
 
   return compact.replace(/[^A-Z0-9]+/g, "");
