@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
 
@@ -517,6 +518,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const storage = await getStorageStrategy();
     const searchParams = request.nextUrl.searchParams;
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize") || 20)));
@@ -790,7 +792,7 @@ export async function GET(request: NextRequest) {
         id: item.id,
         name: item.productName || "未命名商品",
         sku: item.sku,
-        image: item.productImage,
+        image: item.productImage ? storage.resolveUrl(item.productImage) : null,
         sourceType: "shopProduct",
         shopName: item.shop?.name || null,
       } satisfies MatchedCatalogProduct;
