@@ -27,8 +27,8 @@ export async function proxy(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPublicApiKeyWebhook =
-    request.method === "POST" &&
-    (path === "/api/v1/api-key/listened-orders" || path.startsWith("/api/v1/api-key/listened-orders/"));
+    ((request.method === "POST" || request.method === "DELETE") && path === "/api/v1/api-key/listened-orders") ||
+    (request.method === "POST" && path.startsWith("/api/v1/api-key/listened-orders/"));
 
   // Define public paths that don't require authentication
   // STRICT MODE: Only Login, Gallery, and share pages are public.

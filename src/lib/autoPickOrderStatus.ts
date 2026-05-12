@@ -40,6 +40,10 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     return "配送中";
   }
 
+  if (normalized === "expect" || text.includes("expect")) {
+    return "异常";
+  }
+
   if (
     text.includes("待配送")
     || text.includes("待发货")
@@ -84,6 +88,10 @@ export function isAutoPickOrderCancelledStatus(status?: string | null) {
 
 export function isAutoPickOrderDeletedStatus(status?: string | null) {
   return getBaseAutoPickStatusDisplay(status) === "已删除";
+}
+
+export function isAutoPickOrderAbnormalStatus(status?: string | null) {
+  return getBaseAutoPickStatusDisplay(status) === "异常";
 }
 
 export function isAutoPickOrderTerminalStatus(status?: string | null) {

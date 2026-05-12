@@ -31,6 +31,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   getBaseAutoPickStatusDisplay,
+  isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
@@ -356,6 +357,10 @@ function isDeliveringStatus(status?: string | null) {
   return isAutoPickOrderDeliveringStatus(status);
 }
 
+function isAbnormalStatus(status?: string | null) {
+  return isAutoPickOrderAbnormalStatus(status);
+}
+
 function isBrushSyncEligibleOrder(order: Pick<AutoPickOrder, "status" | "isPickup" | "isMainSystemSelfDelivery">) {
   return isCompletedStatus(order.status) && !order.isPickup && !order.isMainSystemSelfDelivery;
 }
@@ -676,10 +681,12 @@ function OrderCard({
   const cancelled = isCancelledStatus(order.status);
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
-  const delivering = isDeliveringStatus(order.status) || Boolean(order.autoCompleteAt);
+  const abnormal = isAbnormalStatus(order.status);
+  const delivering = isDeliveringStatus(order.status) || (!abnormal && Boolean(order.autoCompleteAt));
   const pickup = Boolean(order.isPickup);
   const subscribe = isSubscribeOrder(order);
   const hasOutbound = Boolean(order.hasOutbound);
+  const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal;
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
@@ -722,7 +729,7 @@ function OrderCard({
                       {orderTypeLabel}
                     </span>
                   ) : null}
-                  {order.isMainSystemSelfDelivery ? (
+                  {showBrushMarker ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 text-[13px] font-medium leading-none text-rose-700 dark:text-rose-400">
                       刷单
                     </span>
@@ -839,7 +846,7 @@ function OrderCard({
                 订单已删除
               </span>
             ) : null}
-            {!terminal && order.autoCompleteAt ? (
+            {!terminal && !abnormal && order.autoCompleteAt ? (
               <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <TimerReset size={12} />
                 <span className="truncate sm:hidden">{`自动完成 ${compactAutoCompleteAt}`}</span>
@@ -902,14 +909,18 @@ function OrderCard({
               variant="primary"
               icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
               onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
-              disabled={Boolean(actingId) || terminal}
+              disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !order.isMainSystemSelfDelivery))}
               mobileIconOnly
               title={
                 pickup
                   ? (terminal ? (cancelled ? "订单已取消，不能完成取货" : "订单已取货，不能重复完成取货") : undefined)
                   : terminal
                     ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
-                    : undefined
+                    : !order.isMainSystemSelfDelivery
+                      ? "当前是平台骑手配送，不能在主系统直接完成配送"
+                    : !delivering
+                      ? "订单还未进入配送中，不能直接完成配送"
+                      : undefined
               }
             />
           </div>
@@ -924,7 +935,7 @@ function OrderCard({
               <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <DetailStat label="订单状态" value={getDisplayStatus(order)} />
                 <DetailStat label="订单类型" value={orderTypeLabel || "普通单"} />
-                <DetailStat label="刷单标记" value={order.isMainSystemSelfDelivery ? "主系统自配" : "否"} />
+                <DetailStat label="刷单标记" value={showBrushMarker ? "主系统自配" : "否"} />
                 <DetailStat label="出库状态" value={hasOutbound ? "已出库" : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
@@ -2347,7 +2358,7 @@ export default function OrdersPage() {
     const sourceOrders = activeTab === "today" ? filteredOrders : visibleOrders;
     const cancelledCount = sourceOrders.filter((item) => isCancelledStatus(item.status)).length;
     const validOrders = sourceOrders.filter((item) => !isCancelledStatus(item.status));
-    const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery).length;
+    const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status)).length;
     const trueOrderCount = Math.max(0, validOrders.length - brushCount);
     return {
       validCount: validOrders.length,

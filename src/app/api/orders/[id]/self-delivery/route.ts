@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
+  isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickPickupOrder,
@@ -43,20 +44,45 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
     }
 
-    const result = await callAutoPickCommand(session.id, "/self-delivery", {
-      platform: order.platform,
-      dailyPlatformSequence: order.dailyPlatformSequence,
-      orderNo: order.orderNo,
-      sourceId: order.sourceId,
-      logisticId: order.logisticId,
-    });
-
-    if (result.ok) {
+    let commandOrder = order;
+    if (!String(order.sourceId || "").trim() || !String(order.logisticId || "").trim()) {
       const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
         id: order.sourceId,
         platform: order.platform,
         orderNo: order.orderNo,
         orderTime: order.orderTime,
+      }).catch((refreshError) => {
+        console.error("Failed to refresh auto-pick order before self delivery:", refreshError);
+        return null;
+      });
+
+      if (refreshedOrder) {
+        commandOrder = refreshedOrder;
+      }
+    }
+
+    const sourceId = String(commandOrder.sourceId || "").trim();
+    const logisticId = String(commandOrder.logisticId || "").trim();
+    if (!sourceId || !logisticId) {
+      return NextResponse.json({
+        error: "订单缺少自配所需信息，已尝试自动同步但仍未获取到配送标识，请先手动同步订单后再试。",
+      }, { status: 409 });
+    }
+
+    const result = await callAutoPickCommand(session.id, "/self-delivery", {
+      platform: commandOrder.platform,
+      dailyPlatformSequence: commandOrder.dailyPlatformSequence,
+      orderNo: commandOrder.orderNo,
+      sourceId,
+      logisticId,
+    });
+
+    if (result.ok) {
+      const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
+        id: sourceId,
+        platform: commandOrder.platform,
+        orderNo: commandOrder.orderNo,
+        orderTime: commandOrder.orderTime,
       }).catch((refreshError) => {
         console.error("Failed to refresh auto-pick order after self delivery:", refreshError);
         return null;
@@ -64,11 +90,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
       const schedulingOrder = refreshedOrder || order;
       const integrationConfig = await getAutoPickIntegrationConfigByUserId(session.id);
-      const autoCompleteAt = getEstimatedAutoCompleteAt(schedulingOrder, integrationConfig.selfDeliveryTiming);
+      const autoCompleteBlocked = isAutoPickOrderAbnormalStatus(schedulingOrder.status);
+      const autoCompleteAt = autoCompleteBlocked
+        ? null
+        : getEstimatedAutoCompleteAt(schedulingOrder, integrationConfig.selfDeliveryTiming);
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
-          status: "配送中",
+          status: autoCompleteBlocked ? (schedulingOrder.status || order.status) : "配送中",
           deliveryDeadline: refreshedOrder?.deliveryDeadline || order.deliveryDeadline || null,
           autoCompleteAt: autoCompleteAt || null,
         },
@@ -82,7 +111,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           dueAt: autoCompleteAt,
         });
       } else {
-        await cancelAutoCompleteJob(id, "missing-auto-complete-time");
+        await cancelAutoCompleteJob(id, autoCompleteBlocked ? "abnormal-status-no-auto-complete" : "missing-auto-complete-time");
       }
     }
 

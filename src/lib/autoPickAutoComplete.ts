@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
-import { isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderAbnormalStatus, isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { AutoPickAutoCompleteJobStatus } from "../../prisma/generated-client";
 
 const AUTO_COMPLETE_RETRY_DELAY_MS = 15 * 1000;
@@ -294,7 +294,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
     }
 
     const order = job.order;
-    if (!order || isAutoPickOrderTerminalStatus(order.status)) {
+    if (!order || isAutoPickOrderTerminalStatus(order.status) || isAutoPickOrderAbnormalStatus(order.status)) {
       await markJobCancelled(job.id, job.orderId, "order-terminal-before-auto-complete");
       results.push({ id: job.id, ok: true });
       continue;
@@ -380,19 +380,29 @@ export async function ensureAutoCompleteJob(params: { userId: string; orderId: s
 }
 
 export async function cancelAutoCompleteJob(orderId: string, reason = "manual-cancel") {
-  await prisma.autoPickAutoCompleteJob.updateMany({
-    where: {
-      orderId,
-      status: {
-        in: [JOB_PENDING, JOB_RUNNING],
+  await prisma.$transaction([
+    prisma.autoPickOrder.updateMany({
+      where: {
+        id: orderId,
       },
-    },
-    data: {
-      status: JOB_CANCELLED,
-      lockedAt: null,
-      lastError: reason.slice(0, 1000),
-    },
-  });
+      data: {
+        autoCompleteAt: null,
+      },
+    }),
+    prisma.autoPickAutoCompleteJob.updateMany({
+      where: {
+        orderId,
+        status: {
+          in: [JOB_PENDING, JOB_RUNNING],
+        },
+      },
+      data: {
+        status: JOB_CANCELLED,
+        lockedAt: null,
+        lastError: reason.slice(0, 1000),
+      },
+    }),
+  ]);
 
   await scheduleNextAutoCompleteJob();
 }
@@ -434,7 +444,8 @@ export async function reconcileMissingAutoCompleteJobs(limit = 100) {
   });
 
   for (const order of orders) {
-    if (!order.autoCompleteAt || isAutoPickOrderTerminalStatus(order.status)) {
+    if (!order.autoCompleteAt || isAutoPickOrderTerminalStatus(order.status) || isAutoPickOrderAbnormalStatus(order.status)) {
+      await cancelAutoCompleteJob(order.id, "order-not-eligible-for-auto-complete");
       continue;
     }
 

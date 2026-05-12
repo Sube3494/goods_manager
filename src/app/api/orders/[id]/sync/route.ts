@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
-import { isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -57,8 +57,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
     }
 
-    if (isAutoPickOrderCompletedStatus(refreshedOrder.status) || isAutoPickOrderCancelledStatus(refreshedOrder.status)) {
-      await cancelAutoCompleteJob(order.id, "order-synced-to-terminal");
+    if (
+      isAutoPickOrderCompletedStatus(refreshedOrder.status)
+      || isAutoPickOrderCancelledStatus(refreshedOrder.status)
+      || isAutoPickOrderAbnormalStatus(refreshedOrder.status)
+    ) {
+      await cancelAutoCompleteJob(
+        order.id,
+        isAutoPickOrderAbnormalStatus(refreshedOrder.status) ? "order-synced-to-abnormal" : "order-synced-to-terminal"
+      );
     }
     if (isAutoPickOrderCompletedStatus(refreshedOrder.status)) {
       await syncBrushOrderFromCompletedAutoPickOrder(session.id, refreshedOrder.id).catch((brushError) => {
