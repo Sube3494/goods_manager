@@ -90,9 +90,10 @@ export async function DELETE(request: NextRequest) {
     const payload = await request.json().catch(() => null) as Record<string, unknown> | null;
     const platform = String(payload?.platform || "").trim();
     const orderNo = String(payload?.orderNo || "").trim();
+    const sourceId = String(payload?.sourceId || "").trim();
 
-    if (!platform || !orderNo) {
-      return NextResponse.json({ error: "platform and orderNo are required" }, { status: 400 });
+    if (!sourceId && (!platform || !orderNo)) {
+      return NextResponse.json({ error: "sourceId or platform and orderNo are required" }, { status: 400 });
     }
 
     const targetUserId = await resolveAutoPickTargetUserId(requestApiKey);
@@ -102,13 +103,14 @@ export async function DELETE(request: NextRequest) {
       }, { status: 500 });
     }
 
-    const result = await deleteAutoPickOrderByIdentity(targetUserId, { platform, orderNo });
+    const result = await deleteAutoPickOrderByIdentity(targetUserId, { platform, orderNo, sourceId });
     await markAutoPickApiKeyUsed(requestApiKey);
 
     return NextResponse.json({
       ok: true,
       platform,
       orderNo,
+      sourceId: sourceId || undefined,
       deleted: Boolean(result.deleted),
       notFound: Boolean(result.notFound),
       id: "id" in result ? result.id : undefined,

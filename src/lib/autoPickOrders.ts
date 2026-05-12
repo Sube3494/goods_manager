@@ -1846,26 +1846,44 @@ export async function revokeAutoPickApiKey(userId: string, id: string) {
   });
 }
 
-export async function deleteAutoPickOrderByIdentity(userId: string, lookup: { platform: string; orderNo: string }) {
+export async function deleteAutoPickOrderByIdentity(
+  userId: string,
+  lookup: { platform?: string; orderNo?: string; sourceId?: string }
+) {
   const platform = String(lookup.platform || "").trim();
   const orderNo = String(lookup.orderNo || "").trim();
+  const sourceId = String(lookup.sourceId || "").trim();
 
-  if (!platform || !orderNo) {
-    throw new Error("platform and orderNo are required");
+  if (!sourceId && (!platform || !orderNo)) {
+    throw new Error("sourceId or platform and orderNo are required");
   }
 
-  const existing = await prisma.autoPickOrder.findUnique({
-    where: {
-      userId_platform_orderNo: {
+  const existing = sourceId
+    ? await prisma.autoPickOrder.findFirst({
+      where: {
         userId,
-        platform,
-        orderNo,
+        sourceId,
       },
-    },
-    select: {
-      id: true,
-    },
-  });
+      select: {
+        id: true,
+        platform: true,
+        orderNo: true,
+      },
+    })
+    : await prisma.autoPickOrder.findUnique({
+      where: {
+        userId_platform_orderNo: {
+          userId,
+          platform,
+          orderNo,
+        },
+      },
+      select: {
+        id: true,
+        platform: true,
+        orderNo: true,
+      },
+    });
 
   if (!existing) {
     return { deleted: false, notFound: true };
@@ -1879,8 +1897,8 @@ export async function deleteAutoPickOrderByIdentity(userId: string, lookup: { pl
     type: "delete",
     userId,
     orderId: existing.id,
-    orderNo: lookup.orderNo,
-    platform: lookup.platform,
+    orderNo: existing.orderNo,
+    platform: existing.platform,
     at: new Date().toISOString(),
   });
 
