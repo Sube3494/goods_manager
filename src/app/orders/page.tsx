@@ -129,6 +129,25 @@ function serializeMaiyatianMappings(config: Pick<AutoPickIntegrationConfig, "mai
   return JSON.stringify(Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : []);
 }
 
+function getSyncErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const normalized = message.trim();
+
+  if (!normalized) {
+    return "批量同步失败";
+  }
+
+  if (normalized.includes("Provided Date object is invalid") || normalized.includes("orderTime")) {
+    return "批量同步失败：部分订单时间格式异常，请重试；如果持续出现，我已经保留了详细日志可继续排查。";
+  }
+
+  if (normalized.length > 180) {
+    return "批量同步失败：服务端返回了过长的底层错误，详细原因已写入控制台日志。";
+  }
+
+  return normalized;
+}
+
 function formatTimingNumber(value: number) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
@@ -260,6 +279,51 @@ function getBrushSyncSkippedReasonText(raw: unknown) {
       return "订单不存在";
     default:
       return reason || "";
+  }
+}
+
+function getAutoPickSyncSkippedReasonText(raw: unknown) {
+  const reason = String(raw || "").trim();
+
+  if (!reason) {
+    return "";
+  }
+
+  if (reason.startsWith("missing or invalid fields:")) {
+    const rawFields = reason.slice("missing or invalid fields:".length).trim();
+    const fields = rawFields
+      .split(",")
+      .map((field) => field.trim())
+      .filter(Boolean)
+      .map((field) => {
+        switch (field) {
+          case "platform":
+            return "平台";
+          case "orderNo":
+            return "订单号";
+          case "orderTime":
+            return "下单时间";
+          case "userAddress":
+            return "收货地址";
+          case "id":
+            return "订单 ID";
+          case "items":
+            return "商品项";
+          default:
+            return field;
+        }
+      });
+
+    return fields.length > 0 ? `缺少或无效字段：${fields.join("、")}` : "订单字段不完整";
+  }
+
+  switch (reason) {
+    case "payload is not an object":
+      return "订单数据格式不正确";
+    case "payload shape is invalid":
+      return "订单数据结构不正确";
+    default:
+      return reason;
   }
 }
 
@@ -1037,12 +1101,10 @@ function IntegrationModal({
   isFetchingMaiyatianShops,
   isTestingPlugin,
   isTestingCookie,
-  isRegeneratingInboundApiKey,
   modalRef,
   onClose,
   onChange,
   onFetchMaiyatianShops,
-  onRegenerateInboundApiKey,
   onTestPlugin,
   onTestCookie,
 }: {
@@ -1052,12 +1114,10 @@ function IntegrationModal({
   isFetchingMaiyatianShops: boolean;
   isTestingPlugin: boolean;
   isTestingCookie: boolean;
-  isRegeneratingInboundApiKey: boolean;
   modalRef: React.RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onChange: (value: AutoPickIntegrationConfig) => void;
   onFetchMaiyatianShops: () => void;
-  onRegenerateInboundApiKey: () => void;
   onTestPlugin: () => void;
   onTestCookie: () => void;
 }) {
@@ -1208,17 +1268,7 @@ function IntegrationModal({
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">主系统通过这个地址调用 `auto-pick` 脚本。</p>
               </div>
               <div className="mt-4 min-w-0 border-t border-black/8 pt-4 dark:border-white/10">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调密钥</div>
-                  <button
-                    type="button"
-                    onClick={onRegenerateInboundApiKey}
-                    disabled={isRegeneratingInboundApiKey}
-                    className={pillButtonClass}
-                  >
-                    {isRegeneratingInboundApiKey ? "生成中..." : "重新生成"}
-                  </button>
-                </div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调密钥</div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
                   <input
                     type={showInboundApiKey ? "text" : "password"}
@@ -1236,7 +1286,7 @@ function IntegrationModal({
                     {showInboundApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本上报订单时使用这个值区分用户。你可以直接输入，也可以点“重新生成”拿一个新密钥。</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">这里填写外部系统分配给你的回调密钥。脚本上报订单时会使用这个值做校验。</p>
               </div>
             </div>
 
@@ -1660,7 +1710,6 @@ export default function OrdersPage() {
   const [isBrushSyncPickerOpen, setIsBrushSyncPickerOpen] = useState(false);
   const [isTestingPlugin, setIsTestingPlugin] = useState(false);
   const [isTestingCookie, setIsTestingCookie] = useState(false);
-  const [isRegeneratingInboundApiKey, setIsRegeneratingInboundApiKey] = useState(false);
   const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const [isBulkBrushSyncing, setIsBulkBrushSyncing] = useState(false);
@@ -2012,47 +2061,6 @@ export default function OrdersPage() {
     }
   }, [fetchOrders, integrationConfig, savedMappingsDigest, showToast]);
 
-  const regenerateInboundApiKey = useCallback(async () => {
-    setIsRegeneratingInboundApiKey(true);
-    try {
-      const response = await fetch("/api/orders/integration", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ regenerateInboundApiKey: true }),
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data?.error || "重新生成回调密钥失败");
-      }
-
-      const nextConfig = readIntegrationConfigResponse(data);
-      setIntegrationConfig(nextConfig);
-      setSavedIntegrationDigest(serializeIntegrationConfig({
-        pluginBaseUrl: nextConfig.pluginBaseUrl,
-        inboundApiKey: nextConfig.inboundApiKey,
-        maiyatianCookie: nextConfig.maiyatianCookie,
-        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
-        selfDeliveryTiming: nextConfig.selfDeliveryTiming,
-      }));
-      setSavedMappingsDigest(serializeMaiyatianMappings({
-        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
-      }));
-      const nextInboundApiKey = nextConfig.inboundApiKey.trim();
-      if (nextInboundApiKey && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(nextInboundApiKey);
-        showToast("已生成新的唯一回调密钥，并自动复制到剪贴板", "success");
-      } else {
-        showToast("已生成新的唯一回调密钥", "success");
-      }
-    } catch (error) {
-      console.error("Failed to regenerate inbound api key:", error);
-      showToast(error instanceof Error ? error.message : "重新生成回调密钥失败", "error");
-    } finally {
-      setIsRegeneratingInboundApiKey(false);
-    }
-  }, [showToast]);
-
   const testIntegrationConfig = async (target: "plugin" | "cookie") => {
     if (target === "plugin") {
       setIsTestingPlugin(true);
@@ -2223,7 +2231,7 @@ export default function OrdersPage() {
       const backfilledCount = Number(data?.backfilled || 0);
       const skippedOrders = Array.isArray(data?.skippedOrders) ? data.skippedOrders : [];
       const firstSkippedReason = skippedOrders[0] && typeof skippedOrders[0] === "object"
-        ? String((skippedOrders[0] as { reason?: unknown }).reason || "").trim()
+        ? getAutoPickSyncSkippedReasonText((skippedOrders[0] as { reason?: unknown }).reason)
         : "";
       showToast(
         backfilledCount > 0
@@ -2238,7 +2246,7 @@ export default function OrdersPage() {
       await fetchOrders({ silent: true });
     } catch (error) {
       console.error("Failed to sync orders:", error);
-      showToast(error instanceof Error ? error.message : "批量同步失败", "error");
+      showToast(getSyncErrorMessage(error), "error");
     } finally {
       setIsBulkSyncing(false);
     }
@@ -2766,12 +2774,10 @@ export default function OrdersPage() {
                 isFetchingMaiyatianShops={isFetchingMaiyatianShops}
                 isTestingPlugin={isTestingPlugin}
                 isTestingCookie={isTestingCookie}
-                isRegeneratingInboundApiKey={isRegeneratingInboundApiKey}
                 modalRef={modalRef}
                 onClose={() => setIsIntegrationOpen(false)}
                 onChange={setIntegrationConfig}
                 onFetchMaiyatianShops={fetchMaiyatianShops}
-                onRegenerateInboundApiKey={() => void regenerateInboundApiKey()}
                 onTestPlugin={() => void testIntegrationConfig("plugin")}
                 onTestCookie={() => void testIntegrationConfig("cookie")}
               />,

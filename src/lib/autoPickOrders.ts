@@ -1441,29 +1441,7 @@ export async function getAutoPickIntegrationConfigByUserId(userId: string) {
   const currentPermissions = user?.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions)
     ? { ...(user.permissions as Record<string, unknown>) }
     : {};
-  const config = normalizeAutoPickIntegrationConfig(currentPermissions.autoPickIntegration);
-
-  if (config.inboundApiKey) {
-    return config;
-  }
-
-  const nextConfig: AutoPickIntegrationConfig = {
-    ...config,
-    inboundApiKey: await generateUniqueInboundIntegrationKey(userId),
-  };
-  const nextPermissions: Record<string, unknown> = {
-    ...currentPermissions,
-    autoPickIntegration: nextConfig,
-  };
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      permissions: asPrismaJsonValue(nextPermissions),
-    },
-  });
-
-  return nextConfig;
+  return normalizeAutoPickIntegrationConfig(currentPermissions.autoPickIntegration);
 }
 
 async function listAutoPickCookieUsers() {
@@ -1498,13 +1476,16 @@ export async function updateAutoPickIntegrationConfigByUserId(userId: string, co
     ? { ...(user.permissions as Record<string, unknown>) }
     : {};
 
-  const currentConfig = normalizeAutoPickIntegrationConfig(currentPermissions.autoPickIntegration);
   const normalizedInput = normalizeAutoPickIntegrationConfig(config);
+  if (normalizedInput.inboundApiKey) {
+    const taken = await isManualIntegrationKeyTaken(normalizedInput.inboundApiKey, userId);
+    if (taken) {
+      throw new Error("回调密钥已被其他账号占用，请更换后再保存");
+    }
+  }
+
   const nextConfig: AutoPickIntegrationConfig = {
     ...normalizedInput,
-    inboundApiKey: normalizedInput.inboundApiKey
-      ? normalizedInput.inboundApiKey
-      : currentConfig.inboundApiKey || await generateUniqueInboundIntegrationKey(userId),
   };
 
   const nextPermissions: Record<string, unknown> = {
@@ -1518,37 +1499,36 @@ export async function updateAutoPickIntegrationConfigByUserId(userId: string, co
       permissions: asPrismaJsonValue(nextPermissions),
     },
   });
+
+  await syncAutoPickPluginCookie(nextConfig);
 
   return normalizeAutoPickIntegrationConfig(nextPermissions.autoPickIntegration);
 }
 
-export async function regenerateAutoPickIntegrationInboundKey(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { permissions: true },
-  });
+async function syncAutoPickPluginCookie(config: AutoPickIntegrationConfig) {
+  if (!config.pluginBaseUrl || !config.inboundApiKey) {
+    return;
+  }
 
-  const currentPermissions = user?.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions)
-    ? { ...(user.permissions as Record<string, unknown>) }
-    : {};
-  const currentConfig = normalizeAutoPickIntegrationConfig(currentPermissions.autoPickIntegration);
-  const nextConfig: AutoPickIntegrationConfig = {
-    ...currentConfig,
-    inboundApiKey: await generateUniqueInboundIntegrationKey(userId),
-  };
-  const nextPermissions: Record<string, unknown> = {
-    ...currentPermissions,
-    autoPickIntegration: nextConfig,
-  };
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      permissions: asPrismaJsonValue(nextPermissions),
+  const url = new URL("/api/connections/cookie", `${config.pluginBaseUrl.replace(/\/+$/, "")}/`);
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-API-Key": config.inboundApiKey,
     },
+    body: JSON.stringify({
+      cookie: config.maiyatianCookie,
+      enabled: true,
+    }),
+    cache: "no-store",
   });
 
-  return nextConfig;
+  const data = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(String(data.error || data.reason || `同步脚本 Cookie 失败（${response.status}）`));
+  }
 }
 
 async function findUserIdByManualIntegrationKey(apiKey: string) {
@@ -1578,10 +1558,6 @@ export function generateAutoPickApiKey() {
   return `apk_${randomBytes(24).toString("hex")}`;
 }
 
-function generateAutoPickInboundApiKey() {
-  return `apk_in_${randomBytes(18).toString("hex")}`;
-}
-
 async function isManualIntegrationKeyTaken(apiKey: string, excludeUserId?: string) {
   if (!apiKey) return false;
 
@@ -1607,18 +1583,6 @@ async function isManualIntegrationKeyTaken(apiKey: string, excludeUserId?: strin
   }
 
   return false;
-}
-
-async function generateUniqueInboundIntegrationKey(userId: string) {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const candidate = generateAutoPickInboundApiKey();
-    const taken = await isManualIntegrationKeyTaken(candidate, userId);
-    if (!taken) {
-      return candidate;
-    }
-  }
-
-  throw new Error("Failed to generate a unique inbound api key");
 }
 
 export function getAutoPickApiKeyPrefix(apiKey: string) {

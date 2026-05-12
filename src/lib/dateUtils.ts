@@ -79,6 +79,15 @@ export function parseAsShanghaiTime(input: string | Date | null | undefined): Da
   if (input instanceof Date) return input;
   
   const str = input.trim();
+
+  // 兼容 Unix 时间戳字符串（秒 / 毫秒）
+  if (/^\d{10,13}$/.test(str)) {
+    const numeric = Number(str);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      const millis = str.length === 13 ? numeric : numeric * 1000;
+      return new Date(millis);
+    }
+  }
   
   // 1. 如果字符串包含时区信息 (Z, +, -[offset])，直接解析即可
   if (str.includes('Z') || str.includes('+') || /-\d{2}:\d{2}$/.test(str)) {
