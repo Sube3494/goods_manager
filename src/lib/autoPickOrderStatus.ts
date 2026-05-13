@@ -160,17 +160,48 @@ export function isAutoPickSelfDeliveryStarted(order: {
   return statusCandidates.some((item) => /自配|商家自配|oneself/i.test(String(item || "").trim()));
 }
 
-export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string | null) {
-  const candidates = [userAddress];
+export function isAutoPickPickupOrder(
+  rawPayload: unknown,
+  userAddress?: string | null,
+  shopAddress?: string | null,
+) {
+  const candidates = [userAddress, shopAddress];
 
   if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
     const record = rawPayload as Record<string, unknown>;
+    const delivery = record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
+      ? record.delivery as Record<string, unknown>
+      : {};
+    const extend = record.extend && typeof record.extend === "object" && !Array.isArray(record.extend)
+      ? record.extend as Record<string, unknown>
+      : {};
     candidates.push(
       String(record.shopAddress || ""),
       String(record.rawShopAddress || ""),
+      String(record.shop_address_detail || ""),
+      String(record.raw_shop_address || ""),
       String(record.shop_address || ""),
+      String(record.storeAddress || ""),
       String(record.store_address || ""),
+      String(record.merchantAddress || ""),
       String(record.merchant_address || ""),
+      String(record.channel_address || ""),
+      String(record.channelAddress || ""),
+      String(extend.channel_address || ""),
+      String(extend.channelAddress || ""),
+      String(extend.store_address || ""),
+      String(extend.storeAddress || ""),
+      String(extend.merchant_address || ""),
+      String(extend.merchantAddress || ""),
+      String(record.status || ""),
+      String(record.tips || ""),
+      String(record.deliveryTimeRange || ""),
+      String(record.delivery_time_range || ""),
+      String(record.delivery_time_format || ""),
+      String(record.deliveryTypeName || ""),
+      String(record.delivery_type_name || ""),
+      String(record.fulfilmentTypeName || ""),
+      String(record.fulfilment_type_name || ""),
       String(record.unencrypted_map_address || ""),
       String(record.unencrypted_address || ""),
       String(record.user_remark || ""),
@@ -179,11 +210,16 @@ export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string 
       String(record.deliveryType || ""),
       String(record.delivery_type || ""),
       String(record.fulfilmentType || ""),
-      String(record.fulfilment_type || "")
+      String(record.fulfilment_type || ""),
+      String(delivery.pickupTime || ""),
+      String(delivery.pickup_time || ""),
+      String(delivery.track || ""),
+      String(delivery.logisticName || ""),
+      String(delivery.logistic_name || "")
     );
   }
 
-  return candidates.some((item) => /到店自取|门店自取|上门自取|线下自提|自提/.test(String(item || "").trim()));
+  return candidates.some((item) => /到店自取|门店自取|上门自取|线下自提|到店取货|待取货|取货时间|自提/.test(String(item || "").trim()));
 }
 
 export function isAutoPickOtherPickupOrder(rawPayload: unknown) {
@@ -200,10 +236,11 @@ export function resolveAutoPickBusinessStatus(
   status: string | null | undefined,
   rawPayload: unknown,
   userAddress?: string | null,
+  shopAddress?: string | null,
 ) {
   const baseStatus = getBaseAutoPickStatusDisplay(status);
 
-  if (isAutoPickOtherPickupOrder(rawPayload) && !isAutoPickPickupOrder(rawPayload, userAddress)) {
+  if (isAutoPickOtherPickupOrder(rawPayload) && !isAutoPickPickupOrder(rawPayload, userAddress, shopAddress)) {
     if (baseStatus === "同步中" || baseStatus === "待处理" || baseStatus === "已拣货") {
       return "待配送";
     }

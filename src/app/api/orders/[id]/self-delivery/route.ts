@@ -64,7 +64,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order already cancelled" }, { status: 409 });
     }
 
-    if (isAutoPickPickupOrder(order.rawPayload, order.userAddress)) {
+    if (isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress)) {
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
     }
 

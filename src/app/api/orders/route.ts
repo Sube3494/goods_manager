@@ -817,9 +817,9 @@ export async function GET(request: NextRequest) {
         : readExpectedIncomeFromRawPayload(order.rawPayload);
       const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
       const deleted = isAutoPickOrderDeletedStatus(order.status);
-      const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress);
+      const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress);
       const otherPickup = isAutoPickOtherPickupOrder(order.rawPayload);
-      const businessStatus = resolveAutoPickBusinessStatus(order.status, order.rawPayload, order.userAddress);
+      const businessStatus = resolveAutoPickBusinessStatus(order.status, order.rawPayload, order.userAddress, order.shopAddress);
       return {
         ...order,
         shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload),

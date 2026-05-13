@@ -683,11 +683,11 @@ function OrderCard({
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
-  const delivering = isDeliveringStatus(order.status) || (!abnormal && Boolean(order.autoCompleteAt));
   const pickup = Boolean(order.isPickup);
+  const delivering = !pickup && (isDeliveringStatus(order.status) || (!abnormal && Boolean(order.autoCompleteAt)));
   const subscribe = isSubscribeOrder(order);
   const hasOutbound = Boolean(order.hasOutbound);
-  const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal;
+  const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal && !pickup;
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
@@ -728,6 +728,11 @@ function OrderCard({
                   {orderTypeLabel ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2.5 text-[13px] font-medium leading-none text-violet-700 dark:text-violet-400">
                       {orderTypeLabel}
+                    </span>
+                  ) : null}
+                  {pickup ? (
+                    <span className="inline-flex h-8 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2.5 text-[13px] font-medium leading-none text-sky-700 dark:text-sky-400">
+                      到店自取
                     </span>
                   ) : null}
                   {showBrushMarker ? (
@@ -847,7 +852,7 @@ function OrderCard({
                 订单已删除
               </span>
             ) : null}
-            {!terminal && !abnormal && order.autoCompleteAt ? (
+            {!pickup && !terminal && !abnormal && order.autoCompleteAt ? (
               <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <TimerReset size={12} />
                 <span className="truncate sm:hidden">{`自动完成 ${compactAutoCompleteAt}`}</span>
