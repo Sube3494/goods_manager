@@ -27,6 +27,7 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
 
   if (
     text.includes("已完成")
+    || text.includes("配送完成")
     || normalized === "done"
     || normalized === "completed"
     || normalized === "complete"
@@ -101,6 +102,62 @@ export function isAutoPickOrderTerminalStatus(status?: string | null) {
 
 export function isAutoPickOrderDeliveringStatus(status?: string | null) {
   return getBaseAutoPickStatusDisplay(status) === "配送中";
+}
+
+export function doesAutoPickOrderRequirePickConfirmation(platform?: string | null) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("美团")
+    || normalized.includes("meituan")
+    || normalized.includes("淘宝")
+    || normalized.includes("taobao");
+}
+
+export function isAutoPickPickCompleted(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+
+  const record = rawPayload as Record<string, unknown>;
+  const pickProgress = record.pickProgress;
+  if (!pickProgress || typeof pickProgress !== "object" || Array.isArray(pickProgress)) {
+    return false;
+  }
+
+  return Boolean((pickProgress as Record<string, unknown>).pickCompleted);
+}
+
+export function isAutoPickSelfDeliveryStarted(order: {
+  status?: string | null;
+  rawPayload?: unknown;
+  delivery?: unknown;
+}) {
+  if (isAutoPickOrderDeliveringStatus(order.status)) {
+    return true;
+  }
+
+  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  const delivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+    ? order.delivery as Record<string, unknown>
+    : {};
+
+  const statusCandidates = [
+    order.status,
+    rawPayload.status,
+    rawPayload.tips,
+    rawPayload.delivery_status,
+    rawPayload.deliveryStatus,
+    rawPayload.logisticTag,
+    rawPayload.logistic_tag,
+    rawPayload.logisticName,
+    rawPayload.logistic_name,
+    delivery.logisticName,
+    delivery.logistic_name,
+    delivery.track,
+  ];
+
+  return statusCandidates.some((item) => /自配|商家自配|oneself/i.test(String(item || "").trim()));
 }
 
 export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string | null) {

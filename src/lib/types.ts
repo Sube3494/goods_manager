@@ -174,6 +174,7 @@ export interface AutoPickOrder {
   rawShopAddress?: string | null;
   matchedShopName?: string | null;
   isMainSystemSelfDelivery?: boolean;
+  isPickCompleted?: boolean;
   isPickup?: boolean;
   isOtherPickup?: boolean;
   isDeleted?: boolean;

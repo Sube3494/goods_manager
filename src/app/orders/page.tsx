@@ -30,6 +30,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
+  doesAutoPickOrderRequirePickConfirmation,
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
@@ -329,9 +330,12 @@ function getAutoPickSyncSkippedReasonText(raw: unknown) {
 }
 
 
-function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status">) {
+function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted">) {
   const baseStatus = getBaseAutoPickStatusDisplay(order.status);
   if (!order.isPickup) {
+    if (doesAutoPickOrderRequirePickConfirmation(order.platform) && !isTerminalStatus(order.status) && !isDeliveringStatus(order.status) && !isAbnormalStatus(order.status)) {
+      return order.isPickCompleted ? "已拣货" : "未拣货";
+    }
     return baseStatus;
   }
 
@@ -383,11 +387,11 @@ function getStatusTone(display: string) {
     };
   }
 
-  if (display === "已完成") {
+  if (display === "已完成" || display === "已取货") {
     return {
-      badge: "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-      dot: "bg-emerald-500",
-      soft: "bg-emerald-500/8 text-emerald-700 dark:text-emerald-300",
+      badge: "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-400",
+      dot: "bg-sky-500",
+      soft: "bg-sky-500/8 text-sky-700 dark:text-sky-300",
     };
   }
 
@@ -545,7 +549,7 @@ function MetricCard({
   );
 }
 
-function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status"> }) {
+function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted"> }) {
   const display = getDisplayStatus(order);
   const tone = getStatusTone(display);
   return (
@@ -695,6 +699,8 @@ function OrderCard({
   const deadlineDisplay = getDeadlineDisplay(order);
   const autoCompleteFailed = hasAutoCompleteFailure(order);
   const autoOutboundFailed = hasAutoOutboundFailure(order);
+  const requiresPickConfirmation = doesAutoPickOrderRequirePickConfirmation(order.platform);
+  const pickCompleted = Boolean(order.isPickCompleted);
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
   const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
@@ -892,7 +898,7 @@ function OrderCard({
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal || delivering || pickup}
+              disabled={Boolean(actingId) || terminal || delivering || pickup || (requiresPickConfirmation && !pickCompleted)}
               mobileIconOnly
               title={
                 pickup
@@ -901,6 +907,8 @@ function OrderCard({
                   ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
                   : delivering
                     ? "订单已在配送中，不能重复发起自配"
+                    : requiresPickConfirmation && !pickCompleted
+                      ? "订单还没拣货完成，等收到上报成功后才能自配"
                     : undefined
               }
             />

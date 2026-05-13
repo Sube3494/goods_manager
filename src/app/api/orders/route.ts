@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
-import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
@@ -828,6 +828,9 @@ export async function GET(request: NextRequest) {
         rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isMainSystemSelfDelivery: readMainSystemSelfDeliveryFlag(order.rawPayload),
+        isPickCompleted: doesAutoPickOrderRequirePickConfirmation(order.platform)
+          ? isAutoPickPickCompleted(order.rawPayload)
+          : true,
         isPickup: pickup,
         isOtherPickup: otherPickup,
         isDeleted: deleted,
