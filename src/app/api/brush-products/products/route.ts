@@ -9,6 +9,10 @@ const naturalSortCollator = new Intl.Collator("zh-CN", {
   sensitivity: "base",
 });
 
+function normalizeShopName(value: string | null | undefined) {
+  return String(value || "").trim();
+}
+
 function buildSearchWhere(search: string): Prisma.ProductWhereInput | undefined {
   const keyword = search.trim();
   if (!keyword) return undefined;
@@ -163,7 +167,12 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    products.sort((a, b) => {
+    const normalizedShopName = normalizeShopName(shopName);
+    const filteredProducts = normalizedShopName
+      ? products.filter((product) => normalizeShopName(product.shopName) === normalizedShopName)
+      : products;
+
+    filteredProducts.sort((a, b) => {
       const skuCompare = naturalSortCollator.compare(
         String(a.sku || "").trim(),
         String(b.sku || "").trim()
@@ -195,11 +204,11 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      items: products,
-      total,
+      items: filteredProducts,
+      total: normalizedShopName ? filteredProducts.length : total,
       page,
       pageSize,
-      hasMore: skip + items.length < total,
+      hasMore: normalizedShopName ? false : skip + items.length < total,
     });
   } catch (error) {
     console.error("Failed to fetch brush product library items:", error);

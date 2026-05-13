@@ -22,6 +22,10 @@ function naturalCompareText(a: string | null | undefined, b: string | null | und
   });
 }
 
+function normalizeShopName(value: string | null | undefined) {
+  return String(value || "").trim();
+}
+
 interface ProductSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -313,6 +317,7 @@ export function ProductSelectionModal({
 
   const filterVisibleProducts = useCallback((candidates: Product[], categoryName = selectedCategoryName) => {
     const normalizedSearch = debouncedSearch.trim().toLowerCase();
+    const scopedShopName = normalizeShopName(query?.shopName);
 
     return candidates.filter((p) => {
       const isVisible = (p.isPublic ?? true) && !(p.isDiscontinued ?? false);
@@ -321,10 +326,11 @@ export function ProductSelectionModal({
       const matchesUnselected = !showUnselectedOnly || !selectedIds.includes(getSelectionKey(p));
       const searchableText = [p.name, p.sku, p.sourceProductId, p.shopProductId].filter(Boolean).join(" ").toLowerCase();
       const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
+      const matchesShop = !scopedShopName || normalizeShopName(p.shopName) === scopedShopName;
 
-      return isVisible && matchesCategory && matchesUnselected && matchesSearch;
+      return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop;
     });
-  }, [debouncedSearch, getSelectionKey, selectedCategoryName, selectedIds, showUnselectedOnly]);
+  }, [debouncedSearch, getSelectionKey, query?.shopName, selectedCategoryName, selectedIds, showUnselectedOnly]);
 
   const displayCategoryName = usesPrefetchedData || loadAllOnOpen ? selectedCategoryName : loadedCategoryName;
   const filteredProducts = filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
@@ -561,7 +567,7 @@ export function ProductSelectionModal({
                           </div>
                            )}
                            {imageOnly && (
-                            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/35 to-transparent px-2.5 pb-2.5 pt-10 text-left">
+                           <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/35 to-transparent px-2.5 pb-2.5 pt-10 text-left">
                               {isAlreadySelected && (
                                 <div className="mb-1 inline-flex rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-200">
                                   {selectedBadgeLabel}
@@ -570,14 +576,18 @@ export function ProductSelectionModal({
                               <div className="line-clamp-2 text-xs font-bold leading-snug text-white/95">
                                 {product.name}
                               </div>
-                              {(product.sku || product.category?.name) && (
-                                <div className="mt-1 line-clamp-1 text-[10px] text-white/65">
-                                  {[
-                                    product.sku,
-                                    product.category?.name
-                                  ].filter(Boolean).join(" · ")}
-                                </div>
-                              )}
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                {product.sku && (
+                                  <span className="inline-flex max-w-full items-center rounded-full bg-black/35 px-2 py-0.5 font-mono text-[10px] font-bold text-white/90">
+                                    {`编号 ${product.sku}`}
+                                  </span>
+                                )}
+                                {product.category?.name && (
+                                  <span className="inline-flex max-w-full items-center rounded-full bg-white/12 px-2 py-0.5 text-[10px] text-white/70">
+                                    {product.category.name}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                            )}
                         </button>
