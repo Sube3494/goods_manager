@@ -327,6 +327,13 @@ export default function BrushPlansPage() {
                                 </div>
                             </div>
                             <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">按店铺查看当天节奏</div>
+                            <Link
+                                href={`/brush-plans/preview?date=${encodeURIComponent(group.date)}`}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 text-xs font-black text-primary transition-all hover:bg-primary/10 active:scale-95"
+                            >
+                                <Eye size={14} />
+                                <span>预览当天全部</span>
+                            </Link>
                         </div>
 
                         <div className="flex flex-col gap-4">

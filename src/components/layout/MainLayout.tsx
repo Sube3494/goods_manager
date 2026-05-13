@@ -31,7 +31,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [canAnimate, setCanAnimate] = useState(false);
 
   const isLoginPage = pathname === "/login";
-  const isSharePage = pathname?.startsWith("/media") || pathname?.startsWith("/brush-plans/share");
+  const isSharePage =
+    pathname?.startsWith("/media") ||
+    pathname?.startsWith("/brush-plans/share") ||
+    pathname?.startsWith("/brush-plans/preview");
   const isWideCanvasPage = pathname?.startsWith("/distance-calc");
   const isFullScreenPage = isLoginPage || isSharePage;
   

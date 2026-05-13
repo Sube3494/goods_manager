@@ -165,6 +165,7 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 1000);
   const shopName = searchParams.get('shopName');
   const platform = searchParams.get('platform');
+  const date = searchParams.get('date');
   const skip = (page - 1) * limit;
 
   try {
@@ -178,6 +179,16 @@ export async function GET(req: NextRequest) {
           platform: platform
         }
       };
+    }
+    if (date) {
+      const start = new Date(`${date}T00:00:00.000+08:00`);
+      const end = new Date(`${date}T23:59:59.999+08:00`);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        where.date = {
+          gte: start,
+          lte: end,
+        };
+      }
     }
 
     const [total, items] = await Promise.all([
