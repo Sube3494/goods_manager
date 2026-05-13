@@ -283,7 +283,6 @@ export default function BrushCenterPage() {
   const { user, isLoading: userLoading } = useUser();
   const canManageBrush = hasPermission(user as SessionUser | null, "brush:manage");
   const hasAnyAccess = canManageBrush;
-  const isInitialCompactView = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
 
   const [dashboardData, setDashboardData] = useState<BrushDashboardPayload>({
     stats: EMPTY_DASHBOARD_STATS,
@@ -295,13 +294,13 @@ export default function BrushCenterPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedShop, setSelectedShop] = useState("all");
   const [selectedRange, setSelectedRange] = useState("14");
-  const [isCompactView, setIsCompactView] = useState(isInitialCompactView);
+  const [isCompactView, setIsCompactView] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
-  const [isExpenseChartOpen, setIsExpenseChartOpen] = useState(!isInitialCompactView);
+  const [isExpenseChartOpen, setIsExpenseChartOpen] = useState(true);
   const [selectedShopMetric, setSelectedShopMetric] = useState<"count" | "payment" | "expense">("count");
   const [selectedShopView, setSelectedShopView] = useState("all");
   const [isShopMetricChartOpen, setIsShopMetricChartOpen] = useState(false);
-  const [isViewportReady, setIsViewportReady] = useState(typeof window === "undefined");
+  const [isViewportReady, setIsViewportReady] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

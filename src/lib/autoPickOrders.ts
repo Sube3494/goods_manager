@@ -3016,7 +3016,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     throw new Error("Invalid progress payload");
   }
 
-  const order = await prisma.autoPickOrder.findFirst({
+  let order = await prisma.autoPickOrder.findFirst({
     where: {
       userId,
       platform: progress.platform,
@@ -3026,6 +3026,18 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
       orderTime: "desc",
     },
   });
+
+  if (!order) {
+    const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
+      platform: progress.platform,
+      orderNo: progress.orderNo,
+      orderTime: new Date(),
+    }).catch(() => null);
+
+    if (refreshedOrder) {
+      order = refreshedOrder;
+    }
+  }
 
   if (!order) {
     throw new Error("Order not found");
