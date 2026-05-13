@@ -71,6 +71,26 @@ function isShopNameMatch(candidate: string | null | undefined, scopedShopName: s
   );
 }
 
+function scopePurchasePickerItemsByShop(
+  items: PurchasePickerItem[],
+  shopId: string,
+  shopName: string,
+) {
+  if (!shopId && !shopName) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    if (shopId && String(item.shopId || "").trim() === shopId) {
+      return true;
+    }
+    if (shopName && isShopNameMatch(item.shopName, shopName)) {
+      return true;
+    }
+    return false;
+  });
+}
+
 function comparePurchasePickerItems(a: PurchasePickerItem, b: PurchasePickerItem) {
   const skuCompare = naturalSortCollator.compare(
     String(b.sku || "").trim(),
@@ -191,9 +211,11 @@ export async function GET(request: Request) {
       updatedAt: item.updatedAt,
     }));
 
+    const scopedMerged = scopePurchasePickerItemsByShop(merged, shopId, shopName);
+
     const normalizedItems = aggregateSource
       ? Array.from(
-          merged.reduce((acc, item) => {
+          scopedMerged.reduce((acc, item) => {
             const key = item.sourceProductId || item.shopProductId || item.id;
             const existing = acc.get(key);
             if (!existing) {
@@ -218,14 +240,10 @@ export async function GET(request: Request) {
             return acc;
           }, new Map<string, PurchasePickerItem>())
         ).map(([, value]) => value)
-      : merged;
-
-    const scopedItems = shopName
-      ? normalizedItems.filter((item) => isShopNameMatch(item.shopName, shopName))
-      : normalizedItems;
+      : scopedMerged;
 
     const dedupedItems = Array.from(
-      scopedItems.reduce((acc, item) => {
+      normalizedItems.reduce((acc, item) => {
         const key = buildPurchasePickerDedupeKey(item);
         const existing = acc.get(key);
         if (!existing || scorePurchasePickerItem(item) > scorePurchasePickerItem(existing)) {

@@ -82,6 +82,7 @@ export type AutoPickProgressPayload = {
   orderNo?: string;
   pickRemainingSeconds?: number;
   pickCompleted?: boolean;
+  statusHint?: string;
 };
 
 type AutoPickWebhookBinding = {
@@ -2243,7 +2244,8 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const shouldKeepTerminalStatus = isAutoPickOrderTerminalStatus(existing?.status) && !isAutoPickOrderTerminalStatus(normalized.status);
     const status = shouldKeepTerminalStatus
       ? existing?.status || null
-      : shouldPreservePickingStatus(existing || {}, normalized.status)
+      : (shouldPreservePickingStatus(existing || {}, normalized.status)
+        || shouldPreserveRealtimeStatus(existing || {}, normalized.status))
         ? existing?.status || null
         : normalized.status || existing?.status || null;
     const deliveryDeadline = shouldKeepTerminalStatus
@@ -2631,6 +2633,7 @@ function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPay
   const orderNo = String(input.orderNo || "").trim();
   const pickRemainingSeconds = Number(input.pickRemainingSeconds);
   const pickCompleted = Boolean(input.pickCompleted);
+  const statusHint = String(input.statusHint || "").trim().toLowerCase();
 
   if (!platform || !orderNo) {
     return null;
@@ -2641,6 +2644,7 @@ function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPay
     orderNo,
     pickRemainingSeconds: Number.isFinite(pickRemainingSeconds) ? Math.max(0, pickRemainingSeconds) : undefined,
     pickCompleted,
+    statusHint: statusHint || undefined,
   };
 }
 
@@ -2671,6 +2675,23 @@ function buildAutoPickOrderStateSignature(order: AutoPickInboundOrder) {
 }
 
 function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: string | null) {
+  const statusHint = String(progress.statusHint || "").trim().toLowerCase();
+  if (statusHint === "done") {
+    return "done";
+  }
+  if (statusHint === "delivering") {
+    return "delivering";
+  }
+  if (statusHint === "pickup") {
+    return "pickup";
+  }
+  if (statusHint === "delivery") {
+    return "delivery";
+  }
+  if (statusHint === "confirm") {
+    return "confirm";
+  }
+
   if (progress.pickCompleted) {
     return "已拣货";
   }
@@ -2726,6 +2747,42 @@ function shouldPreservePickingStatus(existing: {
   const incomingBaseStatus = getBaseAutoPickStatusDisplay(normalizedIncoming);
 
   return incomingBaseStatus === "待处理" || incomingBaseStatus === "同步中";
+}
+
+function getAutoPickStatusPriority(status?: string | null) {
+  const baseStatus = getBaseAutoPickStatusDisplay(status);
+  switch (baseStatus) {
+    case "同步中":
+      return 0;
+    case "待处理":
+      return 1;
+    case "已拣货":
+      return 2;
+    case "待配送":
+      return 3;
+    case "配送中":
+      return 4;
+    case "已完成":
+      return 5;
+    case "已取消":
+    case "已删除":
+      return 6;
+    default:
+      return 0;
+  }
+}
+
+function shouldPreserveRealtimeStatus(existing: {
+  status?: string | null;
+  rawPayload?: unknown;
+}, incomingStatus?: string | null) {
+  const record = readAutoPickRawPayloadRecord(existing.rawPayload);
+  const wsStatusHint = String(record.wsStatusHint || "").trim().toLowerCase();
+  if (!wsStatusHint) {
+    return false;
+  }
+
+  return getAutoPickStatusPriority(existing.status) > getAutoPickStatusPriority(incomingStatus);
 }
 
 function toAutoPickBaseProductName(value: string | null | undefined) {
@@ -2979,6 +3036,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
           pickCompleted: Boolean(progress.pickCompleted),
           updatedAt: new Date().toISOString(),
         },
+        wsStatusHint: progress.statusHint || null,
       }
     : {
         pickProgress: {
@@ -2986,6 +3044,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
           pickCompleted: Boolean(progress.pickCompleted),
           updatedAt: new Date().toISOString(),
         },
+        wsStatusHint: progress.statusHint || null,
       };
 
   const updatedOrder = await prisma.autoPickOrder.update({
