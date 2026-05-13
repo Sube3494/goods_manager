@@ -153,6 +153,12 @@ function isPermanentAutoCompleteError(status: number | undefined, error: string)
   return message === "not found";
 }
 
+function isMissingAutoPickCommandIdentity(sourceId: string | null | undefined, deliveryId?: string | null) {
+  const normalizedSourceId = String(sourceId || "").trim();
+  const normalizedDeliveryId = String(deliveryId || "").trim();
+  return !normalizedSourceId || !normalizedDeliveryId || normalizedDeliveryId === "0";
+}
+
 async function markJobFailed(jobId: string, error: string) {
   const currentJob = await prisma.autoPickAutoCompleteJob.findUnique({
     where: { id: jobId },
@@ -262,7 +268,7 @@ async function retryAutoCompleteAfterRefresh(job: {
     } as const;
   }
 
-  if (!String(refreshedOrder.sourceId || "").trim() || !String(refreshedOrder.logisticId || "").trim()) {
+  if (isMissingAutoPickCommandIdentity(refreshedOrder.sourceId, refreshedOrder.logisticId)) {
     return {
       recovered: false,
       error: "refresh-after-not-found-missing-source-or-logistic-id",
@@ -462,12 +468,18 @@ export async function processDueAutoCompleteJobs(limit = 20) {
     }
 
     try {
+      if (isMissingAutoPickCommandIdentity(order.sourceId, order.logisticId)) {
+        await markJobFailed(job.id, "missing-or-invalid-source-or-logistic-id");
+        results.push({ id: job.id, ok: false, error: "missing-or-invalid-source-or-logistic-id" });
+        continue;
+      }
+
       const result = await callAutoPickCommand(order.userId, "/complete-delivery", {
         platform: order.platform,
         dailyPlatformSequence: order.dailyPlatformSequence,
         orderNo: order.orderNo,
         sourceId: order.sourceId,
-        logisticId: order.logisticId,
+        deliveryId: order.logisticId,
       });
 
       if (result.ok) {

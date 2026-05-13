@@ -1388,11 +1388,11 @@ async function submitMaiyatianFormByCookie(
   };
 }
 
-async function submitMaiyatianSelfDeliveryByCookie(cookie: string, sourceId: string, logisticId: string, orderNo = "") {
-  if (!sourceId || !logisticId) {
+async function submitMaiyatianSelfDeliveryByCookie(cookie: string, sourceId: string, orderNo = "") {
+  if (!sourceId) {
     return {
       ok: false,
-      reason: "missing-delivery-submit-params",
+      reason: "missing-self-delivery-id",
       orderNo,
       detail: null,
     };
@@ -1401,7 +1401,6 @@ async function submitMaiyatianSelfDeliveryByCookie(cookie: string, sourceId: str
   return await submitMaiyatianFormByCookie(cookie, MAIYATIAN_DELIVERY_SUBMIT_PATH, {
     id: sourceId,
     dispatcherId: "0",
-    logisticId,
     logisticTag: "oneself",
     tip: "0",
     weight: "0",

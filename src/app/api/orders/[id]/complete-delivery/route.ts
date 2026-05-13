@@ -58,7 +58,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       dailyPlatformSequence: order.dailyPlatformSequence,
       orderNo: order.orderNo,
       sourceId: order.sourceId,
-      logisticId: order.logisticId,
+      deliveryId: order.logisticId,
     });
 
     if (result.ok) {
