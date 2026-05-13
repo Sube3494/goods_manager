@@ -60,6 +60,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         const query = new URLSearchParams({
           pageSize: "1000",
           aggregateSource: "true",
+          ...(formData.shopName ? { shopName: formData.shopName } : {}),
         });
 
         fetch(`/api/purchase-products?${query.toString()}`)
@@ -534,9 +535,12 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         onSelect={handleBatchAdd}
         selectedIds={formData.items.map(i => i.productId)}
         showPrice={false}
-        showSku={false}
+        showSku
         fetchPath="/api/purchase-products"
-        query={{ aggregateSource: "true" }}
+        query={{
+          aggregateSource: "true",
+          ...(formData.shopName ? { shopName: formData.shopName } : {}),
+        }}
     />
     </>
   );

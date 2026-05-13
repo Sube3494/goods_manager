@@ -34,6 +34,43 @@ const naturalSortCollator = new Intl.Collator("zh-CN", {
   sensitivity: "base",
 });
 
+function normalizeShopName(value: string | null | undefined) {
+  return String(value || "").trim();
+}
+
+function stripShopSuffix(value: string) {
+  return value.replace(/(门店|店铺|旗舰店|总店|分店|一店|二店|三店|四店|五店|店)$/g, "").trim();
+}
+
+function isShopNameMatch(candidate: string | null | undefined, scopedShopName: string | null | undefined) {
+  const normalizedCandidate = normalizeShopName(candidate);
+  const normalizedScoped = normalizeShopName(scopedShopName);
+  if (!normalizedScoped) {
+    return true;
+  }
+  if (!normalizedCandidate) {
+    return false;
+  }
+  if (normalizedCandidate === normalizedScoped) {
+    return true;
+  }
+  if (normalizedCandidate.includes(normalizedScoped) || normalizedScoped.includes(normalizedCandidate)) {
+    return true;
+  }
+
+  const coreCandidate = stripShopSuffix(normalizedCandidate);
+  const coreScoped = stripShopSuffix(normalizedScoped);
+  if (!coreCandidate || !coreScoped) {
+    return false;
+  }
+
+  return (
+    coreCandidate === coreScoped ||
+    coreCandidate.includes(coreScoped) ||
+    coreScoped.includes(coreCandidate)
+  );
+}
+
 function comparePurchasePickerItems(a: PurchasePickerItem, b: PurchasePickerItem) {
   const skuCompare = naturalSortCollator.compare(
     String(b.sku || "").trim(),
@@ -112,7 +149,6 @@ export async function GET(request: Request) {
         shop: {
           userId: session.id,
           ...(shopId ? { id: shopId } : {}),
-          ...(shopName ? { name: shopName } : {}),
         },
         ...(search ? {
           OR: [
@@ -184,8 +220,12 @@ export async function GET(request: Request) {
         ).map(([, value]) => value)
       : merged;
 
+    const scopedItems = shopName
+      ? normalizedItems.filter((item) => isShopNameMatch(item.shopName, shopName))
+      : normalizedItems;
+
     const dedupedItems = Array.from(
-      normalizedItems.reduce((acc, item) => {
+      scopedItems.reduce((acc, item) => {
         const key = buildPurchasePickerDedupeKey(item);
         const existing = acc.get(key);
         if (!existing || scorePurchasePickerItem(item) > scorePurchasePickerItem(existing)) {
