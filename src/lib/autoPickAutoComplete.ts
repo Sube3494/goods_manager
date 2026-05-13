@@ -144,6 +144,17 @@ async function markJobRetry(jobId: string, error: string) {
     return;
   }
 
+  if (currentJob.order) {
+    console.error("[auto-pick-auto-complete] job retry scheduled", {
+      jobId,
+      orderId: currentJob.orderId,
+      orderNo: currentJob.order.orderNo,
+      platform: currentJob.order.platform,
+      attempts: currentJob.attempts || 0,
+      error,
+    });
+  }
+
   if ((currentJob.attempts || 0) >= AUTO_COMPLETE_MAX_ATTEMPTS) {
     await prisma.$transaction([
       prisma.autoPickOrder.update({
@@ -313,11 +324,31 @@ export async function processDueAutoCompleteJobs(limit = 20) {
         await markJobSuccess(job.id, order.id, order.userId, order.sourceId, order.platform, order.orderNo, order.orderTime);
         results.push({ id: job.id, ok: true });
       } else {
-        await markJobRetry(job.id, JSON.stringify(result.data));
-        results.push({ id: job.id, ok: false, error: JSON.stringify(result.data) });
+        const errorText = JSON.stringify(result.data);
+        console.error("[auto-pick-auto-complete] complete delivery command failed", {
+          jobId: job.id,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          platform: order.platform,
+          sourceId: order.sourceId,
+          logisticId: order.logisticId,
+          status: result.status,
+          error: errorText,
+        });
+        await markJobRetry(job.id, errorText);
+        results.push({ id: job.id, ok: false, error: errorText });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("[auto-pick-auto-complete] complete delivery command threw", {
+        jobId: job.id,
+        orderId: order.id,
+        orderNo: order.orderNo,
+        platform: order.platform,
+        sourceId: order.sourceId,
+        logisticId: order.logisticId,
+        error: message,
+      });
       await markJobRetry(job.id, message);
       results.push({ id: job.id, ok: false, error: message });
     }
