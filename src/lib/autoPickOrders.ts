@@ -1388,40 +1388,6 @@ async function submitMaiyatianFormByCookie(
   };
 }
 
-async function submitMaiyatianSelfDeliveryByCookie(cookie: string, sourceId: string, orderNo = "") {
-  if (!sourceId) {
-    return {
-      ok: false,
-      reason: "missing-self-delivery-id",
-      orderNo,
-      detail: null,
-    };
-  }
-
-  return await submitMaiyatianFormByCookie(cookie, MAIYATIAN_DELIVERY_SUBMIT_PATH, {
-    id: sourceId,
-    dispatcherId: "0",
-    logisticTag: "oneself",
-    tip: "0",
-    weight: "0",
-    remark: "",
-    amount: "0",
-    deliveryTime: "0",
-    direct: "0",
-    insure: "0",
-    special: "0",
-    priority: "0",
-    car: "0",
-    traffic: "0",
-    trafficWay: "",
-    cake: "0",
-    mealType: "0",
-    fromDoor: "0",
-    toDoor: "0",
-    doorService: "0",
-  }, "self-delivery-submitted");
-}
-
 async function submitMaiyatianPickupCompleteByCookie(cookie: string, sourceId: string, orderNo = "") {
   if (!sourceId) {
     return {
