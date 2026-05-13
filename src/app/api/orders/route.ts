@@ -145,6 +145,28 @@ function normalizeSkuDigits(value: string | null | undefined) {
   return compact.replace(/[^A-Z0-9]+/g, "");
 }
 
+function buildSkuMatchCandidates(value: string | null | undefined) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return [];
+  }
+
+  const segments = rawValue
+    .split("+")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  const sourceSegments = segments.length > 0 ? segments : [rawValue];
+  return Array.from(new Set(sourceSegments.flatMap((segment) => {
+    const normalizedSku = normalizeSkuDigits(segment);
+    return [
+      segment,
+      normalizedSku,
+      normalizedSku ? `B${normalizedSku}` : "",
+    ].filter(Boolean);
+  })));
+}
+
 function readExpectedIncomeFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -753,13 +775,7 @@ export async function GET(request: NextRequest) {
     ));
     const productSkuCandidates = Array.from(new Set(
       orders.flatMap((order) => order.items.flatMap((item) => {
-        const rawSku = String(item.productNo || "").trim();
-        const normalizedSku = normalizeSkuDigits(rawSku);
-        return [
-          rawSku,
-          normalizedSku,
-          normalizedSku ? `B${normalizedSku}` : "",
-        ].filter(Boolean);
+        return buildSkuMatchCandidates(item.productNo);
       }))
     ));
 
@@ -867,13 +883,16 @@ export async function GET(request: NextRequest) {
         autoOutboundResolvedAt: autoOutboundMeta.resolvedAt,
         items: order.items.map((item) => {
           const normalizedProductName = toNormalizedText(item.productName);
-          const normalizedSku = normalizeSkuDigits(item.productNo);
+          const normalizedSkuCandidates = buildSkuMatchCandidates(item.productNo)
+            .map((candidate) => normalizeSkuDigits(candidate))
+            .filter(Boolean);
           const matchedShopProducts = normalizedProductName
             ? (shopProductMap.get(normalizedProductName) || [])
             : [];
-          const matchedSkuProducts = normalizedSku
-            ? (shopProductSkuMap.get(normalizedSku) || [])
-            : [];
+          const matchedSkuProducts = Array.from(new Map(
+            normalizedSkuCandidates.flatMap((candidate) => shopProductSkuMap.get(candidate) || [])
+              .map((product) => [product.id, product])
+          ).values());
           const exactShopProduct = matchedShopProducts.find(
             (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
           );
