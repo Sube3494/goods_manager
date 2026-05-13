@@ -3127,6 +3127,26 @@ export async function refreshAutoPickOrderFromPlugin(
         orderNo: String(detailOrder.orderNo || "").trim() || fallbackOrderNo,
       });
       if (normalizedDetailOrder) {
+        const missingDeliveryIdentity = !String(normalizedDetailOrder.logisticId || "").trim();
+        if (missingDeliveryIdentity) {
+          const fallbackMatched = await findAutoPickOrderFromActiveStatusLists(cookie, {
+            id: normalizedDetailOrder.id || sourceId,
+            platform: normalizedDetailOrder.platform || fallbackPlatform,
+            orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
+            orderTime: lookup.orderTime,
+          });
+
+          if (fallbackMatched) {
+            normalizedDetailOrder.logisticId = normalizedDetailOrder.logisticId || fallbackMatched.logisticId;
+            normalizedDetailOrder.shopId = normalizedDetailOrder.shopId || fallbackMatched.shopId;
+            normalizedDetailOrder.shopAddress = normalizedDetailOrder.shopAddress || fallbackMatched.shopAddress;
+            normalizedDetailOrder.rawShopAddress = normalizedDetailOrder.rawShopAddress || fallbackMatched.rawShopAddress;
+            normalizedDetailOrder.deliveryDeadline = normalizedDetailOrder.deliveryDeadline || fallbackMatched.deliveryDeadline;
+            normalizedDetailOrder.deliveryTimeRange = normalizedDetailOrder.deliveryTimeRange || fallbackMatched.deliveryTimeRange;
+            normalizedDetailOrder.delivery = normalizedDetailOrder.delivery || fallbackMatched.delivery;
+          }
+        }
+
         if (isAutoPickOrderDeletedStatus(normalizedDetailOrder.status)) {
           await deleteAutoPickOrderByIdentity(userId, {
             platform: normalizedDetailOrder.platform || fallbackPlatform,
