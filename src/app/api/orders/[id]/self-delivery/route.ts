@@ -70,13 +70,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
     }
 
+    const abnormal = isAutoPickOrderAbnormalStatus(order.status);
     const requiresPickConfirmation = doesAutoPickOrderRequirePickConfirmation(order.platform);
-    const pickedOrder = !requiresPickConfirmation
+    const pickedOrder = abnormal || !requiresPickConfirmation
       ? order
       : isAutoPickPickCompleted(order.rawPayload)
         ? order
         : null;
-    if (requiresPickConfirmation && !pickedOrder) {
+    if (!abnormal && requiresPickConfirmation && !pickedOrder) {
       return NextResponse.json({
         error: "还没收到这单“上报拣货成功”的消息，暂时不能自配。",
       }, { status: 409 });

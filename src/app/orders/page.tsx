@@ -898,7 +898,7 @@ function OrderCard({
               label="自配"
               icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
               onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal || delivering || pickup || (requiresPickConfirmation && !pickCompleted)}
+              disabled={Boolean(actingId) || terminal || delivering || pickup || (!abnormal && requiresPickConfirmation && !pickCompleted)}
               mobileIconOnly
               title={
                 pickup
@@ -907,7 +907,7 @@ function OrderCard({
                   ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
                   : delivering
                     ? "订单已在配送中，不能重复发起自配"
-                    : requiresPickConfirmation && !pickCompleted
+                    : !abnormal && requiresPickConfirmation && !pickCompleted
                       ? "订单还没拣货完成，等收到上报成功后才能自配"
                     : undefined
               }
