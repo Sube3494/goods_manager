@@ -526,19 +526,41 @@ export async function POST(
       return NextResponse.json({ error: "没有可加入店铺的公开商品" }, { status: 404 });
     }
 
-    const existingAssignments = await prisma.shopProduct.findMany({
-      where: {
-        shopId,
-        OR: [
-          { productId: { in: products.map((product) => product.id) } },
-          { sourceProductId: { in: products.map((product) => product.id) } },
-        ],
-      },
-      select: {
-        productId: true,
-        sourceProductId: true,
-      },
-    });
+    const productSourceIds = products.map((product) => product.id);
+    const productSkus = Array.from(
+      new Set(
+        products
+          .map((product) => normalizeSku(product.sku))
+          .filter((sku): sku is string => Boolean(sku))
+      )
+    );
+
+    const [existingAssignments, existingSkuAssignments] = await Promise.all([
+      prisma.shopProduct.findMany({
+        where: {
+          shopId,
+          OR: [
+            { productId: { in: productSourceIds } },
+            { sourceProductId: { in: productSourceIds } },
+          ],
+        },
+        select: {
+          productId: true,
+          sourceProductId: true,
+        },
+      }),
+      productSkus.length > 0
+        ? prisma.shopProduct.findMany({
+            where: {
+              shopId,
+              sku: { in: productSkus },
+            },
+            select: {
+              sku: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
     const existingAssignmentSet = new Set(
       existingAssignments.flatMap((item) => [item.productId, item.sourceProductId]).filter((value): value is string => Boolean(value))
     );
@@ -548,15 +570,39 @@ export async function POST(
       products.map((product) => product.category?.name || "").filter(Boolean)
     );
 
-    const productsToCreate = products.filter((product) => !existingAssignmentSet.has(product.id));
-    const skippedCount = products.length - productsToCreate.length;
+    const existingSkuSet = new Set(
+      existingSkuAssignments
+        .map((item) => normalizeSku(item.sku))
+        .filter((sku): sku is string => Boolean(sku))
+    );
+
+    let skippedAssignmentCount = 0;
+    let skippedSkuConflictCount = 0;
+    const productsToCreate = products.filter((product) => {
+      if (existingAssignmentSet.has(product.id)) {
+        skippedAssignmentCount += 1;
+        return false;
+      }
+
+      const normalizedProductSku = normalizeSku(product.sku);
+      if (normalizedProductSku && existingSkuSet.has(normalizedProductSku)) {
+        skippedSkuConflictCount += 1;
+        return false;
+      }
+
+      if (normalizedProductSku) {
+        existingSkuSet.add(normalizedProductSku);
+      }
+      return true;
+    });
+    const skippedCount = skippedAssignmentCount + skippedSkuConflictCount;
 
     const result = await prisma.shopProduct.createMany({
       data: productsToCreate.map((product) => ({
         shopId,
         productId: product.id,
         sourceProductId: product.id,
-        sku: null,
+        sku: normalizeSku(product.sku),
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
         productImage: product.image,
@@ -578,7 +624,7 @@ export async function POST(
       count: result.count,
       skipped: skippedCount,
       message: skippedCount > 0
-        ? `成功加入 ${shop.name} ${result.count} 条，跳过 ${skippedCount} 条已复制商品`
+        ? `成功加入 ${shop.name} ${result.count} 条，跳过 ${skippedCount} 条已复制商品${skippedSkuConflictCount > 0 ? `（其中 ${skippedSkuConflictCount} 条因 SKU 冲突）` : ""}`
         : `成功加入 ${shop.name}`,
     });
   } catch (error) {
