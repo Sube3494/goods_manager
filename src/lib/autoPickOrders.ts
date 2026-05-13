@@ -2231,12 +2231,6 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       });
     }
 
-    if (existing) {
-      await tx.autoPickOrderItem.deleteMany({
-        where: { orderId: existing.id },
-      });
-    }
-
     const sourceId = normalized.id || existing?.sourceId || "";
     const logisticId = normalized.logisticId || existing?.logisticId || null;
     const shopId = normalized.shopId || existing?.shopId || null;
@@ -2353,6 +2347,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       data: {
         ...updateData,
         items: {
+          deleteMany: {},
           create: items,
         },
       },
