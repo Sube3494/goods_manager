@@ -3,8 +3,8 @@ import nodemailer from "nodemailer";
 
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.qq.com";
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 465;
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_FROM = process.env.SMTP_FROM || `"PickNote" <${SMTP_USER}>`;
 const SMTP_SECURE = process.env.SMTP_SECURE === "true";
 
@@ -17,6 +17,14 @@ const transporter = nodemailer.createTransport({
     pass: SMTP_PASS,
   },
 });
+
+function readMessageId(info: unknown) {
+  if (!info || typeof info !== "object" || !("messageId" in info)) {
+    return "";
+  }
+
+  return String((info as { messageId?: unknown }).messageId || "");
+}
 
 type VerificationEmailScene = "login" | "reset-password";
 
@@ -58,7 +66,7 @@ export async function sendVerificationEmail(email: string, code: string, scene: 
         </div>
       `,
     });
-    console.log("Message sent: %s", info.messageId);
+    console.log("Message sent: %s", readMessageId(info));
     return true;
   } catch (error) {
     console.error("Error sending email:", error);
@@ -90,7 +98,7 @@ export async function sendInvitationEmail(email: string, inviteUrl: string) {
         </div>
       `,
     });
-    console.log("Invitation sent: %s", info.messageId);
+    console.log("Invitation sent: %s", readMessageId(info));
     return true;
   } catch (error) {
     console.error("Error sending invitation email:", error);

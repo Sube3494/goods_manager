@@ -82,13 +82,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       }, { status: 409 });
     }
 
-    let commandOrder = pickedOrder;
-    if (!String(pickedOrder.sourceId || "").trim() || !String(pickedOrder.logisticId || "").trim()) {
+    const commandBaseOrder = pickedOrder || order;
+    let commandOrder = commandBaseOrder;
+    if (!String(commandBaseOrder.sourceId || "").trim() || !String(commandBaseOrder.logisticId || "").trim()) {
       const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
-        id: pickedOrder.sourceId,
-        platform: pickedOrder.platform,
-        orderNo: pickedOrder.orderNo,
-        orderTime: pickedOrder.orderTime,
+        id: commandBaseOrder.sourceId,
+        platform: commandBaseOrder.platform,
+        orderNo: commandBaseOrder.orderNo,
+        orderTime: commandBaseOrder.orderTime,
       }).catch((refreshError) => {
         console.error("Failed to refresh auto-pick order before self delivery:", refreshError);
         return null;
