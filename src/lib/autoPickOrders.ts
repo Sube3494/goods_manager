@@ -375,14 +375,21 @@ function mergeAutoPickSystemMeta(
   existingRawPayload: unknown,
   explicitSystemMeta?: AutoPickSystemMeta | null
 ) {
+  const existingRecord = readAutoPickRawPayloadRecord(existingRawPayload);
   const existingSystemMeta = readAutoPickSystemMeta(existingRawPayload);
   const nextSystemMeta = explicitSystemMeta || existingSystemMeta;
+  const nextPayload = { ...basePayload };
+
+  if (!("pickProgress" in nextPayload) && "pickProgress" in existingRecord) {
+    nextPayload.pickProgress = existingRecord.pickProgress;
+  }
+
   if (!nextSystemMeta) {
-    return basePayload;
+    return nextPayload;
   }
 
   return {
-    ...basePayload,
+    ...nextPayload,
     systemMeta: nextSystemMeta,
   };
 }

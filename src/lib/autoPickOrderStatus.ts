@@ -166,6 +166,11 @@ export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string 
   if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
     const record = rawPayload as Record<string, unknown>;
     candidates.push(
+      String(record.shopAddress || ""),
+      String(record.rawShopAddress || ""),
+      String(record.shop_address || ""),
+      String(record.store_address || ""),
+      String(record.merchant_address || ""),
       String(record.unencrypted_map_address || ""),
       String(record.unencrypted_address || ""),
       String(record.user_remark || ""),
@@ -178,7 +183,7 @@ export function isAutoPickPickupOrder(rawPayload: unknown, userAddress?: string 
     );
   }
 
-  return candidates.some((item) => /到店自取|门店自取|上门自取|自提/.test(String(item || "").trim()));
+  return candidates.some((item) => /到店自取|门店自取|上门自取|线下自提|自提/.test(String(item || "").trim()));
 }
 
 export function isAutoPickOtherPickupOrder(rawPayload: unknown) {

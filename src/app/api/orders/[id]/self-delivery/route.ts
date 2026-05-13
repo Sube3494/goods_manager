@@ -4,11 +4,9 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
-  doesAutoPickOrderRequirePickConfirmation,
   isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
-  isAutoPickPickCompleted,
   isAutoPickPickupOrder,
   isAutoPickSelfDeliveryStarted,
 } from "@/lib/autoPickOrderStatus";
@@ -71,19 +69,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     }
 
     const abnormal = isAutoPickOrderAbnormalStatus(order.status);
-    const requiresPickConfirmation = doesAutoPickOrderRequirePickConfirmation(order.platform);
-    const pickedOrder = abnormal || !requiresPickConfirmation
-      ? order
-      : isAutoPickPickCompleted(order.rawPayload)
-        ? order
-        : null;
-    if (!abnormal && requiresPickConfirmation && !pickedOrder) {
-      return NextResponse.json({
-        error: "还没收到这单“上报拣货成功”的消息，暂时不能自配。",
-      }, { status: 409 });
-    }
-
-    const commandBaseOrder = pickedOrder || order;
+    const commandBaseOrder = order;
     let commandOrder = commandBaseOrder;
     if (!String(commandBaseOrder.sourceId || "").trim() || !String(commandBaseOrder.logisticId || "").trim()) {
       const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
