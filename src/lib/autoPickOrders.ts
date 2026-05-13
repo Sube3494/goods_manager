@@ -2664,6 +2664,21 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   if (statusHint === "confirm") {
     return "confirm";
   }
+  if (statusHint === "subscribe" || statusHint === "remind") {
+    return "delivery";
+  }
+  if (statusHint === "meal") {
+    return "已拣货";
+  }
+  if (
+    statusHint === "expect"
+    || statusHint === "cancel"
+    || statusHint === "rollback"
+    || statusHint === "close"
+    || statusHint === "closed"
+  ) {
+    return "expect";
+  }
 
   const currentPriority = getAutoPickStatusPriority(currentStatus);
   if (progress.pickCompleted) {
@@ -2685,6 +2700,29 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   }
 
   return currentStatus || "拣货中";
+}
+
+function shouldRefreshAutoPickOrderOnProgressStatusHint(statusHint?: string | null) {
+  const normalized = String(statusHint || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return [
+    "confirm",
+    "subscribe",
+    "delivery",
+    "pickup",
+    "delivering",
+    "done",
+    "expect",
+    "cancel",
+    "rollback",
+    "close",
+    "closed",
+    "remind",
+    "meal",
+  ].includes(normalized);
 }
 
 function hasDeliveryValue(value: unknown) {
@@ -3006,6 +3044,19 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
 
   if (!order) {
     throw new Error("Order not found");
+  }
+
+  if (shouldRefreshAutoPickOrderOnProgressStatusHint(progress.statusHint)) {
+    const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
+      id: order.sourceId,
+      platform: progress.platform,
+      orderNo: progress.orderNo,
+      orderTime: order.orderTime,
+    }).catch(() => null);
+
+    if (refreshedOrder) {
+      return refreshedOrder;
+    }
   }
 
   if (isAutoPickOrderTerminalStatus(order.status)) {
