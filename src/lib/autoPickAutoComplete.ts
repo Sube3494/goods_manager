@@ -271,7 +271,7 @@ async function retryAutoCompleteAfterRefresh(job: {
   if (isMissingAutoPickCommandIdentity(refreshedOrder.sourceId, refreshedOrder.logisticId)) {
     return {
       recovered: false,
-      error: "refresh-after-not-found-missing-source-or-logistic-id",
+      error: "refresh-after-not-found-missing-source-or-delivery-id",
     } as const;
   }
 
@@ -280,7 +280,7 @@ async function retryAutoCompleteAfterRefresh(job: {
     dailyPlatformSequence: refreshedOrder.dailyPlatformSequence,
     orderNo: refreshedOrder.orderNo,
     sourceId: refreshedOrder.sourceId,
-    logisticId: refreshedOrder.logisticId,
+    deliveryId: refreshedOrder.logisticId,
   });
 
   if (retryResult.ok) {
@@ -469,8 +469,8 @@ export async function processDueAutoCompleteJobs(limit = 20) {
 
     try {
       if (isMissingAutoPickCommandIdentity(order.sourceId, order.logisticId)) {
-        await markJobFailed(job.id, "missing-or-invalid-source-or-logistic-id");
-        results.push({ id: job.id, ok: false, error: "missing-or-invalid-source-or-logistic-id" });
+        await markJobFailed(job.id, "missing-or-invalid-source-or-delivery-id");
+        results.push({ id: job.id, ok: false, error: "missing-or-invalid-source-or-delivery-id" });
         continue;
       }
 
@@ -493,7 +493,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
           orderNo: order.orderNo,
           platform: order.platform,
           sourceId: order.sourceId,
-          logisticId: order.logisticId,
+          deliveryId: order.logisticId,
           status: result.status,
           error: errorText,
         });
@@ -507,7 +507,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
               orderNo: order.orderNo,
               platform: order.platform,
               sourceId: order.sourceId,
-              logisticId: order.logisticId,
+              deliveryId: order.logisticId,
               status: recovered.status ?? result.status,
               error: finalError,
             });
@@ -526,7 +526,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
         orderNo: order.orderNo,
         platform: order.platform,
         sourceId: order.sourceId,
-        logisticId: order.logisticId,
+        deliveryId: order.logisticId,
         error: message,
       });
       await markJobRetry(job.id, message);
