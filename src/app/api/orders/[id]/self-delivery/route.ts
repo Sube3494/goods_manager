@@ -71,8 +71,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const commandBaseOrder = order;
     let commandOrder = commandBaseOrder;
     const shouldRefreshBeforeSelfDelivery = isAutoPickOrderAbnormalStatus(order.status)
-      || !String(commandBaseOrder.sourceId || "").trim()
-      || !String(commandBaseOrder.logisticId || "").trim();
+      || !String(commandBaseOrder.sourceId || "").trim();
     if (shouldRefreshBeforeSelfDelivery) {
       const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
         id: commandBaseOrder.sourceId,
@@ -90,10 +89,9 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     }
 
     const sourceId = String(commandOrder.sourceId || "").trim();
-    const logisticId = String(commandOrder.logisticId || "").trim();
-    if (!sourceId || !logisticId) {
+    if (!sourceId) {
       return NextResponse.json({
-        error: "订单缺少自配所需信息，已尝试自动同步但仍未获取到配送标识，请先手动同步订单后再试。",
+        error: "订单缺少自配所需信息，已尝试自动同步但仍未获取到订单标识，请先手动同步订单后再试。",
       }, { status: 409 });
     }
 
@@ -102,7 +100,6 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       dailyPlatformSequence: commandOrder.dailyPlatformSequence,
       orderNo: commandOrder.orderNo,
       sourceId,
-      logisticId,
     });
 
     if (result.ok) {
