@@ -2692,11 +2692,18 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
     return "confirm";
   }
 
+  const currentPriority = getAutoPickStatusPriority(currentStatus);
   if (progress.pickCompleted) {
+    if (currentPriority >= getAutoPickStatusPriority("delivery")) {
+      return currentStatus || "已拣货";
+    }
     return "已拣货";
   }
 
   if (typeof progress.pickRemainingSeconds === "number") {
+    if (currentPriority >= getAutoPickStatusPriority("delivery")) {
+      return currentStatus || "拣货中";
+    }
     const remainingMinutes = Math.ceil(progress.pickRemainingSeconds / 60);
     if (remainingMinutes <= 0) {
       return "拣货中";
