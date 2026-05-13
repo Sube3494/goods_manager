@@ -18,6 +18,21 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function getEmailErrorMessage(error: unknown) {
+  const responseCode = typeof error === "object" && error && "responseCode" in error
+    ? Number((error as { responseCode?: unknown }).responseCode)
+    : 0;
+  const response = typeof error === "object" && error && "response" in error
+    ? String((error as { response?: unknown }).response || "").trim()
+    : "";
+
+  if (responseCode === 550) {
+    return `收件地址被邮件服务器拒收${response ? `: ${response}` : ""}`;
+  }
+
+  return null;
+}
+
 function readMessageId(info: unknown) {
   if (!info || typeof info !== "object" || !("messageId" in info)) {
     return "";
@@ -69,7 +84,7 @@ export async function sendVerificationEmail(email: string, code: string, scene: 
     console.log("Message sent: %s", readMessageId(info));
     return true;
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error(getEmailErrorMessage(error) || "Error sending email:", error);
     return false;
   }
 }
@@ -101,7 +116,7 @@ export async function sendInvitationEmail(email: string, inviteUrl: string) {
     console.log("Invitation sent: %s", readMessageId(info));
     return true;
   } catch (error) {
-    console.error("Error sending invitation email:", error);
+    console.error(getEmailErrorMessage(error) || "Error sending invitation email:", error);
     return false;
   }
 }

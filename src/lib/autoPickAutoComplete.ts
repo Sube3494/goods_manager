@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
-import { isAutoPickOrderAbnormalStatus, isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { AutoPickAutoCompleteJobStatus } from "../../prisma/generated-client";
 
 const AUTO_COMPLETE_RETRY_DELAY_MS = 15 * 1000;
@@ -124,6 +124,181 @@ async function markJobSuccess(jobId: string, orderId: string, userId: string, so
   });
 }
 
+function parseAutoCompleteErrorPayload(error: string) {
+  const text = String(error || "").trim();
+  if (!text) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function isPermanentAutoCompleteError(status: number | undefined, error: string) {
+  if (status === 404) {
+    return true;
+  }
+
+  const normalized = String(error || "").trim().toLowerCase();
+  if (normalized === "not found") {
+    return true;
+  }
+
+  const parsed = parseAutoCompleteErrorPayload(error);
+  const message = String(parsed?.message || parsed?.error || "").trim().toLowerCase();
+  return message === "not found";
+}
+
+async function markJobFailed(jobId: string, error: string) {
+  const currentJob = await prisma.autoPickAutoCompleteJob.findUnique({
+    where: { id: jobId },
+    select: {
+      orderId: true,
+      order: {
+        select: {
+          userId: true,
+          platform: true,
+          orderNo: true,
+        },
+      },
+    },
+  });
+
+  if (!currentJob) {
+    return;
+  }
+
+  if (currentJob.order) {
+    console.error("[auto-pick-auto-complete] job marked failed", {
+      jobId,
+      orderId: currentJob.orderId,
+      orderNo: currentJob.order.orderNo,
+      platform: currentJob.order.platform,
+      error,
+    });
+  }
+
+  await prisma.$transaction([
+    prisma.autoPickOrder.update({
+      where: { id: currentJob.orderId },
+      data: {
+        autoCompleteAt: null,
+      },
+    }),
+    prisma.autoPickAutoCompleteJob.update({
+      where: { id: jobId },
+      data: {
+        status: JOB_FAILED,
+        lockedAt: null,
+        lastError: error.slice(0, 1000),
+      },
+    }),
+  ]);
+
+  if (currentJob.order) {
+    emitAutoPickOrderEvent({
+      type: "upsert",
+      userId: currentJob.order.userId,
+      orderId: currentJob.orderId,
+      orderNo: currentJob.order.orderNo,
+      platform: currentJob.order.platform,
+      at: new Date().toISOString(),
+    });
+  }
+}
+
+async function retryAutoCompleteAfterRefresh(job: {
+  id: string;
+  orderId: string;
+  order: {
+    id: string;
+    userId: string;
+    status: string | null;
+    platform: string;
+    dailyPlatformSequence: number;
+    orderNo: string;
+    sourceId: string;
+    logisticId: string | null;
+    orderTime: Date;
+  };
+}) {
+  const refreshedOrder = await refreshAutoPickOrderFromPlugin(job.order.userId, {
+    id: job.order.sourceId,
+    platform: job.order.platform,
+    orderNo: job.order.orderNo,
+    orderTime: job.order.orderTime,
+  }).catch(() => null);
+
+  if (!refreshedOrder) {
+    return {
+      recovered: false,
+      error: "refresh-after-not-found-empty",
+    } as const;
+  }
+
+  if (isAutoPickOrderCompletedStatus(refreshedOrder.status)) {
+    await markJobSuccess(
+      job.id,
+      refreshedOrder.id,
+      refreshedOrder.userId,
+      refreshedOrder.sourceId,
+      refreshedOrder.platform,
+      refreshedOrder.orderNo,
+      refreshedOrder.orderTime
+    );
+    return {
+      recovered: true,
+    } as const;
+  }
+
+  if (isAutoPickOrderTerminalStatus(refreshedOrder.status) || isAutoPickOrderAbnormalStatus(refreshedOrder.status)) {
+    await markJobCancelled(job.id, refreshedOrder.id, `refresh-after-not-found:${refreshedOrder.status}`);
+    return {
+      recovered: true,
+    } as const;
+  }
+
+  if (!String(refreshedOrder.sourceId || "").trim() || !String(refreshedOrder.logisticId || "").trim()) {
+    return {
+      recovered: false,
+      error: "refresh-after-not-found-missing-source-or-logistic-id",
+    } as const;
+  }
+
+  const retryResult = await callAutoPickCommand(refreshedOrder.userId, "/complete-delivery", {
+    platform: refreshedOrder.platform,
+    dailyPlatformSequence: refreshedOrder.dailyPlatformSequence,
+    orderNo: refreshedOrder.orderNo,
+    sourceId: refreshedOrder.sourceId,
+    logisticId: refreshedOrder.logisticId,
+  });
+
+  if (retryResult.ok) {
+    await markJobSuccess(
+      job.id,
+      refreshedOrder.id,
+      refreshedOrder.userId,
+      refreshedOrder.sourceId,
+      refreshedOrder.platform,
+      refreshedOrder.orderNo,
+      refreshedOrder.orderTime
+    );
+    return {
+      recovered: true,
+    } as const;
+  }
+
+  return {
+    recovered: false,
+    error: JSON.stringify(retryResult.data),
+    status: retryResult.status,
+  } as const;
+}
+
 async function markJobRetry(jobId: string, error: string) {
   const currentJob = await prisma.autoPickAutoCompleteJob.findUnique({
     where: { id: jobId },
@@ -156,32 +331,7 @@ async function markJobRetry(jobId: string, error: string) {
   }
 
   if ((currentJob.attempts || 0) >= AUTO_COMPLETE_MAX_ATTEMPTS) {
-    await prisma.$transaction([
-      prisma.autoPickOrder.update({
-        where: { id: currentJob.orderId },
-        data: {
-          autoCompleteAt: null,
-        },
-      }),
-      prisma.autoPickAutoCompleteJob.update({
-        where: { id: jobId },
-        data: {
-          status: JOB_FAILED,
-          lockedAt: null,
-          lastError: error.slice(0, 1000),
-        },
-      }),
-    ]);
-    if (currentJob.order) {
-      emitAutoPickOrderEvent({
-        type: "upsert",
-        userId: currentJob.order.userId,
-        orderId: currentJob.orderId,
-        orderNo: currentJob.order.orderNo,
-        platform: currentJob.order.platform,
-        at: new Date().toISOString(),
-      });
-    }
+    await markJobFailed(jobId, error);
     return;
   }
 
@@ -335,7 +485,25 @@ export async function processDueAutoCompleteJobs(limit = 20) {
           status: result.status,
           error: errorText,
         });
-        await markJobRetry(job.id, errorText);
+        if (isPermanentAutoCompleteError(result.status, errorText)) {
+          const recovered = await retryAutoCompleteAfterRefresh(job);
+          if (!recovered.recovered) {
+            const finalError = recovered.error || errorText;
+            console.error("[auto-pick-auto-complete] refresh after not-found did not recover", {
+              jobId: job.id,
+              orderId: order.id,
+              orderNo: order.orderNo,
+              platform: order.platform,
+              sourceId: order.sourceId,
+              logisticId: order.logisticId,
+              status: recovered.status ?? result.status,
+              error: finalError,
+            });
+            await markJobFailed(job.id, finalError);
+          }
+        } else {
+          await markJobRetry(job.id, errorText);
+        }
         results.push({ id: job.id, ok: false, error: errorText });
       }
     } catch (error) {

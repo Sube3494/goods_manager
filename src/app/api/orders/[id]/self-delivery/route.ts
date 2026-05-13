@@ -68,10 +68,12 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
     }
 
-    const abnormal = isAutoPickOrderAbnormalStatus(order.status);
     const commandBaseOrder = order;
     let commandOrder = commandBaseOrder;
-    if (!String(commandBaseOrder.sourceId || "").trim() || !String(commandBaseOrder.logisticId || "").trim()) {
+    const shouldRefreshBeforeSelfDelivery = isAutoPickOrderAbnormalStatus(order.status)
+      || !String(commandBaseOrder.sourceId || "").trim()
+      || !String(commandBaseOrder.logisticId || "").trim();
+    if (shouldRefreshBeforeSelfDelivery) {
       const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
         id: commandBaseOrder.sourceId,
         platform: commandBaseOrder.platform,
