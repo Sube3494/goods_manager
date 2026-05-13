@@ -132,6 +132,174 @@ function isTooBroadLocationName(name: string, keyword: string, areaHint: string)
   return false;
 }
 
+function normalizeRegionText(value: string | null | undefined) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .replace(/特别行政区|自治区|省|市|区|县/g, "");
+}
+
+function normalizeSearchText(value: string | null | undefined) {
+  return String(value || "").replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function extractSpecificKeywordHints(keyword: string) {
+  const normalized = normalizeSearchText(keyword);
+  if (!normalized) return [];
+
+  const genericTerms = [
+    "广东省", "广州市", "天河区", "白云区", "越秀区", "海珠区", "荔湾区", "番禺区",
+    "商务公寓", "公寓", "酒店", "小区", "大厦", "广场", "花园", "大楼", "写字楼",
+    "大酒店", "公馆", "中心", "商务", "国际", "一期", "二期", "三期", "一栋", "二栋", "三栋", "1栋", "2栋", "3栋"
+  ];
+
+  let compact = normalized;
+  for (const term of genericTerms) {
+    compact = compact.split(normalizeSearchText(term)).join(" ");
+  }
+
+  const hints = compact
+    .split(/[\s,，()（）\-_/]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2);
+
+  if (hints.length > 0) {
+    return Array.from(new Set(hints));
+  }
+
+  return normalized.length >= 2 ? [normalized] : [];
+}
+
+function candidateContainsSpecificHint(
+  candidate: {
+    name?: string | null;
+    address?: string | null;
+    district?: string | null;
+  },
+  keyword: string
+) {
+  const hints = extractSpecificKeywordHints(keyword);
+  if (hints.length === 0) return true;
+
+  const haystack = [
+    normalizeSearchText(candidate.name),
+    normalizeSearchText(candidate.address),
+    normalizeSearchText(candidate.district),
+  ].join(" ");
+
+  return hints.some((hint) => haystack.includes(hint));
+}
+
+function regionTextMatches(candidate: string | null | undefined, expected: string | null | undefined) {
+  const normalizedCandidate = normalizeRegionText(candidate);
+  const normalizedExpected = normalizeRegionText(expected);
+  if (!normalizedCandidate || !normalizedExpected) return false;
+  return (
+    normalizedCandidate === normalizedExpected
+    || normalizedCandidate.includes(normalizedExpected)
+    || normalizedExpected.includes(normalizedCandidate)
+  );
+}
+
+function scoreLocationCandidate(
+  candidate: {
+    name?: string | null;
+    address?: string | null;
+    province?: string | null;
+    city?: string | null;
+    district?: string | null;
+  },
+  keyword: string,
+  regionHint?: { province?: string | null; city?: string | null }
+) {
+  const normalizedKeyword = normalizeSearchText(keyword);
+  const normalizedName = normalizeSearchText(candidate.name);
+  const normalizedAddress = normalizeSearchText(candidate.address);
+  const normalizedDistrict = normalizeSearchText(candidate.district);
+
+  let score = 0;
+
+  if (normalizedKeyword) {
+    if (normalizedName === normalizedKeyword) score += 80;
+    else if (normalizedName.includes(normalizedKeyword)) score += 50;
+
+    if (normalizedAddress.includes(normalizedKeyword)) score += 28;
+    if (normalizedDistrict.includes(normalizedKeyword)) score += 12;
+  }
+
+  if (regionHint?.province && regionTextMatches(candidate.province, regionHint.province)) {
+    score += 30;
+  }
+  if (regionHint?.city && regionTextMatches(candidate.city, regionHint.city)) {
+    score += 45;
+  }
+
+  if (candidate.address) score += 6;
+  if (candidate.district) score += 4;
+  if (candidateContainsSpecificHint(candidate, keyword)) score += 35;
+
+  return score;
+}
+
+function pickBestPoi(
+  pois: any[],
+  keyword: string,
+  regionHint?: { province?: string | null; city?: string | null }
+) {
+  const candidates = Array.isArray(pois) ? pois : [];
+  if (!candidates.length) return null;
+
+  const ranked = candidates
+    .filter((poi) => poi?.location && Number.isFinite(Number(poi.location.lng)) && Number.isFinite(Number(poi.location.lat)))
+    .filter((poi) => candidateContainsSpecificHint({
+      name: poi.name,
+      address: poi.address,
+      district: poi.adname,
+    }, keyword))
+    .map((poi) => ({
+      poi,
+      score: scoreLocationCandidate({
+        name: poi.name,
+        address: poi.address,
+        province: poi.pname,
+        city: poi.cityname,
+        district: poi.adname,
+      }, keyword, regionHint),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  return ranked[0]?.poi || null;
+}
+
+function pickBestGeocode(
+  geocodes: any[],
+  keyword: string,
+  regionHint?: { province?: string | null; city?: string | null }
+) {
+  const candidates = Array.isArray(geocodes) ? geocodes : [];
+  if (!candidates.length) return null;
+
+  const ranked = candidates
+    .filter((item) => item?.location && Number.isFinite(Number(item.location.lng)) && Number.isFinite(Number(item.location.lat)))
+    .filter((item) => candidateContainsSpecificHint({
+      name: item.formattedAddress,
+      address: item.formattedAddress,
+      district: item.addressComponent?.district,
+    }, keyword))
+    .map((item) => ({
+      item,
+      score: scoreLocationCandidate({
+        name: item.formattedAddress,
+        address: item.formattedAddress,
+        province: item.addressComponent?.province,
+        city: typeof item.addressComponent?.city === "string" ? item.addressComponent.city : item.addressComponent?.province,
+        district: item.addressComponent?.district,
+      }, keyword, regionHint),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  return ranked[0]?.item || null;
+}
+
 function extractRegionParts(shop: Pick<Shop, "address" | "name" | "province" | "city">) {
   if (shop.province && shop.city) {
     return {
@@ -1124,7 +1292,7 @@ export function StoreDispatchMap({
   }, []);
 
   const resolveShopCoordinates = useCallback(
-    async (keyword: string) => {
+    async (keyword: string, regionHint?: { province?: string | null; city?: string | null }) => {
       const { geocoder, placeSearch } = await ensureSearchServices();
 
       const cleanKeyword = keyword
@@ -1136,13 +1304,13 @@ export function StoreDispatchMap({
 
       const geocoderMatch = await withTimeout(
         () =>
-          new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
-            geocoder.getLocation(keyword, (status: string, result: any) => {
-              if (status === "complete" && result?.geocodes?.length) {
-                const first = result.geocodes[0];
-                resolve({
-                  location: [first.location.lng, first.location.lat],
-                  components: first.addressComponent,
+            new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
+              geocoder.getLocation(keyword, (status: string, result: any) => {
+                if (status === "complete" && result?.geocodes?.length) {
+                  const first = pickBestGeocode(result.geocodes, keyword, regionHint) || result.geocodes[0];
+                  resolve({
+                    location: [first.location.lng, first.location.lat],
+                    components: first.addressComponent,
                 });
                 return;
               }
@@ -1162,7 +1330,7 @@ export function StoreDispatchMap({
                 new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
                   geocoder.getLocation(cleanKeyword, (status: string, result: any) => {
                     if (status === "complete" && result?.geocodes?.length) {
-                      const first = result.geocodes[0];
+                      const first = pickBestGeocode(result.geocodes, cleanKeyword, regionHint) || result.geocodes[0];
                       resolve({
                         location: [first.location.lng, first.location.lat],
                         components: first.addressComponent,
@@ -1186,7 +1354,7 @@ export function StoreDispatchMap({
           new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
             placeSearch.search(keyword, (status: string, result: any) => {
               if (status === "complete" && result?.poiList?.pois?.length) {
-                const poi = result.poiList.pois[0];
+                const poi = pickBestPoi(result.poiList.pois, keyword, regionHint) || result.poiList.pois[0];
                 if (poi?.location) {
                   resolve({
                     location: [poi.location.lng, poi.location.lat],
@@ -1223,6 +1391,10 @@ export function StoreDispatchMap({
     }
 
     const keyword = String(shop.address || shop.name || "").trim();
+    const regionHint = {
+      province: shop.province,
+      city: shop.city,
+    };
     if (!keyword) {
       showToast("该店铺缺少可定位地址", "info");
       return;
@@ -1230,7 +1402,7 @@ export function StoreDispatchMap({
 
     try {
       showToast("正在解析店铺位置...", "info");
-      const matched = await resolveShopCoordinates(keyword);
+      const matched = await resolveShopCoordinates(keyword, regionHint);
 
       if (!matched) {
         showToast("这个地址暂时解析不到坐标", "error");
@@ -1311,7 +1483,10 @@ export function StoreDispatchMap({
                 30000,
                 (status: string, result: any) => {
                   if (status === "complete" && result?.poiList?.pois?.length) {
-                    const poi = result.poiList.pois[0];
+                    const poi = pickBestPoi(result.poiList.pois, keyword, {
+                      province: activeProvince,
+                      city: activeCity,
+                    }) || result.poiList.pois[0];
                     if (poi?.location) {
                       resolve({
                         name: poi.name || keyword,
@@ -1336,7 +1511,10 @@ export function StoreDispatchMap({
             new Promise<TargetPoint | null>((resolve) => {
               geocoder.getLocation(geocoderKeyword, (status: string, result: any) => {
                 if (status === "complete" && result?.geocodes?.length) {
-                  const first = result.geocodes[0];
+                  const first = pickBestGeocode(result.geocodes, keyword, {
+                    province: activeProvince,
+                    city: activeCity,
+                  }) || result.geocodes[0];
                   resolve({
                     name: first.formattedAddress || geocoderKeyword,
                     location: [first.location.lng, first.location.lat],
@@ -1366,7 +1544,10 @@ export function StoreDispatchMap({
             new Promise<TargetPoint | null>((resolve) => {
               placeSearch.search(fallbackKeyword, (status: string, result: any) => {
                 if (status === "complete" && result?.poiList?.pois?.length) {
-                  const poi = result.poiList.pois[0];
+                  const poi = pickBestPoi(result.poiList.pois, keyword, {
+                    province: activeProvince,
+                    city: activeCity,
+                  }) || result.poiList.pois[0];
                   if (poi?.location) {
                     resolve({
                       name: poi.name || fallbackKeyword,
@@ -1393,7 +1574,10 @@ export function StoreDispatchMap({
                 50000,
                 (status: string, result: any) => {
                   if (status === "complete" && result?.poiList?.pois?.length) {
-                    const poi = result.poiList.pois[0];
+                    const poi = pickBestPoi(result.poiList.pois, keyword, {
+                      province: activeProvince,
+                      city: activeCity,
+                    }) || result.poiList.pois[0];
                     if (poi?.location) {
                       resolve({
                         name: poi.name || keyword,
