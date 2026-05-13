@@ -357,8 +357,10 @@ function readShopAddressFromRawPayload(rawPayload: unknown) {
     record.shopAddress,
     record.storeAddress,
     record.merchantAddress,
+    record.channelAddress,
     record.store_address,
     record.merchant_address,
+    record.channel_address,
   ];
   for (const item of candidates) {
     const value = String(item || "").trim();

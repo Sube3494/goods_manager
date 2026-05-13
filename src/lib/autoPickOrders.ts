@@ -2031,8 +2031,16 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || input.rawShopAddress
       || input.storeAddress
       || input.merchantAddress
+      || input.channelAddress
       || input.store_address
       || input.merchant_address
+      || input.channel_address
+      || extend?.storeAddress
+      || extend?.store_address
+      || extend?.merchantAddress
+      || extend?.merchant_address
+      || extend?.channelAddress
+      || extend?.channel_address
       || ""
     ).trim() || undefined,
     rawShopAddress: String(
@@ -2040,8 +2048,16 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || input.shopAddress
       || input.storeAddress
       || input.merchantAddress
+      || input.channelAddress
       || input.store_address
       || input.merchant_address
+      || input.channel_address
+      || extend?.storeAddress
+      || extend?.store_address
+      || extend?.merchantAddress
+      || extend?.merchant_address
+      || extend?.channelAddress
+      || extend?.channel_address
       || ""
     ).trim() || undefined,
     isSubscribe: input.isSubscribe === true || input.isSubscribe === 1 || input.isSubscribe === "1" || input.is_subscribe === true || input.is_subscribe === 1 || input.is_subscribe === "1",
@@ -2084,6 +2100,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       channel_tag: normalized.channelTag,
     },
     normalized.userAddress,
+    normalized.shopAddress,
   );
 
   if (!normalized.platform || !normalized.orderNo || !normalized.orderTime || !normalized.userAddress || !normalized.id) {
