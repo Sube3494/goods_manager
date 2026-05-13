@@ -3033,14 +3033,14 @@ export async function refreshAutoPickOrderFromPlugin(
         orderNo: String(detailOrder.orderNo || "").trim() || fallbackOrderNo,
       });
       if (normalizedDetailOrder) {
-      if (isAutoPickOrderDeletedStatus(normalizedDetailOrder.status)) {
-        await deleteAutoPickOrderByIdentity(userId, {
-          platform: normalizedDetailOrder.platform || fallbackPlatform,
-          orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
-        });
-        return null;
-      }
-      return await upsertAutoPickOrder(userId, normalizedDetailOrder);
+        if (isAutoPickOrderDeletedStatus(normalizedDetailOrder.status)) {
+          await deleteAutoPickOrderByIdentity(userId, {
+            platform: normalizedDetailOrder.platform || fallbackPlatform,
+            orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
+          });
+          return null;
+        }
+        return await upsertAutoPickOrder(userId, normalizedDetailOrder);
       }
     }
   }
@@ -3062,7 +3062,25 @@ export async function refreshAutoPickOrderFromPlugin(
     });
 
   if (!matched) {
-    return null;
+    const fallbackMatched = await findAutoPickOrderFromActiveStatusLists(cookie, lookup);
+    if (!fallbackMatched) {
+      return null;
+    }
+
+    const normalizedFallbackMatched = normalizeAutoPickOrderPayload(fallbackMatched);
+    if (!normalizedFallbackMatched) {
+      return null;
+    }
+
+    if (isAutoPickOrderDeletedStatus(normalizedFallbackMatched.status)) {
+      await deleteAutoPickOrderByIdentity(userId, {
+        platform: normalizedFallbackMatched.platform || String(lookup.platform || ""),
+        orderNo: normalizedFallbackMatched.orderNo || String(lookup.orderNo || ""),
+      });
+      return null;
+    }
+
+    return await upsertAutoPickOrder(userId, normalizedFallbackMatched);
   }
 
   if (isAutoPickOrderDeletedStatus(matched.status)) {
@@ -3074,6 +3092,45 @@ export async function refreshAutoPickOrderFromPlugin(
   }
 
   return await upsertAutoPickOrder(userId, matched);
+}
+
+async function findAutoPickOrderFromActiveStatusLists(
+  cookie: string,
+  lookup: { id?: string; platform?: string; orderNo?: string; orderTime?: Date | string | null }
+) {
+  const fallbackPlatform = String(lookup.platform || "").trim();
+  const fallbackOrderNo = String(lookup.orderNo || "").trim();
+  const canTrustLookupPlatform = Boolean(fallbackPlatform && fallbackPlatform !== "未知");
+  const activeStatuses: AutoPickSyncStatus[] = [
+    "confirm",
+    "subscribe",
+    "delivery",
+    "pickup",
+    "delivering",
+    "expect",
+    "remind",
+    "meal",
+  ];
+
+  for (const status of activeStatuses) {
+    const orders = await fetchSimplifiedMaiyatianOrderListByCookie(cookie, status).catch(() => []);
+    const matched = orders.find((order) => {
+      if (lookup.id && order.id === lookup.id) return true;
+      if (order.orderNo !== fallbackOrderNo) {
+        return false;
+      }
+      if (!canTrustLookupPlatform) {
+        return true;
+      }
+      return order.platform === fallbackPlatform;
+    });
+
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return null;
 }
 
 export async function backfillPersistedAutoPickOrderFields(userId: string) {

@@ -40,21 +40,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     });
 
     if (!refreshedOrder) {
-      await cancelAutoCompleteJob(order.id, "order-removed-from-maiyatian");
-      await prisma.autoPickOrder.deleteMany({
-        where: {
-          id: order.id,
-          userId: session.id,
-        },
-      });
-
       return NextResponse.json({
-        ok: true,
+        ok: false,
         id: order.id,
         orderNo: order.orderNo,
         platform: order.platform,
-        removed: true,
-      });
+        preserved: true,
+        error: "Order was not found in the current sync query, local record preserved",
+      }, { status: 409 });
     }
 
     if (

@@ -37,7 +37,7 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     return "已完成";
   }
 
-  if (text.includes("配送中") || normalized === "delivering") {
+  if (text.includes("配送中") || text.includes("派送中") || normalized === "delivering") {
     return "配送中";
   }
 
@@ -171,6 +171,7 @@ export function isAutoPickPickupOrder(
   shopAddress?: string | null,
 ) {
   const candidates = [userAddress, shopAddress];
+  let matchesImplicitPickup = false;
 
   if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
     const record = rawPayload as Record<string, unknown>;
@@ -180,6 +181,25 @@ export function isAutoPickPickupOrder(
     const extend = record.extend && typeof record.extend === "object" && !Array.isArray(record.extend)
       ? record.extend as Record<string, unknown>
       : {};
+    const channelTag = String(record.channelTag || record.channel_tag || "").trim().toLowerCase();
+    const addressText = [
+      userAddress,
+      record.unencrypted_map_address,
+      record.unencrypted_address,
+      record.map_address,
+      record.address,
+    ].map((item) => String(item || "").trim()).join("");
+    const hasDeliveryObject = Boolean(record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery));
+    const deliveryDistance = Number(record.delivery_distance || record.riding_distance || 0);
+    const deliveryId = String(record.delivery_id || "").trim();
+
+    matchesImplicitPickup =
+      channelTag === "other"
+      && !hasDeliveryObject
+      && (deliveryId === "" || deliveryId === "0")
+      && (!Number.isFinite(deliveryDistance) || deliveryDistance <= 0)
+      && !addressText;
+
     candidates.push(
       String(record.shopAddress || ""),
       String(record.rawShopAddress || ""),
@@ -224,7 +244,8 @@ export function isAutoPickPickupOrder(
     );
   }
 
-  return candidates.some((item) => /到店自取|门店自取|上门自取|线下自提|到店取货|待取货|取货时间|自提/.test(String(item || "").trim()));
+  return matchesImplicitPickup
+    || candidates.some((item) => /到店自取|门店自取|上门自取|线下自提|到店取货|待取货|取货时间|自提/.test(String(item || "").trim()));
 }
 
 export function isAutoPickOtherPickupOrder(rawPayload: unknown) {
