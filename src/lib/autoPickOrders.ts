@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
-import { getBaseAutoPickStatusDisplay, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderTerminalStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { getBaseAutoPickStatusDisplay, isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderDeliveringStatus, isAutoPickOrderTerminalStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
@@ -543,6 +543,78 @@ export function normalizeAutoPickIntegrationConfig(input: unknown): AutoPickInte
       : [],
     selfDeliveryTiming: normalizeAutoPickSelfDeliveryTimingConfig(payload.selfDeliveryTiming),
   };
+}
+
+function parseExpectedAutoCompleteBase(deadlineText: string | null | undefined, orderTime: Date | string) {
+  const text = String(deadlineText || "").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+
+  const timeMatch = text.match(/(?:今日|今天|明日|明天|后日|后天)?\s*(\d{1,2}:\d{2})/);
+  if (!timeMatch) return null;
+
+  const baseDate = parseAsShanghaiTime(orderTime);
+  const candidate = new Date(baseDate);
+  candidate.setSeconds(0, 0);
+
+  const [hours, minutes] = timeMatch[1].split(":").map((part) => Number(part));
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+
+  candidate.setHours(hours, minutes, 0, 0);
+
+  if (/明日|明天/.test(text)) {
+    candidate.setDate(candidate.getDate() + 1);
+  } else if (/后日|后天/.test(text)) {
+    candidate.setDate(candidate.getDate() + 2);
+  } else if ((/今日|今天/.test(text) || !/明日|明天|后日|后天/.test(text)) && candidate.getTime() < baseDate.getTime() - 60 * 1000) {
+    candidate.setDate(candidate.getDate() + 1);
+  }
+
+  if (candidate.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return candidate;
+}
+
+function estimateAutoCompleteAtForOrder(
+  order: {
+    orderTime?: string | Date;
+    distanceKm?: number | null;
+    deliveryDeadline?: string | null;
+  },
+  config?: Partial<AutoPickSelfDeliveryTimingConfig> | null,
+) {
+  const orderTime = order.orderTime;
+  if (!orderTime) {
+    return null;
+  }
+
+  const timing = config ? normalizeAutoPickSelfDeliveryTimingConfig(config) : getDefaultAutoPickSelfDeliveryTimingConfig();
+  const distanceKm = typeof order.distanceKm === "number" ? order.distanceKm : null;
+  const heuristicAt = distanceKm != null
+    ? new Date(Date.now() + (timing.pickupMinutes + distanceKm * timing.minutesPerKm + timing.riderUpstairsMinutes) * 60 * 1000)
+    : null;
+
+  const expectedAt = parseExpectedAutoCompleteBase(order.deliveryDeadline, orderTime);
+  const latestSafeAt = expectedAt
+    ? new Date(expectedAt.getTime() - timing.deadlineLeadMinutes * 60 * 1000)
+    : null;
+
+  if (heuristicAt && latestSafeAt) {
+    return heuristicAt.getTime() <= latestSafeAt.getTime() ? heuristicAt : latestSafeAt;
+  }
+
+  if (heuristicAt) {
+    return heuristicAt;
+  }
+
+  if (latestSafeAt) {
+    return latestSafeAt;
+  }
+
+  return null;
 }
 
 function decodeHtmlEntities(value: string) {
@@ -2081,7 +2153,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
   let previousStatus: string | null = null;
 
-  const order = await prisma.$transaction(async (tx) => {
+  let order = await prisma.$transaction(async (tx) => {
     await ensureShopProductsForAutoPickOrder(tx, userId, normalized, items);
     const resolvedInternalShop = await resolveAutoPickInternalShop(tx, userId, normalized);
 
@@ -2290,6 +2362,49 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     await syncAutoOutboundFromCompletedAutoPickOrder(userId, order.id).catch((outboundError) => {
       console.error("Failed to auto-create outbound after webhook upsert:", outboundError);
     });
+  }
+
+  const becameDelivering =
+    isAutoPickOrderDeliveringStatus(order.status)
+    && !isAutoPickOrderDeliveringStatus(previousStatus)
+    && !isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress)
+    && !isAutoPickOrderAbnormalStatus(order.status);
+  const triggeredByMainSystem = Boolean(readAutoPickSystemMeta(order.rawPayload)?.mainSystemSelfDelivery?.triggered);
+
+  if (becameDelivering && triggeredByMainSystem && !order.autoCompleteAt) {
+    const integrationConfig = await getAutoPickIntegrationConfigByUserId(userId);
+    const autoCompleteAt = estimateAutoCompleteAtForOrder(order, integrationConfig.selfDeliveryTiming);
+
+    if (autoCompleteAt) {
+      order = await prisma.autoPickOrder.update({
+        where: { id: order.id },
+        data: {
+          autoCompleteAt,
+          lastSyncedAt: new Date(),
+        },
+        include: {
+          items: {
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+
+      const { ensureAutoCompleteJob } = await import("@/lib/autoPickAutoComplete");
+      await ensureAutoCompleteJob({
+        userId,
+        orderId: order.id,
+        dueAt: autoCompleteAt,
+      });
+
+      emitAutoPickOrderEvent({
+        type: "upsert",
+        userId,
+        orderId: order.id,
+        orderNo: order.orderNo,
+        platform: order.platform,
+        at: new Date().toISOString(),
+      });
+    }
   }
 
   return order;

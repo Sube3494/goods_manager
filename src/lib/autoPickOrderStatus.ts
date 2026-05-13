@@ -47,6 +47,9 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
 
   if (
     text.includes("待配送")
+    || text.includes("配送已下单")
+    || text.includes("配送已接单")
+    || text.includes("骑手已到店")
     || text.includes("待发货")
     || text.includes("待送达")
     || text.includes("待骑手")
@@ -54,6 +57,8 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     || text.includes("尽快送达")
     || text.includes("立即配送")
     || text.includes("商家自配")
+    || normalized === "delivery"
+    || normalized === "pickup"
     || normalized === "pending_delivery"
     || normalized === "pendingdelivery"
   ) {

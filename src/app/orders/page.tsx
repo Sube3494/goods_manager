@@ -684,7 +684,7 @@ function OrderCard({
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
   const pickup = Boolean(order.isPickup);
-  const delivering = !pickup && (isDeliveringStatus(order.status) || (!abnormal && Boolean(order.autoCompleteAt)));
+  const delivering = !pickup && isDeliveringStatus(order.status);
   const subscribe = isSubscribeOrder(order);
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal && !pickup;
@@ -1989,7 +1989,6 @@ export default function OrdersPage() {
       if (action === "self-delivery") {
         patchOrder(orderId, (order) => ({
           ...order,
-          status: "配送中",
           autoCompleteJobStatus: order.autoCompleteJobStatus === "FAILED" ? "PENDING" : order.autoCompleteJobStatus,
           autoCompleteJobError: null,
         }));

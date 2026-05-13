@@ -7,14 +7,14 @@ import {
   isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
+  isAutoPickOrderDeliveringStatus,
   isAutoPickPickupOrder,
-  isAutoPickSelfDeliveryStarted,
 } from "@/lib/autoPickOrderStatus";
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
 
-async function waitForConfirmedSelfDelivery(
+async function waitForDeliveringSelfDelivery(
   userId: string,
   lookup: { id?: string; platform?: string; orderNo?: string; orderTime?: Date | string | null },
   attempts = 3,
@@ -25,7 +25,7 @@ async function waitForConfirmedSelfDelivery(
       return null;
     });
 
-    if (refreshedOrder && isAutoPickSelfDeliveryStarted(refreshedOrder)) {
+    if (refreshedOrder && isAutoPickOrderDeliveringStatus(refreshedOrder.status)) {
       return refreshedOrder;
     }
 
@@ -104,30 +104,37 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     });
 
     if (result.ok) {
-      const refreshedOrder = await waitForConfirmedSelfDelivery(session.id, {
+      const refreshedOrder = await waitForDeliveringSelfDelivery(session.id, {
         id: sourceId,
         platform: commandOrder.platform,
         orderNo: commandOrder.orderNo,
         orderTime: commandOrder.orderTime,
       });
 
-      if (!refreshedOrder) {
-        return NextResponse.json({
-          error: "自配指令已发出，但暂未确认麦芽田已切到自配/配送中状态，请先同步订单确认成功后再继续。",
-        }, { status: 409 });
-      }
+      const latestOrder = refreshedOrder || await refreshAutoPickOrderFromPlugin(session.id, {
+        id: sourceId,
+        platform: commandOrder.platform,
+        orderNo: commandOrder.orderNo,
+        orderTime: commandOrder.orderTime,
+      }).catch((refreshError) => {
+        console.error("Failed to refresh auto-pick order after pending self delivery:", refreshError);
+        return null;
+      });
 
-      const schedulingOrder = refreshedOrder;
-      const integrationConfig = await getAutoPickIntegrationConfigByUserId(session.id);
+      const schedulingOrder = latestOrder || commandOrder;
+      const confirmedDelivering = isAutoPickOrderDeliveringStatus(schedulingOrder.status);
+      const integrationConfig = confirmedDelivering
+        ? await getAutoPickIntegrationConfigByUserId(session.id)
+        : null;
       const autoCompleteBlocked = isAutoPickOrderAbnormalStatus(schedulingOrder.status);
-      const autoCompleteAt = autoCompleteBlocked
-        ? null
-        : getEstimatedAutoCompleteAt(schedulingOrder, integrationConfig.selfDeliveryTiming);
+      const autoCompleteAt = confirmedDelivering && !autoCompleteBlocked && integrationConfig
+        ? getEstimatedAutoCompleteAt(schedulingOrder, integrationConfig.selfDeliveryTiming)
+        : null;
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
-          status: autoCompleteBlocked ? (schedulingOrder.status || order.status) : (schedulingOrder.status || "配送中"),
-          deliveryDeadline: refreshedOrder.deliveryDeadline || order.deliveryDeadline || null,
+          status: schedulingOrder.status || order.status,
+          deliveryDeadline: schedulingOrder.deliveryDeadline || order.deliveryDeadline || null,
           autoCompleteAt: autoCompleteAt || null,
         },
       });
@@ -140,7 +147,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           dueAt: autoCompleteAt,
         });
       } else {
-        await cancelAutoCompleteJob(id, autoCompleteBlocked ? "abnormal-status-no-auto-complete" : "missing-auto-complete-time");
+        await cancelAutoCompleteJob(
+          id,
+          autoCompleteBlocked
+            ? "abnormal-status-no-auto-complete"
+            : confirmedDelivering
+              ? "missing-auto-complete-time"
+              : "waiting-delivering-status"
+        );
       }
     }
 
