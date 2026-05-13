@@ -45,6 +45,14 @@ type TargetPoint = {
   location: [number, number];
 };
 
+type SearchCandidate = TargetPoint & {
+  id: string;
+  address?: string;
+  district?: string;
+  source: "poi" | "geocode";
+  score: number;
+};
+
 type ImportedShopPayload = {
   id: string;
   name: string;
@@ -298,6 +306,94 @@ function pickBestGeocode(
     .sort((a, b) => b.score - a.score);
 
   return ranked[0]?.item || null;
+}
+
+function buildCandidateId(location: [number, number], name: string) {
+  return `${location[0].toFixed(6)},${location[1].toFixed(6)}:${normalizeSearchText(name)}`;
+}
+
+function buildPoiCandidates(
+  pois: any[],
+  keyword: string,
+  regionHint?: { province?: string | null; city?: string | null }
+) {
+  return (Array.isArray(pois) ? pois : [])
+    .filter((poi) => poi?.location && Number.isFinite(Number(poi.location.lng)) && Number.isFinite(Number(poi.location.lat)))
+    .filter((poi) => candidateContainsSpecificHint({
+      name: poi.name,
+      address: poi.address,
+      district: poi.adname,
+    }, keyword))
+    .map((poi) => {
+      const location: [number, number] = [poi.location.lng, poi.location.lat];
+      return {
+        id: buildCandidateId(location, String(poi.name || keyword)),
+        name: String(poi.name || keyword),
+        location,
+        address: String(poi.address || "").trim() || undefined,
+        district: String(poi.adname || "").trim() || undefined,
+        source: "poi" as const,
+        score: scoreLocationCandidate({
+          name: poi.name,
+          address: poi.address,
+          province: poi.pname,
+          city: poi.cityname,
+          district: poi.adname,
+        }, keyword, regionHint),
+      };
+    });
+}
+
+function buildGeocodeCandidates(
+  geocodes: any[],
+  keyword: string,
+  regionHint?: { province?: string | null; city?: string | null }
+) {
+  return (Array.isArray(geocodes) ? geocodes : [])
+    .filter((item) => item?.location && Number.isFinite(Number(item.location.lng)) && Number.isFinite(Number(item.location.lat)))
+    .filter((item) => candidateContainsSpecificHint({
+      name: item.formattedAddress,
+      address: item.formattedAddress,
+      district: item.addressComponent?.district,
+    }, keyword))
+    .map((item) => {
+      const location: [number, number] = [item.location.lng, item.location.lat];
+      const city = typeof item.addressComponent?.city === "string" ? item.addressComponent.city : item.addressComponent?.province;
+      return {
+        id: buildCandidateId(location, String(item.formattedAddress || keyword)),
+        name: String(item.formattedAddress || keyword),
+        location,
+        address: String(item.formattedAddress || "").trim() || undefined,
+        district: String(item.addressComponent?.district || city || "").trim() || undefined,
+        source: "geocode" as const,
+        score: scoreLocationCandidate({
+          name: item.formattedAddress,
+          address: item.formattedAddress,
+          province: item.addressComponent?.province,
+          city,
+          district: item.addressComponent?.district,
+        }, keyword, regionHint),
+      };
+    });
+}
+
+function mergeSearchCandidates(candidates: SearchCandidate[]) {
+  const bestById = new Map<string, SearchCandidate>();
+  for (const candidate of candidates) {
+    const existing = bestById.get(candidate.id);
+    if (!existing || candidate.score > existing.score) {
+      bestById.set(candidate.id, candidate);
+    }
+  }
+  return Array.from(bestById.values()).sort((a, b) => b.score - a.score).slice(0, 6);
+}
+
+function normalizePlaceSearchScope(value: string | null | undefined) {
+  const normalized = String(value || "").trim();
+  if (!normalized || normalized === ALL_REGIONS || normalized === UNKNOWN_CITY || normalized === UNKNOWN_PROVINCE) {
+    return null;
+  }
+  return normalized;
 }
 
 function extractRegionParts(shop: Pick<Shop, "address" | "name" | "province" | "city">) {
@@ -574,7 +670,6 @@ export function StoreDispatchMap({
   const spiderLabelsRef = useRef<any[]>([]);
   const geocoderRef = useRef<any>(null);
   const infoWindowRef = useRef<any>(null);
-  const placeSearchRef = useRef<any>(null);
   const mapInteractionHandlerRef = useRef<(() => void) | null>(null);
   const routeBatchIdRef = useRef(0);
   const lastMarkerFocusRef = useRef<{ shopId: string | null; at: number }>({ shopId: null, at: 0 });
@@ -594,6 +689,7 @@ export function StoreDispatchMap({
   const [pendingDeleteAction, setPendingDeleteAction] = useState<PendingDeleteAction | null>(null);
   const [targetQuery, setTargetQuery] = useState("");
   const [targetPoint, setTargetPoint] = useState<TargetPoint | null>(null);
+  const [targetCandidates, setTargetCandidates] = useState<SearchCandidate[]>([]);
   const [results, setResults] = useState<DistanceResult[]>([]);
   const [isResolvingRoutes, setIsResolvingRoutes] = useState(false);
   const [isSearchingTarget, setIsSearchingTarget] = useState(false);
@@ -1276,24 +1372,32 @@ export function StoreDispatchMap({
       geocoderRef.current = new AMap.Geocoder();
     }
 
-    if (!placeSearchRef.current && typeof AMap.PlaceSearch === "function") {
-      placeSearchRef.current = new AMap.PlaceSearch({
-        pageSize: 5,
-        pageIndex: 1,
-        city: "全国",
-        citylimit: false,
-      });
-    }
-
     return {
       geocoder: geocoderRef.current,
-      placeSearch: placeSearchRef.current,
     };
+  }, []);
+
+  const createPlaceSearch = useCallback((regionHint?: { province?: string | null; city?: string | null }) => {
+    const AMap = AMapRef.current;
+    if (!AMap || typeof AMap.PlaceSearch !== "function") {
+      return null;
+    }
+
+    const city = normalizePlaceSearchScope(regionHint?.city) || normalizePlaceSearchScope(regionHint?.province) || "全国";
+
+    return new AMap.PlaceSearch({
+      pageSize: 8,
+      pageIndex: 1,
+      city,
+      citylimit: city !== "全国",
+    });
   }, []);
 
   const resolveShopCoordinates = useCallback(
     async (keyword: string, regionHint?: { province?: string | null; city?: string | null }) => {
-      const { geocoder, placeSearch } = await ensureSearchServices();
+      const { geocoder } = await ensureSearchServices();
+      const scopedPlaceSearch = createPlaceSearch(regionHint);
+      const fallbackPlaceSearch = scopedPlaceSearch || createPlaceSearch();
 
       const cleanKeyword = keyword
         .replace(/\(.*\)/g, "")
@@ -1301,6 +1405,36 @@ export function StoreDispatchMap({
         .replace(/\d+房$/g, "")
         .replace(/\d+号$/g, "")
         .trim();
+
+      if (scopedPlaceSearch) {
+        const scopedPoiMatch = await withTimeout(
+          () =>
+            new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
+              scopedPlaceSearch.search(cleanKeyword || keyword, (status: string, result: any) => {
+                if (status === "complete" && result?.poiList?.pois?.length) {
+                  const poi = pickBestPoi(result.poiList.pois, keyword, regionHint) || result.poiList.pois[0];
+                  if (poi?.location) {
+                    resolve({
+                      location: [poi.location.lng, poi.location.lat],
+                      components: {
+                        province: poi.pname,
+                        city: poi.cityname,
+                        district: poi.adname,
+                        adcode: poi.adcode,
+                      },
+                    });
+                    return;
+                  }
+                }
+                resolve(null);
+              });
+            }),
+          4000,
+          null
+        );
+
+        if (scopedPoiMatch) return scopedPoiMatch;
+      }
 
       const geocoderMatch = await withTimeout(
         () =>
@@ -1347,12 +1481,12 @@ export function StoreDispatchMap({
 
       if (cleanedMatch) return cleanedMatch;
 
-      if (!placeSearch) return null;
+      if (!fallbackPlaceSearch) return null;
 
       return withTimeout(
         () =>
           new Promise<{ location: [number, number]; components: any } | null>((resolve) => {
-            placeSearch.search(keyword, (status: string, result: any) => {
+            fallbackPlaceSearch.search(cleanKeyword || keyword, (status: string, result: any) => {
               if (status === "complete" && result?.poiList?.pois?.length) {
                 const poi = pickBestPoi(result.poiList.pois, keyword, regionHint) || result.poiList.pois[0];
                 if (poi?.location) {
@@ -1361,6 +1495,7 @@ export function StoreDispatchMap({
                     components: {
                       province: poi.pname,
                       city: poi.cityname,
+                      district: poi.adname,
                       adcode: poi.adcode,
                     },
                   });
@@ -1374,7 +1509,7 @@ export function StoreDispatchMap({
         null
       );
     },
-    [ensureSearchServices]
+    [createPlaceSearch, ensureSearchServices]
   );
 
   const handleLocateShop = useCallback(async (shop: Shop) => {
@@ -1442,10 +1577,36 @@ export function StoreDispatchMap({
     }
   }, [fetchShops, resolveShopCoordinates, showToast]);
 
+  const applyTargetCandidate = useCallback((candidate: SearchCandidate) => {
+    setTargetCandidates([]);
+    setTargetQuery(candidate.name);
+    setTargetPoint({
+      name: candidate.name,
+      location: candidate.location,
+    });
+    const regionLabel = activeProvince === ALL_REGIONS ? ALL_REGIONS : `${activeProvince}${activeCity}`;
+    const nearbyStoreCount =
+      !activeCity || activeCity === ALL_REGIONS
+        ? 0
+        : provinceScopedStores.filter((shop) => {
+            const parts = extractRegionParts(shop);
+            if (parts.city === UNKNOWN_CITY || parts.city === activeCity) return false;
+            const coordinates = getShopCoordinates(shop);
+            if (!coordinates) return false;
+            return getDistanceMeters(coordinates, candidate.location) <= CROSS_CITY_RADIUS_METERS;
+          }).length;
+    setSearchFeedback(
+      nearbyStoreCount > 0
+        ? `已在 ${regionLabel} 范围内定位：${candidate.name}，并自动纳入邻近城市门店参与调货。`
+        : `已在 ${regionLabel} 范围内定位：${candidate.name}`
+    );
+  }, [activeCity, activeProvince, provinceScopedStores]);
+
   const handleResolveTarget = useCallback(async () => {
     const keyword = targetQuery.trim();
     if (!keyword) {
       setTargetPoint(null);
+      setTargetCandidates([]);
       setResults([]);
       setSearchFeedback("请先选地区，再搜索同城目的地。");
       clearTargetArtifacts();
@@ -1466,160 +1627,155 @@ export function StoreDispatchMap({
 
     try {
       setIsSearchingTarget(true);
+      setTargetCandidates([]);
       setSearchFeedback(`正在 ${activeProvince}${activeCity} 搜索：${keyword}`);
-      const { geocoder, placeSearch } = await ensureSearchServices();
-      let match: TargetPoint | null = null;
+      const { geocoder } = await ensureSearchServices();
+      const scopedPlaceSearch = createPlaceSearch({
+        province: activeProvince,
+        city: activeCity,
+      });
+      const fallbackPlaceSearch = scopedPlaceSearch || createPlaceSearch();
+      const collected: SearchCandidate[] = [];
 
       if (
-        placeSearch &&
+        scopedPlaceSearch &&
         regionCenter
       ) {
-        match = await withTimeout(
+        const nearbyCandidates = await withTimeout(
           () =>
-            new Promise<TargetPoint | null>((resolve) => {
-              placeSearch.searchNearBy(
+            new Promise<SearchCandidate[]>((resolve) => {
+              scopedPlaceSearch.searchNearBy(
                 keyword,
                 regionCenter,
                 30000,
                 (status: string, result: any) => {
                   if (status === "complete" && result?.poiList?.pois?.length) {
-                    const poi = pickBestPoi(result.poiList.pois, keyword, {
+                    resolve(buildPoiCandidates(result.poiList.pois, keyword, {
                       province: activeProvince,
                       city: activeCity,
-                    }) || result.poiList.pois[0];
-                    if (poi?.location) {
-                      resolve({
-                        name: poi.name || keyword,
-                        location: [poi.location.lng, poi.location.lat],
-                      });
-                      return;
-                    }
+                    }));
+                    return;
                   }
-                  resolve(null);
+                  resolve([]);
                 }
               );
             }),
           4000,
-          null
+          []
         );
+        collected.push(...nearbyCandidates);
       }
 
-      if (!match) {
-        const geocoderKeyword = activeRegionKeyword ? `${activeRegionKeyword}${keyword}` : keyword;
-        const geocoderMatch = await withTimeout(
+      if (scopedPlaceSearch) {
+        const scopedKeyword = activeRegionKeyword ? `${activeRegionKeyword}${keyword}` : keyword;
+        const scopedCandidates = await withTimeout(
           () =>
-            new Promise<TargetPoint | null>((resolve) => {
-              geocoder.getLocation(geocoderKeyword, (status: string, result: any) => {
-                if (status === "complete" && result?.geocodes?.length) {
-                  const first = pickBestGeocode(result.geocodes, keyword, {
+            new Promise<SearchCandidate[]>((resolve) => {
+              scopedPlaceSearch.search(scopedKeyword, (status: string, result: any) => {
+                if (status === "complete" && result?.poiList?.pois?.length) {
+                  resolve(buildPoiCandidates(result.poiList.pois, keyword, {
                     province: activeProvince,
                     city: activeCity,
-                  }) || result.geocodes[0];
-                  resolve({
-                    name: first.formattedAddress || geocoderKeyword,
-                    location: [first.location.lng, first.location.lat],
-                  });
+                  }));
+                  return;
+                }
+                resolve([]);
+              });
+            }),
+          4000,
+          []
+        );
+        collected.push(...scopedCandidates);
+      }
+
+      {
+        const geocoderKeyword = activeRegionKeyword ? `${activeRegionKeyword}${keyword}` : keyword;
+        const geocoderCandidates = await withTimeout(
+          () =>
+            new Promise<SearchCandidate[]>((resolve) => {
+              geocoder.getLocation(geocoderKeyword, (status: string, result: any) => {
+                if (status === "complete" && result?.geocodes?.length) {
+                  resolve(
+                    buildGeocodeCandidates(result.geocodes, keyword, {
+                      province: activeProvince,
+                      city: activeCity,
+                    }).filter((item) => !isTooBroadLocationName(item.name, keyword, activeRegionKeyword))
+                  );
                   return;
                 }
 
-                resolve(null);
+                resolve([]);
               });
             }),
           4000,
-          null
+          []
         );
-
-        if (
-          geocoderMatch &&
-          !isTooBroadLocationName(geocoderMatch.name, keyword, activeRegionKeyword)
-        ) {
-          match = geocoderMatch;
-        }
+        collected.push(...geocoderCandidates);
       }
 
-      if (!match && placeSearch) {
+      if (fallbackPlaceSearch) {
         const fallbackKeyword = activeRegionKeyword ? `${activeRegionKeyword}${keyword}` : keyword;
-        match = await withTimeout(
+        const fallbackCandidates = await withTimeout(
           () =>
-            new Promise<TargetPoint | null>((resolve) => {
-              placeSearch.search(fallbackKeyword, (status: string, result: any) => {
+            new Promise<SearchCandidate[]>((resolve) => {
+              fallbackPlaceSearch.search(fallbackKeyword, (status: string, result: any) => {
                 if (status === "complete" && result?.poiList?.pois?.length) {
-                  const poi = pickBestPoi(result.poiList.pois, keyword, {
+                  resolve(buildPoiCandidates(result.poiList.pois, keyword, {
                     province: activeProvince,
                     city: activeCity,
-                  }) || result.poiList.pois[0];
-                  if (poi?.location) {
-                    resolve({
-                      name: poi.name || fallbackKeyword,
-                      location: [poi.location.lng, poi.location.lat],
-                    });
-                    return;
-                  }
+                  }));
+                  return;
                 }
-                resolve(null);
+                resolve([]);
               });
             }),
           4000,
-          null
+          []
         );
+        collected.push(...fallbackCandidates);
       }
 
-      if (!match && placeSearch) {
-        match = await withTimeout(
+      if (fallbackPlaceSearch) {
+        const fartherNearbyCandidates = await withTimeout(
           () =>
-            new Promise<TargetPoint | null>((resolve) => {
-              placeSearch.searchNearBy(
+            new Promise<SearchCandidate[]>((resolve) => {
+              fallbackPlaceSearch.searchNearBy(
                 keyword,
                 regionCenter ?? mapRef.current?.getCenter?.() ?? DEFAULT_CENTER,
                 50000,
                 (status: string, result: any) => {
                   if (status === "complete" && result?.poiList?.pois?.length) {
-                    const poi = pickBestPoi(result.poiList.pois, keyword, {
+                    resolve(buildPoiCandidates(result.poiList.pois, keyword, {
                       province: activeProvince,
                       city: activeCity,
-                    }) || result.poiList.pois[0];
-                    if (poi?.location) {
-                      resolve({
-                        name: poi.name || keyword,
-                        location: [poi.location.lng, poi.location.lat],
-                      });
-                      return;
-                    }
+                    }));
+                    return;
                   }
-                  resolve(null);
+                  resolve([]);
                 }
               );
             }),
           4000,
-          null
+          []
         );
+        collected.push(...fartherNearbyCandidates);
       }
 
-      if (!match) {
+      const candidates = mergeSearchCandidates(collected);
+
+      if (!candidates.length) {
         setSearchFeedback(`在 ${activeProvince}${activeCity} 未找到“${keyword}”，请换更完整的商场名或地址。`);
         showToast("未找到该地址坐标", "error");
         return;
       }
 
-      const resolvedMatch = match;
-      setTargetQuery(resolvedMatch.name);
-      setTargetPoint(resolvedMatch);
-      const regionLabel = activeProvince === ALL_REGIONS ? ALL_REGIONS : `${activeProvince}${activeCity}`;
-      const nearbyStoreCount =
-        !activeCity || activeCity === ALL_REGIONS
-          ? 0
-          : provinceScopedStores.filter((shop) => {
-              const parts = extractRegionParts(shop);
-              if (parts.city === UNKNOWN_CITY || parts.city === activeCity) return false;
-              const coordinates = getShopCoordinates(shop);
-              if (!coordinates) return false;
-              return getDistanceMeters(coordinates, resolvedMatch.location) <= CROSS_CITY_RADIUS_METERS;
-            }).length;
-      setSearchFeedback(
-        nearbyStoreCount > 0
-          ? `已在 ${regionLabel} 范围内定位：${resolvedMatch.name}，并自动纳入邻近城市门店参与调货。`
-          : `已在 ${regionLabel} 范围内定位：${resolvedMatch.name}`
-      );
+      if (candidates.length === 1) {
+        applyTargetCandidate(candidates[0]);
+        return;
+      }
+
+      setTargetCandidates(candidates);
+      setSearchFeedback(`找到 ${candidates.length} 个候选地址，请点选最准确的一项。`);
     } catch (error) {
       console.error("Resolve target failed:", error);
       setSearchFeedback("搜索失败，请确认地图已加载完成后再试。");
@@ -1627,7 +1783,7 @@ export function StoreDispatchMap({
     } finally {
       setIsSearchingTarget(false);
     }
-  }, [activeCity, activeProvince, activeRegionKeyword, cityScopedStores.length, clearTargetArtifacts, drawShopMarkers, ensureSearchServices, provinceScopedStores, regionCenter, showToast, targetQuery]);
+  }, [activeCity, activeProvince, activeRegionKeyword, applyTargetCandidate, clearTargetArtifacts, createPlaceSearch, drawShopMarkers, ensureSearchServices, regionCenter, showToast, targetQuery]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2132,7 +2288,10 @@ export function StoreDispatchMap({
               />
               <input
                 value={targetQuery}
-                onChange={(event) => setTargetQuery(event.target.value)}
+                onChange={(event) => {
+                  setTargetQuery(event.target.value);
+                  setTargetCandidates([]);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -2154,6 +2313,7 @@ export function StoreDispatchMap({
                   onClick={() => {
                     setTargetQuery("");
                     setTargetPoint(null);
+                    setTargetCandidates([]);
                     setResults([]);
                     clearTargetArtifacts();
                     drawShopMarkers();
@@ -2164,6 +2324,35 @@ export function StoreDispatchMap({
                 </button>
               )}
             </div>
+            {targetCandidates.length > 0 ? (
+              <div className="mt-2 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-lg">
+                <div className="border-b border-border/60 px-3 py-2 text-[11px] font-bold text-muted-foreground">
+                  请选择最准确的地址
+                </div>
+                <div className="max-h-64 overflow-y-auto p-1.5">
+                  {targetCandidates.map((candidate) => (
+                    <button
+                      key={candidate.id}
+                      onClick={() => applyTargetCandidate(candidate)}
+                      className="w-full rounded-xl px-3 py-2 text-left transition-colors hover:bg-muted"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin size={14} className="shrink-0 text-primary" />
+                        <span className="truncate text-sm font-semibold text-foreground">{candidate.name}</span>
+                        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                          {candidate.source === "poi" ? "POI" : "解析"}
+                        </span>
+                      </div>
+                      {(candidate.address || candidate.district) ? (
+                        <div className="mt-1 pl-6 text-xs text-muted-foreground">
+                          {[candidate.district, candidate.address].filter(Boolean).join(" · ")}
+                        </div>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">

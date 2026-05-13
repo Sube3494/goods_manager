@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { geocodeAddressDetailed } from "@/lib/addressGeocode";
 
 export const dynamic = "force-dynamic";
 
@@ -60,34 +61,11 @@ async function geocodeAddress(address: string): Promise<GeocodeResult> {
     };
   }
 
-  const data = await amapFetch<{
-    status?: string;
-    info?: string;
-    geocodes?: Array<{
-      formatted_address?: string;
-      location?: string;
-    }>;
-  }>("/v3/geocode/geo", {
-    address: address.trim(),
-  });
-
-  if (data.status !== "1" || !Array.isArray(data.geocodes) || data.geocodes.length === 0) {
-    throw new Error(data.info || `无法解析地址: ${address}`);
-  }
-
-  const first = data.geocodes[0];
-  const locationText = String(first.location || "");
-  const [lngText, latText] = locationText.split(",");
-  const lng = Number(lngText);
-  const lat = Number(latText);
-
-  if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
-    throw new Error(`地址坐标无效: ${address}`);
-  }
+  const resolved = await geocodeAddressDetailed(address);
 
   return {
-    formattedAddress: String(first.formatted_address || address).trim(),
-    location: { lng, lat },
+    formattedAddress: resolved.formattedAddress,
+    location: { lng: resolved.longitude, lat: resolved.latitude },
   };
 }
 
