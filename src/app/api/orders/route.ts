@@ -616,7 +616,7 @@ export async function GET(request: NextRequest) {
           userId: true,
           sourceId: true,
           shopId: true,
-          logisticId: true,
+          deliveryId: true,
           city: true,
           platform: true,
           dailyPlatformSequence: true,
@@ -843,7 +843,7 @@ export async function GET(request: NextRequest) {
         shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload),
         shopAddress: order.shopAddress,
         rawShopName: readShopNameFromRawPayload(order.rawPayload) || null,
-        rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || null,
+        rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
         isMainSystemSelfDelivery: readMainSystemSelfDeliveryFlag(order.rawPayload),
         isPickCompleted: doesAutoPickOrderRequirePickConfirmation(order.platform)

@@ -21,7 +21,7 @@ export type AutoPickInboundItem = {
 export type AutoPickInboundOrder = {
   id?: string;
   shopId?: string;
-  logisticId?: string;
+  deliveryId?: string;
   city?: number;
   channelTag?: string;
   platform?: string;
@@ -895,7 +895,7 @@ function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickIn
   return {
     id: String(rawOrder.id || "").trim(),
     shopId: String(rawOrder.shop_id || "").trim() || undefined,
-    logisticId: normalizeAutoPickLogisticId(rawOrder.delivery_id),
+    deliveryId: normalizeAutoPickDeliveryId(rawOrder.delivery_id),
     city: Math.max(0, Number(rawOrder.city || 0) || 0),
     channelTag: channelTag || undefined,
     platform,
@@ -941,7 +941,7 @@ function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPi
   return {
     id: String(rawOrder.id || "").trim(),
     shopId: String(rawOrder.shop_id || "").trim() || undefined,
-    logisticId: normalizeAutoPickLogisticId(rawOrder.delivery_id),
+    deliveryId: normalizeAutoPickDeliveryId(rawOrder.delivery_id),
     city: Math.max(0, Number(rawOrder.city || 0) || 0),
     channelTag: channelTag || undefined,
     platform,
@@ -1206,7 +1206,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   }
 
   const detailId = String(detailData.id || "").trim();
-  const detailLogisticId = normalizeAutoPickLogisticId(
+  const detailDeliveryId = normalizeAutoPickDeliveryId(
     detailData.delivery && typeof detailData.delivery === "object"
       ? detailData.delivery.id || detailData.delivery.logistic_id || ""
       : ""
@@ -1214,8 +1214,8 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   if (detailId) {
     order.id = detailId;
   }
-  if (detailLogisticId) {
-    order.logisticId = detailLogisticId;
+  if (detailDeliveryId) {
+    order.deliveryId = detailDeliveryId;
   }
 
   const detailShopId = String(detailData.shop_id || detailData.merchant_id || "").trim();
@@ -1986,7 +1986,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       )
       || ""
     ).trim() || undefined,
-    logisticId: normalizeAutoPickLogisticId(input.logisticId),
+    deliveryId: normalizeAutoPickDeliveryId(input.deliveryId),
     city: Number.isFinite(Number(input.city)) ? Number(input.city) : undefined,
     channelTag: String(input.channelTag || input.channel_tag || "").trim() || undefined,
     platform: String(input.platform || "").trim(),
@@ -2178,7 +2178,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       select: {
         id: true,
         sourceId: true,
-        logisticId: true,
+        deliveryId: true,
         shopId: true,
         shopAddress: true,
         status: true,
@@ -2210,7 +2210,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     }
 
     const sourceId = normalized.id || existing?.sourceId || "";
-    const logisticId = normalized.logisticId || existing?.logisticId || null;
+    const deliveryId = normalized.deliveryId || existing?.deliveryId || null;
     const shopId = normalized.shopId || existing?.shopId || null;
     const shopAddress = normalized.shopAddress || existing?.shopAddress || null;
     const shouldKeepTerminalStatus = isAutoPickOrderTerminalStatus(existing?.status) && !isAutoPickOrderTerminalStatus(normalized.status);
@@ -2254,7 +2254,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const createData = {
       userId,
       sourceId,
-      logisticId,
+      deliveryId,
       city: normalized.city,
       platform: normalized.platform || "",
       dailyPlatformSequence: normalized.dailyPlatformSequence || 0,
@@ -2280,7 +2280,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
     const updateData = {
       sourceId,
-      logisticId,
+      deliveryId,
       city: normalized.city,
       platform: normalized.platform || "",
       dailyPlatformSequence: normalized.dailyPlatformSequence || 0,
@@ -2794,7 +2794,7 @@ function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
   return compact.replace(/[^A-Z0-9]+/g, "");
 }
 
-function normalizeAutoPickLogisticId(value: unknown) {
+function normalizeAutoPickDeliveryId(value: unknown) {
   const normalized = String(value || "").trim();
   if (!normalized || normalized === "0") {
     return undefined;
@@ -3092,7 +3092,7 @@ export async function refreshAutoPickOrderFromPlugin(
         orderNo: String(detailOrder.orderNo || "").trim() || fallbackOrderNo,
       });
       if (normalizedDetailOrder) {
-        const missingDeliveryIdentity = !String(normalizedDetailOrder.logisticId || "").trim();
+        const missingDeliveryIdentity = !String(normalizedDetailOrder.deliveryId || "").trim();
         if (missingDeliveryIdentity) {
           const fallbackMatched = await findAutoPickOrderFromActiveStatusLists(cookie, {
             id: normalizedDetailOrder.id || sourceId,
@@ -3102,7 +3102,7 @@ export async function refreshAutoPickOrderFromPlugin(
           });
 
           if (fallbackMatched) {
-            normalizedDetailOrder.logisticId = normalizedDetailOrder.logisticId || fallbackMatched.logisticId;
+            normalizedDetailOrder.deliveryId = normalizedDetailOrder.deliveryId || fallbackMatched.deliveryId;
             normalizedDetailOrder.shopId = normalizedDetailOrder.shopId || fallbackMatched.shopId;
             normalizedDetailOrder.shopAddress = normalizedDetailOrder.shopAddress || fallbackMatched.shopAddress;
             normalizedDetailOrder.rawShopAddress = normalizedDetailOrder.rawShopAddress || fallbackMatched.rawShopAddress;

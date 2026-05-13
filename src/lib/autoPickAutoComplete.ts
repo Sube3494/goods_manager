@@ -228,7 +228,7 @@ async function retryAutoCompleteAfterRefresh(job: {
     dailyPlatformSequence: number;
     orderNo: string;
     sourceId: string;
-    logisticId: string | null;
+    deliveryId: string | null;
     orderTime: Date;
   };
 }) {
@@ -268,7 +268,7 @@ async function retryAutoCompleteAfterRefresh(job: {
     } as const;
   }
 
-  if (isMissingAutoPickCommandIdentity(refreshedOrder.sourceId, refreshedOrder.logisticId)) {
+  if (isMissingAutoPickCommandIdentity(refreshedOrder.sourceId, refreshedOrder.deliveryId)) {
     return {
       recovered: false,
       error: "refresh-after-not-found-missing-source-or-delivery-id",
@@ -280,7 +280,7 @@ async function retryAutoCompleteAfterRefresh(job: {
     dailyPlatformSequence: refreshedOrder.dailyPlatformSequence,
     orderNo: refreshedOrder.orderNo,
     sourceId: refreshedOrder.sourceId,
-    deliveryId: refreshedOrder.logisticId,
+    deliveryId: refreshedOrder.deliveryId,
   });
 
   if (retryResult.ok) {
@@ -441,7 +441,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
           dailyPlatformSequence: true,
           orderNo: true,
           sourceId: true,
-          logisticId: true,
+          deliveryId: true,
           orderTime: true,
         },
       },
@@ -468,7 +468,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
     }
 
     try {
-      if (isMissingAutoPickCommandIdentity(order.sourceId, order.logisticId)) {
+      if (isMissingAutoPickCommandIdentity(order.sourceId, order.deliveryId)) {
         await markJobFailed(job.id, "missing-or-invalid-source-or-delivery-id");
         results.push({ id: job.id, ok: false, error: "missing-or-invalid-source-or-delivery-id" });
         continue;
@@ -479,7 +479,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
         dailyPlatformSequence: order.dailyPlatformSequence,
         orderNo: order.orderNo,
         sourceId: order.sourceId,
-        deliveryId: order.logisticId,
+        deliveryId: order.deliveryId,
       });
 
       if (result.ok) {
@@ -493,7 +493,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
           orderNo: order.orderNo,
           platform: order.platform,
           sourceId: order.sourceId,
-          deliveryId: order.logisticId,
+          deliveryId: order.deliveryId,
           status: result.status,
           error: errorText,
         });
@@ -507,7 +507,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
               orderNo: order.orderNo,
               platform: order.platform,
               sourceId: order.sourceId,
-              deliveryId: order.logisticId,
+              deliveryId: order.deliveryId,
               status: recovered.status ?? result.status,
               error: finalError,
             });
@@ -526,7 +526,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
         orderNo: order.orderNo,
         platform: order.platform,
         sourceId: order.sourceId,
-        deliveryId: order.logisticId,
+        deliveryId: order.deliveryId,
         error: message,
       });
       await markJobRetry(job.id, message);

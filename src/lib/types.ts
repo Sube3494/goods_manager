@@ -162,7 +162,7 @@ export interface AutoPickOrder {
   userId: string;
   sourceId: string;
   shopId?: string | null;
-  logisticId?: string | null;
+  deliveryId?: string | null;
   city?: number | null;
   platform: string;
   dailyPlatformSequence: number;

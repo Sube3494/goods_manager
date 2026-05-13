@@ -594,7 +594,7 @@ model AutoPickOrder {
   id                    String              @id @default(cuid())
   userId                String
   sourceId              String
-  logisticId            String?
+  deliveryId            String?
   city                  Int?
   platform              String
   dailyPlatformSequence Int                 @default(0)
