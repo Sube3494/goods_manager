@@ -823,13 +823,24 @@ function readPreferredMaiyatianShopName(rawOrder: Record<string, unknown>) {
 }
 
 function readPreferredMaiyatianShopAddress(rawOrder: Record<string, unknown>) {
+  const extend = rawOrder.extend && typeof rawOrder.extend === "object" && !Array.isArray(rawOrder.extend)
+    ? rawOrder.extend as Record<string, unknown>
+    : null;
   const candidates = [
     rawOrder.shop_address,
     rawOrder.shopAddress,
     rawOrder.storeAddress,
     rawOrder.merchantAddress,
+    rawOrder.channelAddress,
     rawOrder.store_address,
     rawOrder.merchant_address,
+    rawOrder.channel_address,
+    extend?.storeAddress,
+    extend?.store_address,
+    extend?.merchantAddress,
+    extend?.merchant_address,
+    extend?.channelAddress,
+    extend?.channel_address,
     rawOrder.shop_name,
   ];
 
@@ -884,7 +895,7 @@ function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickIn
   return {
     id: String(rawOrder.id || "").trim(),
     shopId: String(rawOrder.shop_id || "").trim() || undefined,
-    logisticId: String(rawOrder.delivery_id || "").trim() || undefined,
+    logisticId: normalizeAutoPickLogisticId(rawOrder.delivery_id),
     city: Math.max(0, Number(rawOrder.city || 0) || 0),
     channelTag: channelTag || undefined,
     platform,
@@ -930,7 +941,7 @@ function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPi
   return {
     id: String(rawOrder.id || "").trim(),
     shopId: String(rawOrder.shop_id || "").trim() || undefined,
-    logisticId: String(rawOrder.delivery_id || "").trim() || undefined,
+    logisticId: normalizeAutoPickLogisticId(rawOrder.delivery_id),
     city: Math.max(0, Number(rawOrder.city || 0) || 0),
     channelTag: channelTag || undefined,
     platform,
@@ -1195,9 +1206,11 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   }
 
   const detailId = String(detailData.id || "").trim();
-  const detailLogisticId = String(detailData.delivery && typeof detailData.delivery === "object"
-    ? detailData.delivery.id || detailData.delivery.logistic_id || ""
-    : "").trim();
+  const detailLogisticId = normalizeAutoPickLogisticId(
+    detailData.delivery && typeof detailData.delivery === "object"
+      ? detailData.delivery.id || detailData.delivery.logistic_id || ""
+      : ""
+  );
   if (detailId) {
     order.id = detailId;
   }
@@ -2008,7 +2021,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       )
       || ""
     ).trim() || undefined,
-    logisticId: String(input.logisticId || "").trim(),
+    logisticId: normalizeAutoPickLogisticId(input.logisticId),
     city: Number.isFinite(Number(input.city)) ? Number(input.city) : undefined,
     channelTag: String(input.channelTag || input.channel_tag || "").trim() || undefined,
     platform: String(input.platform || "").trim(),
@@ -2816,6 +2829,14 @@ function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
   return compact.replace(/[^A-Z0-9]+/g, "");
 }
 
+function normalizeAutoPickLogisticId(value: unknown) {
+  const normalized = String(value || "").trim();
+  if (!normalized || normalized === "0") {
+    return undefined;
+  }
+  return normalized;
+}
+
 function isJdPlatform(platform: string | null | undefined) {
   const normalized = String(platform || "").trim().toLowerCase();
   return normalized === "jd" || normalized.includes("jingdong") || normalized.includes("jddj") || normalized.includes("京东");
@@ -3194,10 +3215,17 @@ async function findAutoPickOrderFromActiveStatusLists(
   return null;
 }
 
-export async function backfillPersistedAutoPickOrderFields(userId: string) {
+export async function backfillPersistedAutoPickOrderFields(
+  userId: string,
+  options?: { orderIds?: string[] }
+) {
+  const orderIds = Array.isArray(options?.orderIds)
+    ? options?.orderIds.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
   const orders = await prisma.autoPickOrder.findMany({
     where: {
       userId,
+      ...(orderIds.length > 0 ? { id: { in: orderIds } } : {}),
       OR: [
         { shopId: null },
         { shopAddress: null },

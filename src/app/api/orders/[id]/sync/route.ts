@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
+import { backfillPersistedAutoPickOrderFields, normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
 
@@ -69,6 +69,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
     }
 
+    const backfill = await backfillPersistedAutoPickOrderFields(session.id, {
+      orderIds: [refreshedOrder.id],
+    });
+
     const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);
 
     return NextResponse.json({
@@ -79,6 +83,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       status: refreshedOrder.status,
       completedAt: normalized?.completedAt || null,
       lastSyncedAt: refreshedOrder.lastSyncedAt,
+      backfilled: backfill.count,
     });
   } catch (error) {
     console.error("Failed to sync auto-pick order:", error);
