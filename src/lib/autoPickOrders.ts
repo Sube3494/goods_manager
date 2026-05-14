@@ -3158,12 +3158,27 @@ export async function refreshAutoPickOrderFromPlugin(
         const shouldReconcileWithActiveList = isAutoPickOrderAbnormalStatus(normalizedDetailOrder.status)
           || !String(normalizedDetailOrder.deliveryId || "").trim();
         if (shouldReconcileWithActiveList) {
-          const fallbackMatched = await findAutoPickOrderFromActiveStatusLists(cookie, {
+          const fallbackLookup = {
             id: normalizedDetailOrder.id || sourceId,
             platform: normalizedDetailOrder.platform || fallbackPlatform,
             orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
             orderTime: lookup.orderTime,
-          });
+          };
+          const targetDate = lookup.orderTime ? formatLocalDate(lookup.orderTime) : formatLocalDate(new Date());
+          const fallbackMatchedFromDate = (await fetchSimplifiedAllMaiyatianOrdersByDateByCookie(cookie, targetDate))
+            .map((order) => normalizeAutoPickOrderPayload(order))
+            .filter((order): order is AutoPickInboundOrder => Boolean(order))
+            .find((order) => {
+              if (fallbackLookup.id && order.id === fallbackLookup.id) return true;
+              if (order.orderNo !== fallbackLookup.orderNo) {
+                return false;
+              }
+              if (!canTrustLookupPlatform) {
+                return true;
+              }
+              return order.platform === fallbackLookup.platform;
+            });
+          const fallbackMatched = fallbackMatchedFromDate || await findAutoPickOrderFromActiveStatusLists(cookie, fallbackLookup);
 
           if (fallbackMatched) {
             normalizedDetailOrder.deliveryId = normalizedDetailOrder.deliveryId || fallbackMatched.deliveryId;
