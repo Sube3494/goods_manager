@@ -1319,6 +1319,48 @@ async function fetchSimplifiedMaiyatianOrderListByCookie(cookie: string, status:
   return results;
 }
 
+async function findAutoPickOrderFromRawActiveStatusLists(
+  cookie: string,
+  lookup: { id?: string; platform?: string; orderNo?: string; orderTime?: Date | string | null }
+) {
+  const fallbackPlatform = String(lookup.platform || "").trim();
+  const fallbackOrderNo = String(lookup.orderNo || "").trim();
+  const canTrustLookupPlatform = Boolean(fallbackPlatform && fallbackPlatform !== "未知");
+  const activeStatuses: AutoPickSyncStatus[] = [
+    "confirm",
+    "subscribe",
+    "delivery",
+    "pickup",
+    "delivering",
+    "expect",
+    "remind",
+    "meal",
+  ];
+
+  for (const status of activeStatuses) {
+    const rows = await fetchMaiyatianRawOrderListByCookie(cookie, status).catch(() => []);
+    const matched = rows
+      .map((row) => buildListenedOrderFromRawOrder(row))
+      .filter((order): order is AutoPickInboundOrder => Boolean(order))
+      .find((order) => {
+        if (lookup.id && order.id === lookup.id) return true;
+        if (order.orderNo !== fallbackOrderNo) {
+          return false;
+        }
+        if (!canTrustLookupPlatform) {
+          return true;
+        }
+        return order.platform === fallbackPlatform;
+      });
+
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return null;
+}
+
 async function fetchSimplifiedAllMaiyatianOrdersByDateByCookie(cookie: string, date: string) {
   const results: AutoPickInboundOrder[] = [];
 
@@ -3168,6 +3210,7 @@ export async function refreshAutoPickOrderFromPlugin(
             orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
             orderTime: lookup.orderTime,
           };
+          const fallbackMatchedFromRawActive = await findAutoPickOrderFromRawActiveStatusLists(cookie, fallbackLookup);
           const targetDate = lookup.orderTime ? formatLocalDate(lookup.orderTime) : formatLocalDate(new Date());
           const fallbackMatchedFromDate = (await fetchSimplifiedAllMaiyatianOrdersByDateByCookie(cookie, targetDate))
             .map((order) => normalizeAutoPickOrderPayload(order))
@@ -3182,7 +3225,7 @@ export async function refreshAutoPickOrderFromPlugin(
               }
               return order.platform === fallbackLookup.platform;
             });
-          const fallbackMatched = fallbackMatchedFromDate || await findAutoPickOrderFromActiveStatusLists(cookie, fallbackLookup);
+          const fallbackMatched = fallbackMatchedFromRawActive || fallbackMatchedFromDate || await findAutoPickOrderFromActiveStatusLists(cookie, fallbackLookup);
 
           if (fallbackMatched) {
             normalizedDetailOrder.deliveryId = normalizedDetailOrder.deliveryId || fallbackMatched.deliveryId;
