@@ -730,7 +730,6 @@ function parseMaiyatianStatusValue(rawValue: unknown) {
     normalized === "cancel"
     || normalized === "cancelled"
     || normalized === "canceled"
-    || normalized === "rollback"
     || normalized === "close"
     || normalized === "closed"
   ) {
@@ -2687,7 +2686,6 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   }
   if (
     statusHint === "cancel"
-    || statusHint === "rollback"
     || statusHint === "close"
     || statusHint === "closed"
   ) {
@@ -3157,8 +3155,9 @@ export async function refreshAutoPickOrderFromPlugin(
         orderNo: String(detailOrder.orderNo || "").trim() || fallbackOrderNo,
       });
       if (normalizedDetailOrder) {
-        const missingDeliveryIdentity = !String(normalizedDetailOrder.deliveryId || "").trim();
-        if (missingDeliveryIdentity) {
+        const shouldReconcileWithActiveList = isAutoPickOrderAbnormalStatus(normalizedDetailOrder.status)
+          || !String(normalizedDetailOrder.deliveryId || "").trim();
+        if (shouldReconcileWithActiveList) {
           const fallbackMatched = await findAutoPickOrderFromActiveStatusLists(cookie, {
             id: normalizedDetailOrder.id || sourceId,
             platform: normalizedDetailOrder.platform || fallbackPlatform,
@@ -3174,6 +3173,12 @@ export async function refreshAutoPickOrderFromPlugin(
             normalizedDetailOrder.deliveryDeadline = normalizedDetailOrder.deliveryDeadline || fallbackMatched.deliveryDeadline;
             normalizedDetailOrder.deliveryTimeRange = normalizedDetailOrder.deliveryTimeRange || fallbackMatched.deliveryTimeRange;
             normalizedDetailOrder.delivery = normalizedDetailOrder.delivery || fallbackMatched.delivery;
+            if (
+              isAutoPickOrderAbnormalStatus(normalizedDetailOrder.status)
+              && !isAutoPickOrderAbnormalStatus(fallbackMatched.status)
+            ) {
+              normalizedDetailOrder.status = fallbackMatched.status;
+            }
           }
         }
 

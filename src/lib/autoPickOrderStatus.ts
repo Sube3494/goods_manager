@@ -14,14 +14,11 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
 
   if (
     text.includes("取消")
-    || text.includes("撤回")
-    || text.includes("回撤")
     || text.includes("退款")
     || text.includes("关闭")
     || normalized === "cancel"
     || normalized === "cancelled"
     || normalized === "canceled"
-    || normalized === "rollback"
     || normalized === "closed"
     || normalized === "refund"
   ) {
