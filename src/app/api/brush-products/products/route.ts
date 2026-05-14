@@ -13,6 +13,39 @@ function normalizeShopName(value: string | null | undefined) {
   return String(value || "").trim();
 }
 
+function stripShopSuffix(value: string) {
+  return value.replace(/(门店|店铺|旗舰店|总店|分店|一店|二店|三店|四店|五店|店)$/g, "").trim();
+}
+
+function isShopNameMatch(candidate: string | null | undefined, scopedShopName: string | null | undefined) {
+  const normalizedCandidate = normalizeShopName(candidate);
+  const normalizedScoped = normalizeShopName(scopedShopName);
+  if (!normalizedScoped) {
+    return true;
+  }
+  if (!normalizedCandidate) {
+    return false;
+  }
+  if (normalizedCandidate === normalizedScoped) {
+    return true;
+  }
+  if (normalizedCandidate.includes(normalizedScoped) || normalizedScoped.includes(normalizedCandidate)) {
+    return true;
+  }
+
+  const coreCandidate = stripShopSuffix(normalizedCandidate);
+  const coreScoped = stripShopSuffix(normalizedScoped);
+  if (!coreCandidate || !coreScoped) {
+    return false;
+  }
+
+  return (
+    coreCandidate === coreScoped ||
+    coreCandidate.includes(coreScoped) ||
+    coreScoped.includes(coreCandidate)
+  );
+}
+
 function buildSearchWhere(search: string): Prisma.ProductWhereInput | undefined {
   const keyword = search.trim();
   if (!keyword) return undefined;
@@ -52,14 +85,6 @@ export async function GET(request: NextRequest) {
         ],
       });
     }
-    if (shopName) {
-      andWhere.push({
-        OR: [
-          { shopProduct: { shop: { name: shopName } } },
-          { shopProductId: null, shop: { name: shopName } },
-        ],
-      });
-    }
     if (searchKeyword) {
       andWhere.push({
         OR: [
@@ -74,39 +99,53 @@ export async function GET(request: NextRequest) {
       ...(andWhere.length > 0 ? { AND: andWhere } : {}),
     };
 
-    const [items, total] = await Promise.all([
-      prisma.brushProduct.findMany({
-        where,
+    const include = {
+      product: {
         include: {
-          product: {
-            include: {
-              supplier: true,
-              category: true,
-            },
-          },
+          supplier: true,
+          category: true,
+        },
+      },
+      shop: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      shopProduct: {
+        include: {
           shop: {
             select: {
               id: true,
               name: true,
             },
           },
-          shopProduct: {
-            include: {
-              shop: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
         },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        skip,
-        take: pageSize,
-      }),
-      prisma.brushProduct.count({ where }),
-    ]);
+      },
+    } satisfies Prisma.BrushProductInclude;
+
+    const normalizedShopName = normalizeShopName(shopName);
+    const shouldFilterByShopName = Boolean(normalizedShopName);
+
+    const [items, total] = shouldFilterByShopName
+      ? await Promise.all([
+          prisma.brushProduct.findMany({
+            where,
+            include,
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          }),
+          prisma.brushProduct.count({ where }),
+        ])
+      : await Promise.all([
+          prisma.brushProduct.findMany({
+            where,
+            include,
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            skip,
+            take: pageSize,
+          }),
+          prisma.brushProduct.count({ where }),
+        ]);
 
     const storage = await getStorageStrategy();
     const fallbackItems = items.filter((item) => !item.shopProduct);
@@ -156,7 +195,7 @@ export async function GET(request: NextRequest) {
         shopId: matchedShopProduct?.shopId || item.shopId || undefined,
         shopName: matchedShopProduct?.shop.name || item.shop?.name || undefined,
         shopProductId: matchedShopProduct?.id || undefined,
-        sku: matchedShopProduct?.sku || item.product.sku,
+        sku: matchedShopProduct?.sku || item.product.sku || item.product.id,
         name: matchedShopProduct?.productName || item.product.name,
         image: resolvedImage ? storage.resolveUrl(resolvedImage) : null,
         remark: matchedShopProduct?.remark || item.product.remark,
@@ -167,9 +206,8 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const normalizedShopName = normalizeShopName(shopName);
     const filteredProducts = normalizedShopName
-      ? products.filter((product) => normalizeShopName(product.shopName) === normalizedShopName)
+      ? products.filter((product) => isShopNameMatch(product.shopName, normalizedShopName))
       : products;
 
     filteredProducts.sort((a, b) => {
@@ -203,12 +241,16 @@ export async function GET(request: NextRequest) {
       );
     });
 
+    const paginatedProducts = shouldFilterByShopName
+      ? filteredProducts.slice(skip, skip + pageSize)
+      : filteredProducts;
+
     return NextResponse.json({
-      items: filteredProducts,
-      total: normalizedShopName ? filteredProducts.length : total,
+      items: paginatedProducts,
+      total: shouldFilterByShopName ? filteredProducts.length : total,
       page,
       pageSize,
-      hasMore: normalizedShopName ? false : skip + items.length < total,
+      hasMore: shouldFilterByShopName ? skip + paginatedProducts.length < filteredProducts.length : skip + items.length < total,
     });
   } catch (error) {
     console.error("Failed to fetch brush product library items:", error);
