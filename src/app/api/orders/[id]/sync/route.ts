@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { backfillPersistedAutoPickOrderFields, normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
+import { backfillPersistedAutoPickOrderFields, clearAutoPickOrderMainSystemSelfDelivery, normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
-import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeliveringStatus } from "@/lib/autoPickOrderStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +67,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       await syncAutoOutboundFromCompletedAutoPickOrder(session.id, refreshedOrder.id).catch((outboundError) => {
         console.error("Failed to auto-create outbound after order sync:", outboundError);
       });
+    }
+
+    if (
+      !isAutoPickOrderDeliveringStatus(refreshedOrder.status)
+      && !isAutoPickOrderCompletedStatus(refreshedOrder.status)
+      && !isAutoPickOrderCancelledStatus(refreshedOrder.status)
+      && !isAutoPickOrderAbnormalStatus(refreshedOrder.status)
+    ) {
+      await clearAutoPickOrderMainSystemSelfDelivery(session.id, refreshedOrder.id, "sync-restored-non-self-delivery");
     }
 
     const backfill = await backfillPersistedAutoPickOrderFields(session.id, {

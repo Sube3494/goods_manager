@@ -3493,6 +3493,69 @@ export async function markAutoPickOrderMainSystemSelfDelivery(userId: string, or
   return updatedOrder;
 }
 
+export async function clearAutoPickOrderMainSystemSelfDelivery(
+  userId: string,
+  orderId: string,
+  reason = "manual-sync-reset"
+) {
+  const order = await prisma.autoPickOrder.findFirst({
+    where: {
+      id: orderId,
+      userId,
+    },
+    select: {
+      id: true,
+      orderNo: true,
+      platform: true,
+      rawPayload: true,
+    },
+  });
+
+  if (!order) {
+    return null;
+  }
+
+  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  const existingSystemMeta = readAutoPickSystemMeta(order.rawPayload) || {};
+  const currentMarker = existingSystemMeta.mainSystemSelfDelivery;
+  if (!currentMarker?.triggered) {
+    return null;
+  }
+
+  const updatedOrder = await prisma.autoPickOrder.update({
+    where: { id: order.id },
+    data: {
+      rawPayload: asPrismaJsonValue({
+        ...rawPayload,
+        systemMeta: {
+          ...existingSystemMeta,
+          mainSystemSelfDelivery: {
+            ...currentMarker,
+            triggered: false,
+            clearedAt: new Date().toISOString(),
+            clearedReason: reason,
+          },
+        },
+      }),
+      autoCompleteAt: null,
+      lastSyncedAt: new Date(),
+    },
+  });
+
+  emitAutoPickOrderEvent({
+    type: "upsert",
+    userId,
+    orderId: updatedOrder.id,
+    orderNo: updatedOrder.orderNo,
+    platform: updatedOrder.platform,
+    at: new Date().toISOString(),
+  });
+
+  return updatedOrder;
+}
+
 export async function wasAutoPickOrderSelfDeliveryTriggeredByMainSystem(userId: string, platformOrderId: string) {
   const normalizedPlatformOrderId = String(platformOrderId || "").trim();
   if (!normalizedPlatformOrderId) {
