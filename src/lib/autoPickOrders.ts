@@ -726,6 +726,16 @@ function parseMaiyatianStatusValue(rawValue: unknown) {
   if (normalized === "delete" || normalized === "deleted") {
     return "已删除";
   }
+  if (
+    normalized === "cancel"
+    || normalized === "cancelled"
+    || normalized === "canceled"
+    || normalized === "rollback"
+    || normalized === "close"
+    || normalized === "closed"
+  ) {
+    return "已取消";
+  }
   return String(rawValue || "").trim();
 }
 
@@ -2672,12 +2682,16 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   }
   if (
     statusHint === "expect"
-    || statusHint === "cancel"
+  ) {
+    return "expect";
+  }
+  if (
+    statusHint === "cancel"
     || statusHint === "rollback"
     || statusHint === "close"
     || statusHint === "closed"
   ) {
-    return "expect";
+    return "cancel";
   }
 
   const currentPriority = getAutoPickStatusPriority(currentStatus);
