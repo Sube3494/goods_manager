@@ -1292,7 +1292,11 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   }
   const detailStatus = resolveMaiyatianOrderStatus((detailData || {}) as Record<string, unknown>);
   if (detailStatus) {
-    order.status = detailStatus;
+    const shouldKeepListStatus = !isAutoPickOrderAbnormalStatus(order.status)
+      && isAutoPickOrderAbnormalStatus(detailStatus);
+    if (!shouldKeepListStatus) {
+      order.status = detailStatus;
+    }
   }
   if (!order.completedAt) {
     order.completedAt = readMaiyatianCompletedAt((detailData || {}) as Record<string, unknown>);
