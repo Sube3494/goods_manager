@@ -9,7 +9,6 @@ import {
   ExternalLink,
   Plus,
   Trash2,
-  Star,
   KeyRound,
   Send,
   Eye,
@@ -84,7 +83,7 @@ export default function ProfilePage() {
       nextAddressList = [
         {
           id: "legacy",
-          label: "默认地址",
+          label: "常用地址",
           address: typedUser.shippingAddress,
           detailAddress: typedUser.shippingAddress,
           contactName: "",
@@ -578,14 +577,13 @@ export default function ProfilePage() {
         </motion.section>
 
         <motion.section id="address-library" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
-          <div className="flex flex-col gap-3 border-b border-border/60 px-3.5 py-3.5 sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-3 border-b border-border/60 px-3.5 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-4">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Addresses</div>
               <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">收货地址库</h3>
               <p className="mt-1 text-sm text-muted-foreground">维护你常用的门店简称、联系人和详细地址，采购时可以直接复用。</p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
                 <button
                   type="button"
                   onClick={() => void saveProfile(name, addressList, brushCommissionBoostEnabled, false)}
@@ -597,7 +595,7 @@ export default function ProfilePage() {
                 </button>
                 <button
                   onClick={() => {
-                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0 };
+                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: false };
                     setAddressList([newAddress, ...addressList]);
                     setExpandedAddressId(newAddress.id);
                   }}
@@ -607,7 +605,6 @@ export default function ProfilePage() {
                   添加地址
                 </button>
               </div>
-            </div>
           </div>
 
           <div className="p-3.5 sm:p-6">
@@ -616,7 +613,7 @@ export default function ProfilePage() {
                 <Home size={30} className="text-muted-foreground/50" />
                 <div>
                   <p className="text-sm font-black text-foreground">地址库还是空的</p>
-                  <p className="mt-1 text-xs text-muted-foreground">先添加一个默认收货地址，后续采购和物流会更顺手。</p>
+                  <p className="mt-1 text-xs text-muted-foreground">先添加一个常用收货地址，后续采购和物流会更顺手。</p>
                 </div>
               </div>
             ) : (
@@ -661,22 +658,6 @@ export default function ProfilePage() {
                               <Trash2 size={14} />
                             </button>
                           </div>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {item.isDefault ? (
-                            <div className="inline-flex h-9 items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 text-xs font-black text-amber-600 dark:text-amber-400">
-                              <Star size={13} fill="currentColor" />
-                              默认地址
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setAddressList(addressList.map((a, i) => ({ ...a, isDefault: i === index })))}
-                              className="inline-flex h-9 items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white px-3 text-xs font-black text-muted-foreground transition-all hover:border-amber-500/25 hover:text-amber-600 dark:bg-white/5"
-                            >
-                              <Star size={13} />
-                              设为默认
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
