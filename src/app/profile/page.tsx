@@ -11,6 +11,7 @@ import {
   Trash2,
   Star,
   KeyRound,
+  Send,
   Eye,
   EyeOff,
   ShieldCheck,
@@ -25,7 +26,6 @@ import Link from "next/link";
 import Image from "next/image";
 import md5 from "blueimp-md5";
 import { User as UserType, AddressItem } from "@/lib/types";
-import { buildAddressDisplay, normalizeAddressItemParts } from "@/lib/addressBook";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export default function ProfilePage() {
@@ -37,18 +37,18 @@ export default function ProfilePage() {
   const [addressList, setAddressList] = useState<AddressItem[]>([]);
   const [brushCommissionBoostEnabled, setBrushCommissionBoostEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [codeCooldown, setCodeCooldown] = useState(0);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "invalid" | "error">("idle");
   const [expandedAddressId, setExpandedAddressId] = useState<string | null>(null);
   const initializedRef = useRef(false);
   const lastSavedSnapshotRef = useRef("");
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const buildProfileSnapshot = (
     nextName: string,
@@ -75,17 +75,20 @@ export default function ProfilePage() {
     if (Array.isArray(addresses)) {
       nextAddressList = addresses.map((item) => ({
         ...item,
-        ...normalizeAddressItemParts(item),
-        address: item.address || buildAddressDisplay(item),
+        address: item.detailAddress || item.address || "",
+        detailAddress: item.detailAddress || item.address || "",
+        contactName: "",
+        contactPhone: "",
       }));
     } else if (typeof typedUser?.shippingAddress === "string" && typedUser.shippingAddress) {
-      const parsed = normalizeAddressItemParts({ address: typedUser.shippingAddress });
       nextAddressList = [
         {
           id: "legacy",
           label: "默认地址",
           address: typedUser.shippingAddress,
-          ...parsed,
+          detailAddress: typedUser.shippingAddress,
+          contactName: "",
+          contactPhone: "",
           isDefault: true,
         },
       ];
@@ -180,25 +183,20 @@ export default function ProfilePage() {
     }
 
     const snapshot = buildProfileSnapshot(name, addressList, brushCommissionBoostEnabled, canUseBrushSimulation);
-    if (snapshot === lastSavedSnapshotRef.current) {
-      setSaveState("saved");
+    setSaveState(snapshot === lastSavedSnapshotRef.current ? "saved" : "idle");
+  }, [name, addressList, brushCommissionBoostEnabled, canUseBrushSimulation]);
+
+  useEffect(() => {
+    if (codeCooldown <= 0) {
       return;
     }
 
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
+    const timer = setTimeout(() => {
+      setCodeCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
 
-    saveTimerRef.current = setTimeout(() => {
-      void saveProfile(name, addressList, brushCommissionBoostEnabled, true);
-    }, 900);
-
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, [name, addressList, brushCommissionBoostEnabled]);
+    return () => clearTimeout(timer);
+  }, [codeCooldown]);
 
   const getPasswordStrength = (value: string) => {
     if (!value) {
@@ -222,36 +220,49 @@ export default function ProfilePage() {
   };
 
   const passwordStrength = getPasswordStrength(newPassword);
-  const defaultAddress = addressList.find((item) => item.isDefault) || null;
   const identityLabel = user?.role === "SUPER_ADMIN" ? "超级管理员" : (user?.roleProfile?.name || "普通成员");
-  const saveStateLabel = {
-    idle: "待编辑",
-    saving: "正在保存",
-    saved: "已实时保存",
-    invalid: "待补全后保存",
-    error: "保存失败",
-  }[saveState];
-  const topStats = [
-    {
-      label: "账户身份",
-      value: identityLabel,
-      hint: "当前账号的系统角色",
-    },
-    {
-      label: "地址档案",
-      value: `${addressList.length} 条`,
-      hint: defaultAddress?.label || "尚未设置默认地址",
-    },
-    {
-      label: "安全状态",
-      value: user?.hasPassword ? "已启用密码" : "待完善",
-      hint: user?.hasPassword ? "可以直接修改登录密码" : "建议尽快设置登录密码",
-    },
-  ];
+
+  const handleSendVerificationCode = async () => {
+    if (!user?.email || isSendingCode || codeCooldown > 0) {
+      return;
+    }
+
+    if (!newPassword || !confirmPassword) {
+      showToast("请先输入并确认新密码", "error");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showToast("两次输入的新密码不一致", "error");
+      return;
+    }
+
+    setIsSendingCode(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setCodeCooldown(60);
+        showToast("验证码已发送到当前登录邮箱", "success");
+      } else {
+        showToast(data?.error || "验证码发送失败", "error");
+      }
+    } catch (error) {
+      console.error("Send verification code failed:", error);
+      showToast("网络错误", "error");
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
 
   const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      showToast("请完整填写密码信息", "error");
+    if (!user?.email || !verificationCode || !newPassword || !confirmPassword) {
+      showToast("请完整填写验证码和新密码", "error");
       return;
     }
 
@@ -262,27 +273,42 @@ export default function ProfilePage() {
 
     setIsChangingPassword(true);
     try {
-      const res = await fetch("/api/auth/change-password", {
+      const verifyRes = await fetch("/api/auth/forgot-password/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          currentPassword,
-          newPassword,
+          email: user.email,
+          code: verificationCode,
+        }),
+      });
+
+      const verifyData = await verifyRes.json().catch(() => null);
+      if (!verifyRes.ok || !verifyData?.resetToken) {
+        showToast(verifyData?.error || "验证码校验失败", "error");
+        return;
+      }
+
+      const resetRes = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: verifyData.resetToken,
+          password: newPassword,
           confirmPassword,
         }),
       });
 
-      const data = await res.json();
-      if (res.ok) {
+      const resetData = await resetRes.json().catch(() => null);
+      if (resetRes.ok) {
         showToast("密码修改成功", "success");
-        setCurrentPassword("");
+        setVerificationCode("");
         setNewPassword("");
         setConfirmPassword("");
-        setShowCurrentPassword(false);
         setShowNewPassword(false);
         setShowConfirmPassword(false);
+        setCodeCooldown(0);
       } else {
-        showToast(data.error || "修改密码失败", "error");
+        showToast(resetData?.error || "修改密码失败", "error");
       }
     } catch (error) {
       console.error("Change password failed:", error);
@@ -309,9 +335,9 @@ export default function ProfilePage() {
 
       <div className="relative mx-auto max-w-7xl space-y-4 sm:space-y-5">
         <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/88 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/84 dark:shadow-black/20 sm:rounded-[26px]">
-          <div className="border-b border-border/60 px-3.5 py-3.5 sm:px-6 sm:py-4 lg:px-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-start gap-3 sm:items-center sm:gap-4">
+          <div className="px-3.5 py-3.5 sm:px-6 sm:py-4 lg:px-8">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+              <div className="flex items-start gap-3 sm:gap-4">
                 <Link href="/" className="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/82 text-muted-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary dark:bg-white/5 sm:h-11 sm:w-11">
                   <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-0.5" />
                 </Link>
@@ -333,209 +359,255 @@ export default function ProfilePage() {
                     <User size={28} className="text-white" />
                   )}
                 </a>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 pt-0.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-[28px]">个人中心</h1>
                     <span className="inline-flex items-center rounded-full border border-border/60 bg-white/80 px-2.5 py-1 text-[10px] font-black text-foreground dark:bg-white/10 sm:px-3 sm:text-[11px]">
-                      {identityLabel}
+                        {identityLabel}
                     </span>
                   </div>
-                  <p className="mt-1 break-all text-xs leading-relaxed text-muted-foreground sm:text-sm">{user?.name || "未命名用户"} · {user?.email}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">集中管理你的基本资料、账号安全和常用收货地址。</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                <a href="#profile-core" className="inline-flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">基本资料</a>
-                <a href="#security-center" className="inline-flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">账号安全</a>
-                <a href="#address-library" className="inline-flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">地址库</a>
-                <a
-                  href="https://cravatar.cn/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border/70 bg-white/82 px-3 text-sm font-black text-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5 sm:px-4"
-                >
-                  <ExternalLink size={15} />
-                  头像设置
-                </a>
-                <div className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border/70 bg-white/82 px-4 text-sm font-black text-foreground dark:bg-white/5 sm:col-span-1 sm:justify-start">
-                  {isSaving ? <Loader2 size={15} className="animate-spin text-primary" /> : <div className={`h-2.5 w-2.5 rounded-full ${saveState === "saved" ? "bg-emerald-500" : saveState === "saving" ? "bg-primary" : saveState === "error" ? "bg-destructive" : saveState === "invalid" ? "bg-amber-500" : "bg-muted-foreground/40"}`} />}
-                  {saveStateLabel}
+              <div className="space-y-2.5 xl:max-w-[460px] xl:justify-self-end">
+                <div className="flex flex-wrap gap-2 xl:justify-end">
+                  <a href="#profile-core" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">基本资料</a>
+                  <a href="#security-center" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">账号安全</a>
+                  <a href="#address-library" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">地址库</a>
+                  <a
+                    href="https://cravatar.cn/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-sm font-black text-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5 sm:px-4"
+                  >
+                    <ExternalLink size={15} />
+                    头像设置
+                  </a>
                 </div>
+
               </div>
             </div>
-          </div>
-
-          <div className="grid gap-2.5 px-3.5 py-3.5 sm:gap-3 sm:px-6 sm:py-4 md:grid-cols-3 lg:px-8 xl:grid-cols-3">
-            {topStats.map((item) => (
-              <div key={item.label} className="rounded-[18px] border border-border/60 bg-white/78 px-3.5 py-3 shadow-sm dark:bg-white/[0.05] sm:rounded-[20px] sm:px-4 sm:py-3.5">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">{item.label}</div>
-                <div className="mt-1 text-base font-black text-foreground sm:mt-1.5 sm:text-xl">{item.value}</div>
-                <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{item.hint}</div>
-              </div>
-            ))}
           </div>
         </motion.section>
 
-        <div className="grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
-          <motion.section id="profile-core" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
-            <div className="border-b border-border/60 px-3.5 py-3.5 sm:px-6 sm:py-4">
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Profile</div>
-              <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">基本资料</h3>
-            </div>
-            <div className="space-y-4 p-3.5 sm:p-6">
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground/70">
-                  <User size={14} className="text-primary" />
-                  显示名称
-                </label>
-                <input
-                  type="text"
-                  placeholder="请输入您的真实姓名或昵称"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
-                />
-                <p className="text-[11px] text-muted-foreground/65">这个名字会在系统内的个人信息、操作记录和协作场景中展示。</p>
+        <motion.section id="profile-core" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
+          <div className="border-b border-border/60 px-3.5 py-3.5 sm:px-6 sm:py-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Profile</div>
+            <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">基本资料</h3>
+          </div>
+          <div className="grid gap-4 p-3.5 sm:gap-5 sm:p-6">
+            <div className="rounded-[22px] border border-border/60 bg-white/78 p-4 shadow-sm dark:bg-white/[0.05] sm:p-5">
+              <div className="mb-4">
+                <div className="text-sm font-black text-foreground">账号资料</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/70">这里保留基础身份信息，避免和上面的导航区重复展示。</p>
               </div>
-
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground/70">
-                  <Mail size={14} className="text-primary" />
-                  登录邮箱
-                </label>
-                <input
-                  type="email"
-                  value={user?.email || ""}
-                  disabled
-                  className="h-12 w-full cursor-not-allowed rounded-2xl border border-border/60 bg-muted/25 px-4 text-sm text-muted-foreground dark:bg-white/5"
-                />
-                <p className="text-[11px] text-muted-foreground/65">邮箱是账号唯一标识，不支持在这里手动修改。</p>
-              </div>
-
-              {canUseBrushSimulation ? (
-              <div className="flex items-start justify-between gap-4 rounded-2xl border border-border/60 bg-white/78 px-4 py-4 shadow-sm dark:bg-white/[0.05]">
-                <div className="min-w-0">
-                  <div className="text-sm font-black text-foreground">刷单模拟显示</div>
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/70">只影响你自己在刷单页看到的实付和到手模拟值，不会改动订单里的原始金额。</p>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground/70">
+                    <User size={14} className="text-primary" />
+                    显示名称
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="请输入您的真实姓名或昵称"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
+                  />
+                  <p className="text-[11px] text-muted-foreground/65">这个名字会在系统内的个人信息、操作记录和协作场景中展示。</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className={`text-xs font-bold ${brushCommissionBoostEnabled ? "text-emerald-500" : "text-muted-foreground"}`}>
-                    {brushCommissionBoostEnabled ? "已开启" : "已关闭"}
-                  </span>
-                  <Switch checked={brushCommissionBoostEnabled} onChange={setBrushCommissionBoostEnabled} />
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground/70">
+                    <Mail size={14} className="text-primary" />
+                    登录邮箱
+                  </label>
+                  <input
+                    type="email"
+                    value={user?.email || ""}
+                    disabled
+                    className="h-12 w-full cursor-not-allowed rounded-2xl border border-border/60 bg-muted/25 px-4 text-sm text-muted-foreground dark:bg-white/5"
+                  />
+                  <p className="text-[11px] text-muted-foreground/65">邮箱是账号唯一标识，不支持在这里手动修改。</p>
                 </div>
               </div>
-              ) : null}
             </div>
-          </motion.section>
 
-          <motion.section id="security-center" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
+            {canUseBrushSimulation ? (
+              <div className="rounded-[22px] border border-border/60 bg-white/78 px-4 py-3.5 shadow-sm dark:bg-white/[0.05] sm:px-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-black text-foreground">刷单模拟显示</div>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/70">只影响刷单页看到的模拟金额，不会改动订单原始金额。</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className={`text-xs font-bold ${brushCommissionBoostEnabled ? "text-emerald-500" : "text-muted-foreground"}`}>
+                      {brushCommissionBoostEnabled ? "已开启" : "已关闭"}
+                    </span>
+                    <Switch checked={brushCommissionBoostEnabled} onChange={setBrushCommissionBoostEnabled} />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </motion.section>
+
+        <motion.section id="security-center" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
             <div className="border-b border-border/60 px-3.5 py-3.5 sm:px-6 sm:py-4">
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Security</div>
               <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">账号安全</h3>
             </div>
-            <div className="grid gap-4 p-3.5 sm:gap-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="space-y-3">
-                {[
-                  {
-                    label: "当前密码",
-                    value: currentPassword,
-                    setValue: setCurrentPassword,
-                    show: showCurrentPassword,
-                    setShow: setShowCurrentPassword,
-                    placeholder: "请输入当前密码",
-                    icon: KeyRound,
-                  },
-                  {
-                    label: "新密码",
-                    value: newPassword,
-                    setValue: setNewPassword,
-                    show: showNewPassword,
-                    setShow: setShowNewPassword,
-                    placeholder: "请输入新密码",
-                    icon: KeyRound,
-                  },
-                  {
-                    label: "确认新密码",
-                    value: confirmPassword,
-                    setValue: setConfirmPassword,
-                    show: showConfirmPassword,
-                    setShow: setShowConfirmPassword,
-                    placeholder: "请再次输入新密码",
-                    icon: ShieldCheck,
-                  },
-                ].map((field) => (
-                  <div key={field.label} className="space-y-2">
+            <div className="space-y-4 p-3.5 sm:space-y-5 sm:p-6">
+              <div className="space-y-4">
+                <div className="rounded-[20px] border border-border/60 bg-white/78 p-4 shadow-sm dark:bg-white/[0.05] sm:rounded-[24px] sm:p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-primary/15 bg-primary/8 text-xs font-black text-primary">1</div>
+                    <div>
+                      <div className="text-sm font-black text-foreground">设置新密码</div>
+                      <div className="text-[11px] text-muted-foreground">先确认你要更新成的新密码。</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div className="grid gap-3 lg:grid-cols-2">
+                    {[
+                      {
+                        label: "新密码",
+                        value: newPassword,
+                        setValue: setNewPassword,
+                        show: showNewPassword,
+                        setShow: setShowNewPassword,
+                        placeholder: "请输入新密码",
+                        icon: KeyRound,
+                      },
+                      {
+                        label: "确认新密码",
+                        value: confirmPassword,
+                        setValue: setConfirmPassword,
+                        show: showConfirmPassword,
+                        setShow: setShowConfirmPassword,
+                        placeholder: "请再次输入新密码",
+                        icon: ShieldCheck,
+                      },
+                    ].map((field) => (
+                      <div key={field.label} className="space-y-2">
+                        <label className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground/70">
+                          <field.icon size={14} className="text-primary" />
+                          {field.label}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={field.show ? "text" : "password"}
+                            value={field.value}
+                            onChange={(e) => field.setValue(e.target.value)}
+                            placeholder={field.placeholder}
+                            className="h-12 w-full rounded-2xl border border-border bg-white px-4 pr-12 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => field.setShow((prev: boolean) => !prev)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground"
+                          >
+                            {field.show ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    </div>
+                    <div className="rounded-2xl border border-border/50 bg-white/60 px-3.5 py-3 dark:bg-white/[0.04]">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">密码强度</span>
+                        <span className={passwordStrength.tone}>{passwordStrength.label}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-4 gap-1.5">
+                        {[1, 2, 3, 4].map((level) => (
+                          <div key={level} className={`h-1.5 rounded-full transition-all ${passwordStrength.score >= level ? passwordStrength.bar : "bg-white/10"}`} />
+                        ))}
+                      </div>
+                      <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/70">建议使用字母、数字和符号组合，避免与其他平台重复。</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[20px] border border-border/60 bg-white/78 p-4 shadow-sm dark:bg-white/[0.05] sm:rounded-[24px] sm:p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-primary/15 bg-primary/8 text-xs font-black text-primary">2</div>
+                      <div>
+                        <div className="text-sm font-black text-foreground">邮箱确认</div>
+                        <div className="text-[11px] text-muted-foreground">验证码会发送到当前登录邮箱，确认是你本人在操作。</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleChangePassword}
+                      disabled={isChangingPassword || !verificationCode || !newPassword || !confirmPassword}
+                      className="inline-flex h-11 items-center justify-center gap-2 self-start whitespace-nowrap rounded-2xl border border-primary/20 bg-primary/6 px-5 text-sm font-black text-primary transition-all hover:bg-primary/12 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      {isChangingPassword ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+                      确认并更新密码
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground/70">
-                      <field.icon size={14} className="text-primary" />
-                      {field.label}
+                      <Mail size={14} className="text-primary" />
+                      邮箱验证码
                     </label>
-                    <div className="relative">
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_max-content]">
                       <input
-                        type={field.show ? "text" : "password"}
-                        value={field.value}
-                        onChange={(e) => field.setValue(e.target.value)}
-                        placeholder={field.placeholder}
-                        className="h-11 w-full rounded-2xl border border-border bg-white px-4 pr-12 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
+                        type="text"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value)}
+                        placeholder="请输入 6 位验证码"
+                        className="h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
                       />
                       <button
                         type="button"
-                        onClick={() => field.setShow((prev) => !prev)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground"
+                        onClick={handleSendVerificationCode}
+                        disabled={isSendingCode || codeCooldown > 0 || !user?.email || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+                        className="inline-flex h-12 min-w-[168px] items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/85 px-5 text-[13px] font-black text-foreground transition-all hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/10 sm:text-sm"
                       >
-                        {field.show ? <EyeOff size={18} /> : <Eye size={18} />}
+                        {isSendingCode ? <Loader2 size={16} className="animate-spin" /> : <Send size={14} />}
+                        <span className="ml-1.5">{codeCooldown > 0 ? `${codeCooldown}s` : "发送验证码"}</span>
                       </button>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
 
-              <div className="rounded-[20px] border border-border/60 bg-white/78 p-3.5 shadow-sm dark:bg-white/[0.05] sm:rounded-[24px] sm:p-4">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">安全概览</div>
-                <div className="mt-3 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">密码强度</span>
-                  <span className={passwordStrength.tone}>{passwordStrength.label}</span>
-                </div>
-                <div className="mt-3 grid grid-cols-4 gap-1.5">
-                  {[1, 2, 3, 4].map((level) => (
-                    <div key={level} className={`h-1.5 rounded-full transition-all ${passwordStrength.score >= level ? passwordStrength.bar : "bg-white/10"}`} />
-                  ))}
-                </div>
-                <div className="mt-4 space-y-3 text-[12px] leading-relaxed text-muted-foreground">
-                  <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 dark:bg-white/[0.05]">建议使用字母、数字和符号组合，避免与其他平台重复。</div>
-                  <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 dark:bg-white/[0.05]">如果忘记密码，也可以在登录页通过邮箱验证码快速重置。</div>
-                </div>
-                <button
-                  onClick={handleChangePassword}
-                  disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-                  className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/6 text-sm font-black text-primary transition-all hover:bg-primary/12 disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  {isChangingPassword ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
-                  更新登录密码
-                </button>
-              </div>
             </div>
-          </motion.section>
-        </div>
+        </motion.section>
 
         <motion.section id="address-library" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
-          <div className="flex flex-col gap-3 border-b border-border/60 px-3.5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+          <div className="flex flex-col gap-3 border-b border-border/60 px-3.5 py-3.5 sm:px-6 sm:py-4">
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Addresses</div>
               <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">收货地址库</h3>
-              <p className="mt-1 text-sm text-muted-foreground">保存后会按详细地址自动解析门店经纬度，后续采购和距离预估优先使用这组数据。</p>
+              <p className="mt-1 text-sm text-muted-foreground">维护你常用的门店简称、联系人和详细地址，采购时可以直接复用。</p>
             </div>
-            <button
-              onClick={() => {
-                const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0 };
-                setAddressList([newAddress, ...addressList]);
-                setExpandedAddressId(newAddress.id);
-              }}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/6 px-4 text-sm font-black text-primary transition-all hover:bg-primary/12 sm:w-auto"
-            >
-              <Plus size={16} />
-              添加地址
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => void saveProfile(name, addressList, brushCommissionBoostEnabled, false)}
+                  disabled={isSaving || saveState === "saving" || saveState === "saved"}
+                  className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-primary/20 bg-primary/8 px-4 text-sm font-black text-primary transition-all hover:bg-primary/12 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isSaving ? <Loader2 size={15} className="animate-spin" /> : null}
+                  保存资料
+                </button>
+                <button
+                  onClick={() => {
+                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0 };
+                    setAddressList([newAddress, ...addressList]);
+                    setExpandedAddressId(newAddress.id);
+                  }}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/6 px-4 text-sm font-black text-primary transition-all hover:bg-primary/12"
+                >
+                  <Plus size={16} />
+                  添加地址
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="p-3.5 sm:p-6">
@@ -565,11 +637,8 @@ export default function ProfilePage() {
                             <div className="truncate text-sm font-black text-foreground">
                               {String(item.label || "").trim() || "未命名门店"}
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {item.contactName || "未填联系人"}{item.contactPhone ? ` · ${item.contactPhone}` : ""}
-                            </div>
                             <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                              {buildAddressDisplay(item) || item.detailAddress || "请补全详细地址"}
+                              {item.detailAddress || "请补全详细地址"}
                             </div>
                           </button>
                           <div className="flex shrink-0 items-center gap-2">
@@ -614,62 +683,21 @@ export default function ProfilePage() {
 
                     {expandedAddressId === item.id ? (
                     <div className="mt-3.5 grid gap-3 border-t border-border/50 pt-3.5 sm:mt-4 sm:pt-4">
-                      <input
-                        type="text"
-                        placeholder="门店简称（必填）"
-                        value={item.label}
-                        onChange={(e) => {
-                          const newList = [...addressList];
-                          newList[index] = { ...newList[index], label: e.target.value };
-                          setAddressList(newList);
-                        }}
-                        className={`h-11 min-w-0 w-full rounded-2xl border bg-white px-4 text-sm font-bold outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 ${
-                          String(item.label || "").trim() ? "border-border dark:border-white/10" : "border-destructive/35"
-                        }`}
-                      />
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
                         <input
                           type="text"
-                          placeholder="联系人"
-                          value={item.contactName || ""}
+                          placeholder="门店简称（必填）"
+                          value={item.label}
                           onChange={(e) => {
                             const newList = [...addressList];
-                            newList[index] = { ...newList[index], contactName: e.target.value };
+                            newList[index] = { ...newList[index], label: e.target.value };
                             setAddressList(newList);
                           }}
-                          className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
+                          className={`h-11 min-w-0 w-full rounded-2xl border bg-white px-4 text-sm font-bold outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 ${
+                            String(item.label || "").trim() ? "border-border dark:border-white/10" : "border-destructive/35"
+                          }`}
                         />
-                        <input
-                          type="text"
-                          placeholder="联系电话"
-                          value={item.contactPhone || ""}
-                          onChange={(e) => {
-                            const newList = [...addressList];
-                            newList[index] = { ...newList[index], contactPhone: e.target.value };
-                            setAddressList(newList);
-                          }}
-                          className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
-                        />
-                      </div>
-
-                      <textarea
-                        placeholder="详细地址..."
-                        value={item.detailAddress || ""}
-                        onChange={(e) => {
-                          const newList = [...addressList];
-                          newList[index] = { ...newList[index], detailAddress: e.target.value };
-                          setAddressList(newList);
-                        }}
-                        rows={3}
-                        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm leading-7 outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
-                      />
-
-                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px]">
-                        <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 dark:bg-white/[0.05]">
-                          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">展示地址</div>
-                          <div className="mt-2 break-words text-sm text-foreground">{buildAddressDisplay(item) || "请补全联系人、电话和详细地址"}</div>
-                        </div>
-                        <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 dark:bg-white/[0.05]">
+                        <div>
                           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">抽出率</div>
                           <div className="relative mt-2">
                             <input
@@ -683,17 +711,25 @@ export default function ProfilePage() {
                                 newList[index] = { ...newList[index], serviceFeeRate: isNaN(val) ? undefined : val / 100 };
                                 setAddressList(newList);
                               }}
-                              className="h-11 w-full rounded-xl border border-border bg-white px-3 pr-8 text-sm font-mono outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
+                              className="h-11 w-full rounded-2xl border border-border bg-white px-4 pr-10 text-sm font-mono outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">%</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 dark:bg-white/[0.05]">
-                        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">门店坐标</div>
-                        <div className="mt-2 font-mono text-sm text-foreground">{item.longitude != null && item.latitude != null ? `${item.longitude}, ${item.latitude}` : "保存后自动生成"}</div>
-                      </div>
+                      <textarea
+                        placeholder="详细地址..."
+                        value={item.detailAddress || ""}
+                        onChange={(e) => {
+                          const newList = [...addressList];
+                          newList[index] = { ...newList[index], detailAddress: e.target.value, address: e.target.value, contactName: "", contactPhone: "" };
+                          setAddressList(newList);
+                        }}
+                        rows={3}
+                        className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm leading-7 outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
+                      />
+
                     </div>
                     ) : null}
                   </div>

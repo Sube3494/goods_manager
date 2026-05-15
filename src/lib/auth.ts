@@ -1,9 +1,13 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies, headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "./prisma";
 import { SessionUser, hasPermission, Permission, AdminCapability, hasAdminAccess } from "./permissions";
-import { SystemSetting } from "../../prisma/generated-client";
+import type { SystemSetting } from "../../prisma/generated-client";
+
+async function getPrismaClient() {
+  const { default: prisma } = await import("./prisma");
+  return prisma;
+}
 
 function getJwtKey() {
   const secretKey = process.env.JWT_SECRET;
@@ -53,6 +57,7 @@ export async function getSession() {
 export async function getFreshSession() {
   const session = await getSession();
   if (!session || !session.user) return null;
+  const prisma = await getPrismaClient();
 
   const user = await prisma.user.findUnique({
     where: { id: (session.user as { id: string }).id },
@@ -164,6 +169,7 @@ export async function getCachedSettings() {
     if (settingsCache && (now - lastSettingsFetch < SETTINGS_CACHE_TTL)) {
         return settingsCache;
     }
+    const prisma = await getPrismaClient();
     settingsCache = await prisma.systemSetting.findFirst();
     lastSettingsFetch = now;
     return settingsCache;

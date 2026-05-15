@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { canGeocodeAddress, geocodeAddress } from "@/lib/addressGeocode";
-import { buildAddressDisplay, getAddressDetail, normalizeAddressItemParts } from "@/lib/addressBook";
+import { getAddressDetail } from "@/lib/addressBook";
 
 type ShippingAddressInput = {
   id?: string;
@@ -14,8 +13,6 @@ type ShippingAddressInput = {
   contactPhone?: string;
   isDefault?: boolean;
   serviceFeeRate?: number;
-  longitude?: number;
-  latitude?: number;
 };
 
 export async function PATCH(req: Request) {
@@ -40,36 +37,23 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: "门店详细地址为必填项" }, { status: 400 });
       }
 
-      if (!canGeocodeAddress()) {
-        return NextResponse.json({ error: "地址坐标服务未配置，暂时无法保存门店地址" }, { status: 500 });
-      }
-
-      try {
-        normalizedShippingAddresses = await Promise.all(
-          (shippingAddresses as ShippingAddressInput[]).map(async (item) => {
-            const normalizedParts = normalizeAddressItemParts(item);
-            const detailAddress = getAddressDetail(normalizedParts);
-            const coord = await geocodeAddress(detailAddress);
-            const normalizedItem = {
-              ...item,
-              label: String(item.label || "").trim(),
-              detailAddress,
-              contactName: normalizedParts.contactName,
-              contactPhone: normalizedParts.contactPhone,
-            };
-            return {
-              ...normalizedItem,
-              address: buildAddressDisplay(normalizedItem),
-              longitude: coord.longitude,
-              latitude: coord.latitude,
-            };
-          })
-        );
-      } catch (error) {
-        return NextResponse.json({
-          error: error instanceof Error ? error.message : "地址坐标解析失败",
-        }, { status: 400 });
-      }
+      normalizedShippingAddresses = (shippingAddresses as ShippingAddressInput[]).map((item) => {
+        const label = String(item.label || "").trim();
+        const detailAddress = getAddressDetail(item);
+        const normalizedItem = {
+          ...item,
+          label,
+          detailAddress,
+          contactName: String(item.contactName || "").trim(),
+          contactPhone: String(item.contactPhone || "").trim(),
+        };
+        return {
+          ...normalizedItem,
+          address: detailAddress,
+          longitude: undefined,
+          latitude: undefined,
+        };
+      });
     }
 
     const canUseBrushSimulation = hasPermission(session, "brush:simulate");
