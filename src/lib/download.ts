@@ -87,13 +87,6 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 }
 
-function buildDownloadFile(blob: Blob, filename: string) {
-  return new File([blob], filename, {
-    type: blob.type || undefined,
-    lastModified: Date.now(),
-  });
-}
-
 export async function triggerFetchedBlobDownload(url: string, filename: string) {
   const response = await fetch(url, { credentials: "include" });
   if (!response.ok) {
@@ -101,8 +94,7 @@ export async function triggerFetchedBlobDownload(url: string, filename: string) 
   }
 
   const blob = await response.blob();
-  const file = buildDownloadFile(blob, filename);
-  triggerBlobDownload(file, filename);
+  triggerBlobDownload(blob, filename);
 }
 
 export async function triggerIOSMediaShare(url: string, filename: string) {
@@ -121,7 +113,10 @@ export async function triggerIOSMediaShare(url: string, filename: string) {
     }
 
     const blob = await response.blob();
-    const file = buildDownloadFile(blob, filename);
+    const file = new File([blob], filename, {
+      type: blob.type || undefined,
+      lastModified: Date.now(),
+    });
 
     const shareData = { files: [file], title: filename };
     const canShare = typeof navigator.canShare === "function" ? navigator.canShare(shareData) : true;
