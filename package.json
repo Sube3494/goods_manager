@@ -2,17 +2,18 @@
   "name": "goods",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.3.13",
   "scripts": {
-    "predev": "pnpm exec prisma generate",
+    "predev": "bunx prisma generate",
     "dev": "next dev",
-    "prebuild": "pnpm exec prisma generate",
-    "prestart": "pnpm exec prisma generate",
+    "prebuild": "bunx prisma generate",
+    "prestart": "bunx prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsc --module commonjs --target es2020 --outDir tmp/purchase-tests --esModuleInterop --skipLibCheck src/lib/pinyin.ts src/lib/types.ts src/lib/purchases.ts scripts/purchases.test.ts && node tmp/purchase-tests/scripts/purchases.test.js",
-    "audit:brush-cleanup": "node scripts/audit_brush_inventory_cleanup.js",
-    "cleanup:inactive-brush-products": "node scripts/cleanup_inactive_brush_products.js"
+    "test": "bunx tsc --module commonjs --target es2020 --outDir tmp/purchase-tests --esModuleInterop --skipLibCheck src/lib/pinyin.ts src/lib/types.ts src/lib/purchases.ts scripts/purchases.test.ts && bun tmp/purchase-tests/scripts/purchases.test.js",
+    "audit:brush-cleanup": "bun scripts/audit_brush_inventory_cleanup.js",
+    "cleanup:inactive-brush-products": "bun scripts/cleanup_inactive_brush_products.js"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",

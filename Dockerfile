@@ -3,28 +3,20 @@
 # ================================
 # Stage 1: 依赖安装
 # ================================
-FROM node:20-alpine AS deps
-RUN corepack enable && corepack prepare pnpm@latest --activate
+FROM oven/bun:1.3.13-alpine AS deps
 WORKDIR /app
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
 ENV npm_config_registry="https://registry.npmmirror.com"
 
-COPY package.json pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
-    pnpm config set store-dir /pnpm/store && \
-    pnpm install --frozen-lockfile && \
-    pnpm store prune
+COPY package.json bun.lock ./
+RUN --mount=type=cache,id=bun-install,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 
 # ================================
 # Stage 2: 构建
 # ================================
-FROM node:20-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate && \
-    apk add --no-cache openssl
+FROM oven/bun:1.3.13-alpine AS builder
+RUN apk add --no-cache openssl
 WORKDIR /app
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
 ENV npm_config_registry="https://registry.npmmirror.com"
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -32,7 +24,7 @@ COPY . .
 
 # 生成 Prisma Client (使用淘宝源加速二进制下载)
 ENV PRISMA_ENGINES_MIRROR="https://npmmirror.com/mirrors/prisma"
-RUN pnpm exec prisma generate
+RUN bunx prisma generate
 
 # 构建 Next.js（standalone 模式减小镜像体积）
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -40,12 +32,12 @@ ARG NEXT_PUBLIC_AMAP_KEY
 ARG NEXT_PUBLIC_AMAP_SECURITY_CODE
 ENV NEXT_PUBLIC_AMAP_KEY=$NEXT_PUBLIC_AMAP_KEY
 ENV NEXT_PUBLIC_AMAP_SECURITY_CODE=$NEXT_PUBLIC_AMAP_SECURITY_CODE
-RUN pnpm build
+RUN bun run build
 
 # ================================
 # Stage 3: 运行时
 # ================================
-FROM node:20-alpine AS runner
+FROM oven/bun:1.3.13-alpine AS runner
 WORKDIR /app
 
 # Prisma 在 Alpine 上需要 openssl；postgresql-client 提供 psql 用于自动建库；su-exec 用于降权
@@ -63,14 +55,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/bun.lock ./bun.lock
 
 # Prisma Client（自定义输出路径：prisma/generated-client）
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# 安装 Prisma CLI（使用淘宝源加速下载并用于启动时自动执行 migrate deploy）
-RUN npm install -g prisma@5.22.0 --registry=https://registry.npmmirror.com && \
-    chmod -R 777 /usr/local/lib/node_modules/prisma/node_modules/@prisma/engines
+# 复用构建阶段已经安装好的 Prisma CLI，避免运行镜像构建时再次联网下载引擎
+RUN chmod -R 777 /app/node_modules/@prisma
 
 # 自动建库脚本（shell 脚本，不依赖 npm 包）
 COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
