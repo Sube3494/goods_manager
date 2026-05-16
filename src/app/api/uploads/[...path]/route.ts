@@ -35,8 +35,7 @@ function normalizeMetadataTimestamp(rawValue: string | null, rawOffset: string |
 
 async function buildImageDownloadBuffer(fullPath: string, ext: string, metadataTimestamp: NonNullable<ReturnType<typeof normalizeMetadataTimestamp>>) {
   const source = await readFile(fullPath);
-  const basePipeline = sharp(source).rotate() as sharp.Sharp;
-  let pipeline = basePipeline.withExif({
+  let pipeline = sharp(source).rotate().withExif({
     IFD0: {
       DateTime: metadataTimestamp.exifDateTime,
     },
