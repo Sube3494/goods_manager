@@ -19,6 +19,7 @@ export async function GET() {
       create: {
         id: "system",
         lowStockThreshold: 10,
+        maxLoginDevices: 2,
         allowDataImport: true,
         allowGalleryUpload: true,
         requireLoginForLightbox: false,
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { 
       lowStockThreshold, 
+      maxLoginDevices,
       allowGalleryUpload, 
       requireLoginForLightbox,
       gallerySortDesc,
@@ -80,6 +82,7 @@ export async function POST(request: Request) {
 
     const updateData: Prisma.SystemSettingUpdateInput = {};
     if (typeof lowStockThreshold === 'number') updateData.lowStockThreshold = lowStockThreshold;
+    if (typeof maxLoginDevices === 'number') updateData.maxLoginDevices = Math.max(1, Math.floor(maxLoginDevices));
     if (typeof allowGalleryUpload === 'boolean') updateData.allowGalleryUpload = allowGalleryUpload;
     if (typeof requireLoginForLightbox === 'boolean') updateData.requireLoginForLightbox = requireLoginForLightbox;
     if (typeof gallerySortDesc === 'boolean') updateData.gallerySortDesc = gallerySortDesc;
@@ -113,6 +116,7 @@ export async function POST(request: Request) {
       create: {
         id: "system",
         lowStockThreshold: (typeof lowStockThreshold === 'number') ? lowStockThreshold : 10,
+        maxLoginDevices: (typeof maxLoginDevices === 'number') ? Math.max(1, Math.floor(maxLoginDevices)) : 2,
         allowDataImport: (typeof allowDataImport === 'boolean') ? allowDataImport : true,
         allowGalleryUpload: (typeof allowGalleryUpload === 'boolean') ? allowGalleryUpload : true,
         requireLoginForLightbox: (typeof requireLoginForLightbox === 'boolean') ? requireLoginForLightbox : false,

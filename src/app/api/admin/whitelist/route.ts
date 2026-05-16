@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthorizedAdmin, getAuthorizedAdminAny } from "@/lib/auth";
+import { getAuthorizedAdmin, getAuthorizedAdminAny, getOnlineDeviceCutoff } from "@/lib/auth";
 import { sendInvitationEmail } from "@/lib/email";
 import { getRequestOrigin } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ export async function GET() {
   }
 
   try {
+    const onlineCutoff = getOnlineDeviceCutoff();
     const whitelist = await prisma.emailWhitelist.findMany({
       orderBy: { createdAt: "desc" },
       include: { roleProfile: true }
@@ -32,8 +33,25 @@ export async function GET() {
             name: true,
             role: true,
             status: true,
+            lastActiveAt: true,
             permissions: true,
-            roleProfile: true
+            roleProfile: true,
+            deviceSessions: {
+              where: {
+                endedAt: null,
+                lastSeenAt: { gte: onlineCutoff },
+              },
+              orderBy: { lastSeenAt: "desc" },
+              take: 5,
+              select: {
+                id: true,
+                deviceType: true,
+                deviceLabel: true,
+                browser: true,
+                os: true,
+                lastSeenAt: true,
+              },
+            },
         }
     });
 

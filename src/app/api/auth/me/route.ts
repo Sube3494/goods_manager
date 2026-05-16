@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getSession } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { getFreshSession, getSession } from "@/lib/auth";
 import { getEffectivePermissions, SessionUser } from "@/lib/permissions";
 
 export async function GET() {
@@ -17,38 +16,25 @@ export async function GET() {
     return response;
   }
 
-  // Fetch the latest user data from the database to ensure roles/permissions are up to date
-  const user = await prisma.user.findUnique({
-    where: { id: (session.user as SessionUser).id },
-    include: { roleProfile: true }
-  });
+  const freshSession = await getFreshSession() as SessionUser | null;
+  const freshUser = freshSession?.user as (SessionUser & {
+    status?: string;
+    passwordHash?: string | null;
+    passwordSetAt?: string | Date | null;
+  }) | undefined;
 
-  if (!user || user.status === "DISABLED") {
+  if (!freshUser || freshUser.status === "DISABLED") {
     const response = NextResponse.json({ user: null });
-    // 清除失效的 session cookie，防止重定向死循环
     response.cookies.set("session", "", { expires: new Date(0) });
     return response;
   }
-
-  // Extra check: must be in whitelist if not SUPER_ADMIN
-  if (user.role !== "SUPER_ADMIN") {
-    const whitelisted = await prisma.emailWhitelist.findUnique({
-      where: { email: user.email.toLowerCase() }
-    });
-    if (!whitelisted) {
-        const response = NextResponse.json({ user: null });
-        response.cookies.set("session", "", { expires: new Date(0) });
-        return response;
-    }
-  }
-
-  const { passwordHash, ...safeUser } = user;
+  const { passwordHash, ...safeUser } = freshUser;
 
   const response = NextResponse.json({
     user: {
       ...safeUser,
-      hasPassword: !!passwordHash || !!user.passwordSetAt,
-      permissions: getEffectivePermissions(user as unknown as SessionUser),
+      hasPassword: !!passwordHash || !!freshUser.passwordSetAt,
+      permissions: getEffectivePermissions(freshUser as unknown as SessionUser),
     }
   });
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");

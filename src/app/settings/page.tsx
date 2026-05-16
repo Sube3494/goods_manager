@@ -65,6 +65,7 @@ function SettingsContent() {
   const canTransferData = hasPermission(sessionUser, "data:transfer");
   const canAccessSettingsPage = isSuperAdmin || canManageSettings || canManageBackups || canTransferData;
   const [lowStockThreshold, setLowStockThreshold] = useState<number | "">(10);
+  const [maxLoginDevices, setMaxLoginDevices] = useState<number | "">(2);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
   const [requireLoginForLightbox, setRequireLoginForLightbox] = useState<boolean>(false);
   const [gallerySortDesc, setGallerySortDesc] = useState<boolean>(true);
@@ -216,6 +217,7 @@ function SettingsContent() {
             if (settingsRes.ok) {
                 const data = await settingsRes.json();
                 setLowStockThreshold(data.lowStockThreshold);
+                setMaxLoginDevices(data.maxLoginDevices ?? 2);
                 setAllowGalleryUpload(data.allowGalleryUpload ?? true);
                 setRequireLoginForLightbox(data.requireLoginForLightbox ?? false);
                 setGallerySortDesc(data.gallerySortDesc ?? true);
@@ -258,6 +260,7 @@ function SettingsContent() {
     
     const payload = {
         lowStockThreshold,
+        maxLoginDevices,
         allowGalleryUpload,
         requireLoginForLightbox,
         gallerySortDesc,
@@ -297,6 +300,7 @@ function SettingsContent() {
     }
   }, [
     lowStockThreshold, 
+    maxLoginDevices,
     allowGalleryUpload, 
     requireLoginForLightbox,
     gallerySortDesc,
@@ -325,6 +329,19 @@ function SettingsContent() {
 
     return () => clearTimeout(timer);
   }, [lowStockThreshold, saveSettings]);
+
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    if (maxLoginDevices === lastSavedSettings.current.maxLoginDevices) return;
+
+    const timer = setTimeout(() => {
+      if (typeof maxLoginDevices === "number" && maxLoginDevices >= 1) {
+        saveSettings({ maxLoginDevices }, { silent: true });
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [maxLoginDevices, saveSettings]);
 
   // Sync tab from URL if it changes while on page
   useEffect(() => {
@@ -594,6 +611,8 @@ function SettingsContent() {
         {activeTab === "data" && (
           <DataTab
             allowGalleryUpload={allowGalleryUpload}
+            maxLoginDevices={maxLoginDevices}
+            setMaxLoginDevices={setMaxLoginDevices}
             toggleGalleryUpload={toggleGalleryUpload}
             requireLoginForLightbox={requireLoginForLightbox}
             toggleRequireLoginForLightbox={toggleRequireLoginForLightbox}

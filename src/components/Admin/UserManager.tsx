@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { useUser } from "@/hooks/useUser";
 import { hasAdminAccess, SessionUser } from "@/lib/permissions";
 import { pinyinMatch } from "@/lib/pinyin";
+import { formatLocalDateTime } from "@/lib/dateUtils";
 
 
 
@@ -35,9 +36,88 @@ interface WhitelistEntry {
     name: string;
     role: string;
     status: string;
+    lastActiveAt?: string | null;
+    deviceSessions?: Array<{
+      id: string;
+      deviceType: string;
+      deviceLabel: string;
+      browser?: string | null;
+      os?: string | null;
+      lastSeenAt: string;
+    }>;
     roleProfileId: string | null;
     roleProfile?: RoleProfile;
   };
+}
+
+function formatLastActiveAt(value?: string | null) {
+  if (!value) return "暂无记录";
+  return formatLocalDateTime(value);
+}
+
+function DeviceBadge({ deviceType, label }: { deviceType: string; label: string }) {
+  const isMobile = deviceType === "mobile" || deviceType === "tablet";
+  const Icon = isMobile ? Smartphone : MonitorSmartphone;
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/15 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+      <Icon size={11} className="shrink-0" />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+function DevicePresence({
+  devices,
+  compact = false,
+}: {
+  devices?: NonNullable<WhitelistEntry["user"]>["deviceSessions"];
+  compact?: boolean;
+}) {
+  if (!devices?.length) {
+    return <span className="text-xs text-muted-foreground">离线</span>;
+  }
+
+  if (compact && devices.length === 1) {
+    const isMobile = devices[0].deviceType === "mobile" || devices[0].deviceType === "tablet";
+    const Icon = isMobile ? Smartphone : MonitorSmartphone;
+    return (
+      <span
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+        title={devices[0].deviceLabel}
+      >
+        <Icon size={14} />
+      </span>
+    );
+  }
+
+  if (!compact && devices.length === 1) {
+    return <DeviceBadge deviceType={devices[0].deviceType} label={devices[0].deviceLabel} />;
+  }
+
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/8 px-2.5 py-1">
+      <div className="flex items-center -space-x-1">
+        {devices.slice(0, 3).map((device, index) => {
+          const isMobile = device.deviceType === "mobile" || device.deviceType === "tablet";
+          const Icon = isMobile ? Smartphone : MonitorSmartphone;
+          return (
+            <span
+              key={device.id}
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+              style={{ zIndex: devices.length - index }}
+              title={device.deviceLabel}
+            >
+              <Icon size={10} />
+            </span>
+          );
+        })}
+      </div>
+      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+        {devices.length} 台在线
+      </span>
+    </div>
+  );
 }
 
 function SelectionCircleButton({
@@ -623,6 +703,8 @@ export function UserManager() {
                   </div>
                 </th>
                 <th className="px-5 py-3 text-xs font-bold text-foreground">成员信息</th>
+                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">最后活动</th>
+                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">在线设备</th>
                 <th className="px-5 py-3 text-xs font-bold text-foreground text-center">系统角色</th>
                 <th className="px-5 py-3 text-xs font-bold text-foreground text-center">状态</th>
                 <th className="px-5 py-3 text-xs font-bold text-foreground text-center">操作</th>
@@ -631,13 +713,13 @@ export function UserManager() {
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="py-20 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-20 text-center text-muted-foreground">
                     <Loader2 className="animate-spin mx-auto mb-4 text-primary" size={32} />
                     正在整理成员目录...
                   </td>
                 </tr>
               ) : filteredEntries.length === 0 ? (
-                <tr><td colSpan={5} className="py-20 text-center text-muted-foreground">暂无成员数据</td></tr>
+                <tr><td colSpan={7} className="py-20 text-center text-muted-foreground">暂无成员数据</td></tr>
               ) : (
                 filteredEntries.map((entry) => {
                   const isRegistered = !!entry.user;
@@ -665,6 +747,14 @@ export function UserManager() {
                             ) : null}
                           </div>
                         </div>
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {isRegistered ? formatLastActiveAt(entry.user?.lastActiveAt) : "暂无记录"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <DevicePresence devices={entry.user?.deviceSessions} compact />
                       </td>
                       <td className="px-5 py-3 text-center">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 whitespace-nowrap">
@@ -778,6 +868,20 @@ export function UserManager() {
                       ) : (
                         <span className="shrink-0 rounded-lg bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-600">等待加入</span>
                       )}
+                    </div>
+
+                    <div className="mt-3 rounded-2xl bg-muted/25 px-3 py-2">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">最后活动</div>
+                      <div className="mt-1 text-xs text-foreground">
+                        {isRegistered ? formatLastActiveAt(entry.user?.lastActiveAt) : "暂无记录"}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 rounded-2xl bg-muted/25 px-3 py-2">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">在线设备</div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <DevicePresence devices={entry.user?.deviceSessions} />
+                      </div>
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-2">

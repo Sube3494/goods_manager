@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "pnpm exec prisma generate",
     "dev": "next dev",
+    "prebuild": "pnpm exec prisma generate",
+    "prestart": "pnpm exec prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

@@ -16,6 +16,8 @@ interface TrendPoint { label: string; pv: number; uv: number }
 interface AnalyticsData { today: { pv: number; uv: number }; month: { pv: number; uv: number }; total: { pv: number; uv: number }; trend: TrendPoint[] }
 interface DataTabProps {
   allowGalleryUpload: boolean;
+  maxLoginDevices: number | "";
+  setMaxLoginDevices: (val: number | "") => void;
   toggleGalleryUpload: () => void;
   requireLoginForLightbox: boolean;
   toggleRequireLoginForLightbox: () => void;
@@ -31,7 +33,7 @@ interface DataTabProps {
 }
 
 export function DataTab({
-  allowGalleryUpload, toggleGalleryUpload, requireLoginForLightbox, toggleRequireLoginForLightbox, gallerySortDesc, setGallerySortDesc,
+  allowGalleryUpload, maxLoginDevices, setMaxLoginDevices, toggleGalleryUpload, requireLoginForLightbox, toggleRequireLoginForLightbox, gallerySortDesc, setGallerySortDesc,
   shareExpireDuration, setShareExpireDuration, shareExpireUnit, setShareExpireUnit,
   saveSettings, mode = "full", canManageDangerZone = true,
 }: DataTabProps) {
@@ -279,6 +281,29 @@ export function DataTab({
           <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">实物相册排序方式</div><div className="mt-1 text-xs text-muted-foreground">决定实物相册中商品组默认按编号升序还是降序排列。</div></div>
             <CustomSelect value={gallerySortDesc ? "desc" : "asc"} triggerClassName="h-10 w-32 rounded-xl border-border bg-background text-xs font-bold" onChange={(val) => { const next = val === "desc"; setGallerySortDesc(next); saveSettings({ gallerySortDesc: next }); }} options={[{ value: "desc", label: "编号降序" }, { value: "asc", label: "编号升序" }]} />
+          </div>
+          <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
+            <div><div className="text-sm font-black text-foreground">同时登录设备数</div><div className="mt-1 text-xs text-muted-foreground">超过上限后，会自动登出最早登录的在线设备。建议至少保留 1 台。</div></div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                value={maxLoginDevices ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "") return setMaxLoginDevices("");
+                  const num = parseInt(val, 10);
+                  setMaxLoginDevices(Number.isNaN(num) ? "" : num);
+                }}
+                onBlur={() => {
+                  const next = typeof maxLoginDevices === "number" && maxLoginDevices >= 1 ? Math.floor(maxLoginDevices) : 2;
+                  setMaxLoginDevices(next);
+                  saveSettings({ maxLoginDevices: next });
+                }}
+                className="h-10 w-20 rounded-xl border border-border bg-white px-2 text-center text-sm font-black outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+              />
+              <span className="text-xs font-bold text-muted-foreground">台</span>
+            </div>
           </div>
           <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
             <div><div className="text-sm font-black text-foreground">分享链接时效</div><div className="mt-1 text-xs text-muted-foreground">配置分享给外部的图片及视频链接在多长时间后自动失效。</div></div>

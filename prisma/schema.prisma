@@ -213,6 +213,7 @@ model User {
   name               String?
   passwordHash       String?
   passwordSetAt      DateTime?
+  lastActiveAt       DateTime?
   role               Role                @default(USER)
   status             String              @default("ACTIVE")
   permissions        Json?               @default("{}")
@@ -239,7 +240,26 @@ model User {
   autoPickApiKeys    AutoPickApiKey[]
   autoPickOrders     AutoPickOrder[]
   autoPickAutoCompleteJobs AutoPickAutoCompleteJob[]
+  deviceSessions     UserDeviceSession[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
+}
+
+model UserDeviceSession {
+  id          String   @id @default(cuid())
+  userId      String
+  sessionId   String   @unique
+  deviceType  String
+  deviceLabel String
+  browser     String?
+  os          String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  endedAt     DateTime?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lastSeenAt])
+  @@index([endedAt, lastSeenAt])
 }
 
 model RoleProfile {
@@ -334,6 +354,7 @@ model RegistrationRequest {
 model SystemSetting {
   id                     String    @id @default(cuid())
   lowStockThreshold      Int       @default(10)
+  maxLoginDevices        Int       @default(2)
   allowDataImport        Boolean   @default(true)
   allowGalleryUpload     Boolean   @default(true)
   requireLoginForLightbox Boolean  @default(false)
