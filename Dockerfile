@@ -6,6 +6,8 @@
 FROM oven/bun:1.3.13-alpine AS deps
 WORKDIR /app
 ENV npm_config_registry="https://registry.npmmirror.com"
+ENV PRISMA_ENGINES_MIRROR="https://npmmirror.com/mirrors/prisma"
+ENV PRISMA_BINARIES_MIRROR="https://npmmirror.com/mirrors/prisma"
 
 COPY package.json bun.lock ./
 RUN --mount=type=cache,id=bun-install,target=/root/.bun/install/cache \
@@ -23,7 +25,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # 生成 Prisma Client (使用淘宝源加速二进制下载)
-ENV PRISMA_ENGINES_MIRROR="https://npmmirror.com/mirrors/prisma"
 RUN bunx prisma generate
 
 # 构建 Next.js（standalone 模式减小镜像体积）
