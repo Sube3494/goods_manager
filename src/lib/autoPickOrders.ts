@@ -287,20 +287,24 @@ function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
     : null;
 
   if (startAt && endAt) {
-    return formatDeadlineSegment(startAt);
-  }
-
-  if (startAt) {
-    return formatDeadlineSegment(startAt);
-  }
-
-  if (looksLikeDeliveryTimeRange(directDeadline)) {
-    const firstTimeMatch = directDeadline.match(/^(.*?\d{1,2}:\d{2})/);
-    return firstTimeMatch?.[1]?.trim() || directDeadline;
+    return formatDeadlineSegment(endAt);
   }
 
   if (endAt) {
     return formatDeadlineSegment(endAt);
+  }
+
+  if (looksLikeDeliveryTimeRange(directDeadline)) {
+    const rangeMatch = directDeadline.match(/[-~至]\s*(.*?\d{1,2}:\d{2})\s*$/);
+    if (rangeMatch?.[1]) {
+      return rangeMatch[1].trim();
+    }
+    const firstTimeMatch = directDeadline.match(/^(.*?\d{1,2}:\d{2})/);
+    return firstTimeMatch?.[1]?.trim() || directDeadline;
+  }
+
+  if (startAt) {
+    return formatDeadlineSegment(startAt);
   }
 
   return undefined;

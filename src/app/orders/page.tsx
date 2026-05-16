@@ -502,7 +502,7 @@ function formatCompactDateTime(value: string | null | undefined) {
 function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange">) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
-  const text = order.isPickup ? (rangeText || deadlineText) : deadlineText;
+  const text = order.isPickup ? (rangeText || deadlineText) : (rangeText || deadlineText);
   if (!text) {
     return "-";
   }
@@ -515,7 +515,7 @@ function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDea
     return text;
   }
 
-  const rangeMatch = text.match(/^(.+?\d{1,2}:\d{2})\s*[-~至].*$/);
+  const rangeMatch = text.match(/[-~至]\s*(.*?\d{1,2}:\d{2})\s*$/);
   if (rangeMatch?.[1]) {
     return rangeMatch[1].trim();
   }
@@ -685,7 +685,6 @@ function OrderCard({
   const abnormal = isAbnormalStatus(order.status);
   const pickup = Boolean(order.isPickup);
   const delivering = !pickup && isDeliveringStatus(order.status);
-  const subscribe = isSubscribeOrder(order);
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal && !pickup;
   const orderTypeLabel = getOrderTypeLabel(order);
@@ -869,10 +868,10 @@ function OrderCard({
               <span className="ml-auto inline-flex min-w-0 items-center justify-end gap-1.5 rounded-full border border-black/8 bg-white/85 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:ml-0 sm:justify-start sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <Clock3 size={12} />
                 <span className="min-w-0 text-right sm:hidden">
-                  <span className="block truncate">{pickup ? `取货 ${compactDeadlineDisplay}` : subscribe ? `预约 ${compactDeadlineDisplay}` : `最晚 ${compactDeadlineDisplay}`}</span>
+                  <span className="block truncate">{pickup ? `取货 ${compactDeadlineDisplay}` : `最晚 ${compactDeadlineDisplay}`}</span>
                 </span>
                 <span className="hidden sm:inline">
-                  {pickup ? `取货时间 ${deadlineDisplay}` : subscribe ? `预约送达 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
+                  {pickup ? `取货时间 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
                 </span>
               </span>
             ) : null}
@@ -945,7 +944,7 @@ function OrderCard({
                 <DetailStat label="出库状态" value={hasOutbound ? "已出库" : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
-                <DetailStat label={pickup ? "取货时间" : subscribe ? "预约送达" : "最晚送达"} value={deadlineDisplay} />
+                <DetailStat label={pickup ? "取货时间" : "最晚送达"} value={deadlineDisplay} />
               </div>
               <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-2.5">
