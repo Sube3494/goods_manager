@@ -2,6 +2,8 @@
 node_modules
 .next
 .pnpm-store
+tmp
+prisma/generated-client
 
 # 本地环境与敏感信息
 .env
@@ -17,10 +19,12 @@ node_modules
 
 # 数据与临时文件
 /public/uploads/*
+/public/backups
 data-processing
 /prisma/*.db
 /prisma/*.db-journal
 *.tsbuildinfo
+*.log
 npm-debug.log*
 yarn-debug.log*
 .pnpm-debug.log*
