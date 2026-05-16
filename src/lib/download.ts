@@ -2,21 +2,6 @@
 
 export type ClientPlatform = "ios" | "android" | "other";
 
-type SaveFilePickerOptions = {
-  suggestedName?: string;
-  types?: Array<{
-    description?: string;
-    accept: Record<string, string[]>;
-  }>;
-};
-
-type SaveFilePickerHandle = {
-  createWritable: () => Promise<{
-    write: (data: Blob | File | ArrayBuffer | ArrayBufferView | string) => Promise<void>;
-    close: () => Promise<void>;
-  }>;
-};
-
 function isSameOrigin(url: string) {
   if (typeof window === "undefined") return false;
 
@@ -66,89 +51,12 @@ function buildDownloadUrl(url: string, filename: string) {
 
     if (isSameOrigin(resolved.toString()) && resolved.pathname.startsWith("/api/uploads/")) {
       resolved.searchParams.set("download", filename);
-      resolved.searchParams.set("downloadedAt", buildClientLocalMetadataTimestamp());
-      resolved.searchParams.set("downloadedOffset", buildClientTimezoneOffset());
     }
 
     return resolved.toString();
   } catch {
     return url;
   }
-}
-
-function buildClientLocalMetadataTimestamp() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-}
-
-function buildClientTimezoneOffset() {
-  const offsetMinutes = -new Date().getTimezoneOffset();
-  const sign = offsetMinutes >= 0 ? "+" : "-";
-  const absoluteMinutes = Math.abs(offsetMinutes);
-  const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, "0");
-  const minutes = String(absoluteMinutes % 60).padStart(2, "0");
-  return `${sign}${hours}:${minutes}`;
-}
-
-function inferMimeTypeFromFilename(filename: string) {
-  const ext = filename.split(".").pop()?.trim().toLowerCase() || "";
-  const mimeTypes: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    mp4: "video/mp4",
-    webm: "video/webm",
-    mov: "video/quicktime",
-  };
-  return mimeTypes[ext] || "application/octet-stream";
-}
-
-function buildSavePickerTypes(filename: string): SaveFilePickerOptions["types"] {
-  const ext = filename.split(".").pop()?.trim().toLowerCase() || "";
-  const mimeType = inferMimeTypeFromFilename(filename);
-  if (!ext) {
-    return [{
-      description: "文件",
-      accept: {
-        [mimeType]: [],
-      },
-    }];
-  }
-
-  return [{
-    description: "下载文件",
-    accept: {
-      [mimeType]: [`.${ext}`],
-    },
-  }];
-}
-
-async function saveFileWithPicker(file: File) {
-  const pickerHost = window as typeof window & {
-    showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<SaveFilePickerHandle>;
-  };
-
-  if (typeof pickerHost.showSaveFilePicker !== "function") {
-    return false;
-  }
-
-  const handle = await pickerHost.showSaveFilePicker({
-    suggestedName: file.name,
-    types: buildSavePickerTypes(file.name),
-  });
-  const writable = await handle.createWritable();
-  await writable.write(file);
-  await writable.close();
-  return true;
 }
 
 export function triggerBrowserDownload(url: string, filename: string) {
@@ -187,27 +95,13 @@ function buildDownloadFile(blob: Blob, filename: string) {
 }
 
 export async function triggerFetchedBlobDownload(url: string, filename: string) {
-  const finalUrl = buildDownloadUrl(url, filename);
-  const response = await fetch(finalUrl, { credentials: "include" });
+  const response = await fetch(url, { credentials: "include" });
   if (!response.ok) {
     throw new Error(`Download request failed: ${response.status}`);
   }
 
   const blob = await response.blob();
   const file = buildDownloadFile(blob, filename);
-  try {
-    const savedWithPicker = await saveFileWithPicker(file);
-    if (savedWithPicker) {
-      return;
-    }
-  } catch (error) {
-    if (!(error instanceof DOMException && error.name === "AbortError")) {
-      console.warn("Save picker failed, falling back to browser download:", error);
-    } else {
-      return;
-    }
-  }
-
   triggerBlobDownload(file, filename);
 }
 
@@ -221,8 +115,7 @@ export async function triggerIOSMediaShare(url: string, filename: string) {
   }
 
   try {
-    const finalUrl = buildDownloadUrl(url, filename);
-    const response = await fetch(finalUrl, { credentials: "include" });
+    const response = await fetch(url, { credentials: "include" });
     if (!response.ok) {
       return false;
     }
