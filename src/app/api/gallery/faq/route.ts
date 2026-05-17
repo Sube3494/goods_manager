@@ -77,7 +77,7 @@ function canReadGalleryFaq(session: SessionUser | null) {
 
 function canManageGalleryFaq(session: SessionUser | null) {
   if (!session?.id) return false;
-  return session.role === "SUPER_ADMIN" || hasPermission(session, "gallery:upload");
+  return session.role === "SUPER_ADMIN";
 }
 
 function productVisibilityWhere(session: SessionUser | null): Prisma.ProductWhereInput {
@@ -132,18 +132,7 @@ export async function GET(request: Request) {
     const search = normalizeText(searchParams.get("search")).toLowerCase();
     const canEditAny = canManageGalleryFaq(session);
 
-    const where =
-      session?.role === "SUPER_ADMIN"
-        ? undefined
-        : {
-            OR: [
-              { userId: session?.id || null },
-              { userId: null },
-            ],
-          };
-
     const faqItems = await prisma.galleryFaq.findMany({
-      where,
       orderBy: [
         { updatedAt: "desc" },
         { createdAt: "desc" },
@@ -173,7 +162,7 @@ export async function GET(request: Request) {
           entries,
           productIds: faq.productIds,
           products: await getVisibleProducts(faq.productIds, session),
-          canEdit: canEditAny && (session?.role === "SUPER_ADMIN" || !faq.userId || faq.userId === session?.id),
+          canEdit: canEditAny,
           createdAt: faq.createdAt,
           updatedAt: faq.updatedAt,
         };
@@ -210,7 +199,7 @@ export async function POST(request: Request) {
         answer: entries[0].answer,
         entries,
         productIds,
-        userId: session?.id,
+        userId: null,
       },
     });
 
@@ -252,10 +241,6 @@ export async function PUT(request: Request) {
     const existing = await prisma.galleryFaq.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
-    }
-
-    if (session?.role !== "SUPER_ADMIN" && existing.userId && existing.userId !== session?.id) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     const updated = await prisma.galleryFaq.update({
@@ -303,10 +288,6 @@ export async function DELETE(request: Request) {
     const existing = await prisma.galleryFaq.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "FAQ not found" }, { status: 404 });
-    }
-
-    if (session?.role !== "SUPER_ADMIN" && existing.userId && existing.userId !== session?.id) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
     await prisma.galleryFaq.delete({ where: { id } });
