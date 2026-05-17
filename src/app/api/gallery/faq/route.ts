@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { pinyinMatch } from "@/lib/pinyin";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../prisma/generated-client";
 
@@ -142,15 +143,14 @@ export async function GET(request: Request) {
     const visibleItems = faqItems.filter((faq) => {
       if (!search) return true;
       const entries = getFaqEntries(faq);
-      const haystack = [
+      const fields = [
         faq.title,
         faq.question,
         faq.answer,
         ...entries.flatMap((entry) => [entry.question, entry.answer]),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(search);
+      ];
+
+      return fields.some((field) => pinyinMatch(normalizeText(field), search));
     });
 
     const items = await Promise.all(
