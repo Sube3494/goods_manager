@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -112,6 +113,7 @@ function getItemTitle(item: Pick<GalleryFaqItem, "title" | "entries"> | Pick<Faq
 
 export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: ProductFaqPanelProps) {
   const { showToast } = useToast();
+  const [isMounted, setIsMounted] = useState(false);
   const [items, setItems] = useState<GalleryFaqItem[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -121,6 +123,10 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -325,7 +331,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
             </Link>
           )}
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] text-foreground shadow-[0_12px_28px_rgba(15,23,42,0.16)] sm:h-12 sm:w-12">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff,#f8fbff)] text-foreground shadow-[0_14px_30px_rgba(148,163,184,0.22)] dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.04))] dark:shadow-[0_12px_28px_rgba(15,23,42,0.16)] sm:h-12 sm:w-12">
               <MessageCircleQuestion size={23} />
             </div>
             <div className="min-w-0">
@@ -368,16 +374,16 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
         )}
       </div>
 
-      {activeDraft && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 sm:p-6 md:pl-[calc(var(--sidebar-width,0px)+1rem)]">
+      {activeDraft && isMounted && createPortal(
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 sm:p-6">
           <button
             type="button"
             aria-label="关闭编辑弹窗"
             onClick={() => setActiveDraft(null)}
             className="absolute inset-0 bg-[rgba(3,6,14,0.72)] backdrop-blur-md"
           />
-          <section className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(9,14,24,0.985),rgba(11,17,28,0.975))] shadow-[0_28px_90px_rgba(2,6,23,0.52)]">
-            <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] bg-[linear-gradient(90deg,rgba(255,255,255,0.03),rgba(59,130,246,0.04),transparent_55%)] p-4 sm:p-5">
+          <section className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff,#f8fbff)] shadow-[0_28px_90px_rgba(148,163,184,0.28)] dark:border-white/[0.08] dark:bg-[linear-gradient(180deg,rgba(9,14,24,0.985),rgba(11,17,28,0.975))] dark:shadow-[0_28px_90px_rgba(2,6,23,0.52)]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 bg-[linear-gradient(90deg,rgba(255,255,255,0.96),rgba(59,130,246,0.06),transparent_55%)] p-4 dark:border-white/[0.06] dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.03),rgba(59,130,246,0.04),transparent_55%)] sm:p-5">
               <div>
                 <div className="text-sm font-semibold text-foreground">{activeDraft.id ? "编辑问题" : "新建问题"}</div>
                 <p className="mt-1 text-xs text-muted-foreground">一条记录就是一问一答，直接关联对应商品。</p>
@@ -385,7 +391,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
               <button
                 type="button"
                 onClick={() => setActiveDraft(null)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-white/8 hover:text-foreground"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-slate-100 hover:text-foreground dark:hover:bg-white/8"
                 title="关闭"
               >
                 <X size={16} />
@@ -393,26 +399,26 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
             </div>
 
             <div className="custom-scrollbar space-y-4 overflow-y-auto p-4 sm:p-5">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-[0_10px_24px_rgba(148,163,184,0.12)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="inline-flex items-center rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-sm font-medium text-sky-100">问题</div>
+                  <div className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-sm font-medium text-sky-700 dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-100">问题</div>
                 </div>
                 <input
                   value={activeDraft.entries[0]?.question || ""}
                   onChange={(event) => activeDraft.entries[0] && updateEntry(activeDraft.entries[0].id, { question: event.target.value })}
                   placeholder="输入客户常问的问题..."
-                  className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-foreground outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
                 />
                 <textarea
                   value={activeDraft.entries[0]?.answer || ""}
                   onChange={(event) => activeDraft.entries[0] && updateEntry(activeDraft.entries[0].id, { answer: event.target.value })}
                   placeholder="输入标准答案或处理建议..."
                   rows={5}
-                  className="mt-3 w-full resize-y rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-foreground outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20"
+                  className="mt-3 w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-foreground outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
                 />
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-[0_10px_24px_rgba(148,163,184,0.12)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-medium text-foreground">关联商品</div>
@@ -420,7 +426,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                   </div>
                   <button
                     onClick={() => setPickerOpen(true)}
-                    className="inline-flex h-8 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 text-sm font-medium transition-all hover:bg-white/10 active:scale-95"
+                    className="inline-flex h-8 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 active:scale-95 dark:border-white/10 dark:bg-white/6 dark:text-foreground dark:hover:bg-white/10"
                   >
                     <Plus size={16} />
                     选择商品
@@ -428,13 +434,13 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                 </div>
 
                 {activeDraft.products.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-muted-foreground">
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/5">
                     还没有关联商品，保存后也可以再补。
                   </div>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2">
                     {activeDraft.products.map((product) => (
-                      <div key={product.id} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 p-2">
+                      <div key={product.id} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2 shadow-[0_8px_20px_rgba(148,163,184,0.1)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
                         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
                           {product.image ? (
                             <Image src={product.image} alt={product.name} fill sizes="36px" className="object-cover" />
@@ -448,7 +454,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                         </div>
                         <button
                           onClick={() => removeProduct(product.id)}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500"
+                           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500"
                           title="取消关联"
                         >
                           <X size={14} />
@@ -460,10 +466,10 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-white/[0.06] bg-[rgba(255,255,255,0.015)] p-4 sm:flex-row sm:justify-end sm:p-5">
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-slate-50/80 p-4 dark:border-white/[0.06] dark:bg-[rgba(255,255,255,0.015)] sm:flex-row sm:justify-end sm:p-5">
               <button
                 onClick={() => setActiveDraft(null)}
-                className="h-10 w-full rounded-full border border-white/10 bg-white/6 px-4 text-sm font-medium transition-all hover:bg-white/10 active:scale-95 sm:w-auto"
+                className="h-10 w-full rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 active:scale-95 dark:border-white/10 dark:bg-white/6 dark:text-foreground dark:hover:bg-white/10 sm:w-auto"
               >
                 取消
               </button>
@@ -478,14 +484,14 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
             </div>
           </section>
         </div>
-      )}
+      , document.body)}
 
       {isLoading ? (
         <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
           <Loader2 size={24} className="animate-spin" />
         </div>
       ) : items.length === 0 ? (
-        <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+          <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-white/80 p-8 text-center shadow-[0_16px_40px_rgba(148,163,184,0.14)] dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none">
           <CircleHelp size={34} className="mb-3 text-muted-foreground" />
           <h2 className="text-lg font-semibold text-foreground">还没有常见问题</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
@@ -498,14 +504,14 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
             return (
               <section
                 key={row.rowId}
-                className="min-w-0 overflow-hidden rounded-[20px] border border-white/10 bg-white/5 shadow-[0_10px_24px_rgba(2,6,23,0.16)] transition-all duration-200 hover:border-white/10"
+                className="min-w-0 overflow-hidden rounded-[20px] border border-slate-200/90 bg-white/92 shadow-[0_18px_42px_rgba(148,163,184,0.18)] transition-all duration-200 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:shadow-[0_10px_24px_rgba(2,6,23,0.16)] dark:hover:border-white/10"
               >
                 <div className="flex w-full min-w-0 flex-col gap-2.5 bg-[linear-gradient(90deg,rgba(59,130,246,0.035),transparent_55%)] px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start gap-2.5">
-                          <div className="mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border border-sky-300/20 bg-sky-300/10 px-1.5 text-[11px] font-semibold text-sky-100 shadow-[0_6px_16px_rgba(56,189,248,0.14)]">
+                          <div className="mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border border-sky-200 bg-sky-50 px-1.5 text-[11px] font-semibold text-sky-700 shadow-[0_6px_16px_rgba(56,189,248,0.12)] dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-100 dark:shadow-[0_6px_16px_rgba(56,189,248,0.14)]">
                             {index + 1}
                           </div>
                           <h2 className="min-w-0 flex-1 break-words text-[17px] font-medium leading-6 text-foreground sm:truncate">
@@ -518,7 +524,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                           <div className="flex min-w-0 items-center gap-2">
                             <div className="flex shrink-0 -space-x-2">
                               {row.products.slice(0, 4).map((product) => (
-                                <div key={product.id} className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-muted ring-2 ring-[#182031]">
+                                <div key={product.id} className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-muted ring-2 ring-white dark:ring-[#182031]">
                                   {product.image ? (
                                     <Image src={product.image} alt={product.name} fill sizes="28px" className="object-cover" />
                                   ) : (
@@ -529,23 +535,23 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                                 </div>
                               ))}
                               {row.products.length > 4 && (
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-transparent text-[9px] font-medium text-slate-200">
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[9px] font-medium text-slate-600 dark:bg-transparent dark:text-slate-200">
                                   +{row.products.length - 4}
                                 </div>
                               )}
                             </div>
-                            <span className="truncate text-[11px] text-slate-400 sm:hidden">
+                            <span className="truncate text-[11px] text-slate-500 dark:text-slate-400 sm:hidden">
                               已关联 {row.products.length} 个商品
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-slate-500 sm:hidden">未关联商品</span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-500 sm:hidden">未关联商品</span>
                         )}
-                        <div className="flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-1 py-1">
+                        <div className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50/90 px-1 py-1 dark:border-white/10 dark:bg-white/[0.04]">
                         <button
                           type="button"
                           onClick={() => void handleCopyAnswer(row.entry.answer || "")}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-300/78 transition-all hover:bg-white/[0.06] hover:text-foreground active:scale-95"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-foreground active:scale-95 dark:text-slate-300/78 dark:hover:bg-white/[0.06]"
                           title="复制答案"
                         >
                           <Copy size={14} />
@@ -558,7 +564,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                                 event.stopPropagation();
                                 setActiveDraft(toSingleEntryDraft(items.find((item) => item.id === row.parentId)!, row.entry.id));
                               }}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-300/78 transition-all hover:bg-white/[0.06] hover:text-foreground active:scale-95"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-foreground active:scale-95 dark:text-slate-300/78 dark:hover:bg-white/[0.06]"
                               title="编辑"
                             >
                               <Pencil size={15} />
@@ -580,9 +586,9 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                       </div>
                       </div>
                     </div>
-                    <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3.5 py-2.5">
-                      <div className="text-[11px] font-black tracking-[0.2em] text-slate-300/70">回答</div>
-                      <div className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-slate-300/82">
+                    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/90 px-3.5 py-2.5 dark:border-white/10 dark:bg-white/5">
+                      <div className="text-[11px] font-black tracking-[0.2em] text-slate-500 dark:text-slate-300/70">回答</div>
+                      <div className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-slate-700 dark:text-slate-300/82">
                         {row.entry.answer || "暂未填写标准答案"}
                       </div>
                     </div>
