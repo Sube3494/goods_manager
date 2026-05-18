@@ -457,11 +457,11 @@ export function ProductSelectionModal({
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-60000 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[110000] bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
       <div
-        className="fixed left-1/2 top-1/2 z-60001 flex min-h-[520px] w-[calc(100%-24px)] sm:min-h-[560px] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/50 bg-white shadow-2xl backdrop-blur-xl dark:bg-gray-900/70 max-h-[min(84dvh,820px)]"
+        className="fixed left-1/2 top-1/2 z-[110001] flex min-h-[520px] w-[calc(100%-24px)] sm:min-h-[560px] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/50 bg-white shadow-2xl backdrop-blur-xl dark:bg-gray-900/70 max-h-[min(84dvh,820px)]"
       >
              <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
               <div className="flex items-center gap-4">
