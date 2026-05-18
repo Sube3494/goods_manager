@@ -2894,6 +2894,18 @@ function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
   return compact.replace(/[^A-Z0-9]+/g, "");
 }
 
+function splitCompositeAutoPickSku(value: string | null | undefined) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return [];
+  }
+
+  return raw
+    .split(/[+＋]/)
+    .map((part) => normalizeAutoPickSkuForMatch(part))
+    .filter(Boolean);
+}
+
 function normalizeAutoPickDeliveryId(value: unknown) {
   const normalized = String(value || "").trim();
   if (!normalized || normalized === "0") {
@@ -3914,74 +3926,79 @@ async function resolveOutboundItemsForAutoPickOrder(
 
   for (const item of order.items) {
     const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedSku = normalizeAutoPickSkuForMatch(item.productNo);
-    let resolvedShopProduct: {
-      id: string;
-      productId: string | null;
-      sourceProductId: string | null;
-      sku: string | null;
-      jdSkuId: string | null;
-      shopId: string | null;
-      shopName: string | null;
-    } | null = null;
+    const normalizedSkus = splitCompositeAutoPickSku(item.productNo);
+    const skuParts = normalizedSkus.length > 0 ? normalizedSkus : [normalizeAutoPickSkuForMatch(item.productNo)];
+    const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.filter(Boolean).length || 1));
 
-    if (normalizedSku) {
-      const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
-        isCandidateInMappedShop(candidate.shopName)
-      );
-      const uniqueCandidateShopIds = Array.from(
-        new Set(
-          skuCandidates
-            .map((candidate) => String(candidate.shopId || "").trim())
-            .filter(Boolean)
-        )
-      );
+    for (const normalizedSku of skuParts) {
+      let resolvedShopProduct: {
+        id: string;
+        productId: string | null;
+        sourceProductId: string | null;
+        sku: string | null;
+        jdSkuId: string | null;
+        shopId: string | null;
+        shopName: string | null;
+      } | null = null;
 
-      if (!internalShop?.id && uniqueCandidateShopIds.length > 1) {
+      if (normalizedSku) {
+        const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
+          isCandidateInMappedShop(candidate.shopName)
+        );
+        const uniqueCandidateShopIds = Array.from(
+          new Set(
+            skuCandidates
+              .map((candidate) => String(candidate.shopId || "").trim())
+              .filter(Boolean)
+          )
+        );
+
+        if (!internalShop?.id && uniqueCandidateShopIds.length > 1) {
+          throw new Error(
+            `店铺商品匹配冲突：SKU ${normalizedSku} 命中多个店铺，且当前订单未能唯一识别店铺`
+          );
+        }
+
+        const sameShopSkuCandidate = skuCandidates.find((candidate) =>
+          Boolean(candidate.productId || candidate.sourceProductId)
+        );
+        if (sameShopSkuCandidate) {
+          resolvedShopProduct = sameShopSkuCandidate;
+        }
+      }
+
+      if (!resolvedShopProduct && internalShop?.id && normalizedSku) {
+        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform);
+        if (existingShopProduct) {
+          resolvedShopProduct = {
+            id: existingShopProduct.id,
+            productId: existingShopProduct.productId || null,
+            sourceProductId: existingShopProduct.sourceProductId || null,
+            sku: existingShopProduct.sku || null,
+            jdSkuId: existingShopProduct.jdSkuId || null,
+            shopId: internalShop.id,
+            shopName: internalShop.name,
+          };
+        }
+      }
+
+      if (!resolvedShopProduct) {
         throw new Error(
-          `店铺商品匹配冲突：SKU ${normalizedSku} 命中多个店铺，且当前订单未能唯一识别店铺`
+          `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / SKU ${normalizedSku || "未提供"}`
         );
       }
 
-      const sameShopSkuCandidate = skuCandidates.find((candidate) =>
-        Boolean(candidate.productId || candidate.sourceProductId)
-      );
-      if (sameShopSkuCandidate) {
-        resolvedShopProduct = sameShopSkuCandidate;
-      }
+      resolvedItems.push({
+        productId: String(
+          resolvedShopProduct?.productId
+          || resolvedShopProduct?.sourceProductId
+          || ""
+        ).trim() || null,
+        shopProductId: resolvedShopProduct?.id || null,
+        quantity: Math.max(1, Number(item.quantity || 1) || 1),
+        price: perResolvedPrice,
+      });
     }
-
-    if (!resolvedShopProduct && internalShop?.id && normalizedSku) {
-      const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform);
-      if (existingShopProduct) {
-        resolvedShopProduct = {
-          id: existingShopProduct.id,
-          productId: existingShopProduct.productId || null,
-          sourceProductId: existingShopProduct.sourceProductId || null,
-          sku: existingShopProduct.sku || null,
-          jdSkuId: existingShopProduct.jdSkuId || null,
-          shopId: internalShop.id,
-          shopName: internalShop.name,
-        };
-      }
-    }
-
-    if (!resolvedShopProduct) {
-      throw new Error(
-        `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / SKU ${normalizedSku || "未提供"}`
-      );
-    }
-
-    resolvedItems.push({
-      productId: String(
-        resolvedShopProduct?.productId
-        || resolvedShopProduct?.sourceProductId
-        || ""
-      ).trim() || null,
-      shopProductId: resolvedShopProduct?.id || null,
-      quantity: Math.max(1, Number(item.quantity || 1) || 1),
-      price: priceShare,
-    });
   }
 
   const resolvedShopName = resolvedItems.length > 0
