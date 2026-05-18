@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { Product } from "@/lib/types";
@@ -45,6 +46,8 @@ interface GalleryFaqItem {
   productIds: string[];
   products: FaqProduct[];
   canEdit: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface FaqDraft {
@@ -117,12 +120,20 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
   const [items, setItems] = useState<GalleryFaqItem[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [sortBy, setSortBy] = useState("updated-desc");
   const [isLoading, setIsLoading] = useState(true);
   const [canEditAny, setCanEditAny] = useState(false);
   const [activeDraft, setActiveDraft] = useState<FaqDraft | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  const sortOptions = [
+    { value: "updated-desc", label: "最近更新" },
+    { value: "created-asc", label: "最早创建" },
+    { value: "question-asc", label: "问题 A-Z" },
+    { value: "question-desc", label: "问题 Z-A" },
+  ];
 
   useEffect(() => {
     setIsMounted(true);
@@ -235,10 +246,35 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
     [activeDraft]
   );
 
+  const sortedItems = useMemo(() => {
+    const next = [...items];
+    const getQuestion = (item: GalleryFaqItem) => item.entries[0]?.question?.trim() || item.title.trim() || "";
+    const toTime = (value?: string) => {
+      if (!value) return 0;
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+
+    next.sort((left, right) => {
+      if (sortBy === "created-asc") {
+        return toTime(left.createdAt) - toTime(right.createdAt);
+      }
+      if (sortBy === "question-asc") {
+        return getQuestion(left).localeCompare(getQuestion(right), "zh-CN", { sensitivity: "base", numeric: true });
+      }
+      if (sortBy === "question-desc") {
+        return getQuestion(right).localeCompare(getQuestion(left), "zh-CN", { sensitivity: "base", numeric: true });
+      }
+      return toTime(right.updatedAt) - toTime(left.updatedAt);
+    });
+
+    return next;
+  }, [items, sortBy]);
+
   const flattenedRows = useMemo<FlattenedFaqRow[]>(
     () =>
-      items.flatMap((item) =>
-        item.entries.map((entry, index) => ({
+      sortedItems.flatMap((item) =>
+        item.entries.map((entry) => ({
           rowId: `${item.id}-${entry.id}`,
           parentId: item.id,
           entry,
@@ -247,7 +283,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
           canEdit: item.canEdit,
         }))
       ),
-    [items]
+    [sortedItems]
   );
 
   const handleSave = async () => {
@@ -363,10 +399,21 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
           )}
         </div>
 
+        <div className="w-32 shrink-0 sm:w-40">
+          <CustomSelect
+            options={sortOptions}
+            value={sortBy}
+            onChange={setSortBy}
+            placeholder="排序方式"
+            triggerClassName="h-10 rounded-full bg-white px-3 text-sm dark:bg-white/5 sm:h-11 sm:px-4"
+          />
+        </div>
+
         {canEditAny && (
           <button
             onClick={() => setActiveDraft(createDraft())}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-sky-200/70 bg-[linear-gradient(135deg,rgba(248,250,252,1),rgba(224,242,254,0.98))] px-4 text-sm font-medium text-slate-950 shadow-[0_10px_28px_rgba(96,165,250,0.22)] transition-all hover:brightness-105 active:scale-95 sm:h-11 sm:px-5"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-sky-200/70 bg-[linear-gradient(135deg,rgba(248,250,252,1),rgba(224,242,254,0.98))] px-3 text-sm font-medium text-slate-950 shadow-[0_10px_28px_rgba(96,165,250,0.22)] transition-all hover:brightness-105 active:scale-95 sm:h-11 sm:px-5"
+            title="新建问题"
           >
             <Plus size={17} />
             <span className="hidden sm:inline">新建问题</span>
