@@ -26,6 +26,43 @@ function normalizeShopName(value: string | null | undefined) {
   return String(value || "").trim();
 }
 
+function stripShopSuffix(value: string) {
+  return value.replace(/(门店|店铺|旗舰店|总店|分店|一店|二店|三店|四店|五店|店)$/g, "").trim();
+}
+
+function isShopNameMatch(candidate: string | null | undefined, scopedShopName: string | null | undefined) {
+  const normalizedCandidate = normalizeShopName(candidate);
+  const normalizedScoped = normalizeShopName(scopedShopName);
+  if (!normalizedScoped) {
+    return true;
+  }
+  if (!normalizedCandidate) {
+    return false;
+  }
+  if (normalizedCandidate === normalizedScoped) {
+    return true;
+  }
+  if (normalizedCandidate.includes(normalizedScoped) || normalizedScoped.includes(normalizedCandidate)) {
+    return true;
+  }
+
+  const coreCandidate = stripShopSuffix(normalizedCandidate);
+  const coreScoped = stripShopSuffix(normalizedScoped);
+  if (!coreCandidate || !coreScoped) {
+    return false;
+  }
+
+  return (
+    coreCandidate === coreScoped ||
+    coreCandidate.includes(coreScoped) ||
+    coreScoped.includes(coreCandidate)
+  );
+}
+
+function getProductCode(product: Product) {
+  return String(product.sku || product.shopProductId || product.sourceProductId || "").trim();
+}
+
 interface ProductSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -49,6 +86,7 @@ interface ProductSelectionModalProps {
   prefetchedProducts?: Product[];
   externalLoading?: boolean;
   loadAllOnOpen?: boolean;
+  respectPublicVisibility?: boolean;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -90,6 +128,7 @@ export function ProductSelectionModal({
   prefetchedProducts,
   externalLoading = false,
   loadAllOnOpen = false,
+  respectPublicVisibility = true,
 }: ProductSelectionModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
@@ -320,17 +359,18 @@ export function ProductSelectionModal({
     const scopedShopName = normalizeShopName(query?.shopName);
 
     return candidates.filter((p) => {
-      const isVisible = (p.isPublic ?? true) && !(p.isDiscontinued ?? false);
+      const matchesVisibility = respectPublicVisibility ? (p.isPublic ?? true) : true;
+      const isVisible = matchesVisibility && !(p.isDiscontinued ?? false);
       const productCategoryName = p.category?.name || (p as Product & { categoryName?: string | null }).categoryName || "";
       const matchesCategory = categoryName === "all" || productCategoryName === categoryName;
       const matchesUnselected = !showUnselectedOnly || !selectedIds.includes(getSelectionKey(p));
-      const searchableText = [p.name, p.sku, p.sourceProductId, p.shopProductId].filter(Boolean).join(" ").toLowerCase();
+      const searchableText = [p.name, getProductCode(p), p.sourceProductId, p.shopProductId].filter(Boolean).join(" ").toLowerCase();
       const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
-      const matchesShop = !scopedShopName || normalizeShopName(p.shopName) === scopedShopName;
+      const matchesShop = !scopedShopName || isShopNameMatch(p.shopName, scopedShopName);
 
       return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop;
     });
-  }, [debouncedSearch, getSelectionKey, query?.shopName, selectedCategoryName, selectedIds, showUnselectedOnly]);
+  }, [debouncedSearch, getSelectionKey, query?.shopName, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
 
   const displayCategoryName = usesPrefetchedData || loadAllOnOpen ? selectedCategoryName : loadedCategoryName;
   const filteredProducts = filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
@@ -482,6 +522,7 @@ export function ProductSelectionModal({
                       const selectionKey = getSelectionKey(product);
                       const isSelected = tempSelectedIds.includes(selectionKey);
                       const isAlreadySelected = selectedIds.includes(selectionKey);
+                      const productCode = getProductCode(product);
                       return (
                          <button
                           key={product.id}
@@ -537,9 +578,9 @@ export function ProductSelectionModal({
                            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
                              <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
                              <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                                {showSku && product.sku && (
+                                {showSku && productCode && (
                                   <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
-                                    编号：{product.sku}
+                                    编号：{productCode}
                                   </span>
                                 )}
                                 {product.shopName && (
@@ -577,9 +618,9 @@ export function ProductSelectionModal({
                                 {product.name}
                               </div>
                               <div className="mt-1 flex flex-wrap items-center gap-1">
-                                {product.sku && (
+                                {productCode && (
                                   <span className="inline-flex max-w-full items-center rounded-full bg-black/35 px-2 py-0.5 font-mono text-[10px] font-bold text-white/90">
-                                    {`编号 ${product.sku}`}
+                                    {`编号 ${productCode}`}
                                   </span>
                                 )}
                                 {product.category?.name && (

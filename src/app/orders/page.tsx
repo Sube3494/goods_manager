@@ -460,6 +460,19 @@ function getOrderItemDisplay(item: AutoPickOrderItem) {
   };
 }
 
+function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
+  if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
+    return item.displayItems.map((displayItem) => ({
+      name: displayItem.name || item.productName || "未命名商品",
+      sku: displayItem.sku || item.productNo || "-",
+      image: displayItem.image || item.thumb || null,
+      quantity: displayItem.quantity,
+    }));
+  }
+
+  return [getOrderItemDisplay(item)];
+}
+
 function getOrderSourceLabel(order: AutoPickOrder) {
   return order.matchedShopName || "";
 }
@@ -475,7 +488,10 @@ function getOrderTypeLabel(order: Pick<AutoPickOrder, "isSubscribe">) {
 }
 
 function getItemCount(items: AutoPickOrderItem[]) {
-  return items.reduce((sum, item) => sum + item.quantity, 0);
+  return items.reduce(
+    (sum, item) => sum + getExpandedOrderItemDisplays(item).reduce((innerSum, displayItem) => innerSum + displayItem.quantity, 0),
+    0
+  );
 }
 
 function formatDistanceKm(value: number | null | undefined) {
@@ -593,9 +609,11 @@ function DetailBlock({
   );
 }
 
-function ProductStripItem({ item }: { item: AutoPickOrderItem }) {
-  const display = getOrderItemDisplay(item);
-
+function ProductStripItem({
+  display,
+}: {
+  display: { name: string; sku: string; image: string | null; quantity: number };
+}) {
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/6 sm:h-11 sm:w-11 sm:rounded-xl">
@@ -819,9 +837,14 @@ function OrderCard({
             </div>
 
             <div className="mt-2 grid gap-1.5 sm:mt-2.5 sm:gap-2">
-              {order.items.map((item, index) => (
-                <ProductStripItem key={`${item.productNo || item.productName}-${index}`} item={item} />
-              ))}
+              {order.items.flatMap((item, index) =>
+                getExpandedOrderItemDisplays(item).map((display, displayIndex) => (
+                  <ProductStripItem
+                    key={`${item.productNo || item.productName}-${index}-${display.sku}-${displayIndex}`}
+                    display={display}
+                  />
+                ))
+              )}
             </div>
           </div>
         </div>

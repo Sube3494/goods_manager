@@ -167,6 +167,20 @@ function buildSkuMatchCandidates(value: string | null | undefined) {
   })));
 }
 
+function splitCompositeSkuSegments(value: string | null | undefined) {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return [];
+  }
+
+  const segments = rawValue
+    .split(/[+＋]/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  return segments.length > 0 ? segments : [rawValue];
+}
+
 function readExpectedIncomeFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -886,6 +900,7 @@ export async function GET(request: NextRequest) {
           const normalizedSkuCandidates = buildSkuMatchCandidates(item.productNo)
             .map((candidate) => normalizeSkuDigits(candidate))
             .filter(Boolean);
+          const skuSegments = splitCompositeSkuSegments(item.productNo);
           const matchedShopProducts = normalizedProductName
             ? (shopProductMap.get(normalizedProductName) || [])
             : [];
@@ -902,8 +917,31 @@ export async function GET(request: NextRequest) {
           const matchedProduct = !normalizedProductName
             ? (exactSkuProduct || matchedSkuProducts[0] || null)
             : (exactSkuProduct || exactShopProduct || matchedSkuProducts[0] || matchedShopProducts[0] || null);
+          const displayItems = skuSegments.length > 1
+            ? skuSegments.map((segment) => {
+                const normalizedSegmentSku = normalizeSkuDigits(segment);
+                const segmentCandidates = normalizedSegmentSku
+                  ? Array.from(new Map(
+                      (shopProductSkuMap.get(normalizedSegmentSku) || [])
+                        .map((product) => [product.id, product])
+                    ).values())
+                  : [];
+                const exactSegmentProduct = segmentCandidates.find(
+                  (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
+                );
+                const segmentMatchedProduct = exactSegmentProduct || segmentCandidates[0] || null;
+
+                return {
+                  name: segmentMatchedProduct?.name || item.productName || "未命名商品",
+                  sku: segmentMatchedProduct?.sku || segment,
+                  image: segmentMatchedProduct?.image || item.thumb || null,
+                  quantity: item.quantity,
+                };
+              })
+            : undefined;
           return {
             ...item,
+            displayItems,
             matchedProduct,
           };
         }),

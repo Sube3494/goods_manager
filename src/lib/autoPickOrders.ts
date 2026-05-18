@@ -3905,11 +3905,17 @@ async function resolveOutboundItemsForAutoPickOrder(
     shopId: string | null;
     shopName: string | null;
   }>>();
+  const shopProductNameMap = new Map<string, Array<{
+    id: string;
+    productId: string | null;
+    sourceProductId: string | null;
+    sku: string | null;
+    jdSkuId: string | null;
+    shopId: string | null;
+    shopName: string | null;
+  }>>();
   for (const item of shopProducts) {
-    const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
-    if (!normalizedSku) continue;
-    const current = shopProductSkuMap.get(normalizedSku) || [];
-    current.push({
+    const entry = {
       id: item.id,
       productId: item.productId || null,
       sourceProductId: item.sourceProductId || null,
@@ -3917,7 +3923,19 @@ async function resolveOutboundItemsForAutoPickOrder(
       jdSkuId: item.jdSkuId || null,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
-    });
+    };
+
+    const normalizedName = toNormalizedText(item.productName);
+    if (normalizedName) {
+      const current = shopProductNameMap.get(normalizedName) || [];
+      current.push(entry);
+      shopProductNameMap.set(normalizedName, current);
+    }
+
+    const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
+    if (!normalizedSku) continue;
+    const current = shopProductSkuMap.get(normalizedSku) || [];
+    current.push(entry);
     shopProductSkuMap.set(normalizedSku, current);
   }
 
@@ -3926,6 +3944,7 @@ async function resolveOutboundItemsForAutoPickOrder(
 
   for (const item of order.items) {
     const productName = toAutoPickBaseProductName(item.productName);
+    const normalizedProductName = toNormalizedText(productName);
     const normalizedSkus = splitCompositeAutoPickSku(item.productNo);
     const skuParts = normalizedSkus.length > 0 ? normalizedSkus : [normalizeAutoPickSkuForMatch(item.productNo)];
     const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.filter(Boolean).length || 1));
@@ -3967,6 +3986,18 @@ async function resolveOutboundItemsForAutoPickOrder(
         }
       }
 
+      if (!resolvedShopProduct && normalizedProductName) {
+        const nameCandidates = (shopProductNameMap.get(normalizedProductName) || []).filter((candidate) =>
+          isCandidateInMappedShop(candidate.shopName)
+        );
+        const sameShopNameCandidate = nameCandidates.find((candidate) =>
+          Boolean(candidate.productId || candidate.sourceProductId)
+        );
+        if (sameShopNameCandidate) {
+          resolvedShopProduct = sameShopNameCandidate;
+        }
+      }
+
       if (!resolvedShopProduct && internalShop?.id && normalizedSku) {
         const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform);
         if (existingShopProduct) {
@@ -3984,7 +4015,7 @@ async function resolveOutboundItemsForAutoPickOrder(
 
       if (!resolvedShopProduct) {
         throw new Error(
-          `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / SKU ${normalizedSku || "未提供"}`
+          `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / 商品 ${productName || "未命名商品"} / SKU ${normalizedSku || "未提供"}`
         );
       }
 

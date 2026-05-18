@@ -136,6 +136,12 @@ export interface AutoPickOrderItem {
   productNo?: string | null;
   quantity: number;
   thumb?: string | null;
+  displayItems?: Array<{
+    name: string;
+    sku?: string | null;
+    image?: string | null;
+    quantity: number;
+  }>;
   matchedProduct?: {
     id: string;
     name: string;
