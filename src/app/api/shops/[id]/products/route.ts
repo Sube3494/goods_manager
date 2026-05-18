@@ -577,25 +577,29 @@ export async function POST(
     );
 
     let skippedAssignmentCount = 0;
-    let skippedSkuConflictCount = 0;
-    const productsToCreate = products.filter((product) => {
+    let copiedWithoutSkuCount = 0;
+    const productsToCreate = products.flatMap((product) => {
       if (existingAssignmentSet.has(product.id)) {
         skippedAssignmentCount += 1;
-        return false;
+        return [];
       }
 
       const normalizedProductSku = normalizeSku(product.sku);
+      let nextSku = normalizedProductSku;
       if (normalizedProductSku && existingSkuSet.has(normalizedProductSku)) {
-        skippedSkuConflictCount += 1;
-        return false;
+        nextSku = null;
+        copiedWithoutSkuCount += 1;
       }
 
-      if (normalizedProductSku) {
-        existingSkuSet.add(normalizedProductSku);
+      if (nextSku) {
+        existingSkuSet.add(nextSku);
       }
-      return true;
+      return [{
+        ...product,
+        sku: nextSku,
+      }];
     });
-    const skippedCount = skippedAssignmentCount + skippedSkuConflictCount;
+    const skippedCount = skippedAssignmentCount;
 
     const result = await prisma.shopProduct.createMany({
       data: productsToCreate.map((product) => ({
@@ -623,9 +627,10 @@ export async function POST(
       success: true,
       count: result.count,
       skipped: skippedCount,
-      message: skippedCount > 0
-        ? `成功加入 ${shop.name} ${result.count} 条，跳过 ${skippedCount} 条已复制商品${skippedSkuConflictCount > 0 ? `（其中 ${skippedSkuConflictCount} 条因 SKU 冲突）` : ""}`
-        : `成功加入 ${shop.name}`,
+      message:
+        skippedCount > 0 || copiedWithoutSkuCount > 0
+          ? `成功加入 ${shop.name} ${result.count} 条${skippedCount > 0 ? `，跳过 ${skippedCount} 条已复制商品` : ""}${copiedWithoutSkuCount > 0 ? `${skippedCount > 0 ? "，" : "，"}其中 ${copiedWithoutSkuCount} 条因 SKU 冲突未带编号复制` : ""}`
+          : `成功加入 ${shop.name}`,
     });
   } catch (error) {
     console.error("Failed to assign products to shop:", error);
