@@ -1,5 +1,6 @@
 const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "avif"] as const;
 const ALLOWED_VIDEO_EXTENSIONS = ["mp4", "webm", "ogg", "mov", "m4v"] as const;
+export const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
 
 const ALLOWED_IMAGE_MIME_PREFIX = "image/";
 const ALLOWED_VIDEO_MIME_PREFIX = "video/";
@@ -51,4 +52,15 @@ export function validateUploadFile(fileName: string, fileType: string) {
   }
 
   return { ok: true as const, ext };
+}
+
+export function validateUploadFileSize(fileSize: number) {
+  if (fileSize > MAX_UPLOAD_SIZE_BYTES) {
+    return {
+      ok: false as const,
+      error: "文件大小超过 50MB 限制",
+    };
+  }
+
+  return { ok: true as const };
 }

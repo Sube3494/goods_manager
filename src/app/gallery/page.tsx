@@ -22,6 +22,7 @@ import { hasPermission } from "@/lib/permissions";
 import { Product, GalleryItem, Category, GalleryGroupSummary } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
+import { validateUploadFileSize } from "@/lib/uploadValidation";
 import md5 from "blueimp-md5";
 
 
@@ -626,6 +627,13 @@ function GalleryContent() {
         const file = filesToUpload[index];
         const uploadTask = async () => {
           try {
+            const sizeValidation = validateUploadFileSize(file.size);
+            if (!sizeValidation.ok) {
+              showToast(`"${file.name.length > 16 ? file.name.slice(0, 16) + '…' : file.name}" 超过 50MB 限制`, "error");
+              results.push({ status: "rejected", reason: new Error(sizeValidation.error) });
+              return;
+            }
+
             const data = await uploadGalleryMedia(file, "gallery", (pct) => {
               setIsUploading(`文件 ${index + 1}/${filesToUpload.length} : ${pct}%`);
             });

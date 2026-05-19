@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { join } from "path";
 import { tmpdir } from "os";
 import { createReadStream } from "fs";
-import { access, unlink } from "fs/promises";
+import { access, stat, unlink } from "fs/promises";
 import { getStorageStrategy } from "@/lib/storage";
 import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { PassThrough, Readable } from "stream";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { validateUploadFile } from "@/lib/uploadValidation";
+import { validateUploadFile, validateUploadFileSize } from "@/lib/uploadValidation";
 
 const TEMP_DIR = join(tmpdir(), "goods_uploads_temp");
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { fileId, fileName, fileType, totalChunks, folder, useTimestamp } = body;
+    const { fileId, fileName, fileType, fileSize, totalChunks, folder, useTimestamp } = body;
 
     if (!fileId || !fileName || !totalChunks) {
       return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
@@ -38,14 +38,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
+    const sizeValidation = validateUploadFileSize(Number(fileSize || 0));
+    if (!sizeValidation.ok) {
+      return NextResponse.json({ error: sizeValidation.error }, { status: 413 });
+    }
+
+    let mergedFileSize = 0;
+
     // Verify all chunks exist
     for (let i = 0; i < totalChunks; i++) {
       const chunkPath = join(TEMP_DIR, `${fileId}_${i}`);
       try {
         await access(chunkPath);
+        const chunkStat = await stat(chunkPath);
+        mergedFileSize += chunkStat.size;
       } catch {
         return NextResponse.json({ error: `Missing chunk ${i} for fileId ${fileId}` }, { status: 400 });
       }
+    }
+
+    const actualSizeValidation = validateUploadFileSize(mergedFileSize);
+    if (!actualSizeValidation.ok) {
+      return NextResponse.json({ error: actualSizeValidation.error }, { status: 413 });
     }
 
     const passThrough = new PassThrough();

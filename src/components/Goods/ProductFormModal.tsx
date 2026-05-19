@@ -72,6 +72,7 @@ interface ProductFormModalProps {
 
 import { createPortal } from "react-dom";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
+import { validateUploadFileSize } from "@/lib/uploadValidation";
 
 export function ProductFormModal({
   isOpen,
@@ -368,7 +369,8 @@ export function ProductFormModal({
         const uploadTask = async () => {
           try {
             // 前端大小校验 (Frontend size validation - 50MB)
-            if (file.size > 50 * 1024 * 1024) {
+            const sizeValidation = validateUploadFileSize(file.size);
+            if (!sizeValidation.ok) {
               showToast(`"${file.name.length > 16 ? file.name.slice(0, 16) + '…' : file.name}" 超过 50MB 限制`, "error");
               return;
             }

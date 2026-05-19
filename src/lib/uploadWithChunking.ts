@@ -1,4 +1,5 @@
 import imageCompression from "browser-image-compression";
+import { validateUploadFileSize } from "@/lib/uploadValidation";
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -59,6 +60,11 @@ export async function uploadFileWithChunking(
   folder?: string,
   onProgress?: (percent: number) => void
 ): Promise<{ url: string; path?: string; type: string; skipped?: boolean; name?: string }> {
+  const sizeValidation = validateUploadFileSize(file.size);
+  if (!sizeValidation.ok) {
+    throw new Error(sizeValidation.error);
+  }
+
   file = await maybeCompressImageBeforeUpload(file);
 
   // ── 去重预检：计算 SHA-256 后询问服务端是否已有相同文件 ──
@@ -183,6 +189,7 @@ export async function uploadFileWithChunking(
       fileId,
       fileName: file.name,
       fileType: file.type || "application/octet-stream",
+      fileSize: file.size,
       totalChunks,
       folder,
       useTimestamp: true 

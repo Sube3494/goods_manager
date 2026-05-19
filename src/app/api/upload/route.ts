@@ -3,7 +3,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { validateUploadFile } from "@/lib/uploadValidation";
+import { MAX_UPLOAD_SIZE_BYTES, validateUploadFile, validateUploadFileSize } from "@/lib/uploadValidation";
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const contentLength = Number(request.headers.get("content-length") || "0");
     
     // Server-side size validation (50MB Hard limit)
-    if (contentLength > 50 * 1024 * 1024) {
+    if (contentLength > MAX_UPLOAD_SIZE_BYTES) {
       return NextResponse.json({ error: "文件大小超过服务器限制 (50MB)" }, { status: 413 });
     }
     
@@ -32,6 +32,11 @@ export async function POST(request: Request) {
       const formData = await request.formData();
       const file = formData.get("file") as File | null;
       if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+
+      const sizeValidation = validateUploadFileSize(file.size);
+      if (!sizeValidation.ok) {
+        return NextResponse.json({ error: sizeValidation.error }, { status: 413 });
+      }
 
       const validation = validateUploadFile(file.name, file.type);
       if (!validation.ok) {
@@ -67,6 +72,11 @@ export async function POST(request: Request) {
     const validation = validateUploadFile(decodeURIComponent(fileName), fileType);
     if (!validation.ok) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const sizeValidation = validateUploadFileSize(contentLength);
+    if (contentLength > 0 && !sizeValidation.ok) {
+      return NextResponse.json({ error: sizeValidation.error }, { status: 413 });
     }
 
      if (!request.body) {

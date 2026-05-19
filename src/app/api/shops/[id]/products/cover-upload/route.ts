@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
-import { validateUploadFile } from "@/lib/uploadValidation";
+import { validateUploadFile, validateUploadFileSize } from "@/lib/uploadValidation";
 import prisma from "@/lib/prisma";
 
 async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
@@ -32,6 +32,11 @@ export async function POST(
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    }
+
+    const sizeValidation = validateUploadFileSize(file.size);
+    if (!sizeValidation.ok) {
+      return NextResponse.json({ error: sizeValidation.error }, { status: 413 });
     }
 
     const validation = validateUploadFile(file.name, file.type);
