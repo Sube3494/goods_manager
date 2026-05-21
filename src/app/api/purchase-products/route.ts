@@ -159,10 +159,24 @@ export async function GET(request: Request) {
     const allMode = searchParams.get("all") === "true";
     const pageSize = allMode ? 999999 : Math.min(parseInt(searchParams.get("pageSize") || "20", 10), 2000);
     const search = (searchParams.get("search") || "").trim().toLowerCase();
+    const categoryName = (searchParams.get("category") || "all").trim();
     const supplierId = searchParams.get("supplierId") || "";
     const shopId = searchParams.get("shopId") || "";
     const shopName = (searchParams.get("shopName") || "").trim();
     const aggregateSource = searchParams.get("aggregateSource") === "true";
+    const matchedCategoryIds = categoryName !== "all"
+      ? (
+          await prisma.category.findMany({
+            where: {
+              userId: session.id,
+              name: categoryName,
+            },
+            select: {
+              id: true,
+            },
+          })
+        ).map((category) => category.id)
+      : [];
 
     const shopProducts = await prisma.shopProduct.findMany({
       where: {
@@ -178,6 +192,14 @@ export async function GET(request: Request) {
           ],
         } : {}),
         ...(supplierId ? { supplierId } : {}),
+        ...(categoryName !== "all"
+          ? {
+              OR: [
+                { categoryName },
+                ...(matchedCategoryIds.length > 0 ? [{ categoryId: { in: matchedCategoryIds } }] : []),
+              ],
+            }
+          : {}),
       },
       include: {
         shop: { select: { id: true, name: true } },
