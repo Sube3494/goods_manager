@@ -283,6 +283,19 @@ function looksLikeDeliveryTimeRange(value: unknown) {
   return /\d{1,2}:\d{2}/.test(text);
 }
 
+function extractDeliveryRangeLeadingSegment(text: string) {
+  const normalized = String(text || "").trim();
+  if (!normalized) return "";
+
+  const leadingRangeMatch = normalized.match(/^(.*?\d{1,2}:\d{2})\s*[-~至]/);
+  if (leadingRangeMatch?.[1]) {
+    return leadingRangeMatch[1].trim();
+  }
+
+  const firstTimeMatch = normalized.match(/^(.*?\d{1,2}:\d{2})/);
+  return firstTimeMatch?.[1]?.trim() || normalized;
+}
+
 function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
   const directDeadline = String(input.deliveryDeadline || input.delivery_deadline || "").trim();
   const startTimestamp = Number(input.delivery_time || input.deliveryTime || 0);
@@ -304,12 +317,7 @@ function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
   }
 
   if (looksLikeDeliveryTimeRange(directDeadline)) {
-    const rangeMatch = directDeadline.match(/[-~至]\s*(.*?\d{1,2}:\d{2})\s*$/);
-    if (rangeMatch?.[1]) {
-      return rangeMatch[1].trim();
-    }
-    const firstTimeMatch = directDeadline.match(/^(.*?\d{1,2}:\d{2})/);
-    return firstTimeMatch?.[1]?.trim() || directDeadline;
+    return extractDeliveryRangeLeadingSegment(directDeadline);
   }
 
   if (startAt) {

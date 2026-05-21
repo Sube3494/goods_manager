@@ -532,9 +532,9 @@ function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDea
     return text;
   }
 
-  const rangeMatch = text.match(/[-~至]\s*(.*?\d{1,2}:\d{2})\s*$/);
-  if (rangeMatch?.[1]) {
-    return rangeMatch[1].trim();
+  const leadingRangeMatch = text.match(/^(.*?\d{1,2}:\d{2})\s*[-~至]/);
+  if (leadingRangeMatch?.[1]) {
+    return leadingRangeMatch[1].trim();
   }
 
   const firstTimeMatch = text.match(/^(.*?\d{1,2}:\d{2})/);
