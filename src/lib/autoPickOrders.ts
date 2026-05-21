@@ -115,6 +115,15 @@ type AutoPickSystemMeta = {
   };
 };
 
+type AutoPickManualMatchedProductMeta = {
+  id?: string;
+  name?: string;
+  sku?: string | null;
+  image?: string | null;
+  sourceType?: "product" | "shopProduct";
+  shopName?: string | null;
+};
+
 const MAIYATIAN_BASE_URL = "https://saas.maiyatian.com";
 const MAIYATIAN_ORDER_LIST_PATH = "/order/list/?&";
 const MAIYATIAN_QUERY_LIST_PATH = "/query/list/?&";
@@ -2192,24 +2201,24 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
   }
 
   const orderTime = parseAsShanghaiTime(normalized.orderTime);
-  const items = normalized.items
+  const normalizedItems = normalized.items
     ?.filter((item) => item.productName && Number(item.quantity) > 0)
     .map((item) => ({
       productName: item.productName || "",
       productNo: item.productNo || null,
       quantity: Math.max(1, Number(item.quantity || 1)),
       thumb: item.thumb || null,
-      rawPayload: item,
+      rawPayload: item as Record<string, unknown>,
     })) || [];
 
-  if (!items.length) {
+  if (!normalizedItems.length) {
     throw new Error("Order items are required");
   }
 
   let previousStatus: string | null = null;
 
   let order = await prisma.$transaction(async (tx) => {
-    await ensureShopProductsForAutoPickOrder(tx, userId, normalized, items);
+    await ensureShopProductsForAutoPickOrder(tx, userId, normalized, normalizedItems);
     const resolvedInternalShop = await resolveAutoPickInternalShop(tx, userId, normalized);
 
     const existingCandidates = await tx.autoPickOrder.findMany({
@@ -2245,6 +2254,15 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         deliveryTimeRange: true,
         delivery: true,
         rawPayload: true,
+        items: {
+          select: {
+            productName: true,
+            productNo: true,
+            quantity: true,
+            rawPayload: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
 
@@ -2309,6 +2327,24 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ...nextRawPayload,
       systemMeta: nextSystemMeta,
     };
+    const existingItemPayloadMap = new Map<string, Array<unknown>>();
+    for (const currentItem of existing?.items || []) {
+      const signature = buildAutoPickOrderItemSignature(currentItem);
+      const queue = existingItemPayloadMap.get(signature) || [];
+      queue.push(currentItem.rawPayload);
+      existingItemPayloadMap.set(signature, queue);
+    }
+    const items = normalizedItems.map((item) => {
+      const signature = buildAutoPickOrderItemSignature(item);
+      const preservedRawPayload = existingItemPayloadMap.get(signature)?.shift();
+      return {
+        productName: item.productName,
+        productNo: item.productNo,
+        quantity: item.quantity,
+        thumb: item.thumb,
+        rawPayload: asPrismaJsonValue(mergeAutoPickOrderItemRawPayload(item.rawPayload, preservedRawPayload)),
+      };
+    });
 
     const createData = {
       userId,
@@ -2795,6 +2831,59 @@ function readAutoPickRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
     ? rawPayload as Record<string, unknown>
     : {};
+}
+
+function buildAutoPickOrderItemSignature(input: {
+  productName?: string | null;
+  productNo?: string | null;
+  quantity?: number | null;
+}) {
+  return [
+    String(input.productName || "").trim().toLowerCase(),
+    String(input.productNo || "").trim().toLowerCase(),
+    Math.max(1, Number(input.quantity || 1) || 1),
+  ].join("::");
+}
+
+function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
+  const record = readAutoPickRawPayloadRecord(rawPayload);
+  const candidate = record.manualMatchedProduct;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+
+  const manual = candidate as AutoPickManualMatchedProductMeta;
+  const id = String(manual.id || "").trim();
+  const name = String(manual.name || "").trim();
+  if (!id || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    sku: String(manual.sku || "").trim() || null,
+    image: String(manual.image || "").trim() || null,
+    sourceType: manual.sourceType === "shopProduct" ? "shopProduct" as const : "product" as const,
+    shopName: String(manual.shopName || "").trim() || null,
+  };
+}
+
+function mergeAutoPickOrderItemRawPayload(
+  basePayload: Record<string, unknown>,
+  existingRawPayload: unknown
+) {
+  const existingRecord = readAutoPickRawPayloadRecord(existingRawPayload);
+  const nextPayload = { ...basePayload };
+  const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(existingRawPayload);
+  if (!manualMatchedProduct) {
+    return nextPayload;
+  }
+
+  return {
+    ...nextPayload,
+    manualMatchedProduct,
+  };
 }
 
 function readAutoPickPickProgress(rawPayload: unknown) {
@@ -3631,7 +3720,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     shopId?: string | null;
     rawPayload?: unknown;
     preferredMappedShopName?: string | null;
-    items: Array<{ productName: string; productNo?: string | null; quantity: number }>;
+    items: Array<{ productName: string; productNo?: string | null; quantity: number; rawPayload?: unknown }>;
   }
 ) {
   const user = await prisma.user.findUnique({
@@ -3749,6 +3838,15 @@ async function resolveBrushOrderItemsForAutoPickOrder(
   const resolvedCandidateShopNames = new Set<string>();
 
   for (const item of order.items) {
+    const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
+    if (manualMatchedProduct?.id) {
+      resolvedItems.push({
+        productId: manualMatchedProduct.id,
+        quantity: Math.max(1, Number(item.quantity || 1) || 1),
+      });
+      continue;
+    }
+
     const productName = toAutoPickBaseProductName(item.productName);
     const normalizedName = toNormalizedText(productName);
     const normalizedSku = normalizeAutoPickSkuForMatch(item.productNo);
@@ -3838,6 +3936,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       productNo?: string | null;
       quantity: number;
       thumb?: string | null;
+      rawPayload?: unknown;
     }>;
   }
 ) {
@@ -3943,6 +4042,7 @@ async function resolveOutboundItemsForAutoPickOrder(
   const resolvedItems: ResolvedAutoPickOutboundItem[] = [];
 
   for (const item of order.items) {
+    const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     const productName = toAutoPickBaseProductName(item.productName);
     const normalizedProductName = toNormalizedText(productName);
     const normalizedSkus = splitCompositeAutoPickSku(item.productNo);
@@ -3950,6 +4050,32 @@ async function resolveOutboundItemsForAutoPickOrder(
     const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.filter(Boolean).length || 1));
 
     for (const normalizedSku of skuParts) {
+      if (manualMatchedProduct?.id) {
+        let manualShopProductId: string | null = null;
+        if (internalShop?.id) {
+          const matchedShopProduct = await tx.shopProduct.findFirst({
+            where: {
+              shopId: internalShop.id,
+              OR: [
+                { productId: manualMatchedProduct.id },
+                { sourceProductId: manualMatchedProduct.id },
+              ],
+            },
+            select: { id: true },
+            orderBy: { updatedAt: "desc" },
+          });
+          manualShopProductId = matchedShopProduct?.id || null;
+        }
+
+        resolvedItems.push({
+          productId: manualMatchedProduct.id,
+          shopProductId: manualShopProductId,
+          quantity: Math.max(1, Number(item.quantity || 1) || 1),
+          price: perResolvedPrice,
+        });
+        continue;
+      }
+
       let resolvedShopProduct: {
         id: string;
         productId: string | null;
@@ -4123,6 +4249,7 @@ export async function createOutboundFromAutoPickOrder(
         productNo: item.productNo,
         quantity: item.quantity,
         thumb: item.thumb,
+        rawPayload: item.rawPayload,
       })),
     });
 
@@ -4415,6 +4542,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
       productName: item.productName,
       productNo: item.productNo,
       quantity: item.quantity,
+      rawPayload: item.rawPayload,
     })),
   });
 

@@ -79,6 +79,7 @@ export function ConfirmModal({
   };
 
   const currentStyle = variantStyles[variant as keyof typeof variantStyles] || variantStyles.warning;
+  const authPrimary = isAuth && variant === "primary";
 
   return createPortal(
     <AnimatePresence>
@@ -99,9 +100,21 @@ export function ConfirmModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xl transition-all duration-500"
+            className={cn(
+              "fixed inset-0 transition-all duration-500",
+              authPrimary
+                ? "bg-black/55 backdrop-blur-2xl"
+                : "bg-black/60 backdrop-blur-xl"
+            )}
             onClick={onClose}
-          />
+          >
+            {authPrimary && (
+              <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div className="absolute left-[-8%] top-[-6%] h-56 w-56 rounded-full bg-orange-500/18 blur-3xl" />
+                <div className="absolute right-[-10%] bottom-[-10%] h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+              </div>
+            )}
+          </motion.div>
           
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -109,62 +122,112 @@ export function ConfirmModal({
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", damping: 25, stiffness: 350 }}
             className={cn(
-              "relative z-10 w-full rounded-[26px] sm:rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col",
-              isAuth
-                ? "sm:max-w-[420px]"
-                : "sm:max-w-[420px]"
+              "relative z-10 w-full overflow-hidden flex flex-col",
+              authPrimary
+                ? "rounded-[30px] border border-white/10 bg-[#1c1d22]/95 text-white shadow-[0_40px_120px_rgba(0,0,0,0.45)] sm:max-w-[400px]"
+                : "rounded-[26px] sm:rounded-[32px] bg-white dark:bg-zinc-900 border border-black/5 dark:border-white/10 shadow-2xl sm:max-w-[420px]"
             )}
             style={{
-              width: isAuth
+              width: authPrimary
+                ? "min(calc(100dvw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px), 25rem)"
+                : isAuth
                 ? "min(calc(100dvw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px), 22rem)"
                 : "min(calc(100dvw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 24px), 24rem)",
               maxHeight: "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)",
             }}
           >
             {/* Subtle Gradient Accent */}
-            <div className={cn("absolute top-0 left-0 right-0 h-40 bg-linear-to-b opacity-20 pointer-events-none", currentStyle.accent)} />
+            <div
+              className={cn(
+                "absolute top-0 left-0 right-0 pointer-events-none",
+                authPrimary
+                  ? "h-44 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_70%)] opacity-100"
+                  : cn("h-40 bg-linear-to-b opacity-20", currentStyle.accent)
+              )}
+            />
 
             {/* Close Button */}
             <button 
               onClick={onClose} 
-              className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 z-20 rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-all active:scale-90"
+              className={cn(
+                "absolute z-20 rounded-full p-2 transition-all active:scale-90",
+                authPrimary
+                  ? "top-4 right-4 text-[#c8ceda] hover:bg-white/6 hover:text-white"
+                  : "top-3.5 right-3.5 sm:top-5 sm:right-5 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
+              )}
             >
               <X size={18} strokeWidth={2.5} />
             </button>
 
-            <div className="px-5 sm:px-8 pt-6 sm:pt-10 pb-5 sm:pb-8 flex flex-col items-center text-center overflow-y-auto min-w-0">
+            <div
+              className={cn(
+                "flex flex-col items-center text-center overflow-y-auto min-w-0",
+                authPrimary
+                  ? "px-8 pt-10 pb-6"
+                  : "px-5 sm:px-8 pt-6 sm:pt-10 pb-5 sm:pb-8"
+              )}
+            >
               {/* Icon Section */}
               <motion.div 
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1, type: "spring", stiffness: 400, damping: 20 }}
                 className={cn(
-                  "w-16 h-16 sm:w-20 sm:h-20 rounded-[22px] sm:rounded-[28px] flex items-center justify-center border-2 mb-4 sm:mb-8 relative group shrink-0",
-                  currentStyle.iconBg
+                  "flex items-center justify-center relative group shrink-0",
+                  authPrimary
+                    ? "mb-8 h-22 w-22 rounded-[26px] border-2 border-white/14 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_18px_30px_rgba(0,0,0,0.25)]"
+                    : cn("w-16 h-16 sm:w-20 sm:h-20 rounded-[22px] sm:rounded-[28px] border-2 mb-4 sm:mb-8", currentStyle.iconBg)
                 )}
               >
-                <div className="absolute inset-0 rounded-[28px] bg-inherit opacity-50 blur-xl group-hover:blur-2xl transition-all duration-500" />
+                <div
+                  className={cn(
+                    "absolute inset-0 bg-inherit opacity-50 transition-all duration-500",
+                    authPrimary ? "rounded-[26px] blur-lg group-hover:blur-xl" : "rounded-[28px] blur-xl group-hover:blur-2xl"
+                  )}
+                />
                 <div className="relative z-10 scale-100 sm:scale-110">
                   {icons[variant as keyof typeof icons] || icons.warning}
                 </div>
               </motion.div>
 
               {/* Text Section */}
-              <div className="space-y-2.5 sm:space-y-3 relative z-10">
-                <h2 className="text-[1.9rem] sm:text-2xl font-black text-foreground tracking-tight leading-none sm:leading-tight break-words">
+              <div className={cn("relative z-10", authPrimary ? "space-y-3" : "space-y-2.5 sm:space-y-3")}>
+                <h2 className={cn(
+                  "font-black tracking-tight break-words",
+                  authPrimary
+                    ? "text-[2.1rem] leading-none text-white"
+                    : "text-[1.9rem] sm:text-2xl leading-none sm:leading-tight text-foreground"
+                )}>
                   {title}
                 </h2>
-                <div className="max-w-[17.5rem] sm:max-w-none text-[15px] sm:text-[15px] font-medium text-muted-foreground leading-7 sm:leading-relaxed px-1 sm:px-2 break-words">
+                <div className={cn(
+                  "break-words",
+                  authPrimary
+                    ? "mx-auto max-w-[17rem] px-1 text-base font-medium leading-7 text-[#b6bdc9]"
+                    : "max-w-[17.5rem] sm:max-w-none text-[15px] sm:text-[15px] font-medium text-muted-foreground leading-7 sm:leading-relaxed px-1 sm:px-2"
+                )}>
                   {message}
                 </div>
               </div>
             </div>
 
             {/* Footer Buttons */}
-            <div className="px-5 sm:px-8 pb-5 sm:pb-8 pt-1 sm:pt-0 flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-4 relative z-10 min-w-0">
+            <div
+              className={cn(
+                "relative z-10 min-w-0",
+                authPrimary
+                  ? "grid grid-cols-2 gap-4 px-8 pb-8 pt-0"
+                  : "px-5 sm:px-8 pb-5 sm:pb-8 pt-1 sm:pt-0 flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-4"
+              )}
+            >
               <button
                 onClick={onClose}
-                className="order-1 sm:order-none min-w-0 h-11 sm:h-14 rounded-2xl px-4 text-[15px] sm:text-[15px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-black/5 dark:border-white/10 sm:border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all active:scale-[0.97]"
+                className={cn(
+                  "min-w-0 px-4 text-[15px] font-bold transition-all active:scale-[0.97]",
+                  authPrimary
+                    ? "h-14 rounded-3xl border border-white/8 bg-transparent text-[#c5ccd7] hover:border-white/14 hover:bg-white/4 hover:text-white"
+                    : "order-1 sm:order-none h-11 sm:h-14 rounded-2xl sm:text-[15px] text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-black/5 dark:border-white/10 sm:border-transparent hover:border-black/5 dark:hover:border-white/5"
+                )}
               >
                 {cancelLabel}
               </button>
@@ -174,8 +237,10 @@ export function ConfirmModal({
                   onClose();
                 }}
                 className={cn(
-                  "min-w-0 h-13 sm:h-14 rounded-[20px] sm:rounded-2xl px-4 text-[15px] sm:text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight",
-                  currentStyle.confirm
+                  "min-w-0 px-4 text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight",
+                  authPrimary
+                    ? "h-14 rounded-3xl bg-white text-[#17181c] shadow-[0_12px_30px_rgba(255,255,255,0.12)] hover:bg-white/92"
+                    : cn("h-13 sm:h-14 rounded-[20px] sm:rounded-2xl sm:text-[15px]", currentStyle.confirm)
                 )}
               >
                 {confirmLabel}

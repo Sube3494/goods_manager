@@ -98,16 +98,6 @@ export default function BrushPlansPreviewPage() {
             .sort((a, b) => a.shopName.localeCompare(b.shopName, "zh-CN"));
     }, [plans]);
 
-    const summary = useMemo(() => {
-        const items = groupedPreview.flatMap((shop) => shop.platforms.flatMap((platform) => platform.items));
-        return {
-            shopCount: groupedPreview.length,
-            taskCount: items.length,
-            quantityCount: items.reduce((sum, item) => sum + (item.quantity || 1), 0),
-            platformCount: new Set(items.map((item) => item.__platform)).size,
-        };
-    }, [groupedPreview]);
-
     return (
         <div className="min-h-dynamic-screen bg-background text-foreground">
             <header className="sticky top-0 z-20 border-b border-border/60 bg-background/92 backdrop-blur-xl">
@@ -129,19 +119,6 @@ export default function BrushPlansPreviewPage() {
                         <ThemeToggle className="h-10 w-10 shrink-0 rounded-full border border-border/70 bg-white/90 shadow-sm dark:bg-white/5" />
                     </div>
 
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div className="space-y-2">
-                            <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">当天全店安排</h1>
-                            <p className="text-sm font-medium text-muted-foreground">按店铺分开，再按平台整理，直接一页看完当天所有安排。</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                            <SummaryCard label="店铺" value={summary.shopCount} />
-                            <SummaryCard label="平台" value={summary.platformCount} />
-                            <SummaryCard label="任务" value={summary.taskCount} />
-                            <SummaryCard label="份数" value={summary.quantityCount} />
-                        </div>
-                    </div>
                 </div>
             </header>
 
@@ -163,41 +140,46 @@ export default function BrushPlansPreviewPage() {
                         <p className="mt-2 text-sm font-medium text-muted-foreground">回到安排表新增计划，或者换个日期再看。</p>
                     </div>
                 ) : (
-                    <div className="space-y-5">
+                    <div className="space-y-4 sm:space-y-5">
                         {groupedPreview.map((shopGroup) => (
                             <section
                                 key={shopGroup.shopName}
-                                className="overflow-hidden rounded-[24px] border border-border/50 bg-white/90 shadow-sm dark:bg-white/5"
+                                className="overflow-hidden rounded-[22px] border border-border/50 bg-white/90 shadow-sm dark:bg-white/5 sm:rounded-[24px]"
                             >
-                                <div className="border-b border-border/40 px-4 py-4 sm:px-5">
+                                <div className="border-b border-border/40 px-3.5 py-3.5 sm:px-5 sm:py-4">
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
                                                     <Store size={18} />
                                                 </div>
-                                                <h2 className="truncate text-lg font-black text-foreground">{shopGroup.shopName}</h2>
+                                                <div className="min-w-0">
+                                                    <h2 className="truncate text-[22px] font-black leading-none tracking-tight text-foreground sm:text-lg sm:leading-tight">{shopGroup.shopName}</h2>
+                                                    <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-bold text-muted-foreground sm:hidden">
+                                                        <span>{shopGroup.platforms.length} 个平台</span>
+                                                        <span className="opacity-40">•</span>
+                                                        <span>{shopGroup.platforms.reduce((sum, platform) => sum + platform.items.length, 0)} 个任务</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
+                                            <div className="mt-2 hidden flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground sm:flex">
                                                 <span>{shopGroup.platforms.length} 个平台</span>
                                                 <span className="opacity-40">•</span>
                                                 <span>{shopGroup.platforms.reduce((sum, platform) => sum + platform.items.length, 0)} 个任务</span>
-                                                <span className="opacity-40">•</span>
-                                                <span>{shopGroup.totalQuantity} 份安排</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4 p-4 sm:p-5">
+                                <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
                                     {shopGroup.platforms.map((platformGroup) => {
                                         const meta = getPlatformMeta(platformGroup.platform);
                                         return (
                                             <div
                                                 key={`${shopGroup.shopName}-${platformGroup.platform}`}
-                                                className="rounded-[22px] border border-border/60 bg-black/[0.02] p-3 sm:p-4 dark:bg-white/[0.03]"
+                                                className="rounded-[20px] border border-border/60 bg-black/[0.02] p-2.5 sm:rounded-[22px] sm:p-4 dark:bg-white/[0.03]"
                                             >
-                                                <div className="mb-3 flex flex-wrap items-center gap-2">
+                                                <div className="mb-2.5 flex flex-wrap items-center gap-2 sm:mb-3">
                                                     <span className={meta.badgeClassName}>
                                                         <Image
                                                             src={meta.iconSrc}
@@ -209,12 +191,9 @@ export default function BrushPlansPreviewPage() {
                                                         />
                                                         {platformGroup.platform}
                                                     </span>
-                                                    <span className="text-xs font-bold text-muted-foreground">
-                                                        {platformGroup.items.length} 个任务
-                                                    </span>
                                                 </div>
 
-                                                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                                                     {platformGroup.items.map((item, index) => (
                                                         <CompactItemCard
                                                             key={`${shopGroup.shopName}-${platformGroup.platform}-${item.id || index}`}
@@ -237,15 +216,6 @@ export default function BrushPlansPreviewPage() {
     );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
-    return (
-        <div className="rounded-2xl border border-border/70 bg-white/90 px-3 py-2 shadow-sm dark:bg-white/5">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-            <div className="mt-1 text-xl font-black text-foreground">{value}</div>
-        </div>
-    );
-}
-
 function CompactItemCard({
     item,
     index,
@@ -260,41 +230,40 @@ function CompactItemCard({
     const productName = item.productName || item.product?.name || "未绑定商品";
 
     return (
-        <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white px-3 py-2.5 shadow-sm transition-all hover:border-primary/25 hover:shadow-md dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10">
-            <div className="flex items-center gap-2 self-start">
-                <span className={cn("flex h-6 min-w-6 items-center justify-center rounded-full text-[10px] font-black", accentClassName)}>
+        <div className="overflow-hidden rounded-[20px] border border-border/60 bg-white p-2 shadow-sm transition-all hover:border-primary/25 hover:shadow-md dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 sm:rounded-2xl">
+            <div className="relative aspect-square overflow-hidden rounded-[18px] bg-muted/50">
+                <span className={cn("absolute left-1.5 top-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black shadow-sm", accentClassName)}>
                     {index + 1}
                 </span>
-                <div className="relative h-11 w-11 overflow-hidden rounded-2xl bg-muted/50">
-                    {imageUrl ? (
-                        <Image src={imageUrl} alt="" fill className="object-cover" unoptimized />
-                    ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground/35">
-                            <Package size={18} />
-                        </div>
-                    )}
+                <div className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/55 px-2 py-1 text-[10px] font-black text-white backdrop-blur-md">
+                    x{item.quantity || 1}
                 </div>
+                {imageUrl ? (
+                    <Image src={imageUrl} alt="" fill className="object-cover" unoptimized />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground/35">
+                        <Package size={18} />
+                    </div>
+                )}
             </div>
 
-            <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-black/[0.04] px-2 py-1 text-[11px] font-bold text-foreground dark:bg-white/[0.08]">
-                            <Search size={12} className="shrink-0 text-muted-foreground" />
-                            <span className="truncate">{keyword}</span>
-                        </div>
-                        <div className="mt-1.5 truncate text-[12px] font-medium text-muted-foreground">
-                            {productName}
-                        </div>
+            <div className="mt-2.5">
+                <div className="rounded-2xl bg-black/[0.04] px-2.5 py-2 dark:bg-white/[0.08]">
+                    <div className="flex items-center gap-1.5">
+                        <Search size={12} className="shrink-0 text-muted-foreground" />
+                        <span className="line-clamp-3 break-all text-[13px] font-black leading-5 text-foreground sm:text-[15px] sm:leading-5.5">
+                            {keyword}
+                        </span>
                     </div>
-                    <div className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">
-                        x{item.quantity || 1}
-                    </div>
+                </div>
+
+                <div className="mt-2 line-clamp-2 break-all text-[11px] leading-4 text-muted-foreground sm:text-[12px]">
+                    {productName}
                 </div>
 
                 {item.note ? (
-                    <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-                        <ChevronRight size={12} />
+                    <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                        <ChevronRight size={12} className="shrink-0" />
                         <span className="truncate">{item.note}</span>
                     </div>
                 ) : null}
@@ -322,7 +291,7 @@ function getPlatformMeta(platform: string) {
         return {
             iconSrc: "/platform/美团.svg",
             iconAlt: "美团",
-            badgeClassName: "inline-flex items-center gap-2 rounded-full border border-border/60 bg-white px-3 py-1 text-xs font-black text-foreground dark:border-white/10 dark:bg-white/5",
+            badgeClassName: "inline-flex items-center gap-2 rounded-full border border-border/60 bg-white px-3 py-1 text-[11px] font-black text-foreground dark:border-white/10 dark:bg-white/5 sm:text-xs",
             accentClassName: "bg-black/[0.06] text-foreground dark:bg-white/[0.12]",
         };
     }
@@ -330,7 +299,7 @@ function getPlatformMeta(platform: string) {
         return {
             iconSrc: "/platform/淘宝.svg",
             iconAlt: "淘宝",
-            badgeClassName: "inline-flex items-center gap-2 rounded-full border border-border/60 bg-white px-3 py-1 text-xs font-black text-foreground dark:border-white/10 dark:bg-white/5",
+            badgeClassName: "inline-flex items-center gap-2 rounded-full border border-border/60 bg-white px-3 py-1 text-[11px] font-black text-foreground dark:border-white/10 dark:bg-white/5 sm:text-xs",
             accentClassName: "bg-black/[0.06] text-foreground dark:bg-white/[0.12]",
         };
     }
@@ -338,7 +307,7 @@ function getPlatformMeta(platform: string) {
         return {
             iconSrc: "/platform/京东.svg",
             iconAlt: "京东",
-            badgeClassName: "inline-flex items-center gap-2 rounded-full border border-border/60 bg-white px-3 py-1 text-xs font-black text-foreground dark:border-white/10 dark:bg-white/5",
+            badgeClassName: "inline-flex items-center gap-2 rounded-full border border-border/60 bg-white px-3 py-1 text-[11px] font-black text-foreground dark:border-white/10 dark:bg-white/5 sm:text-xs",
             accentClassName: "bg-black/[0.06] text-foreground dark:bg-white/[0.12]",
         };
     }

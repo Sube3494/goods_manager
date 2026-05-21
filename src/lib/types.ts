@@ -149,6 +149,7 @@ export interface AutoPickOrderItem {
     image?: string | null;
     sourceType: "product" | "shopProduct";
     shopName?: string | null;
+    isManual?: boolean;
   } | null;
   createdAt?: string;
   updatedAt?: string;
@@ -161,6 +162,7 @@ export interface AutoPickMatchedProductRef {
   image?: string | null;
   sourceType: "product" | "shopProduct";
   shopName?: string | null;
+  isManual?: boolean;
 }
 
 export interface AutoPickOrder {
@@ -178,6 +180,7 @@ export interface AutoPickOrder {
   shopAddress?: string | null;
   rawShopName?: string | null;
   rawShopAddress?: string | null;
+  matchedShopId?: string | null;
   matchedShopName?: string | null;
   isMainSystemSelfDelivery?: boolean;
   isPickCompleted?: boolean;

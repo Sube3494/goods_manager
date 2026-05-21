@@ -29,6 +29,7 @@ import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import {
   doesAutoPickOrderRequirePickConfirmation,
   getBaseAutoPickStatusDisplay,
@@ -688,12 +689,16 @@ function OrderCard({
   actingId,
   onToggleExpanded,
   onRunAction,
+  onOpenMatchEditor,
+  onClearManualMatch,
 }: {
   order: AutoPickOrder;
   expanded: boolean;
   actingId: string;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
+  onClearManualMatch: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
 }) {
   const itemCount = getItemCount(order.items);
   const completed = isCompletedStatus(order.status);
@@ -970,6 +975,59 @@ function OrderCard({
                 <DetailStat label={pickup ? "取货时间" : "最晚送达"} value={deadlineDisplay} />
               </div>
               <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
+                <div className="rounded-[18px] border border-black/6 bg-black/2 p-3 dark:border-white/8 dark:bg-white/3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">商品匹配</div>
+                    <div className="text-xs text-muted-foreground">可直接手动改</div>
+                  </div>
+                  <div className="grid gap-2">
+                    {order.items.map((item, index) => (
+                      <div key={item.id || `${item.productNo || item.productName}-${index}`} className="rounded-2xl border border-black/6 bg-white/80 p-3 dark:border-white/8 dark:bg-white/4">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-foreground">{item.matchedProduct?.name || "未匹配到系统商品"}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              原始商品：{item.productName || "未命名商品"}{item.productNo ? ` / ${item.productNo}` : ""}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                              <span className={cn(
+                                "inline-flex items-center rounded-full px-2 py-1 font-bold",
+                                item.matchedProduct
+                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                              )}>
+                                {item.matchedProduct ? (item.matchedProduct.isManual ? "手动匹配" : "自动匹配") : "未匹配"}
+                              </span>
+                              {item.matchedProduct?.sku ? (
+                                <span className="text-muted-foreground">SKU {item.matchedProduct.sku}</span>
+                              ) : null}
+                              <span className="text-muted-foreground">x{item.quantity}</span>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            {item.matchedProduct?.isManual ? (
+                              <button
+                                type="button"
+                                onClick={() => onClearManualMatch(order, item)}
+                                className="inline-flex h-9 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 hover:text-foreground dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 dark:hover:text-white"
+                              >
+                                恢复自动
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => onOpenMatchEditor(order, item)}
+                              className="inline-flex h-9 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 hover:text-foreground dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 dark:hover:text-white"
+                            >
+                              改匹配
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-2.5">
                   <DetailBlock label="系统门店" value={order.matchedShopName || "-"} />
                   <DetailBlock label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
@@ -1735,6 +1793,16 @@ export default function OrdersPage() {
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [showCompletedToday, setShowCompletedToday] = useState(false);
   const [actingId, setActingId] = useState("");
+  const [isMatchPickerOpen, setIsMatchPickerOpen] = useState(false);
+  const [isSavingMatch, setIsSavingMatch] = useState(false);
+  const [matchEditorTarget, setMatchEditorTarget] = useState<{
+    orderId: string;
+    itemId: string;
+    itemName: string;
+    shopName: string;
+    shopId: string;
+    currentMatchedProductId: string;
+  } | null>(null);
 
   const [integrationConfig, setIntegrationConfig] = useState<AutoPickIntegrationConfig>({
     pluginBaseUrl: "",
@@ -1844,6 +1912,109 @@ export default function OrdersPage() {
   const patchOrder = useCallback((orderId: string, updater: (order: AutoPickOrder) => AutoPickOrder) => {
     setOrders((current) => current.map((order) => (order.id === orderId ? updater(order) : order)));
   }, []);
+
+  const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem) => {
+    setMatchEditorTarget({
+      orderId: order.id,
+      itemId: String(item.id || "").trim(),
+      itemName: item.productName || "未命名商品",
+      shopName: order.matchedShopName || "",
+      shopId: order.matchedShopId || "",
+      currentMatchedProductId: item.matchedProduct?.id || "",
+    });
+    setIsMatchPickerOpen(true);
+  }, []);
+
+  const closeMatchEditor = useCallback(() => {
+    if (isSavingMatch) return;
+    setIsMatchPickerOpen(false);
+    setMatchEditorTarget(null);
+  }, [isSavingMatch]);
+
+  const applyItemMatchedProduct = useCallback((
+    orderId: string,
+    itemId: string,
+    matchedProduct: AutoPickOrderItem["matchedProduct"]
+  ) => {
+    patchOrder(orderId, (order) => ({
+      ...order,
+      items: order.items.map((item) => (
+        item.id === itemId
+          ? {
+              ...item,
+              matchedProduct: matchedProduct ?? null,
+              displayItems: undefined,
+            }
+          : item
+      )),
+    }));
+  }, [patchOrder]);
+
+  const saveManualMatch = useCallback(async (productId: string) => {
+    if (!matchEditorTarget?.orderId || !matchEditorTarget.itemId) {
+      return;
+    }
+
+    const currentOrder = orders.find((order) => order.id === matchEditorTarget.orderId);
+    const currentItem = currentOrder?.items.find((item) => item.id === matchEditorTarget.itemId);
+
+    setIsSavingMatch(true);
+    try {
+      const response = await fetch(`/api/orders/${matchEditorTarget.orderId}/items/${matchEditorTarget.itemId}/match`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId,
+          autoMatchedProduct: currentItem?.matchedProduct && !currentItem.matchedProduct.isManual
+            ? currentItem.matchedProduct
+            : undefined,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || "更新商品匹配失败");
+      }
+
+      applyItemMatchedProduct(matchEditorTarget.orderId, matchEditorTarget.itemId, data?.matchedProduct || null);
+      showToast("商品匹配已更新", "success");
+      setIsMatchPickerOpen(false);
+      setMatchEditorTarget(null);
+    } catch (error) {
+      console.error("Failed to save manual product match:", error);
+      showToast(error instanceof Error ? error.message : "更新商品匹配失败", "error");
+    } finally {
+      setIsSavingMatch(false);
+    }
+  }, [applyItemMatchedProduct, matchEditorTarget, orders, showToast]);
+
+  const clearManualMatch = useCallback(async (order: AutoPickOrder, item: AutoPickOrderItem) => {
+    const itemId = String(item.id || "").trim();
+    if (!order.id || !itemId) {
+      return;
+    }
+
+    setIsSavingMatch(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/items/${itemId}/match`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clear: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "恢复自动匹配失败");
+      }
+
+      applyItemMatchedProduct(order.id, itemId, null);
+      showToast("已恢复自动匹配", "success");
+    } catch (error) {
+      console.error("Failed to clear manual product match:", error);
+      showToast(error instanceof Error ? error.message : "恢复自动匹配失败", "error");
+    } finally {
+      setIsSavingMatch(false);
+    }
+  }, [applyItemMatchedProduct, showToast]);
 
   const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number }) => {
     if (isFetchingRef.current) {
@@ -2735,6 +2906,8 @@ export default function OrdersPage() {
                   actingId={actingId}
                   onToggleExpanded={toggleExpanded}
                   onRunAction={runAction}
+                  onOpenMatchEditor={openMatchEditor}
+                  onClearManualMatch={clearManualMatch}
                 />
               ))}
             </div>
@@ -2766,6 +2939,8 @@ export default function OrdersPage() {
                       actingId={actingId}
                       onToggleExpanded={toggleExpanded}
                       onRunAction={runAction}
+                      onOpenMatchEditor={openMatchEditor}
+                      onClearManualMatch={clearManualMatch}
                     />
                   ))}
                 </div>
@@ -2838,6 +3013,37 @@ export default function OrdersPage() {
             document.body
           )
         : null}
+
+      <ProductSelectionModal
+        isOpen={isMatchPickerOpen}
+        onClose={closeMatchEditor}
+        onSelect={(products) => {
+          const selectedProduct = products[0];
+          const resolvedProductId = String(
+            selectedProduct?.sourceProductId
+            || selectedProduct?.productId
+            || selectedProduct?.id
+            || ""
+          ).trim();
+          if (!resolvedProductId) {
+            return;
+          }
+          void saveManualMatch(resolvedProductId);
+        }}
+        selectedIds={matchEditorTarget?.currentMatchedProductId ? [matchEditorTarget.currentMatchedProductId] : []}
+        singleSelect
+        loadAllOnOpen
+        showPlatformSelector={false}
+        showCategoryFilter
+        showPrice={false}
+        title={matchEditorTarget ? `改商品匹配 · ${matchEditorTarget.itemName}` : "改商品匹配"}
+        fetchPath="/api/shop-products"
+        query={{
+          all: "true",
+          ...(matchEditorTarget?.shopId ? { shopId: matchEditorTarget.shopId } : {}),
+        }}
+        emptyStateText={matchEditorTarget?.shopName ? `当前店铺“${matchEditorTarget.shopName}”下没有找到候选商品` : "未找到相关商品"}
+      />
 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>

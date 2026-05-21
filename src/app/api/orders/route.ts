@@ -112,6 +112,7 @@ type MatchedCatalogProduct = {
   image?: string | null;
   sourceType: "product" | "shopProduct";
   shopName?: string | null;
+  isManual?: boolean;
 };
 
 type UserPermissionsPayload = {
@@ -219,6 +220,34 @@ function readResolvedAutoPickShop(rawPayload: unknown) {
   return {
     id: id || null,
     name: name || null,
+  };
+}
+
+function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const candidate = (rawPayload as Record<string, unknown>).manualMatchedProduct;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+
+  const record = candidate as Record<string, unknown>;
+  const id = String(record.id || "").trim();
+  const name = String(record.name || "").trim();
+  if (!id || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    sku: String(record.sku || "").trim() || null,
+    image: String(record.image || "").trim() || null,
+    sourceType: record.sourceType === "shopProduct" ? "shopProduct" : "product",
+    shopName: String(record.shopName || "").trim() || null,
+    isManual: true,
   };
 }
 
@@ -890,12 +919,14 @@ export async function GET(request: NextRequest) {
 
       return {
         ...order,
+        matchedShopId: lockedResolvedShop?.id || null,
         matchedShopName,
         autoOutboundStatus: autoOutboundMeta.status,
         autoOutboundError: autoOutboundMeta.error,
         autoOutboundAttemptedAt: autoOutboundMeta.attemptedAt,
         autoOutboundResolvedAt: autoOutboundMeta.resolvedAt,
         items: order.items.map((item) => {
+          const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
           const normalizedProductName = toNormalizedText(item.productName);
           const normalizedSkuCandidates = buildSkuMatchCandidates(item.productNo)
             .map((candidate) => normalizeSkuDigits(candidate))
@@ -914,10 +945,12 @@ export async function GET(request: NextRequest) {
           const exactSkuProduct = matchedSkuProducts.find(
             (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
           );
-          const matchedProduct = !normalizedProductName
+          const matchedProduct = manualMatchedProduct || (!normalizedProductName
             ? (exactSkuProduct || matchedSkuProducts[0] || null)
-            : (exactSkuProduct || exactShopProduct || matchedSkuProducts[0] || matchedShopProducts[0] || null);
-          const displayItems = skuSegments.length > 1
+            : (exactSkuProduct || exactShopProduct || matchedSkuProducts[0] || matchedShopProducts[0] || null));
+          const displayItems = manualMatchedProduct
+            ? undefined
+            : skuSegments.length > 1
             ? skuSegments.map((segment) => {
                 const normalizedSegmentSku = normalizeSkuDigits(segment);
                 const segmentCandidates = normalizedSegmentSku
