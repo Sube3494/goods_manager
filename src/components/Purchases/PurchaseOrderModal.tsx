@@ -343,6 +343,7 @@ export function PurchaseOrderModal({
 
   // Only 'Received' status or system-generated records are truly read-only for core product/price info
   const effectiveReadOnly = readOnly || formData.status === "Received" || (initialData?.status === "Received");
+  const isNewPurchase = !initialData && formData.type === "Purchase";
   
   // Derived: system-generated records (auto-created from outbound returns) are always locked
   const isSystemGenerated =
@@ -1217,13 +1218,23 @@ export function PurchaseOrderModal({
                                                 保存采购单
                                             </button>
 
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAction("Received")}
-                                                className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]"
-                                            >
-                                                确认入库
-                                            </button>
+                                            {isNewPurchase ? (
+                                                <button
+                                                    type="submit"
+                                                    className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2"
+                                                >
+                                                    <CheckCircle size={14} className="hidden sm:block" />
+                                                    确认下单
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAction("Received")}
+                                                    className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]"
+                                                >
+                                                    确认入库
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                 </div>
