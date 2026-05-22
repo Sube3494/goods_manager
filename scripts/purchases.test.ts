@@ -4,6 +4,7 @@ import {
   getPurchaseStatusLabel,
   getTrackingUrl,
   matchesPurchaseStatus,
+  PURCHASE_STATUS_OPTIONS,
 } from "../src/lib/purchases";
 import { PurchaseOrder } from "../src/lib/types";
 
@@ -105,5 +106,6 @@ assert.equal(getTrackingUrl("ABC", "未知快递"), null);
 
 assert.equal(getPurchaseStatusLabel("Ordered"), "已下单");
 assert.equal(getPurchaseStatusLabel("Received"), "已入库");
+assert.equal(PURCHASE_STATUS_OPTIONS.length, 3);
 
 console.log("purchases tests passed");

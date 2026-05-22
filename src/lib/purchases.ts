@@ -5,7 +5,6 @@ export const PURCHASE_STATUS_OPTIONS = [
   { value: "All", label: "全部" },
   { value: "Confirmed", label: "已下单" },
   { value: "Received", label: "已入库" },
-  { value: "Draft", label: "草稿" },
 ] as const;
 
 export type PurchaseStatusFilter = (typeof PURCHASE_STATUS_OPTIONS)[number]["value"];
