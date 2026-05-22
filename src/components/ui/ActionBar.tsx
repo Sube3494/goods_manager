@@ -69,21 +69,21 @@ export function ActionBar({
               {onEdit && (
                 <button
                   onClick={onEdit}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground hover:bg-foreground/90 text-background dark:text-black shadow-lg shadow-black/10 active:scale-[0.98] transition-all sm:h-8 sm:w-auto sm:px-6"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground hover:bg-foreground/90 text-background dark:text-black shadow-lg shadow-black/10 active:scale-[0.98] transition-all whitespace-nowrap sm:h-8 sm:w-auto sm:px-6"
                   title="批量修改"
                 >
                   <Pencil size={16} className="sm:hidden" />
-                  <span className="hidden sm:inline text-xs font-black">批量修改</span>
+                  <span className="hidden whitespace-nowrap sm:inline text-xs font-black">批量修改</span>
                 </button>
               )}
               {onDelete && (
                 <button
                   onClick={onDelete}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all sm:h-8 sm:w-auto sm:px-6"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all whitespace-nowrap sm:h-8 sm:w-auto sm:px-6"
                   title="删除"
                 >
                   <Trash2 size={16} className="sm:hidden" />
-                  <span className="hidden sm:inline text-xs font-black">删除</span>
+                  <span className="hidden whitespace-nowrap sm:inline text-xs font-black">删除</span>
                 </button>
               )}
               {extraActions.map((action) => (
