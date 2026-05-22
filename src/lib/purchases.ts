@@ -58,7 +58,7 @@ export function getPurchaseStatusLabel(status: PurchaseStatus) {
     case "Shipped":
       return "已下单";
     default:
-      return "草稿";
+      return "已下单";
   }
 }
 

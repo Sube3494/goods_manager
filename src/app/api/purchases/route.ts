@@ -9,6 +9,7 @@ import { FinanceMath } from "@/lib/math";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 
 async function resolvePurchaseOrderResponse<T extends {
+  status?: string;
   paymentVouchers?: unknown;
   trackingData?: unknown;
   items: Array<{
@@ -21,9 +22,11 @@ async function resolvePurchaseOrderResponse<T extends {
   }>;
 }>(purchase: T) {
   const storage = await getStorageStrategy();
+  const normalizedStatus = purchase.status === "Draft" ? "Confirmed" : purchase.status;
 
   return {
     ...purchase,
+    status: normalizedStatus,
     paymentVouchers: Array.isArray(purchase.paymentVouchers)
       ? purchase.paymentVouchers.map((voucher) => typeof voucher === "string" ? storage.resolveUrl(voucher) : voucher)
       : purchase.paymentVouchers,
@@ -198,12 +201,14 @@ export async function POST(request: Request) {
 
     const orderId = generateOrderId();
 
+    const normalizedStatus = status === "Draft" ? "Confirmed" : (status || "Confirmed");
+
     const purchase = await prisma.$transaction(async (tx) => {
       const p = await tx.purchaseOrder.create({
         data: {
           id: orderId,
           type: type || undefined,
-          status: status || "Draft",
+          status: normalizedStatus,
           date: date ? new Date(date) : new Date(),
           totalAmount: FinanceMath.add(Number(totalAmount) || 0, 0),
           shippingFees: FinanceMath.add(Number(shippingFees) || 0, 0),
@@ -221,7 +226,7 @@ export async function POST(request: Request) {
               shopProductId: item.shopProductId || null,
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
-              remainingQuantity: status === "Received" ? (Number(item.quantity) || 0) : undefined,
+              remainingQuantity: normalizedStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
               costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
             }))
           }
@@ -238,7 +243,7 @@ export async function POST(request: Request) {
       });
 
       // 如果状态是 Received，增加商品库存 (原子事务)
-      if (status === "Received") {
+      if (normalizedStatus === "Received") {
         for (const item of items) {
           if (item.shopProductId) {
             const incomingCost = FinanceMath.add(Number(item.costPrice) || 0, 0);

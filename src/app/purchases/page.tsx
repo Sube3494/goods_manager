@@ -331,7 +331,7 @@ function PurchasesContent() {
           }, 500);
         }
         
-        const msg = data.status === "Draft" ? "草稿已暂存" : (isEdit ? "采购单已更新" : "采购单已创建");
+        const msg = isEdit ? "采购单已更新" : "采购单已创建";
         showToast(msg, "success");
         setIsModalOpen(false);
       } else {
@@ -348,16 +348,24 @@ function PurchasesContent() {
     return filterPurchases(purchases, { searchQuery, statusFilter, shopFilter });
   }, [purchases, searchQuery, statusFilter, shopFilter]);
 
+  const statsPurchases = useMemo(() => {
+    return filterPurchases(purchases, {
+      searchQuery,
+      statusFilter: "All",
+      shopFilter,
+    });
+  }, [purchases, searchQuery, shopFilter]);
+
   const purchaseStats = useMemo(() => {
-    const totalAmount = filteredPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
-    const receivedPurchases = filteredPurchases.filter((purchase) => purchase.status === "Received");
-    const pendingPurchases = filteredPurchases.filter((purchase) => purchase.status !== "Received");
+    const totalAmount = statsPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
+    const receivedPurchases = statsPurchases.filter((purchase) => purchase.status === "Received");
+    const pendingPurchases = statsPurchases.filter((purchase) => purchase.status !== "Received");
     const receivedAmount = receivedPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
     const pendingAmount = pendingPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
-    const shopCount = new Set(filteredPurchases.map((purchase) => purchase.shopName).filter(Boolean)).size;
+    const shopCount = new Set(statsPurchases.map((purchase) => purchase.shopName).filter(Boolean)).size;
 
     return {
-      totalCount: filteredPurchases.length,
+      totalCount: statsPurchases.length,
       totalAmount,
       receivedCount: receivedPurchases.length,
       receivedAmount,
@@ -365,7 +373,7 @@ function PurchasesContent() {
       pendingAmount,
       shopCount,
     };
-  }, [filteredPurchases]);
+  }, [statsPurchases]);
 
   const totalItems = filteredPurchases.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));

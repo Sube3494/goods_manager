@@ -1182,10 +1182,10 @@ export function ProductFormModal({
                                                          <span className={cn(
                                                             "text-[9px] px-1.5 py-0.5 rounded-md font-medium uppercase",
                                                             order.status === "Received" ? "bg-green-500/10 text-green-500" : 
-                                                            order.status === "Ordered" ? "bg-blue-500/10 text-blue-500" :
+                                                            (order.status === "Ordered" || order.status === "Confirmed" || order.status === "Shipped") ? "bg-blue-500/10 text-blue-500" :
                                                             "bg-gray-500/10 text-gray-500"
                                                         )}>
-                                                            {order.status === "Received" ? "已入库" : order.status === "Ordered" ? "待入库" : "草稿"}
+                                                            {order.status === "Received" ? "已入库" : "待入库"}
                                                         </span>
                                                     </div>
                                                     <span className="text-xs font-medium text-foreground">单号: {order.id}</span>

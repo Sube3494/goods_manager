@@ -18,7 +18,7 @@ export function PurchaseTrackingList({
   onCopy,
 }: PurchaseTrackingListProps) {
   if (!trackingData || trackingData.length === 0) {
-    if (status !== "Draft" && !compact) {
+    if (!compact) {
       return <span className="text-[10px] text-muted-foreground opacity-30 italic">暂由仓库处理中</span>;
     }
 

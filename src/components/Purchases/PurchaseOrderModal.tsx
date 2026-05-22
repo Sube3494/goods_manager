@@ -320,7 +320,7 @@ export function PurchaseOrderModal({
     const today = new Date();
     return {
       id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
-      status: "Draft",
+      status: "Confirmed",
       type: defaultType,
       date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
       items: [],
@@ -509,7 +509,7 @@ export function PurchaseOrderModal({
 
             setFormData(prev => ({
                 id: newId,
-                status: "Draft",
+                status: "Confirmed",
                 date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
                 items: [],
                 type: defaultType,
@@ -676,29 +676,13 @@ export function PurchaseOrderModal({
 
   const inferStatus = (currentData: PurchaseOrder): PurchaseStatus => {
     if (currentData.status === "Received") return "Received";
-    if (currentData.items.length > 0) return "Confirmed";
-    return "Draft";
+    return "Confirmed";
   };
 
-  const handleAction = (status: PurchaseStatus, isDraftManual: boolean = false) => {
+  const handleAction = (status: PurchaseStatus) => {
     if (formData.items.length === 0) return;
 
-    let targetStatus = status;
-    
-    // Logic for "Draft" button:
-    // If user explicitly clicks "Save as Draft" (isDraftManual)
-    if (isDraftManual) {
-        // Only allow status to be "Draft" if it was already "Draft" or it's a new order
-        // Otherwise, keep the current status (e.g., if it's "Shipped", keep it "Shipped")
-        if (formData.status !== "Draft") {
-            targetStatus = formData.status;
-        } else {
-            targetStatus = "Draft";
-        }
-    } else if (status !== "Received") {
-        // Normal "Submit/Save" button: auto-infer status unless it's formal receipt
-        targetStatus = inferStatus(formData);
-    }
+    const targetStatus = status === "Received" ? "Received" : inferStatus(formData);
 
     onSubmit({
       ...formData,
@@ -798,7 +782,7 @@ export function PurchaseOrderModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (effectiveReadOnly && formData.status !== "Confirmed" && formData.status !== "Shipped") return; // Prevent normal form submit if read-only, unless it's for tracking updates
-    handleAction(formData.status === "Draft" ? "Confirmed" : formData.status);
+    handleAction(formData.status);
   };
 
   if (!mounted) return null;
@@ -1224,33 +1208,22 @@ export function PurchaseOrderModal({
                                             撤销入库
                                         </button>
                                     )}
-                                    {(formData.status === "Draft" || (formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered" || formData.status === "Shipped") && (
+                                    {((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered" || formData.status === "Shipped") && (
                                         <>
                                             <button
-                                                type="button"
-                                                onClick={() => handleAction("Draft", true)}
+                                                type="submit"
                                                 className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
                                             >
-                                                {formData.status === "Draft" ? "暂存草稿" : "保存修改"}
+                                                保存采购单
                                             </button>
 
-                                            {formData.status === "Draft" ? (
-                                                <button
-                                                    type="submit"
-                                                    className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2"
-                                                >
-                                                    <CheckCircle size={14} className="hidden sm:block" />
-                                                    确认下单
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleAction("Received")}
-                                                    className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]"
-                                                >
-                                                    确认入库
-                                                </button>
-                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAction("Received")}
+                                                className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]"
+                                            >
+                                                确认入库
+                                            </button>
                                         </>
                                     )}
                                 </div>

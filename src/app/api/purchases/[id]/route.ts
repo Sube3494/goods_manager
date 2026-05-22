@@ -49,8 +49,10 @@ export async function PUT(
         throw new Error("采购单不存在");
       }
 
-      const previousStatus = existingPurchase.status;
-      const nextStatus = typeof status === "string" && status.trim() ? status : previousStatus;
+      const previousStatus = existingPurchase.status === "Draft" ? "Confirmed" : existingPurchase.status;
+      const nextStatus = typeof status === "string" && status.trim()
+        ? (status === "Draft" ? "Confirmed" : status)
+        : previousStatus;
       const isReceivingNow = previousStatus !== "Received" && nextStatus === "Received";
       const isRevokingReceived = previousStatus === "Received" && nextStatus !== "Received";
 

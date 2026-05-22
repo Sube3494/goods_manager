@@ -73,7 +73,7 @@ const purchases: PurchaseOrder[] = [
   },
   {
     id: "PO-003",
-    status: "Draft",
+    status: "Received",
     totalAmount: 50,
     date: "2026-04-09T00:00:00.000Z",
     shippingFees: 0,

@@ -272,7 +272,7 @@ export interface BrushProduct {
   updatedAt?: string;
 }
 
-export type PurchaseStatus = "Draft" | "Confirmed" | "Shipped" | "Received" | "Ordered";
+export type PurchaseStatus = "Confirmed" | "Shipped" | "Received" | "Ordered";
 
 export interface TrackingInfo {
   courier: string;
