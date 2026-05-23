@@ -13,7 +13,8 @@
     "lint": "eslint",
     "test": "bunx tsc --module commonjs --target es2020 --outDir tmp/purchase-tests --esModuleInterop --skipLibCheck src/lib/pinyin.ts src/lib/types.ts src/lib/purchases.ts scripts/purchases.test.ts && bun tmp/purchase-tests/scripts/purchases.test.js",
     "audit:brush-cleanup": "bun scripts/audit_brush_inventory_cleanup.js",
-    "cleanup:inactive-brush-products": "bun scripts/cleanup_inactive_brush_products.js"
+    "cleanup:inactive-brush-products": "bun scripts/cleanup_inactive_brush_products.js",
+    "migrate:purchase-items": "bun scripts/migrate-purchase-items.ts"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",

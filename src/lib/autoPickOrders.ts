@@ -9,7 +9,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { FinanceMath } from "@/lib/math";
-import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey } from "@/lib/shopIdentity";
+import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -3786,10 +3786,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     : null;
   const mappedShopNameText = String(internalShop?.name || mappedShopName || "").trim();
   const isCandidateInMappedShop = (candidateShopName: string | null | undefined) => {
-    if (!mappedShopNameText) {
-      return true;
-    }
-    return String(candidateShopName || "").trim() === mappedShopNameText;
+    return isShopNameMatch(candidateShopName, mappedShopNameText);
   };
 
   const shopProductNameMap = new Map<string, Array<{
@@ -3978,10 +3975,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     : null;
   const mappedShopNameText = String(internalShop?.name || mappedShopName || "").trim();
   const isCandidateInMappedShop = (candidateShopName: string | null | undefined) => {
-    if (!mappedShopNameText) {
-      return true;
-    }
-    return String(candidateShopName || "").trim() === mappedShopNameText;
+    return isShopNameMatch(candidateShopName, mappedShopNameText);
   };
 
   const shopProducts = await tx.shopProduct.findMany({

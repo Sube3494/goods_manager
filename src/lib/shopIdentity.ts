@@ -105,3 +105,37 @@ export function findMatchingShopRecord<T extends ShopIdentityRecord>(
 
   return matchedByName[0] || null;
 }
+
+function stripShopSuffix(value: string) {
+  return value.replace(/(门店|店铺|旗舰店|总店|分店|一店|二店|三店|四店|五店|店)$/g, "").trim();
+}
+
+export function isShopNameMatch(candidate: string | null | undefined, scopedShopName: string | null | undefined) {
+  const normalizedCandidate = String(candidate || "").trim();
+  const normalizedScoped = String(scopedShopName || "").trim();
+  if (!normalizedScoped) {
+    return true;
+  }
+  if (!normalizedCandidate) {
+    return false;
+  }
+  if (normalizedCandidate === normalizedScoped) {
+    return true;
+  }
+  if (normalizedCandidate.includes(normalizedScoped) || normalizedScoped.includes(normalizedCandidate)) {
+    return true;
+  }
+
+  const coreCandidate = stripShopSuffix(normalizedCandidate);
+  const coreScoped = stripShopSuffix(normalizedScoped);
+  if (!coreCandidate || !coreScoped) {
+    return false;
+  }
+
+  return (
+    coreCandidate === coreScoped ||
+    coreCandidate.includes(coreScoped) ||
+    coreScoped.includes(coreCandidate)
+  );
+}
+

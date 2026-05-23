@@ -7,7 +7,7 @@ import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatu
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
-import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
+import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 
 export const dynamic = "force-dynamic";
 
@@ -961,10 +961,10 @@ export async function GET(request: NextRequest) {
               .map((product) => [product.id, product])
           ).values());
           const exactShopProduct = matchedShopProducts.find(
-            (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
+            (product) => isShopNameMatch(product.shopName, matchedShopName)
           );
           const exactSkuProduct = matchedSkuProducts.find(
-            (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
+            (product) => isShopNameMatch(product.shopName, matchedShopName)
           );
           const matchedProduct = manualMatchedProduct || (!normalizedProductName
             ? (exactSkuProduct || matchedSkuProducts[0] || null)
@@ -981,7 +981,7 @@ export async function GET(request: NextRequest) {
                     ).values())
                   : [];
                 const exactSegmentProduct = segmentCandidates.find(
-                  (product) => String(product.shopName || "").trim() === String(matchedShopName || "").trim()
+                  (product) => isShopNameMatch(product.shopName, matchedShopName)
                 );
                 const segmentMatchedProduct = exactSegmentProduct || segmentCandidates[0] || null;
 

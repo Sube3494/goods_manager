@@ -130,6 +130,8 @@ export function ProductSelectionModal({
   loadAllOnOpen = false,
   respectPublicVisibility = true,
 }: ProductSelectionModalProps) {
+  const queryRef = useRef(query);
+  queryRef.current = query;
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
 
@@ -253,11 +255,11 @@ export function ProductSelectionModal({
         page: targetPage.toString(),
         ...(loadAllOnOpen ? { all: "true" } : { pageSize: "20" }),
         ...(remoteSearch ? { search: remoteSearch } : {}),
-        ...(query || {}),
-        ...(remoteCategoryName !== "all" ? { category: remoteCategoryName } : {}),
+        ...(queryRef.current || {}),
+        ...(remoteCategoryName !== "all" ? { category: remoteCategoryName, categoryName: remoteCategoryName } : {}),
       });
 
-      const shopId = query?.shopId;
+      const shopId = queryRef.current?.shopId;
       const categoryUrl = shopId 
         ? `/api/categories?shopId=${shopId}` 
         : fetchPath === "/api/shop-products" 
@@ -304,7 +306,7 @@ export function ProductSelectionModal({
         setIsNextPageLoading(false);
       }
     }
-  }, [fetchPath, loadAllOnOpen, query, querySignature, remoteCategoryName, remoteSearch, shouldShowCategoryFilter]);
+  }, [fetchPath, loadAllOnOpen, querySignature, remoteCategoryName, remoteSearch, shouldShowCategoryFilter]);
 
   useEffect(() => {
     if (loadingDelayRef.current) {
@@ -357,15 +359,15 @@ export function ProductSelectionModal({
       const productCategoryName = p.category?.name || (p as Product & { categoryName?: string | null }).categoryName || "";
       const matchesCategory = categoryName === "all" || productCategoryName === categoryName;
       const matchesUnselected = !showUnselectedOnly || !selectedIds.includes(getSelectionKey(p));
-      const searchableText = [p.name, getProductCode(p), p.sourceProductId, p.shopProductId].filter(Boolean).join(" ").toLowerCase();
+      const searchableText = [p.name, p.sku, p.jdSkuId].filter(Boolean).join(" ").toLowerCase();
       const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
       const matchesShop = !scopedShopName || isShopNameMatch(p.shopName, scopedShopName);
 
       return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop;
     });
-  }, [debouncedSearch, getSelectionKey, query?.shopName, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
+  }, [debouncedSearch, getSelectionKey, queryRef.current?.shopName, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
 
-  const displayCategoryName = usesPrefetchedData || loadAllOnOpen ? selectedCategoryName : loadedCategoryName;
+  const displayCategoryName = selectedCategoryName;
 
   const filteredProducts = useMemo(() => {
     return filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);

@@ -70,7 +70,7 @@ const purchases = [
     },
     {
         id: "PO-003",
-        status: "Draft",
+        status: "Received",
         totalAmount: 50,
         date: "2026-04-09T00:00:00.000Z",
         shippingFees: 0,
@@ -92,4 +92,5 @@ strict_1.default.equal((0, purchases_1.getTrackingUrl)("SF123456", "顺丰速运
 strict_1.default.equal((0, purchases_1.getTrackingUrl)("ABC", "未知快递"), null);
 strict_1.default.equal((0, purchases_1.getPurchaseStatusLabel)("Ordered"), "已下单");
 strict_1.default.equal((0, purchases_1.getPurchaseStatusLabel)("Received"), "已入库");
+strict_1.default.equal(purchases_1.PURCHASE_STATUS_OPTIONS.length, 3);
 console.log("purchases tests passed");

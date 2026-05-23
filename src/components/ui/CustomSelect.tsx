@@ -176,7 +176,7 @@ export function CustomSelect({
                 top: `${dropdownPosition.top}px`,
                 left: `${dropdownPosition.left}px`,
                 width: `${dropdownPosition.width}px`,
-                zIndex: 99999,
+                zIndex: 999999,
                 transformOrigin: dropdownPosition.showAbove ? 'bottom' : 'top',
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
