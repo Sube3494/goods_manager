@@ -455,12 +455,9 @@ export default function OutboundPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className={`flex flex-col items-center gap-0.5 text-xs font-mono transition-colors ${isReturned ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                            <div className="flex items-center gap-1.5">
-                              <History size={11} className="opacity-50" />
-                              {format(new Date(order.date), 'yyyy-MM-dd', { locale: zhCN })}
-                            </div>
-                            <span className="text-[10px] opacity-60">{format(new Date(order.date), 'HH:mm', { locale: zhCN })}</span>
+                          <div className={`flex items-center gap-1.5 text-xs font-mono transition-colors ${isReturned ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                            <History size={11} className="opacity-50" />
+                            {format(new Date(order.date), 'yyyy-MM-dd HH:mm', { locale: zhCN })}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
