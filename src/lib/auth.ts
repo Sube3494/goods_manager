@@ -18,12 +18,42 @@ function getJwtKey() {
   return new TextEncoder().encode(secretKey);
 }
 
-const sessionCookieOptions = {
+const baseSessionCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
   path: "/",
 };
+
+function isLocalHostname(hostname: string) {
+  const normalized = String(hostname || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1") {
+    return true;
+  }
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(normalized)) {
+    return normalized.startsWith("10.")
+      || normalized.startsWith("127.")
+      || normalized.startsWith("192.168.")
+      || /^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
+  }
+  return false;
+}
+
+async function getSessionCookieOptions() {
+  const headerStore = await headers();
+  const hostHeader = String(headerStore.get("x-forwarded-host") || headerStore.get("host") || "").trim();
+  const forwardedProto = String(headerStore.get("x-forwarded-proto") || "").trim().toLowerCase();
+  const hostname = hostHeader.split(":")[0] || "";
+  const isHttps = forwardedProto === "https";
+  const secure = process.env.NODE_ENV === "production" && !isLocalHostname(hostname) && isHttps;
+
+  return {
+    ...baseSessionCookieOptions,
+    secure,
+  };
+}
 
 export const SESSION_DURATION = 60 * 60 * 24 * 7; // 1 week
 const LAST_ACTIVE_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
@@ -309,6 +339,7 @@ export async function getFreshSession() {
 export async function login(userData: Partial<SessionUser>) {
   const expires = new Date(Date.now() + SESSION_DURATION * 1000);
   const sessionId = randomUUID();
+  const sessionCookieOptions = await getSessionCookieOptions();
   const session = await encrypt({ 
     ...userData,
     sessionId,
@@ -329,6 +360,7 @@ export async function login(userData: Partial<SessionUser>) {
 }
 
 export async function logout() {
+  const sessionCookieOptions = await getSessionCookieOptions();
   const session = (await cookies()).get("session")?.value;
   if (session) {
     try {
@@ -350,6 +382,7 @@ export async function updateSession(request: NextRequest) {
   try {
     const parsed = await decrypt(session) as SessionPayload;
     parsed.expires = new Date(Date.now() + SESSION_DURATION * 1000);
+    const sessionCookieOptions = await getSessionCookieOptions();
     const res = NextResponse.next();
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.headers.set("Pragma", "no-cache");
