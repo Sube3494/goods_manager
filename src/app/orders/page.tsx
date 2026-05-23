@@ -2579,7 +2579,7 @@ export default function OrdersPage() {
   }, [activeTab, filteredOrders, overview, shop, visibleOrders]);
   const remainingOrderCount = Math.max(0, meta.total - visibleOrders.length);
   const displayedSummary = useMemo(() => {
-    if (shop === "all") {
+    if (activeTab === "all" && shop === "all") {
       return summary;
     }
     return summarizeOrders(activeTab === "today" ? filteredOrders : visibleOrders);
