@@ -132,7 +132,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                   <span className="text-muted-foreground">平台渠道</span>
                   {platformMeta ? (
                     <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black shadow-xs", platformMeta.className)}>
-                      <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full shrink-0">
+                      <span className="inline-flex h-5 w-5 items-center justify-center shrink-0">
                         <Image
                           src={platformMeta.iconSrc}
                           alt={platformMeta.name}

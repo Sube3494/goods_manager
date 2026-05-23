@@ -438,7 +438,7 @@ export default function OutboundPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {platformMeta ? (
                             <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] shadow-xs", platformMeta.className)}>
-                              <span className="inline-flex h-4.5 w-4.5 items-center justify-center overflow-hidden rounded-full shrink-0">
+                              <span className="inline-flex h-4.5 w-4.5 items-center justify-center shrink-0">
                                 <Image
                                   src={platformMeta.iconSrc}
                                   alt={platformMeta.name}
@@ -572,7 +572,7 @@ export default function OutboundPage() {
                         {/* 1. 平台与流水单号集成 Badge */}
                         {platformMeta ? (
                           <span className={cn("inline-flex h-7 items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border shadow-xs whitespace-nowrap", platformMeta.className)}>
-                            <span className="inline-flex h-3.5 w-3.5 items-center justify-center overflow-hidden rounded-full shrink-0">
+                            <span className="inline-flex h-3.5 w-3.5 items-center justify-center shrink-0">
                               <Image
                                 src={platformMeta.iconSrc}
                                 alt={platformMeta.name}

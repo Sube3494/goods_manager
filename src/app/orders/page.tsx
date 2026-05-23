@@ -730,7 +730,7 @@ function OrderCard({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black/8 bg-black/3 pl-2 pr-2.5 text-foreground dark:border-white/10 dark:bg-white/4">
-                    <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden">
+                    <span className="inline-flex h-5 w-5 items-center justify-center">
                       <Image
                         src={platformMeta.iconSrc}
                         alt={platformMeta.iconAlt}
