@@ -2047,6 +2047,10 @@ export default function OrdersPage() {
       if (status !== "all") params.set("status", status);
       if (effectiveStartDate) params.set("startDate", effectiveStartDate);
       if (effectiveEndDate) params.set("endDate", effectiveEndDate);
+      if (activeTab === "all" && shop === "all" && !silent) {
+        params.set("_metrics", "1");
+      }
+      if (silent) params.set("_lite", "1");
 
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -2072,10 +2076,18 @@ export default function OrdersPage() {
       });
       setMeta(payload.meta || { total: 0, page: 1, pageSize: effectivePageSize, totalPages: 1 });
       setCurrentPage(effectivePage);
-      setPlatforms(Array.isArray(payload.filters?.platforms) ? payload.filters.platforms : []);
-      setStatuses(Array.isArray(payload.filters?.statuses) ? payload.filters.statuses : []);
-      setSummary(payload.summary || { receivedAmount: 0, platformCommission: 0, validOrderCount: 0, itemCount: 0, totalDeliveryFee: 0 });
-      setOverview(payload.overview || { totalCount: payload.meta?.total || 0, trueOrderCount: 0, brushCount: 0, cancelledCount: 0 });
+      if (Array.isArray(payload.filters?.platforms)) {
+        setPlatforms(payload.filters.platforms);
+      }
+      if (Array.isArray(payload.filters?.statuses)) {
+        setStatuses(payload.filters.statuses);
+      }
+      if (payload.summary) {
+        setSummary(payload.summary);
+      }
+      if (payload.overview) {
+        setOverview(payload.overview);
+      }
     } catch (error) {
       console.error("Failed to fetch orders:", error);
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
@@ -2089,7 +2101,7 @@ export default function OrdersPage() {
         setIsLoading(false);
       }
     }
-  }, [activeTab, endDate, platform, query, showToast, startDate, status, todayDate]);
+  }, [activeTab, endDate, platform, query, shop, showToast, startDate, status, todayDate]);
 
   useEffect(() => {
     setCurrentPage(1);

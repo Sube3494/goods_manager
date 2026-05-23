@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { FinanceMath } from "@/lib/math";
 import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
+import { createRequestPerfTracker } from "@/lib/perf";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
 
 function startOfDay(input: Date) {
@@ -188,6 +189,7 @@ function resolveAutoPickMatchedShopName(order: { shopId?: string | null; rawPayl
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "其他"] as const;
 
 export async function GET(request: NextRequest) {
+  const perf = createRequestPerfTracker(request);
   try {
     const user = await getAuthorizedUser("dashboard:read");
     if (!user) {
@@ -288,6 +290,7 @@ export async function GET(request: NextRequest) {
         startDate = startOfDay(new Date(Math.min(...candidates.map((item) => item.getTime()))));
       }
     }
+    perf.lap("range-bootstrap");
 
     const [shopCount, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders, autoPickOrdersInRange] = await Promise.all([
       prisma.shop.count({
@@ -390,6 +393,7 @@ export async function GET(request: NextRequest) {
         orderBy: { orderTime: "asc" },
       }),
     ]);
+    perf.lap("core-queries");
 
     const [brushOrdersInRange, settlementsInRange] = await Promise.all([
       prisma.brushOrder.findMany({
@@ -436,6 +440,7 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
+    perf.lap("secondary-queries");
 
     const filteredAutoPickOrdersInRange = shopName
       ? autoPickOrdersInRange.filter((order) => resolveAutoPickMatchedShopName(order, user.permissions) === shopName)
@@ -514,6 +519,7 @@ export async function GET(request: NextRequest) {
         outboundOrder: { select: { date: true, note: true } },
       },
     });
+    perf.lap("outbound-cost-query");
 
     const productCost = outboundProductCost.reduce((sum, item) => {
       const unitCost = item.shopProduct?.costPrice ?? item.product?.costPrice ?? 0;
@@ -728,6 +734,14 @@ export async function GET(request: NextRequest) {
       purchaseOrder: item.purchaseOrder,
       subtotal: FinanceMath.multiply(item.costPrice, item.quantity),
     }));
+    perf.lap("response-build");
+    perf.log("GET /api/stats", {
+      shopName: shopName || null,
+      rangeMode: rangeMode || null,
+      rangeDays: businessTrend.length,
+      purchaseOrders: purchaseOrdersInRange.length,
+      autoPickOrders: filteredAutoPickOrdersInRange.length,
+    });
 
     return NextResponse.json({
       shopCount,
@@ -767,6 +781,8 @@ export async function GET(request: NextRequest) {
       platformBusinessTrend,
       shopBreakdown,
       alerts,
+    }, {
+      headers: perf.headers(),
     });
   } catch (error) {
     if (error instanceof Error) {

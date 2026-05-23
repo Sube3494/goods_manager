@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
@@ -579,6 +580,7 @@ function readDeliveryFee(delivery: unknown) {
 }
 
 export async function GET(request: NextRequest) {
+  const perf = createRequestPerfTracker(request);
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
@@ -587,6 +589,8 @@ export async function GET(request: NextRequest) {
   try {
     const storage = await getStorageStrategy();
     const searchParams = request.nextUrl.searchParams;
+    const liteMode = searchParams.get("_lite") === "1";
+    const includeMetrics = !liteMode && searchParams.get("_metrics") === "1";
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize") || 20)));
     const query = String(searchParams.get("query") || "").trim();
@@ -703,56 +707,67 @@ export async function GET(request: NextRequest) {
         take: pageSize,
       }),
       prisma.autoPickOrder.count({ where }),
-      prisma.autoPickOrder.findMany({
-        where: platformFilterWhere,
-        distinct: ["platform"],
-        select: { platform: true },
-        orderBy: { platform: "asc" },
-      }),
-      prisma.autoPickOrder.findMany({
-        where: {
-          ...statusFilterWhere,
-          NOT: { status: null },
-        },
-        distinct: ["status"],
-        select: { status: true },
-        orderBy: { status: "asc" },
-      }),
+      liteMode
+        ? Promise.resolve([])
+        : prisma.autoPickOrder.findMany({
+            where: platformFilterWhere,
+            distinct: ["platform"],
+            select: { platform: true },
+            orderBy: { platform: "asc" },
+          }),
+      liteMode
+        ? Promise.resolve([])
+        : prisma.autoPickOrder.findMany({
+            where: {
+              ...statusFilterWhere,
+              NOT: { status: null },
+            },
+            distinct: ["status"],
+            select: { status: true },
+            orderBy: { status: "asc" },
+          }),
       prisma.user.findUnique({
         where: { id: session.id },
         select: { permissions: true },
       }),
-      prisma.autoPickOrder.count({
-        where: {
-          ...where,
-          ...(cancelledWhere || {}),
-        },
-      }),
-      prisma.autoPickOrder.count({
-        where: {
-          ...where,
-          ...(cancelledWhere ? { NOT: cancelledWhere } : {}),
-          rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true },
-        },
-      }),
-      prisma.autoPickOrder.findMany({
-        where,
-        select: {
-          platform: true,
-          status: true,
-          actualPaid: true,
-          expectedIncome: true,
-          platformCommission: true,
-          delivery: true,
-          rawPayload: true,
-          items: {
-            select: {
-              quantity: true,
+      !includeMetrics
+        ? Promise.resolve(0)
+        : prisma.autoPickOrder.count({
+            where: {
+              ...where,
+              ...(cancelledWhere || {}),
             },
-          },
-        },
-      }),
+          }),
+      !includeMetrics
+        ? Promise.resolve(0)
+        : prisma.autoPickOrder.count({
+            where: {
+              ...where,
+              ...(cancelledWhere ? { NOT: cancelledWhere } : {}),
+              rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true },
+            },
+          }),
+      !includeMetrics
+        ? Promise.resolve([])
+        : prisma.autoPickOrder.findMany({
+            where,
+            select: {
+              platform: true,
+              status: true,
+              actualPaid: true,
+              expectedIncome: true,
+              platformCommission: true,
+              delivery: true,
+              rawPayload: true,
+              items: {
+                select: {
+                  quantity: true,
+                },
+              },
+            },
+          }),
     ]);
+    perf.lap("core-queries");
 
     const outboundNoteNeedles = orders
       .map((order) => String(order.orderNo || "").trim())
@@ -776,6 +791,7 @@ export async function GET(request: NextRequest) {
           },
         })
       : [];
+    perf.lap("outbound-lookup");
 
     const outboundByOrderNo = new Map<string, { id: string }>();
     for (const outbound of outboundRows) {
@@ -787,31 +803,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const summary = summaryOrders.reduce((acc, order) => {
-      const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
-      const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
-      const cancelled = isAutoPickOrderCancelledStatus(order.status);
-      if (!cancelled) {
-        acc.receivedAmount += Math.max(0, Number(metrics.expectedIncome || 0));
-        acc.platformCommission += metrics.platformCommission;
-        acc.validOrderCount += 1;
-      }
-      acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
-      acc.totalDeliveryFee += readDeliveryFee(order.delivery);
-      return acc;
-    }, {
-      receivedAmount: 0,
-      platformCommission: 0,
-      validOrderCount: 0,
-      itemCount: 0,
-      totalDeliveryFee: 0,
-    });
-    const overview = {
-      totalCount: total,
-      cancelledCount: cancelledTotal,
-      brushCount: brushTotal,
-      trueOrderCount: Math.max(0, total - cancelledTotal - brushTotal),
-    };
+    const summary = !includeMetrics
+      ? null
+      : summaryOrders.reduce((acc, order) => {
+          const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
+          const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
+          const cancelled = isAutoPickOrderCancelledStatus(order.status);
+          if (!cancelled) {
+            acc.receivedAmount += Math.max(0, Number(metrics.expectedIncome || 0));
+            acc.platformCommission += metrics.platformCommission;
+            acc.validOrderCount += 1;
+          }
+          acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
+          acc.totalDeliveryFee += readDeliveryFee(order.delivery);
+          return acc;
+        }, {
+          receivedAmount: 0,
+          platformCommission: 0,
+          validOrderCount: 0,
+          itemCount: 0,
+          totalDeliveryFee: 0,
+        });
+    const overview = !includeMetrics
+      ? null
+      : {
+          totalCount: total,
+          cancelledCount: cancelledTotal,
+          brushCount: brushTotal,
+          trueOrderCount: Math.max(0, total - cancelledTotal - brushTotal),
+        };
 
     const productNames = Array.from(new Set(
       orders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
@@ -844,6 +864,7 @@ export async function GET(request: NextRequest) {
             },
           })
       : [];
+    perf.lap("shop-product-lookup");
 
     const shopProductMap = new Map<string, MatchedCatalogProduct[]>();
     const shopProductSkuMap = new Map<string, MatchedCatalogProduct[]>();
@@ -980,6 +1001,8 @@ export async function GET(request: NextRequest) {
         }),
       };
     });
+    perf.lap("response-build");
+    perf.log("GET /api/orders", { page, pageSize, count: orders.length, total });
 
     return NextResponse.json({
       items: enrichedOrders,
@@ -989,12 +1012,18 @@ export async function GET(request: NextRequest) {
         pageSize,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
       },
-      filters: {
-        platforms: platformRows.map((item) => item.platform).filter(Boolean),
-        statuses: statusRows.map((item) => item.status).filter((item): item is string => Boolean(item)),
-      },
-      summary,
-      overview,
+      ...(liteMode ? {} : {
+        filters: {
+          platforms: platformRows.map((item) => item.platform).filter(Boolean),
+          statuses: statusRows.map((item) => item.status).filter((item): item is string => Boolean(item)),
+        },
+        ...(includeMetrics ? {
+          summary,
+          overview,
+        } : {}),
+      }),
+    }, {
+      headers: perf.headers(),
     });
   } catch (error) {
     console.error("Failed to fetch auto-pick orders:", error);
