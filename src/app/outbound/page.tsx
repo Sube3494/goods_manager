@@ -455,7 +455,7 @@ export default function OutboundPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className={`flex items-center gap-1.5 text-xs font-mono transition-colors ${isReturned ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                          <div className={`flex items-center justify-center gap-1.5 text-xs font-mono transition-colors ${isReturned ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
                             <History size={11} className="opacity-50" />
                             {format(new Date(order.date), 'yyyy-MM-dd HH:mm', { locale: zhCN })}
                           </div>
