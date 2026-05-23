@@ -191,7 +191,8 @@ export function ProductSelectionModal({
       resultsVersion.current += 1;
       lastLoadedSignatureRef.current = "";
 
-      setShowUnselectedOnly(true);
+      // singleSelect 模式（如"修改商品匹配"）下，已选商品应以勾选态显示而非被过滤掉
+      setShowUnselectedOnly(!singleSelect);
       setIsLoading(usesPrefetchedData ? externalLoading : true);
       setShowInitialSkeleton(!(usesPrefetchedData && !externalLoading));
       pageRef.current = 1;
