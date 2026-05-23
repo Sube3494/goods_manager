@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -2927,16 +2927,6 @@ export default function OrdersPage() {
                   onOpenMatchEditor={openMatchEditor}
                   onClearManualMatch={clearManualMatch}
                 />
-              ))}
-            </div>
-          ) : null}
-
-          {!isLoading && activeTab === "today" && todayCompletedOrders.length > 0 ? (
-            <section className="rounded-[28px] border border-black/8 bg-white/76 p-3 shadow-xs dark:border-white/10 dark:bg-white/4">
-              <button
-                type="button"
-                onClick={() => setShowCompletedToday((current) => !current)}
-                className="flex w-full items-center justify-between rounded-[22px] border border-black/8 bg-black/2 px-4 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/3"
               ))}
             </div>
           ) : null}
