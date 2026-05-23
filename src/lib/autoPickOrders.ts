@@ -4052,7 +4052,6 @@ async function resolveOutboundItemsForAutoPickOrder(
   for (const item of order.items) {
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedProductName = toNormalizedText(productName);
     const normalizedSkus = splitCompositeAutoPickSku(item.productNo);
     const skuParts = normalizedSkus.length > 0 ? normalizedSkus : [normalizeAutoPickSkuForMatch(item.productNo)];
     const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.filter(Boolean).length || 1));
@@ -4112,23 +4111,9 @@ async function resolveOutboundItemsForAutoPickOrder(
           );
         }
 
-        const sameShopSkuCandidate = skuCandidates.find((candidate) =>
-          Boolean(candidate.productId || candidate.sourceProductId)
-        );
+        const sameShopSkuCandidate = skuCandidates[0] || null;
         if (sameShopSkuCandidate) {
           resolvedShopProduct = sameShopSkuCandidate;
-        }
-      }
-
-      if (!resolvedShopProduct && normalizedProductName) {
-        const nameCandidates = (shopProductNameMap.get(normalizedProductName) || []).filter((candidate) =>
-          isCandidateInMappedShop(candidate.shopName)
-        );
-        const sameShopNameCandidate = nameCandidates.find((candidate) =>
-          Boolean(candidate.productId || candidate.sourceProductId)
-        );
-        if (sameShopNameCandidate) {
-          resolvedShopProduct = sameShopNameCandidate;
         }
       }
 
