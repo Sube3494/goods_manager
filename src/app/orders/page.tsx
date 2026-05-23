@@ -1914,16 +1914,22 @@ export default function OrdersPage() {
   }, []);
 
   const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem) => {
+    const resolvedShopName = order.matchedShopName || "";
+    // 用 matchedShopName 在本地店铺列表里查找真实数据库 shopId
+    // matchedShopId 来自 rawPayload，不等于数据库 Shop.id，不能直接用
+    const resolvedShopId = localShops.find(
+      (s) => s.name === resolvedShopName
+    )?.id || "";
     setMatchEditorTarget({
       orderId: order.id,
       itemId: String(item.id || "").trim(),
       itemName: item.productName || "未命名商品",
-      shopName: order.matchedShopName || "",
-      shopId: order.matchedShopId || "",
+      shopName: resolvedShopName,
+      shopId: resolvedShopId,
       currentMatchedProductId: item.matchedProduct?.id || "",
     });
     setIsMatchPickerOpen(true);
-  }, []);
+  }, [localShops]);
 
   const closeMatchEditor = useCallback(() => {
     if (isSavingMatch) return;
@@ -2931,6 +2937,16 @@ export default function OrdersPage() {
                 type="button"
                 onClick={() => setShowCompletedToday((current) => !current)}
                 className="flex w-full items-center justify-between rounded-[22px] border border-black/8 bg-black/2 px-4 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/3"
+              ))}
+            </div>
+          ) : null}
+
+          {!isLoading && activeTab === "today" && todayCompletedOrders.length > 0 ? (
+            <section className="rounded-[28px] border border-black/8 bg-white/76 p-3 shadow-xs dark:border-white/10 dark:bg-white/4">
+              <button
+                type="button"
+                onClick={() => setShowCompletedToday((current) => !current)}
+                className="flex w-full items-center justify-between rounded-[22px] border border-black/8 bg-black/2 px-4 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/3"
               >
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">今日已完成</div>
@@ -3052,7 +3068,9 @@ export default function OrdersPage() {
         fetchPath="/api/shop-products"
         query={{
           all: "true",
+          // 用真实数据库 shopId 做后端过滤；shopName 供前端 isShopNameMatch 兜底
           ...(matchEditorTarget?.shopId ? { shopId: matchEditorTarget.shopId } : {}),
+          ...(matchEditorTarget?.shopName ? { shopName: matchEditorTarget.shopName } : {}),
         }}
         emptyStateText={matchEditorTarget?.shopName ? `当前店铺“${matchEditorTarget.shopName}”下没有找到候选商品` : "未找到相关商品"}
       />
