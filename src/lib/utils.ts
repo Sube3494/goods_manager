@@ -117,26 +117,26 @@ export function parseOutboundNote(note: string | undefined | null): ParsedNote {
   let workingNote = noteParts ? noteParts[1] : note;
   
   // 1. 提取店铺
-  const shopMatch = workingNote.match(/^\[店铺:(.*?)\]\s*/);
+  const shopMatch = workingNote.match(/\[店铺:(.*?)\]/);
   if (shopMatch) {
     result.shopName = shopMatch[1];
-    workingNote = workingNote.replace(/^\[店铺:.*?\]\s*/, '');
+    workingNote = workingNote.replace(/\[店铺:.*?\]\s*/, '');
   }
   
   // 2. 提取流水号
-  const serialMatch = workingNote.match(/^\[流水号:(.*?)\]\s*/);
+  const serialMatch = workingNote.match(/\[流水号:(.*?)\]/);
   if (serialMatch) {
     if (serialMatch[1] !== '无') {
       result.serialNum = serialMatch[1];
     }
-    workingNote = workingNote.replace(/^\[流水号:.*?\]\s*/, '');
+    workingNote = workingNote.replace(/\[流水号:.*?\]\s*/, '');
   }
   
   // 3. 提取平台标识
-  const platformMatch = workingNote.match(/^\[([^\[\]]+)\]/);
+  const platformMatch = workingNote.match(/\[([^\[\]]+)\]/);
   if (platformMatch) {
     result.platform = platformMatch[1];
-    workingNote = workingNote.replace(/^\[([^\[\]]+)\]\s*/, '');
+    workingNote = workingNote.replace(/\[([^\[\]]+)\]\s*/, '');
   }
   
   // 4. 提取平台单号
@@ -171,7 +171,15 @@ export interface PlatformBadgeMeta {
 
 export function getPlatformMeta(platform: string | undefined | null): PlatformBadgeMeta | null {
   if (!platform) return null;
-  const name = platform.trim();
+  let name = platform.trim();
+
+  if (name.includes("帮我取货")) {
+    return {
+      name: "帮我取货",
+      iconSrc: "/platform/其他.svg",
+      className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 dark:bg-violet-500/20 dark:border-violet-500/30",
+    };
+  }
   
   if (name.includes("美团")) {
     return {

@@ -41,8 +41,8 @@ function formatPurchaseItemsSummary(purchase: PurchaseOrder) {
   return {
     items: visibleItems.map((item) => ({
       key: item.id || item.shopProductId || item.productId || `${item.quantity}-${item.costPrice}`,
-      name: item.shopProduct?.name || item.product?.name || "未知商品",
-      image: item.shopProduct?.image || item.product?.image || "",
+      name: item.shopProduct?.productName || item.shopProduct?.name || "未知商品",
+      image: item.shopProduct?.image || "",
       quantity: item.quantity,
     })),
     hasMore: purchase.items.length > visibleItems.length,
@@ -611,7 +611,7 @@ function PurchasesContent() {
           totalAmount += subtotal;
 
           // ── 第一步：预取图片并计算尺寸，用于动态行高 ──
-          const imageUrl = item.image || item.shopProduct?.image || item.product?.image;
+          const imageUrl = item.shopProduct?.image || item.image;
           let imageBuffer: ArrayBuffer | null = null;
           let imgW = 0;
           let imgH = 0;

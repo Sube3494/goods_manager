@@ -50,16 +50,16 @@ const PurchaseItemRow = memo(({
 }) => {
     const itemKey = item.shopProductId || item.productId || "";
     const productData = useMemo(() => {
-        const p = item.product || products.find(g => g.id === itemKey);
-        const supplierId = p?.supplierId || item.supplierId;
+        const p = products.find(g => g.id === itemKey);
+        const supplierId = item.shopProduct?.supplierId || item.supplierId;
         return {
-            imageUrl: item.image || p?.image,
-            productName: p?.name || "加载中...",
-            productSku: p?.sku,
+            imageUrl: item.shopProduct?.image || item.image || p?.image,
+            productName: item.shopProduct?.productName || item.shopProduct?.name || p?.name || "加载中...",
+            productSku: item.shopProduct?.sku || p?.sku,
             supplierName: suppliers.find(s => s.id === supplierId)?.name,
-            remark: p?.remark
+            remark: item.shopProduct?.remark || p?.remark
         };
-    }, [item, products, suppliers]);
+    }, [item, products, suppliers, itemKey]);
 
     const isBatchMode = onToggle !== undefined;
     const [confirmingDelete, setConfirmingDelete] = useState(false);

@@ -15,6 +15,7 @@ async function resolvePurchaseOrderResponse<T extends {
   items: Array<{
     shopProduct?: {
       productImage?: string | null;
+      productName?: string | null;
     } | null;
     product?: {
       image?: string | null;
@@ -45,6 +46,7 @@ async function resolvePurchaseOrderResponse<T extends {
       shopProduct: item.shopProduct
         ? {
             ...item.shopProduct,
+            name: item.shopProduct.productName || "未命名商品",
             image: item.shopProduct.productImage ? storage.resolveUrl(item.shopProduct.productImage) : null,
           }
         : null,

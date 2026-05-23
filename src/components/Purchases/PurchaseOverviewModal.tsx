@@ -53,14 +53,14 @@ export function PurchaseOverviewModal({ isOpen, onClose, purchases }: PurchaseOv
         if (!pid) {
           continue;
         }
-        const name = item.shopProduct?.name || item.product?.name || "未知商品";
-        const sku = item.shopProduct?.sku || item.product?.sku || "";
+        const name = item.shopProduct?.productName || item.shopProduct?.name || "未知商品";
+        const sku = item.shopProduct?.sku || "";
         const qty = item.quantity || 0;
         const sid = item.supplierId || item.shopProduct?.supplierId || item.product?.supplierId || "";
         const sname = item.supplier?.name || (item.product as { supplier?: { name: string } })?.supplier?.name || "";
         
-        // Pick image: PurchaseOrderItem.image or Product.image
-        const image = item.image || item.shopProduct?.image || item.product?.image;
+        // Pick image: PurchaseOrderItem.image or ShopProduct.image
+        const image = item.shopProduct?.image || item.image;
 
 
         // Product aggregation

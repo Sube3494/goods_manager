@@ -104,6 +104,7 @@ export interface ShopCatalogItem {
   sku?: string | null;
   jdSkuId?: string | null;
   name: string;
+  productName?: string | null;
   image?: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
