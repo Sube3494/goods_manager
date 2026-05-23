@@ -351,6 +351,7 @@ export default function OutboundPage() {
                     const isReturned = order.status === 'Returned';
                     const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
                     const rawNote = noteParts ? noteParts[1] : (order.note || "");
+                    const platformName = extractPlatform(rawNote);
                     
                     const shopMatch = rawNote.match(/^\[店铺:(.*?)\]\s*/);
                     const shopName = shopMatch ? shopMatch[1] : resolveOrderShopName(order);
@@ -375,12 +376,19 @@ export default function OutboundPage() {
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-center text-[11px] font-mono text-muted-foreground">
                           <div className="flex flex-col items-center gap-1.5">
-                            {shopName && (
-                              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                <Store size={8} />
-                                {shopName}
-                              </span>
-                            )}
+                            <div className="flex flex-wrap items-center justify-center gap-1">
+                              {shopName && (
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                  <Store size={8} />
+                                  {shopName}
+                                </span>
+                              )}
+                              {platformName && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-500/10 text-violet-500 border border-violet-500/20">
+                                  {platformName}
+                                </span>
+                              )}
+                            </div>
                             <span className="font-semibold text-muted-foreground/40 text-[10px]">
                               {serialNum ? `流水单号 #${serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
                             </span>
@@ -512,6 +520,7 @@ export default function OutboundPage() {
                 const isReturned = order.status === 'Returned';
                 const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
                 const rawNote = noteParts ? noteParts[1] : (order.note || "");
+                const platformName = extractPlatform(rawNote);
                 
                 const shopMatch = rawNote.match(/^\[店铺:(.*?)\]\s*/);
                 const shopName = shopMatch ? shopMatch[1] : resolveOrderShopName(order);
@@ -546,6 +555,11 @@ export default function OutboundPage() {
                         {shopName && (
                           <span className="text-[9px] font-bold text-blue-500 px-1.5 py-0.5 bg-blue-500/10 rounded border border-blue-500/20 flex items-center gap-0.5">
                             <Store size={8} /> {shopName}
+                          </span>
+                        )}
+                        {platformName && (
+                          <span className="text-[9px] font-bold text-violet-500 px-1.5 py-0.5 bg-violet-500/10 rounded border border-violet-500/20">
+                            {platformName}
                           </span>
                         )}
                         {isReturned && (
