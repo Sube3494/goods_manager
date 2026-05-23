@@ -88,3 +88,117 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     return false;
   }
 }
+
+export interface ParsedNote {
+  platform: string | null;
+  platformId: string | null;
+  address: string | null;
+  userNote: string | null;
+  shopName: string | null;
+  serialNum: string | null;
+  rawNote: string;
+}
+
+export function parseOutboundNote(note: string | undefined | null): ParsedNote {
+  const result: ParsedNote = {
+    platform: null,
+    platformId: null,
+    address: null,
+    userNote: null,
+    shopName: null,
+    serialNum: null,
+    rawNote: note || "",
+  };
+  
+  if (!note) return result;
+  
+  // 提取对冲退回前的原始备注
+  const noteParts = note.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
+  let workingNote = noteParts ? noteParts[1] : note;
+  
+  // 1. 提取店铺
+  const shopMatch = workingNote.match(/^\[店铺:(.*?)\]\s*/);
+  if (shopMatch) {
+    result.shopName = shopMatch[1];
+    workingNote = workingNote.replace(/^\[店铺:.*?\]\s*/, '');
+  }
+  
+  // 2. 提取流水号
+  const serialMatch = workingNote.match(/^\[流水号:(.*?)\]\s*/);
+  if (serialMatch) {
+    if (serialMatch[1] !== '无') {
+      result.serialNum = serialMatch[1];
+    }
+    workingNote = workingNote.replace(/^\[流水号:.*?\]\s*/, '');
+  }
+  
+  // 3. 提取平台标识
+  const platformMatch = workingNote.match(/^\[([^\[\]]+)\]/);
+  if (platformMatch) {
+    result.platform = platformMatch[1];
+    workingNote = workingNote.replace(/^\[([^\[\]]+)\]\s*/, '');
+  }
+  
+  // 4. 提取平台单号
+  const platformIdMatch = workingNote.match(/平台单号:\s*([^\s|]+)/);
+  if (platformIdMatch) {
+    result.platformId = platformIdMatch[1];
+    // 移除平台单号部分
+    workingNote = workingNote.replace(/平台单号:\s*[^\s|]+\s*\|?\s*/, '');
+  }
+  
+  // 5. 提取地址
+  const addressMatch = workingNote.match(/地址:\s*([^|]+)/);
+  if (addressMatch) {
+    result.address = addressMatch[1].trim();
+    // 移除地址部分
+    workingNote = workingNote.replace(/地址:\s*[^|]+\s*\|?\s*/, '');
+  }
+  
+  // 6. 提取真实备注
+  let cleanNote = workingNote.replace(/^\|\s*/, '').replace(/\|\s*$/, '');
+  cleanNote = cleanNote.replace(/^备注:\s*/, '').trim();
+  result.userNote = cleanNote || null;
+  
+  return result;
+}
+
+export interface PlatformBadgeMeta {
+  name: string;
+  iconSrc: string;
+  className: string;
+}
+
+export function getPlatformMeta(platform: string | undefined | null): PlatformBadgeMeta | null {
+  if (!platform) return null;
+  const name = platform.trim();
+  
+  if (name.includes("美团")) {
+    return {
+      name: "美团",
+      iconSrc: "/platform/美团.svg",
+      className: "bg-[#FFD000]/10 text-amber-700 dark:text-[#FFD000] border-amber-500/20 dark:bg-[#FFD000]/20 dark:border-[#FFD000]/30",
+    };
+  }
+  if (name.includes("京东")) {
+    return {
+      name: "京东",
+      iconSrc: "/platform/京东.svg",
+      className: "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 dark:bg-red-500/20 dark:border-red-500/30",
+    };
+  }
+  if (name.includes("淘宝")) {
+    return {
+      name: "淘宝",
+      iconSrc: "/platform/淘宝.svg",
+      className: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 dark:bg-orange-500/20 dark:border-orange-500/30",
+    };
+  }
+  return {
+    name: name,
+    iconSrc: "/platform/其他.svg",
+    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 dark:bg-violet-500/20 dark:border-violet-500/30",
+  };
+}
+
+

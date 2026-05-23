@@ -1192,7 +1192,7 @@ export function PurchaseOrderModal({
                                 <div className="flex items-baseline gap-0.5 sm:gap-1">
                                     <span className="text-[10px] sm:text-xs font-bold text-primary">￥</span>
                                     <span className="text-xl sm:text-2xl font-black text-foreground font-mono tabular-nums leading-none">
-                                        {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                                        {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                 </div>
                             </div>

@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const session = await getFreshSession() as SessionUser | null;
   const { searchParams } = new URL(request.url);
   const scope = searchParams.get("scope") || "all";
+  const shopId = searchParams.get("shopId");
   const mainProductsOnly = scope === "main-products";
 
   try {
@@ -23,24 +24,28 @@ export async function GET(request: Request) {
     });
 
     const [products, shopProducts] = await Promise.all([
-      prisma.product.findMany({
-        where: session ? {
-          userId: session.id,
-          ...(mainProductsOnly ? { isShopOnly: false } : {}),
-        } : {
-          isPublic: true,
-          isShopOnly: false,
-        },
-        select: {
-          categoryId: true,
-        },
-      }),
+      // 如果指定了 shopId，说明只查询该店的分类，主库商品计数置空
+      shopId
+        ? Promise.resolve([])
+        : prisma.product.findMany({
+            where: session ? {
+              userId: session.id,
+              ...(mainProductsOnly ? { isShopOnly: false } : {}),
+            } : {
+              isPublic: true,
+              isShopOnly: false,
+            },
+            select: {
+              categoryId: true,
+            },
+          }),
       session
         ? prisma.shopProduct.findMany({
             where: {
               shop: {
                 userId: session.id,
               },
+              ...(shopId ? { shopId } : {}),
             },
             select: {
               categoryId: true,
@@ -61,7 +66,8 @@ export async function GET(request: Request) {
       countMap.set(product.categoryId, current + 1);
     }
 
-    
+    const showOnlyWithProducts = mainProductsOnly || !!shopId;
+
     // 映射回前端需要的结构
     const formatted = categories.map(c => ({
       id: c.id,
@@ -69,7 +75,7 @@ export async function GET(request: Request) {
       description: c.description || "",
       count: countMap.get(c.id) || 0,
     }))
-      .filter((category) => !mainProductsOnly || category.count > 0)
+      .filter((category) => !showOnlyWithProducts || category.count > 0)
       .sort((a, b) => {
         const nameCompare = a.name.localeCompare(b.name, "zh-CN", {
           numeric: true,

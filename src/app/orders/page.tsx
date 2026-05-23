@@ -3048,7 +3048,7 @@ export default function OrdersPage() {
         showPlatformSelector={false}
         showCategoryFilter
         showPrice={false}
-        title={matchEditorTarget ? `改商品匹配 · ${matchEditorTarget.itemName}` : "改商品匹配"}
+        title="修改商品匹配"
         fetchPath="/api/shop-products"
         query={{
           all: "true",

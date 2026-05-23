@@ -39,6 +39,23 @@ function getInboundTypeLabel(order: PurchaseOrder) {
   }
 }
 
+function getCleanShortId(id: string): string {
+  if (id.startsWith('PO-AUTO-')) {
+    return id.slice('PO-AUTO-'.length).replace(/^[-\s]+/, '');
+  }
+  if (id.startsWith('PO-INIT-')) {
+    return id.slice('PO-INIT-'.length);
+  }
+  if (id.startsWith('PO-')) {
+    const sub = id.slice('PO-'.length);
+    if (sub.length > 8 && /^\d{8}-\d+$/.test(sub)) {
+      return sub.slice(4);
+    }
+    return sub;
+  }
+  return id.slice(-6).toUpperCase().replace(/^[-\s]+/, '');
+}
+
 function InboundContent() {
   const { showToast } = useToast();
   // Data States
@@ -302,7 +319,8 @@ function InboundContent() {
             <tbody className="divide-y divide-border">
                 {paginatedInbounds.map((po) => {
                   const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
-                  const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${po.id.slice(-6).toUpperCase()}`;
+                  const cleanId = getCleanShortId(po.id);
+                  const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${cleanId}`;
 
                   return (
                    <tr 
@@ -328,7 +346,7 @@ function InboundContent() {
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] font-mono text-muted-foreground/30 font-semibold">{serialText}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground/50 font-medium">{serialText}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -337,7 +355,7 @@ function InboundContent() {
                           <div 
                             key={idx} 
                             className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default"
-                              title={item.product?.name}
+                            title={item.product?.name}
                           >
                             <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
                               {item.product?.image ? (
@@ -415,7 +433,8 @@ function InboundContent() {
             ) : paginatedInbounds.length > 0 ? (
               paginatedInbounds.map((po) => {
                 const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
-                const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${po.id.slice(-6).toUpperCase()}`;
+                const cleanId = getCleanShortId(po.id);
+                const shortIdText = serialMatch && serialMatch[1] !== '无' ? `#${serialMatch[1]}` : `#${cleanId}`;
 
                 return (
                 <div
@@ -424,21 +443,21 @@ function InboundContent() {
                   className="rounded-2xl border border-border/50 bg-white/50 dark:bg-white/5 p-4 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-3">
-                     <div className="flex flex-col gap-1">
-                       <div className="flex items-center gap-1.5">
-                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                            po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-                         }`}>
-                           {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
-                         </span>
-                         {po.shopName && (
-                           <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
-                             <Store size={8} />
-                             {po.shopName}
-                           </span>
-                         )}
-                       </div>
-                       <span className="text-[10px] font-mono text-muted-foreground/30 font-semibold">{serialText}</span>
+                     <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                           po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                        }`}>
+                          {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
+                        </span>
+                        {po.shopName && (
+                          <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
+                            <Store size={8} />
+                            {po.shopName}
+                          </span>
+                        )}
+                        <span className="inline-flex items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 py-0.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
+                          {shortIdText}
+                        </span>
                      </div>
                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase shrink-0">
                         已入库
@@ -486,8 +505,8 @@ function InboundContent() {
                     </div>
                   </div>
                 </div>
-              );
-            })
+                );
+              })
             ) : (
               <EmptyState
                 icon={<Package size={40} strokeWidth={1.5} />}

@@ -42,11 +42,8 @@ export default function ShopGoodsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [sortBy, setSortBy] = useState("sku-desc");
-  const [categoryOptions, setCategoryOptions] = useState([{ value: "all", label: "全部分类" }]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [assignedTemplateIds, setAssignedTemplateIds] = useState<string[]>([]);
-  const [templateCatalogProducts, setTemplateCatalogProducts] = useState<Product[]>([]);
-  const [isTemplateCatalogLoading, setIsTemplateCatalogLoading] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -80,6 +77,16 @@ export default function ShopGoodsPage() {
     },
     [selectedShopId]
   );
+
+  const categoryOptions = useMemo(() => {
+    const names = Array.from(new Set([
+      ...categories.map((category) => String(category.name || "").trim()),
+      ...items.map((item) => String(item.categoryName || "").trim() || "未分类"),
+    ].filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, "zh-CN"));
+
+    return [{ value: "all", label: "全部分类" }, ...names.map((name) => ({ value: name, label: name }))];
+  }, [categories, items]);
 
   const displayedItems = useMemo(
     () =>
@@ -251,7 +258,7 @@ export default function ShopGoodsPage() {
 
   useEffect(() => {
     const fetchAssignedTemplateIds = async () => {
-      if (!selectedShopId) {
+      if (!isPickerOpen || !selectedShopId) {
         setAssignedTemplateIds([]);
         return;
       }
@@ -281,64 +288,7 @@ export default function ShopGoodsPage() {
     };
 
     void fetchAssignedTemplateIds();
-  }, [selectedShopId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchTemplateCatalog = async () => {
-      setIsTemplateCatalogLoading(true);
-      try {
-        const params = new URLSearchParams({
-          all: "true",
-          page: "1",
-          pageSize: "2000",
-          includePublic: "true",
-          ...(selectedShopId ? { shopId: selectedShopId, shopFilterMode: "unassigned" } : {}),
-        });
-        const res = await fetch(`/api/products?${params.toString()}`);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data?.error || "Failed to fetch template catalog");
-        }
-
-        if (cancelled) return;
-        const nextProducts = Array.isArray(data?.items) ? data.items : [];
-        setTemplateCatalogProducts(nextProducts);
-      } catch (error) {
-        if (cancelled) return;
-        console.error("Failed to fetch template catalog:", error);
-        setTemplateCatalogProducts([]);
-      } finally {
-        if (!cancelled) {
-          setIsTemplateCatalogLoading(false);
-        }
-      }
-    };
-
-    void fetchTemplateCatalog();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedShopId]);
-
-  useEffect(() => {
-    const fetchCategoryOptions = async () => {
-      try {
-        const queryParams = buildAggregateQuery(1, { pageSize: "2000" });
-        const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
-        const data: ShopProductsResponse = await res.json().catch(() => ({}));
-        if (!res.ok) return;
-        const names = Array.from(new Set((data.items || []).map((item) => (item.categoryName || "未分类").trim() || "未分类")))
-          .sort((a, b) => a.localeCompare(b, "zh-CN"));
-        setCategoryOptions([{ value: "all", label: "全部分类" }, ...names.map((name) => ({ value: name, label: name }))]);
-      } catch (error) {
-        console.error("Failed to fetch shop categories:", error);
-      }
-    };
-    void fetchCategoryOptions();
-  }, [buildAggregateQuery]);
+  }, [isPickerOpen, selectedShopId]);
 
   useEffect(() => {
     if (!hasMore || isLoading || isNextPageLoading) return;

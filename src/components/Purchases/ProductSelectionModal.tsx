@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import { X, Search, Check, Loader2, Package } from "lucide-react";
@@ -150,6 +150,7 @@ export function ProductSelectionModal({
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
+  const [localVisibleCount, setLocalVisibleCount] = useState(50);
   const { showToast } = useToast();
   const resultsVersion = useRef(0);
   const [mounted] = useState(typeof window !== "undefined");
@@ -194,13 +195,18 @@ export function ProductSelectionModal({
       setIsLoading(usesPrefetchedData ? externalLoading : true);
       setShowInitialSkeleton(!(usesPrefetchedData && !externalLoading));
       pageRef.current = 1;
+      setLocalVisibleCount(50);
       setIsInitialized(true);
     } else {
       setIsInitialized(false);
       setShowInitialSkeleton(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // 移除对 selectedIds 的依赖，因为它可能由于父组件重渲染而导致意外重置
+  }, [isOpen]); 
+
+  useEffect(() => {
+    setLocalVisibleCount(50);
+  }, [debouncedSearch, selectedCategoryName, showUnselectedOnly]);
 
   useEffect(() => {
     if (!usesPrefetchedData) return;
@@ -250,9 +256,15 @@ export function ProductSelectionModal({
         ...(remoteCategoryName !== "all" ? { category: remoteCategoryName } : {}),
       });
 
+      const shopId = query?.shopId;
+      const categoryUrl = shopId 
+        ? `/api/categories?shopId=${shopId}` 
+        : fetchPath === "/api/shop-products" 
+        ? "/api/categories" 
+        : "/api/categories?scope=main-products";
       const [pRes, sRes] = await Promise.all([
         fetch(`${fetchPath}?${queryParams.toString()}`),
-        mode === 'initial' && shouldShowCategoryFilter ? fetch("/api/categories?scope=main-products") : Promise.resolve(null)
+        mode === 'initial' && shouldShowCategoryFilter ? fetch(categoryUrl) : Promise.resolve(null)
       ]);
 
       if (version !== resultsVersion.current) return;
@@ -334,26 +346,6 @@ export function ProductSelectionModal({
     fetchData('initial');
   }, [fetchData, isInitialized, isOpen, querySignature, usesPrefetchedData]);
 
-  useEffect(() => {
-    if (usesPrefetchedData) return;
-    if (!isOpen || !hasMore || isLoading || isSearching || isNextPageLoading) return;
-
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting) {
-          fetchData('next');
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-
-    return () => observer.disconnect();
-  }, [fetchData, hasMore, isLoading, isNextPageLoading, isOpen, isSearching, usesPrefetchedData]);
-
   const filterVisibleProducts = useCallback((candidates: Product[], categoryName = selectedCategoryName) => {
     const normalizedSearch = debouncedSearch.trim().toLowerCase();
     const scopedShopName = normalizeShopName(query?.shopName);
@@ -373,12 +365,56 @@ export function ProductSelectionModal({
   }, [debouncedSearch, getSelectionKey, query?.shopName, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
 
   const displayCategoryName = usesPrefetchedData || loadAllOnOpen ? selectedCategoryName : loadedCategoryName;
-  const filteredProducts = filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
-  const selectableProducts = filteredProducts.filter((product) => !selectedIds.includes(getSelectionKey(product)));
-  const allFilteredSelected =
-    !singleSelect &&
-    selectableProducts.length > 0 &&
-    selectableProducts.every((product) => tempSelectedIds.includes(getSelectionKey(product)));
+
+  const filteredProducts = useMemo(() => {
+    return filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
+  }, [filterVisibleProducts, products, displayCategoryName]);
+
+  const hasMoreLocal = filteredProducts.length > localVisibleCount;
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const needBackendMore = !usesPrefetchedData && hasMore && !isLoading && !isSearching && !isNextPageLoading;
+    const needFrontendMore = hasMoreLocal;
+
+    if (!needBackendMore && !needFrontendMore) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting) {
+          if (needBackendMore) {
+            fetchData('next');
+          } else if (needFrontendMore) {
+            setLocalVisibleCount(prev => prev + 50);
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [fetchData, hasMore, isLoading, isNextPageLoading, isOpen, isSearching, usesPrefetchedData, hasMoreLocal]);
+
+  const selectableProducts = useMemo(() => {
+    return filteredProducts.filter((product: Product) => !selectedIds.includes(getSelectionKey(product)));
+  }, [filteredProducts, selectedIds, getSelectionKey]);
+
+  const allFilteredSelected = useMemo(() => {
+    return (
+      !singleSelect &&
+      selectableProducts.length > 0 &&
+      selectableProducts.every((product: Product) => tempSelectedIds.includes(getSelectionKey(product)))
+    );
+  }, [singleSelect, selectableProducts, tempSelectedIds, getSelectionKey]);
+
+  const displayedProducts = useMemo(() => {
+    return filteredProducts.slice(0, localVisibleCount);
+  }, [filteredProducts, localVisibleCount]);
 
   const handleToggleSelectAll = async () => {
     if (singleSelect || selectableProducts.length === 0) {
@@ -518,7 +554,7 @@ export function ProductSelectionModal({
                     </div>
                  ) : (
                     <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-1.5")}>
-                    {filteredProducts.map(product => {
+                    {displayedProducts.map((product: Product) => {
                       const selectionKey = getSelectionKey(product);
                       const isSelected = tempSelectedIds.includes(selectionKey);
                       const isAlreadySelected = selectedIds.includes(selectionKey);
@@ -639,25 +675,24 @@ export function ProductSelectionModal({
                         <div className="py-12 text-center text-muted-foreground">
                             {emptyStateText}
                         </div>
-                    )}
+                     )}
                     
-                    <div ref={observerTarget} className="flex h-14 items-center justify-center">
-                      {filteredProducts.length > 0 && hasMore && !isLoading && !isSearching && isNextPageLoading && (
+                     <div ref={observerTarget} className="flex h-14 items-center justify-center">
+                      {(isNextPageLoading || (hasMoreLocal && !isLoading && !isSearching)) ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
                           <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                           加载更多...
                         </div>
-                      )}
-                      {filteredProducts.length > 0 && hasMore && !isLoading && !isSearching && !isNextPageLoading && (
+                      ) : (hasMore && !isLoading && !isSearching) ? (
                         <div className="h-5 opacity-0">占位</div>
-                      )}
+                      ) : null}
+                     </div>
                     </div>
-                    </div>
-                 )}
+                  )}
                 </div>
             </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5 gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5 gap-4">
                {showPlatformSelector ? (
                  <div className="flex flex-col gap-2 w-full sm:w-auto">
                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>
