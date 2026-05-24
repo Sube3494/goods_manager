@@ -125,13 +125,13 @@ export async function POST(request: Request) {
               }
             }
 
+            // stock 字段禁止通过导入覆盖，库存只能通过采购入库批次生成
             await tx.product.upsert({
               where: { sku },
               update: {
                 name,
                 categoryId,
                 supplierId,
-                stock: Number(p["库存数量"] || 0),
                 costPrice: Number(p["成本价"] || 0)
               },
               create: {
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
                 name,
                 categoryId,
                 supplierId,
-                stock: Number(p["库存数量"] || 0),
+                stock: 0, // 新建时库存初始为 0，需通过采购入库
                 costPrice: Number(p["成本价"] || 0),
                 userId
               }

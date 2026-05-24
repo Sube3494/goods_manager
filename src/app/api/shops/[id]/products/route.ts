@@ -381,7 +381,6 @@ export async function PUT(
     const productImage = typeof body?.image === "string" ? body.image.trim() : "";
     const supplierId = typeof body?.supplierId === "string" ? body.supplierId.trim() : "";
     const costPrice = Number(body?.costPrice ?? 0);
-    const stock = Number(body?.stock ?? 0);
     const isPublic = Boolean(body?.isPublic ?? true);
     const isDiscontinued = Boolean(body?.isDiscontinued ?? false);
     const remark = typeof body?.remark === "string" ? body.remark.trim() : "";
@@ -426,7 +425,6 @@ export async function PUT(
         productImage: normalizedProductImage,
         supplierId: supplierId || null,
         costPrice: Number.isFinite(costPrice) ? costPrice : 0,
-        stock: Number.isFinite(stock) ? stock : 0,
         isPublic,
         isDiscontinued,
         remark: remark || null,
@@ -697,10 +695,7 @@ export async function PATCH(
       updateData.costPrice = Number.isFinite(costPrice) ? costPrice : 0;
     }
 
-    if (body?.stock !== undefined) {
-      const stock = Number(body.stock);
-      updateData.stock = Number.isFinite(stock) ? Math.max(0, Math.trunc(stock)) : 0;
-    }
+    // stock 字段禁止通过此接口手动修改，库存只能通过采购入库生成批次
 
     if (body?.isShelfLife !== undefined) {
       updateData.isShelfLife = Boolean(body.isShelfLife);

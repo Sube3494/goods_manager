@@ -7,6 +7,7 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
+import { InventoryService } from "@/services/inventoryService";
 
 async function resolvePurchaseOrderResponse<T extends {
   status?: string;
@@ -245,25 +246,20 @@ export async function POST(request: Request) {
         }
       });
 
-      // 如果状态是 Received，增加商品库存 (原子事务)
+      // 如果状态是 Received，更新店铺商品成本价，并调用同步物理库存 (原子事务)
       if (normalizedStatus === "Received") {
         for (const item of items) {
           if (item.shopProductId) {
             const incomingCost = FinanceMath.add(Number(item.costPrice) || 0, 0);
-            await tx.shopProduct.update({
-              where: { id: item.shopProductId },
-              data: {
-                stock: { increment: Number(item.quantity) || 0 },
-                ...(incomingCost > 0 ? { costPrice: incomingCost } : {}),
-              }
-            });
+            if (incomingCost > 0) {
+              await tx.shopProduct.update({
+                where: { id: item.shopProductId },
+                data: { costPrice: incomingCost }
+              });
+            }
+            await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
           } else if (item.productId) {
-            await tx.product.update({
-              where: { id: item.productId },
-              data: {
-                stock: { increment: Number(item.quantity) || 0 }
-              }
-            });
+            await InventoryService.syncStockFromBatches(tx, item.productId, null);
           }
         }
       }

@@ -87,76 +87,67 @@ export class InventoryService {
         throw new Error(`商品 ID ${item.shopProductId || item.productId} 库存不足，缺口: ${remainingToDeduct}`);
       }
 
-      // 4. 更新业务商品库存总量（优先店铺商品）
-      if (item.shopProductId) {
-        const shopProductResult = await tx.shopProduct.updateMany({
-          where: {
-            id: item.shopProductId,
-            shop: { userId },
-            stock: {
-              gte: item.quantity
-            }
-          },
-          data: {
-            stock: {
-              decrement: item.quantity
-            }
-          }
-        });
+      // 4. 根据实际扣减完的批次，统一同步该商品及其关联的主库商品物理库存
+      await this.syncStockFromBatches(tx, item.productId || null, item.shopProductId || null);
+    }
+  }
 
-        if (shopProductResult.count === 0) {
-          throw new Error(`并发冲突：店铺商品 ID ${item.shopProductId} 的库存发生变动导致不足。请重试。`);
+  /**
+   * 将指定商品的物理库存 stock 字段同步为所有已确认采购批次(PurchaseOrderItem)的剩余数量之和。
+   * @param tx Prisma 事务客户端
+   * @param productId 主库商品 ID
+   * @param shopProductId 店铺商品 ID
+   */
+  static async syncStockFromBatches(
+    tx: Prisma.TransactionClient,
+    productId: string | null,
+    shopProductId: string | null
+  ) {
+    if (shopProductId) {
+      // 聚合所有有效的店铺采购批次
+      const aggregateResult = await tx.purchaseOrderItem.aggregate({
+        where: {
+          shopProductId,
+          remainingQuantity: { gt: 0 },
+          purchaseOrder: { status: "Received" }
+        },
+        _sum: {
+          remainingQuantity: true
         }
+      });
+      const sum = aggregateResult._sum.remainingQuantity || 0;
 
-        // 4.1 同步扣减关联的主库全局商品库存（Product.stock）
-        // 如果该店铺商品关联了主库商品（productId），则联动扣减主库总库存
-        // 避免 ShopProduct.stock 扣减了但 Product.stock 没动，导致数据脱节
-        const linkedProductId = item.productId;
-        if (linkedProductId) {
-          await tx.product.update({
-            where: { id: linkedProductId },
-            data: {
-              stock: {
-                decrement: item.quantity
-              }
-            }
-          });
-        } else {
-          // 如果 item 中没有携带 productId，则从数据库中查询一次
-          const shopProduct = await tx.shopProduct.findUnique({
-            where: { id: item.shopProductId },
-            select: { productId: true }
-          });
-          if (shopProduct?.productId) {
-            await tx.product.update({
-              where: { id: shopProduct.productId },
-              data: {
-                stock: {
-                  decrement: item.quantity
-                }
-              }
-            });
-          }
-        }
-      } else {
-        const productResult = await tx.product.updateMany({
-          where: {
-            id: item.productId!,
-            stock: {
-              gte: item.quantity
-            }
-          },
-          data: {
-            stock: {
-              decrement: item.quantity
-            }
-          }
-        });
+      await tx.shopProduct.update({
+        where: { id: shopProductId },
+        data: { stock: sum }
+      });
 
-        if (productResult.count === 0) {
-          throw new Error(`并发冲突：商品 ID ${item.productId} 的总库存发生变动导致不足。请重试。`);
-        }
+      // 联动同步主库商品
+      const sp = await tx.shopProduct.findUnique({
+        where: { id: shopProductId },
+        select: { productId: true }
+      });
+      if (sp?.productId) {
+        await this.syncStockFromBatches(tx, sp.productId, null);
       }
+    } else if (productId) {
+      // 聚合所有有效的全局采购批次（包括所有店铺的）
+      const aggregateResult = await tx.purchaseOrderItem.aggregate({
+        where: {
+          productId,
+          remainingQuantity: { gt: 0 },
+          purchaseOrder: { status: "Received" }
+        },
+        _sum: {
+          remainingQuantity: true
+        }
+      });
+      const sum = aggregateResult._sum.remainingQuantity || 0;
+
+      await tx.product.update({
+        where: { id: productId },
+        data: { stock: sum }
+      });
     }
   }
 }

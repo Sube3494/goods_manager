@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
+    const { name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
     const isShelfLife = Boolean(body?.isShelfLife ?? false);
     const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     const normalizedSku = normalizeSku(sku);
@@ -138,8 +138,8 @@ export async function POST(request: Request) {
 
     const storage = await getStorageStrategy();
 
-    // 格式化价格和库存
-    const stockNum = Number(stock) || 0;
+    // 格式化价格和库存 (强制库存初始值为 0，只能通过采购生成批次入库)
+    const stockNum = 0;
 
     let resolvedShopId: string | null = null;
     let resolvedShopName = "";

@@ -4411,22 +4411,8 @@ export async function createOutboundFromAutoPickOrder(
             },
           });
 
-          // 仅当系统总库存也不足时，才补充系统总库存差额
-          // 防止"批次缺货但系统有库存"时，总库存被重复叠加
-          const shopProductRecord = await tx.shopProduct.findUnique({
-            where: { id: item.shopProductId },
-            select: { stock: true },
-          });
-          const currentSystemStock = shopProductRecord?.stock ?? 0;
-          const systemCompensateQty = Math.max(0, item.quantity - currentSystemStock);
-          if (systemCompensateQty > 0) {
-            await tx.shopProduct.update({
-              where: { id: item.shopProductId },
-              data: {
-                stock: { increment: systemCompensateQty },
-              },
-            });
-          }
+          // 自动补偿采购单创建后，调用 syncStockFromBatches 重新同步物理库存
+          await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
         }
       } else if (item.productId) {
         const activeBatches = await tx.purchaseOrderItem.findMany({
@@ -4466,21 +4452,8 @@ export async function createOutboundFromAutoPickOrder(
             },
           });
 
-          // 仅当系统总库存也不足时，才补充系统总库存差额
-          const productRecord = await tx.product.findUnique({
-            where: { id: item.productId },
-            select: { stock: true },
-          });
-          const currentSystemStock = productRecord?.stock ?? 0;
-          const systemCompensateQty = Math.max(0, item.quantity - currentSystemStock);
-          if (systemCompensateQty > 0) {
-            await tx.product.update({
-              where: { id: item.productId },
-              data: {
-                stock: { increment: systemCompensateQty },
-              },
-            });
-          }
+          // 自动补偿采购单创建后，调用 syncStockFromBatches 重新同步物理库存
+          await InventoryService.syncStockFromBatches(tx, item.productId, null);
         }
       }
     }

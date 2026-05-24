@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { addDays, parseISO, startOfDay } from "date-fns";
 import { getStorageStrategy } from "@/lib/storage";
+import { InventoryService } from "@/services/inventoryService";
 
 export async function GET(request: NextRequest) {
   try {
@@ -372,35 +373,8 @@ export async function PUT(request: NextRequest) {
           }
         }
 
-        // 2. 同步更新店铺商品总库存 (ShopProduct)
-        if (oldBatch.shopProductId) {
-          const sp = await tx.shopProduct.findUnique({
-            where: { id: oldBatch.shopProductId }
-          });
-          if (sp) {
-            const currentStock = sp.stock ?? 0;
-            await tx.shopProduct.update({
-              where: { id: oldBatch.shopProductId },
-              data: {
-                stock: Math.max(0, currentStock + diff)
-              }
-            });
-          }
-        } else {
-          // 3. 同步更新主库商品总库存 (Product)
-          const p = await tx.product.findUnique({
-            where: { id: oldBatch.productId }
-          });
-          if (p) {
-            const currentStock = p.stock ?? 0;
-            await tx.product.update({
-              where: { id: oldBatch.productId },
-              data: {
-                stock: Math.max(0, currentStock + diff)
-              }
-            });
-          }
-        }
+        // 2. 统一同步更新主库/店铺商品总库存
+        await InventoryService.syncStockFromBatches(tx, oldBatch.productId || null, oldBatch.shopProductId || null);
       }
 
       return updated;

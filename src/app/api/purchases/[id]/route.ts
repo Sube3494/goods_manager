@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 import { FinanceMath } from "@/lib/math";
+import { InventoryService } from "@/services/inventoryService";
 
 function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
   const nextStock = currentStock - revertQty;
@@ -146,7 +147,6 @@ export async function PUT(
               await tx.shopProduct.update({
                 where: { id: item.shopProductId },
                 data: {
-                  stock: { increment: incomingQty },
                   costPrice: newCostPrice
                 }
               });
@@ -176,7 +176,6 @@ export async function PUT(
               await tx.product.update({
                 where: { id: item.productId },
                 data: {
-                  stock: { increment: incomingQty },
                   costPrice: newCostPrice
                 }
               });
@@ -190,6 +189,9 @@ export async function PUT(
               data: { remainingQuantity: incomingQty }
             });
           }
+
+          // 原子同步物理库存
+          await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
         }
       } else if (isRevokingReceived) {
         for (const item of existingPurchase.items) {
@@ -205,7 +207,6 @@ export async function PUT(
               await tx.shopProduct.update({
                 where: { id: item.shopProductId },
                 data: {
-                  stock: { decrement: revertQty },
                   costPrice: calculateRevertedCostPrice(
                     Number(shopProduct.stock || 0),
                     Number(shopProduct.costPrice || 0),
@@ -224,7 +225,6 @@ export async function PUT(
               await tx.product.update({
                 where: { id: item.productId },
                 data: {
-                  stock: { decrement: revertQty },
                   costPrice: calculateRevertedCostPrice(
                     Number(product.stock || 0),
                     Number(product.costPrice || 0),
@@ -241,6 +241,11 @@ export async function PUT(
           where: { purchaseOrderId: id },
           data: { remainingQuantity: null },
         });
+
+        // 撤销入库后，同步物理库存
+        for (const item of existingPurchase.items) {
+          await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
+        }
       }
       return p;
     });
@@ -293,7 +298,6 @@ export async function DELETE(
             await tx.shopProduct.update({
               where: { id: item.shopProductId },
               data: {
-                stock: { decrement: originalQuantity },
                 costPrice: calculateRevertedCostPrice(
                   Number(shopProduct.stock || 0),
                   Number(shopProduct.costPrice || 0),
@@ -314,7 +318,6 @@ export async function DELETE(
             await tx.product.update({
               where: { id: item.productId },
               data: {
-                stock: { decrement: originalQuantity },
                 costPrice: calculateRevertedCostPrice(
                   Number(product.stock || 0),
                   Number(product.costPrice || 0),
@@ -334,6 +337,11 @@ export async function DELETE(
       await tx.purchaseOrder.delete({
         where: { id }
       });
+
+      // 物理删除后，同步物理库存
+      for (const item of existingPurchase.items) {
+        await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
+      }
     });
 
     return NextResponse.json({ success: true, message: "Purchase order deleted successfully" });

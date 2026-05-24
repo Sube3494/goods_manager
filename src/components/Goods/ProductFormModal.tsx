@@ -1425,24 +1425,23 @@ export function ProductFormModal({
                                 />
                             </div>
 
-                            {/* Initial Stock */}
+                            {/* Stock - 只读，库存由采购批次自动计算，禁止手动修改 */}
                             {!hideStockField && (
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                     <Package size={16} className="text-blue-500" /> 商品库存
                                 </label>
-                                <div className="relative">
-                                    <input 
-                                        type="number" 
-                                        min="0"
-                                        value={formData.stock}
-                                        onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                                        className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
-                                        placeholder="0"
-                                    />
-                                </div>
+                                <input
+                                    type="number"
+                                    readOnly
+                                    disabled
+                                    value={formData.stock ?? 0}
+                                    placeholder="由采购批次自动计算"
+                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none font-medium no-spinner text-sm opacity-50 cursor-not-allowed"
+                                />
                             </div>
                             )}
+
                         </div>
 
 

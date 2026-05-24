@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { InventoryService } from "@/services/inventoryService";
 
 /**
  * 实现“退货入库”逻辑 (对冲出库)
@@ -98,30 +99,9 @@ export async function POST(
             amountToRestore -= restoreToThisBatch;
           }
         }
-
-        // 2. Restore current stock to the original business item
-        if (item.shopProductId) {
-          await tx.shopProduct.update({
-            where: { id: item.shopProductId },
-            data: {
-              stock: {
-                increment: item.quantity
-              }
-            }
-          });
-        } else if (item.productId) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: {
-                increment: item.quantity
-              }
-            }
-          });
-        }
       }
 
-      // 3. Create a corresponding Inbound record (PurchaseOrder)
+      // 2. Create a corresponding Inbound record (PurchaseOrder)
       const inboundType = order.type === "Sample" ? "InternalReturn" : "Return";
       const inboundId = `IN-${order.id.slice(-8).toUpperCase()}`; // Generate a linked ID
 
@@ -145,6 +125,11 @@ export async function POST(
           }
         }
       });
+
+      // 3. 统一同步物理库存
+      for (const item of order.items) {
+        await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId || null);
+      }
 
       // 4. Update the order as "Returned" instead of deleting
       return await tx.outboundOrder.update({
