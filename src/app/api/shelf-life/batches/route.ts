@@ -6,7 +6,7 @@ import { getStorageStrategy } from "@/lib/storage";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthorizedUser("product:read");
+    const user = await getAuthorizedUser("shelf_life:read");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthorizedUser("purchase:manage");
+    const user = await getAuthorizedUser("shelf_life:manage");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = await getAuthorizedUser("purchase:manage");
+    const user = await getAuthorizedUser("shelf_life:manage");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }

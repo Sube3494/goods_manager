@@ -15,6 +15,7 @@ export type Permission =
   | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy"
   | "settlement:manage"
   | "logistics:manage"
+  | "shelf_life:read" | "shelf_life:manage"
   | "roles:manage"
   | "settings:manage"
   | "backup:manage"
@@ -138,6 +139,14 @@ export const PERMISSION_TREE = [
     label: "物流配送",
     children: [
       { key: "logistics:manage", label: "调货与网点管理" },
+    ]
+  },
+  {
+    key: "shelf_life",
+    label: "保质期管理",
+    children: [
+      { key: "shelf_life:read", label: "查看保质期台账" },
+      { key: "shelf_life:manage", label: "调整/核销库存" },
     ]
   },
   {
@@ -290,6 +299,7 @@ const DEFAULT_ROUTE_RULES: RouteAccessRule[] = [
   { href: "/inbound", permission: "inbound:manage" },
   { href: "/outbound", permission: "outbound:manage" },
   { href: "/settlement", permission: "settlement:manage" },
+  { href: "/shelf-life", permission: "shelf_life:read" },
   { href: "/gallery", permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"] },
   { href: "/admin/members", adminCapability: ["members:manage", "members:status", "whitelist:manage"] },
   { href: "/admin/roles", adminCapability: "roles:manage" },

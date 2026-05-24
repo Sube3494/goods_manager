@@ -20,6 +20,8 @@ import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useUser } from "@/hooks/useUser";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 interface BatchItem {
   id: string;
@@ -50,7 +52,9 @@ interface StatsSummary {
 
 export default function ShelfLifeDashboard() {
   const { showToast } = useToast();
-  
+  const { user } = useUser();
+  const sessionUser = user as SessionUser | null;
+  const canManage = hasPermission(sessionUser, "shelf_life:manage");
   
   // SEO 标题控制
   useEffect(() => {
@@ -408,7 +412,7 @@ export default function ShelfLifeDashboard() {
                           <th className="px-6 py-4 text-center whitespace-nowrap">保质期状态</th>
                           <th className="px-6 py-4 text-center whitespace-nowrap">在库状态</th>
                           <th className="px-6 py-4 w-[18%] text-center">备注说明</th>
-                          <th className="px-6 py-4 text-center whitespace-nowrap">操作</th>
+                          {canManage && <th className="px-6 py-4 text-center whitespace-nowrap">操作</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-black/5 dark:divide-white/5">
@@ -531,21 +535,23 @@ export default function ShelfLifeDashboard() {
                               </td>
 
                               {/* 操作 */}
-                              <td className="px-6 py-4 text-center whitespace-nowrap">
-                                <button
-                                  onClick={() => {
-                                    setActiveAdjustBatch(batch);
-                                    setAdjustStock(batch.remainingStock);
-                                    setAdjustRemark(batch.remark);
-                                    setIsAdjustModalOpen(true);
-                                  }}
-                                  className="flex items-center justify-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all active:scale-95 cursor-pointer mx-auto"
-                                  title="报废核销或更正库存"
-                                >
-                                  <Edit3 size={12} />
-                                  <span>调整/核销</span>
-                                </button>
-                              </td>
+                              {canManage && (
+                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                  <button
+                                    onClick={() => {
+                                      setActiveAdjustBatch(batch);
+                                      setAdjustStock(batch.remainingStock);
+                                      setAdjustRemark(batch.remark);
+                                      setIsAdjustModalOpen(true);
+                                    }}
+                                    className="flex items-center justify-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all active:scale-95 cursor-pointer mx-auto"
+                                    title="报废核销或更正库存"
+                                  >
+                                    <Edit3 size={12} />
+                                    <span>调整/核销</span>
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
@@ -648,20 +654,22 @@ export default function ShelfLifeDashboard() {
                           )}
 
                           {/* 4. 卡片操作区：操作按钮居右 */}
-                          <div className="flex justify-end pt-2 border-t border-black/5 dark:border-white/5 w-full shrink-0">
-                            <button
-                              onClick={() => {
-                                setActiveAdjustBatch(batch);
-                                setAdjustStock(batch.remainingStock);
-                                setAdjustRemark(batch.remark);
-                                setIsAdjustModalOpen(true);
-                              }}
-                              className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all active:scale-95 border border-black/5 dark:border-white/10"
-                            >
-                              <Edit3 size={11} />
-                              <span>调整/核销</span>
-                            </button>
-                          </div>
+                          {canManage && (
+                            <div className="flex justify-end pt-2 border-t border-black/5 dark:border-white/5 w-full shrink-0">
+                              <button
+                                onClick={() => {
+                                  setActiveAdjustBatch(batch);
+                                  setAdjustStock(batch.remainingStock);
+                                  setAdjustRemark(batch.remark);
+                                  setIsAdjustModalOpen(true);
+                                }}
+                                className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all active:scale-95 border border-black/5 dark:border-white/10"
+                              >
+                                <Edit3 size={11} />
+                                <span>调整/核销</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

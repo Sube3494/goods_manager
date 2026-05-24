@@ -5,7 +5,7 @@ import { startOfDay } from "date-fns";
 
 export async function GET() {
   try {
-    const user = await getAuthorizedUser("product:read");
+    const user = await getAuthorizedUser("shelf_life:read");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
