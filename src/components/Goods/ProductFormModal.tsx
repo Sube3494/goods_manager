@@ -236,7 +236,13 @@ export function ProductFormModal({
 
         if (historyRes.ok) {
           const data = await historyRes.json();
-          setInboundHistory(Array.isArray(data) ? data : (data.items || []));
+          const list = Array.isArray(data) ? data : (data.items || []);
+          // 过滤掉系统自动补库存的入库记录，不显示在商品编辑弹窗里
+          const filtered = list.filter((order: PurchaseOrder) => 
+            order.type !== "AutoInbound" && 
+            !(order.note || "").includes("库存不足，系统自动补齐")
+          );
+          setInboundHistory(filtered);
         }
       } catch (error) {
         console.error("Failed to fetch product data:", error);
