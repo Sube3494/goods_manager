@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
     const normalizedAddresses = shippingAddresses
       .map((item, index) => ({
         id: String(item?.id || `address-${index}`),
+        addressBookId: String(item?.id || `address-${index}`),
         name: normalizeShopName(item?.label),
         address: normalizeShopAddress(getAddressDetail(item)),
         isDefault: Boolean(item?.isDefault),
@@ -94,6 +95,7 @@ export async function GET(request: NextRequest) {
           String(existing.name || "").trim() !== addr.name ||
           String(existing.address || "").trim() !== addr.address ||
           String(existing.externalId || "").trim() !== String(addr.externalId || "").trim() ||
+          existing.addressBookId !== addr.addressBookId ||
           !sameNullableNumber(existing.longitude, addr.longitude) ||
           !sameNullableNumber(existing.latitude, addr.latitude);
 
@@ -105,6 +107,7 @@ export async function GET(request: NextRequest) {
               address: addr.address,
               dedupeKey: buildShopDedupeKey(addr) || null,
               externalId: addr.externalId || null,
+              addressBookId: addr.addressBookId,
               longitude: addr.longitude,
               latitude: addr.latitude,
             },
@@ -125,6 +128,7 @@ export async function GET(request: NextRequest) {
           address: addr.address,
           dedupeKey: buildShopDedupeKey(addr) || null,
           externalId: addr.externalId || null,
+          addressBookId: addr.addressBookId,
           longitude: addr.longitude,
           latitude: addr.latitude,
           isSource: true,

@@ -1,4 +1,5 @@
 export type ShopIdentityInput = {
+  addressBookId?: unknown;
   externalId?: unknown;
   name?: unknown;
   address?: unknown;
@@ -6,6 +7,7 @@ export type ShopIdentityInput = {
 
 export type ShopIdentityRecord = {
   id?: string;
+  addressBookId?: string | null;
   externalId?: string | null;
   name?: string | null;
   address?: string | null;
@@ -77,6 +79,16 @@ export function findMatchingShopRecord<T extends ShopIdentityRecord>(
   shops: T[],
   target: ShopIdentityInput
 ) {
+  const addressBookId = target.addressBookId ? String(target.addressBookId).trim() : "";
+  if (addressBookId) {
+    const matchedByAddressBookId = shops.find(
+      (shop) => shop.addressBookId && String(shop.addressBookId).trim() === addressBookId
+    );
+    if (matchedByAddressBookId) {
+      return matchedByAddressBookId;
+    }
+  }
+
   const externalId = normalizeExternalId(target.externalId);
   if (externalId) {
     const matchedByExternalId = shops.find((shop) => normalizeExternalId(shop.externalId) === externalId);
