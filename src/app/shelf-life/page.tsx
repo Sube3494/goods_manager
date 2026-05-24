@@ -379,7 +379,7 @@ export default function ShelfLifeDashboard() {
               {/* 重置按钮 */}
               {(searchQuery || 
                 selectedStatus !== "all" || 
-                (shops.length > 1 ? selectedShop !== "all" : selectedShop !== (shops[0]?.id || ""))) && (
+                (shops.length > 0 && (shops.length > 1 ? selectedShop !== "all" : selectedShop !== shops[0].id))) && (
                 <button
                   onClick={() => {
                     setSearchQuery("");
