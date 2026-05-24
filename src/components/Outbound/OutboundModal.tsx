@@ -117,7 +117,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
     const fetchShops = async () => {
       try {
-        const res = await fetch("/api/shops");
+        const res = await fetch("/api/shops?source=shipping-addresses");
         if (!res.ok) return;
         const data = await res.json();
         const items = Array.isArray(data?.shops) ? data.shops : [];
@@ -274,7 +274,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-[calc(100%-32px)] sm:w-full max-w-4xl h-[600px] max-h-safe-modal overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-white/10 shadow-2xl flex flex-col"
+          className="relative w-[calc(100%-32px)] sm:w-full max-w-4xl h-[600px] max-h-safe-modal overflow-hidden rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/5 p-4 sm:p-6 shrink-0">
@@ -317,7 +317,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                             placeholder="输入名称或 SKU..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-border dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="w-full pl-10 pr-4 py-2 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                         />
                     </div>
                 </div>
@@ -395,7 +395,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
             </div>
 
             {/* Right: Selected List & Meta */}
-            <div className={`flex-1 flex flex-col bg-white dark:bg-gray-900 ${mobileView === "selection" ? "hidden md:flex" : "flex"}`}>
+            <div className={`flex-1 flex flex-col bg-transparent ${mobileView === "selection" ? "hidden md:flex" : "flex"}`}>
                 <div className="flex flex-col h-full overflow-hidden">
 
                     <div className="p-4 sm:p-5 grid grid-cols-2 gap-4 shrink-0">
@@ -411,7 +411,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                               label: shop.name,
                             }))}
                             placeholder="选择门店"
-                            triggerClassName="bg-white dark:bg-gray-800 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
+                            triggerClassName="bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
                         />
                     </div>
                     <div className="space-y-1.5">
@@ -425,7 +425,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                     { value: "Loss", label: "库存损耗" },
                                     { value: "Return", label: "退货出库" }
                                 ]}
-                                triggerClassName="bg-white dark:bg-gray-800 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
+                                triggerClassName="bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
                             />
                         </div>
                         <div className="space-y-1.5 col-span-2">
@@ -435,7 +435,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
                                 placeholder="选填..."
-                                className="w-full bg-white dark:bg-gray-800 border border-border dark:border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                                className="w-full bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                             />
                         </div>
                     </div>
@@ -445,7 +445,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                         <div className="space-y-3">
                             {selectedItems.length > 0 ? (
                                 selectedItems.map(item => (
-                                    <div key={getItemKey(item)} className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl border border-white/5 bg-white dark:bg-gray-800/40 group shadow-sm">
+                                    <div key={getItemKey(item)} className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl border border-border/50 dark:border-white/5 bg-white/60 dark:bg-white/5 group shadow-sm">
                                         <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-white/10 bg-muted shrink-0 shadow-sm">
                                             {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
                                         </div>
@@ -505,7 +505,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                     </div>
 
                   {/* Right Side Footer Area - Desktop Only */}
-                  <div className="p-4 sm:p-5 border-t border-border dark:border-white/5 shrink-0 hidden md:block">
+                  <div className="p-4 sm:p-5 border-t border-border/30 dark:border-white/5 shrink-0 hidden md:block">
                       <button
                           onClick={handleSubmit}
                           disabled={selectedItems.length === 0}
@@ -520,7 +520,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           </div>
 
           {/* Mobile Bottom Bar - Fixed at bottom of modal body */}
-          <div className="md:hidden border-t border-white/5 p-4 bg-white dark:bg-gray-900 shrink-0">
+          <div className="md:hidden border-t border-border/30 dark:border-white/5 p-4 bg-white/80 dark:bg-transparent shrink-0">
               <div className="flex items-center justify-between mb-3">
                   <div className="flex flex-col">
                       <span className="text-xs font-bold text-foreground">共选择 {selectedItems.length} 项商品</span>
