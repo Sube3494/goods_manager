@@ -13,12 +13,17 @@ export async function GET() {
     const now = new Date();
     const today = startOfDay(now);
 
-    // 获取该用户所有开启了保质期的批次
+    // 获取该用户所有开启了保质期的批次，且仅限制在个人中心地址库店铺
     const allBatches = await prisma.productBatch.findMany({
       where: {
         remainingStock: { gt: 0 },
         product: {
           userId: user.id
+        },
+        shopProduct: {
+          shop: {
+            addressBookId: { not: null }
+          }
         }
       },
       include: {

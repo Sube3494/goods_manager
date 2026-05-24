@@ -132,7 +132,7 @@ export default function ShelfLifeDashboard() {
   // 获取店铺列表
   const fetchShops = useCallback(async () => {
     try {
-      const res = await fetch("/api/shops");
+      const res = await fetch("/api/shops?source=shipping-addresses");
       if (res.ok) {
         const data = await res.json();
         setShops(Array.isArray(data?.shops) ? data.shops : []);

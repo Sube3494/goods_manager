@@ -31,11 +31,21 @@ export async function GET(request: NextRequest) {
       remainingStock: { gt: 0 },
       product: {
         userId: user.id
+      },
+      shopProduct: {
+        shop: {
+          addressBookId: { not: null }
+        }
       }
     };
 
     if (shopId !== "all") {
-      where.shopProduct = { shopId };
+      where.shopProduct = {
+        shopId,
+        shop: {
+          addressBookId: { not: null }
+        }
+      };
     }
 
     if (search) {
