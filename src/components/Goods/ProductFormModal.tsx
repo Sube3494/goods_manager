@@ -1124,7 +1124,7 @@ export function ProductFormModal({
                         )}
                     </div>
 
-                    {user?.role === "SUPER_ADMIN" && (
+                    {user?.role === "SUPER_ADMIN" && (!hideProductionControl || !hideVisibilityControl) && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Production Condition Box */}
                             {!hideProductionControl && (
