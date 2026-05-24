@@ -118,7 +118,8 @@ export async function PUT(
             include: {
               product: true,
               shopProduct: true,
-              supplier: true
+              supplier: true,
+              batches: true
             }
           }
         } as any // eslint-disable-line @typescript-eslint/no-explicit-any

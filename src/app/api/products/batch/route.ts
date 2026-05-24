@@ -167,7 +167,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { ids, categoryId, supplierId, isPublic, isDiscontinued, costPrice } = await request.json();
+    const { ids, categoryId, supplierId, isPublic, isDiscontinued, costPrice, isShelfLife, shelfLifeDays } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
@@ -176,12 +176,20 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const updateData: Record<string, string | number | boolean> = {};
+    const updateData: Record<string, string | number | boolean | null> = {};
     if (categoryId) updateData.categoryId = categoryId;
     if (supplierId) updateData.supplierId = supplierId;
     if (isPublic !== undefined) updateData.isPublic = isPublic;
     if (isDiscontinued !== undefined) updateData.isDiscontinued = isDiscontinued;
     if (costPrice !== undefined) updateData.costPrice = costPrice;
+    if (isShelfLife !== undefined) {
+      updateData.isShelfLife = Boolean(isShelfLife);
+      if (isShelfLife === false) {
+        updateData.shelfLifeDays = null;
+      } else if (shelfLifeDays !== undefined) {
+        updateData.shelfLifeDays = Number(shelfLifeDays) || null;
+      }
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

@@ -84,6 +84,17 @@ export async function POST(
                 }
               }
             });
+
+            // 同样增加关联的保质期批次库存 ProductBatch 的 remainingStock
+            await tx.productBatch.updateMany({
+              where: { purchaseOrderItemId: batch.id },
+              data: {
+                remainingStock: {
+                  increment: restoreToThisBatch
+                }
+              }
+            });
+
             amountToRestore -= restoreToThisBatch;
           }
         }

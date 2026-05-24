@@ -67,6 +67,18 @@ export class InventoryService {
           throw new Error(`并发冲突：商品 ID ${item.shopProductId || item.productId} 在该批次库存不足。请重试。`);
         }
 
+        // 同时更新关联的保质期批次库存 ProductBatch（如果有的话）
+        await tx.productBatch.updateMany({
+          where: {
+            purchaseOrderItemId: batch.id
+          },
+          data: {
+            remainingStock: {
+              decrement: deductFromThisBatch
+            }
+          }
+        });
+
         remainingToDeduct -= deductFromThisBatch;
       }
 

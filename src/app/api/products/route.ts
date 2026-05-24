@@ -130,6 +130,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { name, sku, jdSkuId, jdSkuIds, costPrice, stock, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
+    const isShelfLife = Boolean(body?.isShelfLife ?? false);
+    const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     const normalizedSku = normalizeSku(sku);
     const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
     const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
@@ -202,6 +204,8 @@ export async function POST(request: Request) {
           isDiscontinued: isDiscontinued ?? false,
           remark: remark || null,
           specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : Prisma.JsonNull) : undefined,
+          isShelfLife,
+          shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
         },
       });
 
@@ -227,6 +231,8 @@ export async function POST(request: Request) {
         shopId: created.shopId,
         shopName: resolvedShopName,
         assignedShopIds: [created.shopId],
+        isShelfLife: created.isShelfLife,
+        shelfLifeDays: created.shelfLifeDays,
       });
     }
 
@@ -284,6 +290,8 @@ export async function POST(request: Request) {
           specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
           remark: remark || null,
           userId: user.id,
+          isShelfLife,
+          shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
           ...(resolvedShopId ? {
             shopProducts: {
               create: [{
@@ -303,6 +311,8 @@ export async function POST(request: Request) {
                 isDiscontinued: isDiscontinued ?? false,
                 remark: remark || null,
                 specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+                isShelfLife,
+                shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
               }],
             },
           } : {}),
@@ -349,6 +359,8 @@ export async function PUT(request: Request) {
 
     const body = await request.json();
     const { id, name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const isShelfLife = body?.isShelfLife !== undefined ? Boolean(body.isShelfLife) : undefined;
+    const shelfLifeDays = body?.shelfLifeDays !== undefined ? (body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null) : undefined;
     const normalizedSku = normalizeSku(sku);
     const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
     const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
@@ -400,7 +412,9 @@ export async function PUT(request: Request) {
           isPublic: isPublic ?? undefined,
           isDiscontinued: isDiscontinued ?? undefined,
           specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
-          remark: remark !== undefined ? remark : undefined
+          remark: remark !== undefined ? remark : undefined,
+          isShelfLife: isShelfLife ?? undefined,
+          shelfLifeDays: shelfLifeDays !== undefined ? (Number.isFinite(shelfLifeDays) ? shelfLifeDays : null) : undefined,
         },
       });
 

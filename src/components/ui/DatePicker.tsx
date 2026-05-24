@@ -178,7 +178,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
               maxWidth: 'calc(100vw - 2rem)',
               pointerEvents: 'auto'
             }}
-            className="z-1000001 rounded-[24px] glass p-3 shadow-2xl border border-white/10"
+            className="z-1000001 rounded-[24px] bg-white dark:bg-[#121826] p-3 shadow-2xl border border-black/5 dark:border-white/5"
           >
             <div className="max-w-[280px] mx-auto">
               <div className="flex items-center justify-between mb-4 px-1">
@@ -248,7 +248,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                       onClick={() => handleDateClick(day)}
                       className={cn(
                         "aspect-square w-full rounded-lg text-xs flex items-center justify-center transition-all duration-200 relative",
-                        !isCurrentMonth && "text-muted-foreground/30",
+                        !isCurrentMonth && "text-muted-foreground/50",
                         isCurrentMonth && !isDisabled && "text-foreground hover:bg-primary/10 hover:text-primary",
                         isDisabled && "text-muted-foreground/20 cursor-not-allowed",
                         isSelected && "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/30 hover:bg-primary hover:text-primary-foreground",

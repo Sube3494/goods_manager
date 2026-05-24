@@ -131,7 +131,8 @@ export async function GET(request: Request) {
             include: {
               product: true,
               shopProduct: true,
-              supplier: true
+              supplier: true,
+              batches: true
             }
           }
         },

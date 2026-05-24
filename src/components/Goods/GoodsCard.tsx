@@ -108,8 +108,26 @@ export const GoodsCard = memo(function GoodsCard({
             className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/30 group-hover:text-primary/50 transition-colors">
-            <Package size={32} strokeWidth={1.5} />
+          <div className="flex h-full w-full items-center justify-center bg-black/1 dark:bg-white/1 transition-colors">
+            <svg 
+              className="w-10 h-10 text-muted-foreground/20 group-hover:text-primary/45 group-hover:scale-105 transition-all duration-500 ease-out" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="1.2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z" className="fill-primary/5 dark:fill-white/2" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+              <path d="M2 7v10" />
+              <path d="M12 12v10" />
+              <path d="M22 7v10" />
+              <circle cx="12" cy="7" r="1.5" className="fill-primary/10 dark:fill-white/10" />
+              <line x1="12" y1="2" x2="12" y2="12" strokeDasharray="2 2" className="opacity-60" />
+              <path d="M7 4.5l1-1m8 1l-1-1" className="opacity-45" />
+            </svg>
           </div>
         )}
 
@@ -136,17 +154,17 @@ export const GoodsCard = memo(function GoodsCard({
           
           <div className="flex flex-wrap items-center gap-1.5 min-h-[22px]">
             {product.sku && (
-              <span className="text-[10px] bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full text-muted-foreground font-number shrink-0 leading-none flex items-center h-5" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[10px] bg-zinc-100 dark:bg-white/10 border border-zinc-200 dark:border-white/5 px-2 py-0.5 rounded-full text-zinc-800 dark:text-zinc-200 font-number shrink-0 leading-none flex items-center h-5" style={{ fontFamily: 'var(--font-mono)' }}>
                 {product.sku}
               </span>
             )}
-            <span className="text-[10px] bg-primary/5 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 h-5 leading-none">
-              <Package size={10} strokeWidth={2.5} className="shrink-0" />
+            <span className="text-[10px] bg-violet-500/8 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 h-5 leading-none">
+              <Package size={10} strokeWidth={2.5} className="shrink-0 text-violet-500 dark:text-violet-400" />
               {getCategoryName(product.category)}
             </span>
             {product.supplierId && (
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-zinc-500/5 border border-zinc-500/10 px-2 py-0.5 rounded-full h-5 leading-none">
-                <Truck size={10} className="shrink-0" />
+              <div className="flex items-center gap-1 text-[10px] text-sky-600 dark:text-sky-400 bg-sky-500/8 border border-sky-500/20 px-2 py-0.5 rounded-full h-5 leading-none">
+                <Truck size={10} className="shrink-0 text-sky-500 dark:text-sky-400" />
                 <span className="truncate max-w-[100px]">
                     {product.supplier?.name || "未知供应商"}
                 </span>
@@ -167,18 +185,29 @@ export const GoodsCard = memo(function GoodsCard({
         <div className="mt-2 flex items-center justify-between pt-4 border-t border-white/10">
           <div>
             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">{stockTitle}</p>
-            <p className={`text-sm font-bold mt-0.5 font-number ${!disableLowStockTone && product.stock < lowStockThreshold ? 'text-destructive' : 'text-foreground'}`}>
-               {product.stock} <span className="text-[10px] font-bold inline-block ml-1">{stockUnit}</span>
+            <p className="text-sm font-bold mt-0.5 font-number leading-none h-5 flex items-baseline">
+              {product.stock === 0 && !disableLowStockTone ? (
+                <>
+                  <span className="text-rose-500 dark:text-rose-400 text-sm sm:text-base font-bold">0</span>
+                  <span className="text-[10px] font-bold text-rose-500/70 dark:text-rose-400/70 ml-0.5">{stockUnit}</span>
+                </>
+              ) : !disableLowStockTone && product.stock < lowStockThreshold ? (
+                <>
+                  <span className="text-amber-500 dark:text-amber-400 text-sm sm:text-base font-bold">{product.stock}</span>
+                  <span className="text-[10px] font-bold text-amber-500/70 dark:text-amber-400/70 ml-0.5">{stockUnit}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-foreground text-sm sm:text-base font-bold">{product.stock}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground ml-0.5">{stockUnit}</span>
+                </>
+              )}
             </p>
           </div>
           <div className="text-right">
              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">进货单价</p>
              <p className="font-bold text-foreground">
-                {Number(product.costPrice || 0) > 0 ? (
-                  <span className="text-base sm:text-lg font-number">¥{Number(product.costPrice).toLocaleString()}</span>
-                ) : (
-                  <span className="text-xs sm:text-sm text-foreground font-bold font-number">以实际为准</span>
-                )}
+                <span className="text-base sm:text-lg font-number">¥{Number(product.costPrice || 0).toLocaleString()}</span>
              </p>
           </div>
         </div>

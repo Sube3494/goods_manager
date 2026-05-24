@@ -318,6 +318,8 @@ export default function GoodsPage() {
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
     costPrice?: number;
+    isShelfLife?: boolean;
+    shelfLifeDays?: number;
   }) => {
     const count = selectedIds.length;
     try {

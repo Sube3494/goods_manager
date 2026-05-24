@@ -97,7 +97,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, stock, categoryId, supplierId, image, isPublic, remark } = body;
+    const { name, sku, jdSkuId, jdSkuIds, costPrice, stock, categoryId, supplierId, image, isPublic, remark, isShelfLife, shelfLifeDays } = body;
     const normalizedSku = normalizeSku(sku);
     const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
     const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
@@ -140,7 +140,9 @@ export async function PUT(
           supplierId,
           image,
           isPublic,
-          remark: remark !== undefined ? remark : undefined
+          remark: remark !== undefined ? remark : undefined,
+          isShelfLife: isShelfLife !== undefined ? Boolean(isShelfLife) : undefined,
+          shelfLifeDays: isShelfLife === false ? null : (shelfLifeDays !== undefined ? (Number(shelfLifeDays) || null) : undefined)
         }
       });
 

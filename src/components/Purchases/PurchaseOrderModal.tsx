@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, Camera, Copy, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search } from "lucide-react";
+import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search } from "lucide-react";
 import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier, Shop } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -37,7 +37,8 @@ const PurchaseItemRow = memo(({
     onUpdate, 
     onRemove,
     isChecked,
-    onToggle
+    onToggle,
+    onManageShelfLife
 }: { 
     item: PurchaseOrderItem; 
     readOnly: boolean; 
@@ -47,6 +48,7 @@ const PurchaseItemRow = memo(({
     onRemove: (productId: string) => void;
     isChecked?: boolean;
     onToggle?: (productId: string) => void;
+    onManageShelfLife?: (item: PurchaseOrderItem) => void;
 }) => {
     const itemKey = item.shopProductId || item.productId || "";
     const productData = useMemo(() => {
@@ -153,6 +155,31 @@ const PurchaseItemRow = memo(({
                                     <span className="font-bold opacity-70 shrink-0">注:</span>
                                     <span className="truncate leading-none">{productData.remark}</span>
                                 </span>
+                            )}
+                            {/* Shelf Life Expiration Badge */}
+                            {readOnly && item.shopProduct?.isShelfLife && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (onManageShelfLife) {
+                                            onManageShelfLife(item);
+                                        }
+                                    }}
+                                    className={cn(
+                                        "flex items-center gap-1 text-[10px] px-2.5 py-0.5 rounded-full w-fit max-w-full font-bold shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 border",
+                                        item.batches && item.batches.length > 0
+                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                            : "bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20 animate-pulse animate-duration-3000"
+                                    )}
+                                >
+                                    <Calendar size={10} className="shrink-0" />
+                                    {item.batches && item.batches.length > 0 ? (
+                                        <span>生产日期: {new Date(item.batches[0].productionDate!).toISOString().split('T')[0]}</span>
+                                    ) : (
+                                        <span>未录入生产日期 (点击录入)</span>
+                                    )}
+                                </button>
                             )}
                         </div>
                     </div>
@@ -370,6 +397,68 @@ export function PurchaseOrderModal({
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
   const [batchConfirming, setBatchConfirming] = useState(false);
   const purchaseCatalogFetchPath = "/api/purchase-products";
+  
+  // Shelf Life Modal State
+  const [shelfLifeModalOpen, setShelfLifeModalOpen] = useState(false);
+  const [activeShelfLifeItem, setActiveShelfLifeItem] = useState<PurchaseOrderItem | null>(null);
+  const [selectedProductionDate, setSelectedProductionDate] = useState("");
+  const [shelfLifeRemark, setShelfLifeRemark] = useState("");
+  const [isSavingShelfLife, setIsSavingShelfLife] = useState(false);
+  
+  const handleOpenShelfLifeModal = useCallback((item: PurchaseOrderItem) => {
+    setActiveShelfLifeItem(item);
+    if (item.batches && item.batches.length > 0 && item.batches[0].productionDate) {
+      setSelectedProductionDate(new Date(item.batches[0].productionDate).toISOString().split("T")[0]);
+      setShelfLifeRemark(item.batches[0].remark || "");
+    } else {
+      setSelectedProductionDate(new Date().toISOString().split("T")[0]);
+      setShelfLifeRemark("");
+    }
+    setShelfLifeModalOpen(true);
+  }, []);
+
+  const handleSaveShelfLife = async () => {
+    if (!activeShelfLifeItem || !selectedProductionDate) return;
+    setIsSavingShelfLife(true);
+    try {
+      const res = await fetch("/api/shelf-life/batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          purchaseOrderItemId: activeShelfLifeItem.id,
+          productionDate: selectedProductionDate,
+          remark: shelfLifeRemark
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        showToast(data?.error || "保存保质期失败", "error");
+        return;
+      }
+      showToast("保质期批次录入成功！", "success");
+      
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.map(item => {
+          if (item.id === activeShelfLifeItem.id) {
+            return {
+              ...item,
+              batches: [data.batch]
+            };
+          }
+          return item;
+        })
+      }));
+      
+      setShelfLifeModalOpen(false);
+      setActiveShelfLifeItem(null);
+    } catch (error) {
+      console.error("Failed to save shelf life batch:", error);
+      showToast("保存失败", "error");
+    } finally {
+      setIsSavingShelfLife(false);
+    }
+  };
   const selectedPurchaseShopId = useMemo(
     () => shops.find((shop) => shop.name === formData.shopName)?.id || "",
     [shops, formData.shopName]
@@ -397,7 +486,7 @@ export function PurchaseOrderModal({
         return nameMatch || skuMatch;
     });
   }, [formData.items, searchQuery, products, getPurchaseItemKey]);
-  const [isUploadingVoucher, setIsUploadingVoucher] = useState(false);
+  const [, setIsUploadingVoucher] = useState(false);
   const [galleryState, setGalleryState] = useState<{
     isOpen: boolean;
     images: string[];
@@ -411,7 +500,7 @@ export function PurchaseOrderModal({
   // State for two-step inline delete confirmations
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
   const [confirmingDeleteIndex, setConfirmingDeleteIndex] = useState<number | null>(null);
-  const [hoveredZone, setHoveredZone] = useState<{ type: 'payment' | 'waybill', index?: number } | null>(null);
+  const [hoveredZone] = useState<{ type: 'payment' | 'waybill', index?: number } | null>(null);
 
   useEffect(() => {
       let clearTba: NodeJS.Timeout;
@@ -508,7 +597,7 @@ export function PurchaseOrderModal({
             
             const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address || "";
 
-            setFormData(prev => ({
+            setFormData(() => ({
                 id: newId,
                 status: "Confirmed",
                 date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
@@ -555,34 +644,11 @@ export function PurchaseOrderModal({
   }, [formData.shippingAddress, addressList, formData.shopName]);
 
 
-  const calculateTotal = () => {
+  const calculateTotal = useCallback(() => {
     const itemsTotal = formData.items.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
     const gross = itemsTotal + (Number(formData.shippingFees) || 0) + (Number(formData.extraFees) || 0);
     return Math.max(0, gross - (Number(formData.discountAmount) || 0));
-  };
-
-
-  const addTrackingRow = () => {
-      const current = formData.trackingData || [];
-      setFormData({
-          ...formData,
-          trackingData: [...current, { courier: "顺丰速运", number: "", waybillImages: [] }]
-      });
-  };
-
-  const removeTrackingRow = (index: number) => {
-      const current = formData.trackingData || [];
-      setFormData({
-          ...formData,
-          trackingData: current.filter((_, i) => i !== index)
-      });
-  };
-
-  const updateTrackingData = (index: number, field: string, value: string | string[]) => {
-      const current = [...(formData.trackingData || [])];
-      current[index] = { ...current[index], [field]: value };
-      setFormData({ ...formData, trackingData: current });
-  };
+  }, [formData.items, formData.shippingFees, formData.extraFees, formData.discountAmount]);
 
   const addItem = useCallback(() => {
     setIsSelectionModalOpen(true);
@@ -627,7 +693,7 @@ export function PurchaseOrderModal({
       ...prev,
       items: prev.items.filter(item => getPurchaseItemKey(item) !== itemKey)
     }));
-  }, []);
+  }, [getPurchaseItemKey]);
 
   const toggleBatchSelect = useCallback((itemKey: string) => {
     setBatchSelected(prev => {
@@ -644,7 +710,7 @@ export function PurchaseOrderModal({
     }));
     setBatchSelected(new Set());
     setBatchMode(false);
-  }, [batchSelected]);
+  }, [batchSelected, getPurchaseItemKey]);
 
   const updateItem = useCallback((itemKey: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => {
     setFormData(prev => {
@@ -673,7 +739,7 @@ export function PurchaseOrderModal({
       newItems[index] = { ...newItems[index], [field]: processedValue };
       return { ...prev, items: newItems };
     });
-  }, []);
+  }, [getPurchaseItemKey]);
 
   const inferStatus = (currentData: PurchaseOrder): PurchaseStatus => {
     if (currentData.status === "Received") return "Received";
@@ -700,7 +766,7 @@ export function PurchaseOrderModal({
       totalAmount: calculateTotal(),
       status: "Confirmed",
     });
-  }, [formData, onSubmit]);
+  }, [formData, onSubmit, calculateTotal]);
 
   const handleFileUpload = useCallback(async (files: FileList | File[], type: 'payment' | 'waybill', rowIndex?: number) => {
     if (!files || files.length === 0) return;
@@ -805,6 +871,71 @@ export function PurchaseOrderModal({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed left-1/2 top-1/2 z-10000 w-[calc(100%-32px)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
           >
+            {/* Expiration Batch Form Modal */}
+            {shelfLifeModalOpen && activeShelfLifeItem && (
+              <div className="fixed inset-0 z-70000 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShelfLifeModalOpen(false)} />
+                <div className="relative w-full max-w-md rounded-3xl border border-border/50 bg-white p-6 shadow-2xl dark:bg-gray-900/90 backdrop-blur-xl">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <Calendar size={18} className="text-primary" />
+                      录入到货生产日期
+                    </h3>
+                    <button onClick={() => setShelfLifeModalOpen(false)} className="rounded-full p-1.5 hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground transition-colors">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="bg-primary/5 border border-primary/10 rounded-2xl p-3 text-xs space-y-1">
+                      <p className="font-bold text-primary">商品名称: {activeShelfLifeItem.shopProduct?.productName || activeShelfLifeItem.product?.name}</p>
+                      <p className="text-muted-foreground/80">到货数量: {activeShelfLifeItem.quantity} 件</p>
+                      <p className="text-muted-foreground/80">保质期设定: {activeShelfLifeItem.shopProduct?.shelfLifeDays} 天</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">生产日期</label>
+                      <DatePicker 
+                        value={selectedProductionDate}
+                        onChange={(val) => setSelectedProductionDate(val)}
+                        placeholder="请选择生产日期"
+                        showClear={true}
+                        className="w-full h-11"
+                        triggerClassName="rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 h-11 text-sm text-foreground font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">批次备注 (可选)</label>
+                      <input 
+                        type="text"
+                        placeholder="例如: 瓶身喷码/箱体完好"
+                        value={shelfLifeRemark}
+                        onChange={(e) => setShelfLifeRemark(e.target.value)}
+                        className="w-full h-11 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => setShelfLifeModalOpen(false)}
+                        className="flex-1 h-11 rounded-xl border border-border text-sm font-bold text-muted-foreground hover:bg-muted/30 transition-all active:scale-95"
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={handleSaveShelfLife}
+                        disabled={isSavingShelfLife || !selectedProductionDate}
+                        className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/45 transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        {isSavingShelfLife ? "保存中..." : "保存批次"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex items-center justify-between border-b border-white/10 p-5 sm:p-8 shrink-0">
               <div className="flex flex-col gap-0.5 min-w-0">
                 <h2 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2 sm:gap-3 truncate">
@@ -957,13 +1088,6 @@ export function PurchaseOrderModal({
                         )}
                     </div>
 
-
-
-
-
-
-
-
                     {/* Items Section */}
                         <div className="flex flex-col gap-3 px-2">
                             {/* Title & Buttons Row */}
@@ -1088,6 +1212,7 @@ export function PurchaseOrderModal({
                                     onRemove={removeItem}
                                     isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
                                     onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
+                                    onManageShelfLife={handleOpenShelfLifeModal}
                                 />
                             ))}
                             

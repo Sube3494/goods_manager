@@ -15,12 +15,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function naturalCompareText(a: string | null | undefined, b: string | null | undefined) {
-  return String(a || "").localeCompare(String(b || ""), "zh-CN", {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
 
 function normalizeShopName(value: string | null | undefined) {
   return String(value || "").trim();
@@ -111,9 +105,6 @@ export function ProductSelectionModal({
   onSelect,
   selectedIds,
   selectedBadgeLabel = "已在计划中",
-  unselectedOnlyLabel = "显示未复制",
-  unselectedOnlyTitle = "切换是否只显示未复制商品",
-  hideUnselectedOnlyToggle = false,
   singleSelect = false,
   showPrice = true,
   showSku = true,
@@ -147,7 +138,6 @@ export function ProductSelectionModal({
   const [hasMore, setHasMore] = useState(true);
   const pageRef = useRef(1);
   const [selectedCategoryName, setSelectedCategoryName] = useState<string>("all");
-  const [loadedCategoryName, setLoadedCategoryName] = useState<string>("all");
   const [categories, setCategories] = useState<Category[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -185,7 +175,6 @@ export function ProductSelectionModal({
       setProducts([]);
       setSearchQuery("");
       setSelectedCategoryName("all");
-      setLoadedCategoryName("all");
       setHasLoadedResults(false);
       setHasMore(false);
       setIsNextPageLoading(false);
@@ -279,7 +268,6 @@ export function ProductSelectionModal({
         
         if (mode === 'initial' || mode === 'search') {
           setProducts(newItems);
-          setLoadedCategoryName(selectedCategoryName);
         } else {
           setProducts(prev => {
             const existingIds = new Set(prev.map(i => i.id));
@@ -332,7 +320,7 @@ export function ProductSelectionModal({
         loadingDelayRef.current = null;
       }
     };
-  }, [hasLoadedResults, isLoading, products.length]);
+  }, [hasLoadedResults, isLoading, products.length, isOpen]);
 
   useEffect(() => {
     if (usesPrefetchedData) return;
@@ -351,7 +339,7 @@ export function ProductSelectionModal({
 
   const filterVisibleProducts = useCallback((candidates: Product[], categoryName = selectedCategoryName) => {
     const normalizedSearch = debouncedSearch.trim().toLowerCase();
-    const scopedShopName = normalizeShopName(query?.shopName);
+    const scopedShopName = normalizeShopName(queryRef.current?.shopName);
 
     return candidates.filter((p) => {
       const matchesVisibility = respectPublicVisibility ? (p.isPublic ?? true) : true;
@@ -365,7 +353,7 @@ export function ProductSelectionModal({
 
       return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop;
     });
-  }, [debouncedSearch, getSelectionKey, queryRef.current?.shopName, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
+  }, [debouncedSearch, getSelectionKey, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
 
   const displayCategoryName = selectedCategoryName;
 
@@ -451,7 +439,6 @@ export function ProductSelectionModal({
       const data = await res.json();
       const allProducts = filterVisibleProducts(Array.isArray(data.items) ? data.items : [], selectedCategoryName);
       setProducts(allProducts);
-      setLoadedCategoryName(selectedCategoryName);
       setHasMore(false);
       setTempSelectedIds(allProducts.map((product: Product) => getSelectionKey(product)));
       setSelectedProducts(allProducts);
@@ -496,11 +483,11 @@ export function ProductSelectionModal({
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[110000] bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-110000 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
       <div
-        className="fixed left-1/2 top-1/2 z-[110001] flex min-h-[520px] w-[calc(100%-24px)] sm:min-h-[560px] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/50 bg-white shadow-2xl backdrop-blur-xl dark:bg-gray-900/70 max-h-[min(84dvh,820px)]"
+        className="fixed left-1/2 top-1/2 z-110001 flex min-h-[520px] w-[calc(100%-24px)] sm:min-h-[560px] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/50 bg-white shadow-2xl backdrop-blur-xl dark:bg-gray-900/70 max-h-[min(84dvh,820px)]"
       >
              <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
               <div className="flex items-center gap-4">
@@ -618,7 +605,7 @@ export function ProductSelectionModal({
                              <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
                              <div className="flex min-w-0 items-center gap-1 overflow-hidden">
                                 {showSku && productCode && (
-                                  <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted-foreground">
+                                  <span className="shrink-0 rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-800 dark:text-zinc-200">
                                     编号：{productCode}
                                   </span>
                                 )}

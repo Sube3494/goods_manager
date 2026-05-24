@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -463,6 +463,8 @@ export default function ShopGoodsPage() {
       isDiscontinued: item.isDiscontinued ?? false,
       specs: item.specs || {},
       remark: item.remark || "",
+      isShelfLife: item.isShelfLife ?? false,
+      shelfLifeDays: item.shelfLifeDays ?? null,
     });
     setIsEditOpen(true);
   }, []);
@@ -546,6 +548,8 @@ export default function ShopGoodsPage() {
           isDiscontinued: formData.isDiscontinued ?? false,
           remark: formData.remark?.trim() || "",
           specs: formData.specs || {},
+          isShelfLife: formData.isShelfLife,
+          shelfLifeDays: formData.isShelfLife ? (Number(formData.shelfLifeDays) || null) : null,
         }),
       });
       const responseData = await res.json().catch(() => null);
@@ -575,6 +579,8 @@ export default function ShopGoodsPage() {
     isDiscontinued?: boolean;
     costPrice?: number;
     stock?: number;
+    isShelfLife?: boolean;
+    shelfLifeDays?: number;
   }) => {
     if (selectedIds.length === 0) return;
     const categoryName = updateData.categoryId
@@ -606,6 +612,8 @@ export default function ShopGoodsPage() {
           ...(updateData.costPrice !== undefined ? { costPrice: updateData.costPrice } : {}),
           ...(updateData.stock !== undefined ? { stock: updateData.stock } : {}),
           ...(updateData.isPublic !== undefined ? { isPublic: updateData.isPublic } : {}),
+          ...(updateData.isShelfLife !== undefined ? { isShelfLife: updateData.isShelfLife } : {}),
+          ...(updateData.shelfLifeDays !== undefined ? { shelfLifeDays: updateData.shelfLifeDays } : {}),
         };
       }));
       setSelectedIds([]);
@@ -736,7 +744,7 @@ export default function ShopGoodsPage() {
 
       {needsAddress && !isLoading && (
         <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center px-6">
-          <div className="rounded-full bg-muted/50 p-4 mb-4"><Store size={32} className="text-muted-foreground" /></div>
+          <div className="rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 p-4 mb-4"><Store size={32} className="text-indigo-500 dark:text-indigo-400" /></div>
           <h3 className="text-lg font-semibold">还没有店铺地址信息</h3>
           <p className="text-sm text-muted-foreground mb-5">请先到个人信息里添加店铺地址，系统会自动把地址同步成可选店铺。</p>
           <Link href="/profile#address-library" className="inline-flex items-center justify-center rounded-full bg-primary px-5 h-10 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">去添加店铺地址</Link>
@@ -756,11 +764,11 @@ export default function ShopGoodsPage() {
             ))}
           </div>
           {displayedItems.length > 0 && <div ref={observerTarget} className="flex justify-center mt-8 mb-12 py-4">{isNextPageLoading ? <div className="flex items-center gap-3 text-muted-foreground bg-white/5 px-6 py-2 rounded-full border border-white/10 animate-pulse"><div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" /><span className="text-sm font-medium">正在拉取更多记录...</span></div> : hasMore ? <div className="h-10 invisible" /> : <div className="text-muted-foreground text-sm font-medium flex items-center gap-2 opacity-50"><div className="w-1.5 h-1.5 rounded-full bg-current" />当前店铺商品已全部展示<div className="w-1.5 h-1.5 rounded-full bg-current" /></div>}</div>}
-          {!isLoading && displayedItems.length === 0 && <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center"><div className="rounded-full bg-muted/50 p-4 mb-4"><Store size={32} className="text-muted-foreground" /></div><h3 className="text-lg font-semibold">还没有店铺商品</h3><p className="text-sm text-muted-foreground">{selectedShop ? `当前店铺是 ${selectedShop.name}，可以从右上角主库复制。` : "请先选择一个店铺。"}</p></div>}
+          {!isLoading && displayedItems.length === 0 && <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white dark:bg-white/5 text-center"><div className="rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 p-4 mb-4"><Store size={32} className="text-indigo-500 dark:text-indigo-400" /></div><h3 className="text-lg font-semibold">还没有店铺商品</h3><p className="text-sm text-muted-foreground">{selectedShop ? `当前店铺是 ${selectedShop.name}，可以从右上角主库复制。` : "请先选择一个店铺。"}</p></div>}
         </>
       ) : null}
 
-      <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: selectedShop ? `删除 ${selectedShop.name} 商品` : "删除所选商品", onClick: handleRemoveSelected, variant: "danger" }]} />
+      <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: "删除商品", icon: <Trash2 size={16} />, onClick: handleRemoveSelected, variant: "danger" }]} />
       <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" loadAllOnOpen={true} respectPublicVisibility={false} />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
       <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />

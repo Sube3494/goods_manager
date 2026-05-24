@@ -82,6 +82,8 @@ export interface Product {
   shopId?: string;
   shopName?: string;
   isStandaloneShopProduct?: boolean;
+  isShelfLife?: boolean;
+  shelfLifeDays?: number | null;
 }
 
 export interface Shop {
@@ -118,6 +120,8 @@ export interface ShopCatalogItem {
   isDiscontinued?: boolean;
   remark?: string | null;
   specs?: Record<string, string> | null;
+  isShelfLife?: boolean;
+  shelfLifeDays?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -303,6 +307,21 @@ export interface PurchaseOrder {
   updatedAt?: string;
 }
 
+export interface ProductBatch {
+  id: string;
+  productId: string;
+  shopProductId?: string | null;
+  batchNo?: string | null;
+  productionDate?: string | Date | null;
+  expirationDate: string | Date;
+  quantity: number;
+  remainingStock: number;
+  purchaseOrderItemId?: string | null;
+  remark?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PurchaseOrderItem {
   id?: string;
   purchaseOrderId?: string;
@@ -316,6 +335,7 @@ export interface PurchaseOrderItem {
   quantity: number;
   remainingQuantity?: number;
   costPrice: number;
+  batches?: ProductBatch[];
 }
 
 export interface PurchaseOrderItemWithOrder extends PurchaseOrderItem {

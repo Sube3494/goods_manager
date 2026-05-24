@@ -4,7 +4,6 @@
   "private": true,
   "packageManager": "bun@1.3.13",
   "scripts": {
-    "predev": "bunx prisma generate",
     "dev": "next dev",
     "prebuild": "bunx prisma generate",
     "prestart": "bunx prisma generate",

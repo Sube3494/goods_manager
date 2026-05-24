@@ -42,9 +42,9 @@ export function ActionBar({
           animate={{ y: 0, x: "-50%" }}
           exit={{ y: 80, x: "-50%" }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="fixed bottom-4 lg:bottom-10 z-50000 pointer-events-none w-[calc(100%-1rem)] sm:w-fit sm:max-w-[calc(100%-2rem)] left-1/2 lg:left-[calc(50%+(var(--sidebar-width,0px)/2))] will-change-transform"
+          className="fixed bottom-4 lg:bottom-10 z-50000 pointer-events-none w-[calc(100%-1rem)] sm:w-fit sm:max-w-[calc(100%-2rem)] left-1/2 lg:left-[calc(50%+(var(--sidebar-width,0)/2))] will-change-transform"
         >
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-3 pr-2 py-2 sm:flex-nowrap sm:justify-start sm:gap-6 sm:pl-6 sm:pr-4 sm:h-12 sm:py-0 rounded-[24px] sm:rounded-full glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] pointer-events-auto">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-3 pr-2 py-2 sm:flex-nowrap sm:justify-start sm:gap-6 sm:pl-6 sm:pr-8 sm:h-12 sm:py-0 rounded-[24px] sm:rounded-full glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] pointer-events-auto">
 
             {/* Select All Checkbox - Minimal on mobile */}
             <button 
@@ -105,7 +105,7 @@ export function ActionBar({
 
               <button 
                 onClick={onClear}
-                className="h-9 w-9 shrink-0 rounded-full text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all outline-none sm:h-auto sm:w-auto sm:p-2"
+                className="h-9 w-9 shrink-0 rounded-full text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all outline-none sm:h-auto sm:w-auto sm:p-2 sm:mr-3.5"
               >
                 <X size={20} />
               </button>

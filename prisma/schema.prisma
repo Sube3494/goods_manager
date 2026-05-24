@@ -40,6 +40,8 @@ model Product {
   pinyin          String?
   isDiscontinued  Boolean             @default(false)
   isShopOnly      Boolean             @default(false)
+  isShelfLife     Boolean             @default(false)
+  shelfLifeDays   Int?
   remark          String?
   userId          String?
   sourceProductId String?
@@ -55,6 +57,7 @@ model Product {
   shopProducts    ShopProduct[]
   storeOpeningItems StoreOpeningItem[]
   jdSkuMappings   ProductJdSku[]
+  batches         ProductBatch[]
 
   @@index([categoryId])
   @@index([supplierId])
@@ -153,6 +156,7 @@ model PurchaseOrderItem {
   shopProduct       ShopProduct?  @relation(fields: [shopProductId], references: [id])
   purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   supplier          Supplier?     @relation(fields: [supplierId], references: [id])
+  batches           ProductBatch[]
 
   @@index([productId])
   @@index([shopProductId])
@@ -242,6 +246,7 @@ model User {
   autoPickAutoCompleteJobs AutoPickAutoCompleteJob[]
   deviceSessions     UserDeviceSession[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
+  batches            ProductBatch[]
 }
 
 model UserDeviceSession {
@@ -596,6 +601,9 @@ model ShopProduct {
   sourceProductId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  isShelfLife     Boolean  @default(false)
+  shelfLifeDays   Int?
+  batches         ProductBatch[]
 
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
   product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -711,4 +719,31 @@ model AutoPickApiKey {
 
   @@index([userId, revokedAt])
   @@index([userId, createdAt(sort: Desc)])
+}
+
+model ProductBatch {
+  id                  String             @id @default(cuid())
+  productId           String
+  shopProductId       String?
+  batchNo             String?            // 批次号
+  productionDate      DateTime?          // 生产日期
+  expirationDate      DateTime           // 过期日期
+  quantity            Int                @default(0)  // 该批次初始入库数量
+  remainingStock      Int                @default(0)  // 该批次当前剩余库存
+  purchaseOrderItemId String?            // 关联采购明细ID，方便追溯历史入库
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  remark              String?
+  userId              String?
+  
+  product             Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shopProduct         ShopProduct?       @relation(fields: [shopProductId], references: [id], onDelete: SetNull)
+  purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
+  user                User?              @relation(fields: [userId], references: [id])
+
+  @@index([productId])
+  @@index([shopProductId])
+  @@index([expirationDate])
+  @@index([purchaseOrderItemId])
+  @@index([userId])
 }

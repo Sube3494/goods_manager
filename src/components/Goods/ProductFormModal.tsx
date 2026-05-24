@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2 } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2, Calendar } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
+import { DatePicker } from "@/components/ui/DatePicker";
 import Image from "next/image";
 
 import { clsx, type ClassValue } from "clsx";
@@ -35,7 +36,7 @@ function normalizeJdSkuPreview(value: string) {
 }
 
 function formatInitialJdSkuValue(initialData?: Product | null) {
-  const jdSkuIds = Array.isArray(initialData?.jdSkuIds) ? initialData.jdSkuIds.filter(Boolean) : [];
+  const jdSkuIds = initialData && Array.isArray(initialData.jdSkuIds) ? initialData.jdSkuIds.filter(Boolean) : [];
   if (jdSkuIds.length > 0) {
     return jdSkuIds.join("\n");
   }
@@ -108,7 +109,9 @@ export function ProductFormModal({
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {},
-    remark: initialData?.remark || ""
+    remark: initialData?.remark || "",
+    isShelfLife: initialData?.isShelfLife ?? false,
+    shelfLifeDays: initialData?.shelfLifeDays !== null && initialData?.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : ""
   });
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -148,6 +151,7 @@ export function ProductFormModal({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   // 移动端排序模式 (Mobile reorder mode)
   const [isReorderMode, setIsReorderMode] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
   const jdSkuPreview = useMemo(() => normalizeJdSkuPreview(formData.jdSkuId), [formData.jdSkuId]);
 
   // Lock page scroll without losing the user's current scroll position.
@@ -295,7 +299,9 @@ export function ProductFormModal({
           isDiscontinued: initialData.isDiscontinued ?? false,
           isPublic: initialData.isPublic ?? true,
           specs: initialData.specs as Record<string, string> || {},
-          remark: initialData.remark || ""
+          remark: initialData.remark || "",
+          isShelfLife: initialData.isShelfLife ?? false,
+          shelfLifeDays: initialData.shelfLifeDays !== null && initialData.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : ""
         });
         if (initialData.id && !hideGallerySection) {
           fetchGallery(initialData.id, initialData.image || "");
@@ -313,7 +319,9 @@ export function ProductFormModal({
           isDiscontinued: false,
           isPublic: true,
           specs: {},
-          remark: ""
+          remark: "",
+          isShelfLife: false,
+          shelfLifeDays: ""
         });
       }
     }
@@ -755,11 +763,17 @@ export function ProductFormModal({
         });
     }
 
+    const shelfLifeDaysVal = formData.isShelfLife 
+      ? (formData.shelfLifeDays ? parseInt(String(formData.shelfLifeDays), 10) : null) 
+      : null;
+
     await onSubmit({
       ...formData,
       costPrice: Number(formData.costPrice),
       stock: hideStockField ? 0 : Number(formData.stock),
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
+      isShelfLife: formData.isShelfLife,
+      shelfLifeDays: shelfLifeDaysVal,
       id: initialData?.id
     }, galleryImages);
   };
@@ -1174,33 +1188,94 @@ export function ProductFormModal({
                                         const item = order.items.find((i: PurchaseOrderItem) => i.productId === initialData.id || i.shopProductId === initialData.id);
                                         if (!item) return null;
 
+                                        const itemId = item.id || "";
+                                        const existingDate = item.batches && item.batches.length > 0 && item.batches[0].productionDate
+                                            ? new Date(item.batches[0].productionDate).toISOString().split('T')[0]
+                                            : "";
+                                        const dateVal = itemId ? (selectedDates[itemId] !== undefined ? selectedDates[itemId] : existingDate) : existingDate;
+
                                         return (
-                                            <div key={order.id} className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-white/5 border border-white/5 hover:border-primary/20 transition-colors">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-mono text-muted-foreground">{new Date(order.date).toLocaleDateString()}</span>
-                                                         <span className={cn(
-                                                            "text-[9px] px-1.5 py-0.5 rounded-md font-medium uppercase",
-                                                            order.status === "Received" ? "bg-green-500/10 text-green-500" : 
-                                                            (order.status === "Ordered" || order.status === "Confirmed" || order.status === "Shipped") ? "bg-blue-500/10 text-blue-500" :
-                                                            "bg-gray-500/10 text-gray-500"
-                                                        )}>
-                                                            {order.status === "Received" ? "已入库" : "待入库"}
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-xs font-medium text-foreground">单号: {order.id}</span>
-                                                </div>
-                                                <div className="text-right flex flex-col items-end gap-0.5">
-                                                    <div className="text-xs font-semibold text-foreground">
-                                                        x{item.quantity} 
-                                                        {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
-                                                            <span className="text-[10px] font-normal text-muted-foreground ml-1">
-                                                                 (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
+                                            <div key={order.id} className="flex flex-col gap-2 p-3 rounded-xl bg-white dark:bg-white/5 border border-white/5 hover:border-primary/20 transition-colors">
+                                                <div className="flex items-center justify-between w-full">
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-mono text-muted-foreground">{new Date(order.date).toLocaleDateString()}</span>
+                                                             <span className={cn(
+                                                                "text-[9px] px-1.5 py-0.5 rounded-md font-medium uppercase",
+                                                                order.status === "Received" ? "bg-green-500/10 text-green-500" : 
+                                                                (order.status === "Ordered" || order.status === "Confirmed" || order.status === "Shipped") ? "bg-blue-500/10 text-blue-500" :
+                                                                "bg-gray-500/10 text-gray-500"
+                                                            )}>
+                                                                {order.status === "Received" ? "已入库" : "待入库"}
                                                             </span>
-                                                        )}
+                                                        </div>
+                                                        <span className="text-xs font-medium text-foreground">单号: {order.id}</span>
                                                     </div>
-                                                    <div className="text-[10px] text-muted-foreground">成本: ￥{item.costPrice}</div>
+                                                    <div className="text-right flex flex-col items-end gap-0.5">
+                                                        <div className="text-xs font-semibold text-foreground">
+                                                            x{item.quantity} 
+                                                            {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
+                                                                <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                                                                     (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground">成本: ￥{item.costPrice}</div>
+                                                    </div>
                                                 </div>
+
+                                                {/* 如果是保质期商品，且已入库，则显示生产日期输入框可以直接补录日期 */}
+                                                {formData.isShelfLife && order.status === "Received" && (
+                                                    <div className="flex items-center justify-between gap-3 mt-1 pt-2 border-t border-border/20 dark:border-white/5 w-full">
+                                                        <span className="text-[10px] text-muted-foreground font-bold flex items-center gap-1.5 shrink-0">
+                                                            <Calendar size={12} className="text-muted-foreground/80" />
+                                                            生产日期:
+                                                        </span>
+                                                        <div className="flex items-center gap-2 flex-1 justify-end">
+                                                            <DatePicker 
+                                                                value={dateVal}
+                                                                onChange={async (newVal) => {
+                                                                    if (!newVal || !itemId) return;
+                                                                    setSelectedDates(prev => ({ ...prev, [itemId]: newVal }));
+                                                                    try {
+                                                                        const res = await fetch("/api/shelf-life/batches", {
+                                                                            method: "POST",
+                                                                            headers: { "Content-Type": "application/json" },
+                                                                            body: JSON.stringify({
+                                                                                purchaseOrderItemId: itemId,
+                                                                                productionDate: newVal
+                                                                            })
+                                                                        });
+                                                                        const resData = await res.json().catch(() => null);
+                                                                        if (res.ok) {
+                                                                            showToast("保质期批次录入成功！", "success");
+                                                                            // 局部静默更新当前 batches 数据，让其在前端即时体现
+                                                                            setInboundHistory(prev => prev.map(o => {
+                                                                                if (o.id === order.id) {
+                                                                                    return {
+                                                                                        ...o,
+                                                                                        items: o.items.map(i => i.id === item.id ? { ...i, batches: [resData.batch] } : i)
+                                                                                    };
+                                                                                }
+                                                                                return o;
+                                                                            }));
+                                                                        } else {
+                                                                            showToast(resData?.error || "录入失败", "error");
+                                                                        }
+                                                                    } catch (err) {
+                                                                        console.error("Failed to save batch:", err);
+                                                                        showToast("网络保存失败", "error");
+                                                                    }
+                                                                }}
+                                                                placeholder="选择日期"
+                                                                isCompact={true}
+                                                                showClear={false}
+                                                                className="w-[125px] h-7"
+                                                                triggerClassName="rounded-full bg-white/5 border border-border dark:border-white/10 text-[10px] h-7 px-2"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })
@@ -1228,42 +1303,78 @@ export function ProductFormModal({
                     )}
 
                     {!hidePricingFields && (
-                    <div className={cn("grid gap-4", hideStockField ? "grid-cols-1" : "grid-cols-2")}>
-                        {/* Cost Price */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <FileText size={16} /> 进货单价 (￥)
-                            </label>
-                            <input 
-                                type="number" 
-                                step="0.01"
-                                min="0"
-                                value={formData.costPrice}
-                                onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
-                                className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
-                                placeholder="0.00"
-                            />
-                        </div>
-
-                        {/* Initial Stock */}
-                        {!hideStockField && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Package size={16} /> 商品库存
-                            </label>
-                            <div className="relative">
+                    <div className="space-y-4">
+                        <div className={cn("grid gap-4", hideStockField ? "grid-cols-1" : "grid-cols-2")}>
+                            {/* Cost Price */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                    <Tag size={16} className="rotate-90 text-amber-500" /> 进货单价 (￥)
+                                </label>
                                 <input 
                                     type="number" 
+                                    step="0.01"
                                     min="0"
-                                    value={formData.stock}
-                                    onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
-                                    placeholder="0"
+                                    value={formData.costPrice}
+                                    onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
+                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
+                                    placeholder="0.00"
                                 />
                             </div>
-                        </div>
-                        )}
 
+                            {/* Initial Stock */}
+                            {!hideStockField && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                    <Package size={16} className="text-blue-500" /> 商品库存
+                                </label>
+                                <div className="relative">
+                                    <input 
+                                        type="number" 
+                                        min="0"
+                                        value={formData.stock}
+                                        onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                                        className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+                            )}
+                        </div>
+
+                        {/* Shelf Life / 保质期管理 */}
+                        <div className="p-4 rounded-2xl bg-muted/20 border border-white/5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                                        <Calendar size={16} className="text-emerald-500" /> 开启保质期管理
+                                    </label>
+                                    <p className="text-[10px] text-muted-foreground">开启后可录入商品的生产日期并跟踪保质期状态</p>
+                                </div>
+                                <Switch 
+                                    checked={formData.isShelfLife}
+                                    onChange={(checked) => setFormData({ ...formData, isShelfLife: checked })}
+                                />
+                            </div>
+
+                            {formData.isShelfLife && (
+                                <div className="space-y-2 pt-2 border-t border-white/5">
+                                    <label className="text-xs font-bold text-muted-foreground/80 uppercase tracking-wider">
+                                        保质期天数
+                                    </label>
+                                    <div className="relative flex items-center">
+                                        <input 
+                                            type="number" 
+                                            min="1"
+                                            value={formData.shelfLifeDays}
+                                            onChange={(e) => setFormData({ ...formData, shelfLifeDays: e.target.value })}
+                                            className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 pr-12 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
+                                            placeholder="请输入保质期天数，例如：365"
+                                        />
+                                        <span className="absolute right-4 text-xs text-muted-foreground font-medium">天</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     )}
 

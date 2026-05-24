@@ -212,6 +212,8 @@ export async function GET(
         stock: item.stock ?? 0,
         isPublic: item.isPublic ?? true,
         isDiscontinued: item.isDiscontinued ?? false,
+        isShelfLife: item.isShelfLife ?? false,
+        shelfLifeDays: item.shelfLifeDays ?? null,
         sourceType: "shopProduct" as const,
         shopProductId: item.id,
         isStandaloneShopProduct: !item.productId,
@@ -295,6 +297,8 @@ export async function GET(
       stock: item.stock ?? 0,
       isPublic: item.isPublic ?? true,
       isDiscontinued: item.isDiscontinued ?? false,
+      isShelfLife: item.isShelfLife ?? false,
+      shelfLifeDays: item.shelfLifeDays ?? null,
       sourceType: "shopProduct" as const,
       shopProductId: item.id,
       isStandaloneShopProduct: !item.productId,
@@ -381,6 +385,8 @@ export async function PUT(
     const isPublic = Boolean(body?.isPublic ?? true);
     const isDiscontinued = Boolean(body?.isDiscontinued ?? false);
     const remark = typeof body?.remark === "string" ? body.remark.trim() : "";
+    const isShelfLife = Boolean(body?.isShelfLife ?? false);
+    const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     if (!productName) {
       return NextResponse.json({ error: "商品名称不能为空" }, { status: 400 });
     }
@@ -425,6 +431,8 @@ export async function PUT(
         isDiscontinued,
         remark: remark || null,
         specs: Prisma.JsonNull,
+        isShelfLife,
+        shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
       },
       select: {
         id: true,
@@ -441,6 +449,8 @@ export async function PUT(
         stock: true,
         isPublic: true,
         isDiscontinued: true,
+        isShelfLife: true,
+        shelfLifeDays: true,
         remark: true,
         specs: true,
         createdAt: true,
@@ -463,6 +473,8 @@ export async function PUT(
       stock: updated.stock ?? 0,
       isPublic: updated.isPublic ?? true,
       isDiscontinued: updated.isDiscontinued ?? false,
+      isShelfLife: updated.isShelfLife ?? false,
+      shelfLifeDays: updated.shelfLifeDays ?? null,
       remark: updated.remark || null,
       specs: null,
       createdAt: updated.createdAt,
@@ -516,6 +528,8 @@ export async function POST(
         stock: true,
         isPublic: true,
         isDiscontinued: true,
+        isShelfLife: true,
+        shelfLifeDays: true,
         remark: true,
         specs: true,
         category: { select: { name: true } },
@@ -617,6 +631,8 @@ export async function POST(
         stock: 0,
         isPublic: product.isPublic,
         isDiscontinued: product.isDiscontinued,
+        isShelfLife: product.isShelfLife ?? false,
+        shelfLifeDays: product.shelfLifeDays ?? null,
         remark: product.remark,
         specs: product.specs ?? Prisma.JsonNull,
       })),
@@ -684,6 +700,16 @@ export async function PATCH(
     if (body?.stock !== undefined) {
       const stock = Number(body.stock);
       updateData.stock = Number.isFinite(stock) ? Math.max(0, Math.trunc(stock)) : 0;
+    }
+
+    if (body?.isShelfLife !== undefined) {
+      updateData.isShelfLife = Boolean(body.isShelfLife);
+      if (body.isShelfLife === false) {
+        updateData.shelfLifeDays = null;
+      } else if (body?.shelfLifeDays !== undefined) {
+        const shelfLifeDays = Number(body.shelfLifeDays);
+        updateData.shelfLifeDays = Number.isFinite(shelfLifeDays) ? Math.max(1, Math.trunc(shelfLifeDays)) : null;
+      }
     }
 
     if (Object.keys(updateData).length === 0) {
