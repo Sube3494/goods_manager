@@ -102,7 +102,8 @@ export async function PATCH(
       });
     }
 
-    const product = await prisma.product.findFirst({
+    // 先在 Product 表中查找（支持 productId 本身）
+    let product = await prisma.product.findFirst({
       where: user.role === "SUPER_ADMIN"
         ? { id: productId }
         : {
@@ -117,16 +118,68 @@ export async function PATCH(
       },
     });
 
+    // 如果 Product 表中找不到，说明前端传入的可能是 ShopProduct.id
+    // 尝试在 ShopProduct 表中查找，并取其关联的 Product 信息
+    let shopProductName: string | null = null;
+    let shopProductSku: string | null = null;
+    let shopProductImage: string | null = null;
+    let shopProductLinkedProductId: string | null = null;
+
     if (!product) {
+      const shopProduct = await prisma.shopProduct.findFirst({
+        where: {
+          id: productId,
+          shop: { userId: user.id },
+        },
+        select: {
+          id: true,
+          productId: true,
+          sourceProductId: true,
+          productName: true,
+          sku: true,
+          productImage: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              image: true,
+            },
+          },
+        },
+      });
+
+      if (shopProduct) {
+        // 优先用 ShopProduct 自身的信息，再用关联的 Product 兜底
+        shopProductName = shopProduct.productName || shopProduct.product?.name || null;
+        shopProductSku = shopProduct.sku || shopProduct.product?.sku || null;
+        shopProductImage = shopProduct.productImage || shopProduct.product?.image || null;
+        shopProductLinkedProductId = shopProduct.productId || shopProduct.sourceProductId || shopProduct.id;
+
+        // 尝试加载关联的 Product，以便记录 manualMatchedProduct 时用真实 productId
+        if (shopProduct.productId) {
+          product = await prisma.product.findFirst({
+            where: { id: shopProduct.productId },
+            select: { id: true, name: true, sku: true, image: true },
+          });
+        }
+      }
+    }
+
+    if (!product && !shopProductLinkedProductId) {
       return NextResponse.json({ error: "商品不存在或无权使用" }, { status: 404 });
     }
 
     const storage = await getStorageStrategy();
+    const resolvedProductId = product?.id || shopProductLinkedProductId!;
+    const resolvedName = shopProductName || product?.name || "未命名商品";
+    const resolvedSku = shopProductSku || product?.sku || null;
+    const rawImage = shopProductImage || product?.image || null;
     const matchedProduct = {
-      id: product.id,
-      name: product.name || "未命名商品",
-      sku: product.sku || null,
-      image: product.image ? storage.resolveUrl(product.image) : null,
+      id: resolvedProductId,
+      name: resolvedName,
+      sku: resolvedSku,
+      image: rawImage ? storage.resolveUrl(rawImage) : null,
       sourceType: "product" as const,
       shopName: null,
       isManual: true,
