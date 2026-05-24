@@ -706,17 +706,26 @@ export async function POST(req: NextRequest) {
             }
 
             // 4.1 自动库存补偿逻辑 (Auto-Inbound Compensator)
-            // 在扣减之前，检查每个商品的当前库存是否足够。如果不足，立刻打单入库。
+            // 在扣减之前，检查每个商品的当前在库批次余量是否足够。
+            // 如果批次不足，立刻打单入库（防止 FIFO 扣减时抛"无批次可扣"错误）。
             for (const item of matchedItems) {
-              const currentProduct = await tx.product.findUnique({
-                where: { id: item.productId },
-                select: { stock: true }
+              // 查询当前在库有余量的批次总和
+              const activeBatches = await tx.purchaseOrderItem.findMany({
+                where: {
+                  productId: item.productId,
+                  remainingQuantity: { gt: 0 },
+                  purchaseOrder: {
+                    userId,
+                    status: "Received",
+                  },
+                },
+                select: { remainingQuantity: true },
               });
+              const currentBatchStock = activeBatches.reduce((sum, b) => sum + (b.remainingQuantity || 0), 0);
 
-              const currentStock = currentProduct?.stock || 0;
-              if (currentStock < item.quantity) {
-                // 库存不足以发货！系统自动生成虚拟入库单，补齐差额
-                const gap = item.quantity - currentStock;
+              if (currentBatchStock < item.quantity) {
+                // 批次库存不足以发货！系统自动生成虚拟入库单，补齐批次差额
+                const batchGap = item.quantity - currentBatchStock;
                 const compensateOrderId = `PO-AUTO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
                 
                 await tx.purchaseOrder.create({
@@ -726,25 +735,34 @@ export async function POST(req: NextRequest) {
                     status: "Received", // 直接完成
                     totalAmount: 0,
                     date: new Date(),
-                    note: `[${platform}导入] [流水号:${dailySerial || '无'}] 导入订单(单号:${platformOrderId})时库存不足，系统自动补齐 ${gap} 件`,
+                    note: `[${platform}导入] [流水号:${dailySerial || '无'}] 导入订单(单号:${platformOrderId})时批次库存不足，系统自动补齐 ${batchGap} 件`,
                     shopName: shopName ? String(shopName) : null, // 传递清洗后的智能店名
                     userId: userId,
                     items: {
                       create: [{
                         productId: item.productId,
-                        quantity: gap,
-                        remainingQuantity: gap,
+                        quantity: batchGap,
+                        remainingQuantity: batchGap,
                         costPrice: 0
                       }]
                     }
                   }
                 });
 
-                // 更新商品总表库存，将其拉平到发货要求线
-                await tx.product.update({
+                // 仅当系统总库存也不足时，才按实际差额增补总库存
+                // 防止"系统有库存但无批次"时，总库存被重复叠加
+                const currentProduct = await tx.product.findUnique({
                   where: { id: item.productId },
-                  data: { stock: { increment: gap } }
+                  select: { stock: true }
                 });
+                const currentSystemStock = currentProduct?.stock || 0;
+                const systemCompensateQty = Math.max(0, item.quantity - currentSystemStock);
+                if (systemCompensateQty > 0) {
+                  await tx.product.update({
+                    where: { id: item.productId },
+                    data: { stock: { increment: systemCompensateQty } }
+                  });
+                }
               }
             }
 

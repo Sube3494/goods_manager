@@ -107,6 +107,37 @@ export class InventoryService {
         if (shopProductResult.count === 0) {
           throw new Error(`并发冲突：店铺商品 ID ${item.shopProductId} 的库存发生变动导致不足。请重试。`);
         }
+
+        // 4.1 同步扣减关联的主库全局商品库存（Product.stock）
+        // 如果该店铺商品关联了主库商品（productId），则联动扣减主库总库存
+        // 避免 ShopProduct.stock 扣减了但 Product.stock 没动，导致数据脱节
+        const linkedProductId = item.productId;
+        if (linkedProductId) {
+          await tx.product.update({
+            where: { id: linkedProductId },
+            data: {
+              stock: {
+                decrement: item.quantity
+              }
+            }
+          });
+        } else {
+          // 如果 item 中没有携带 productId，则从数据库中查询一次
+          const shopProduct = await tx.shopProduct.findUnique({
+            where: { id: item.shopProductId },
+            select: { productId: true }
+          });
+          if (shopProduct?.productId) {
+            await tx.product.update({
+              where: { id: shopProduct.productId },
+              data: {
+                stock: {
+                  decrement: item.quantity
+                }
+              }
+            });
+          }
+        }
       } else {
         const productResult = await tx.product.updateMany({
           where: {
