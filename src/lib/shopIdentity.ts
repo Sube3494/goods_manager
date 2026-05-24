@@ -103,7 +103,22 @@ export function findMatchingShopRecord<T extends ShopIdentityRecord>(
     return matchedByName[0];
   }
 
-  return matchedByName[0] || null;
+  if (matchedByName[0]) {
+    return matchedByName[0];
+  }
+
+  // 智能 Fallback 匹配：如果简称已变，但“详细地址”完全一致且唯一，则判定为改名后的同一家店铺
+  const addressKey = normalizeShopAddressKey(target.address);
+  if (addressKey) {
+    const matchedByAddress = shops.filter(
+      (shop) => normalizeShopAddressKey(shop.address) === addressKey
+    );
+    if (matchedByAddress.length === 1) {
+      return matchedByAddress[0];
+    }
+  }
+
+  return null;
 }
 
 function stripShopSuffix(value: string) {

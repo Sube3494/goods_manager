@@ -43,6 +43,22 @@ function formatInitialJdSkuValue(initialData?: Product | null) {
   return initialData?.jdSkuId || "";
 }
 
+function parseShelfLife(daysStr: string): { value: string; unit: "天" | "月" | "年" } {
+  const days = parseInt(daysStr, 10);
+  if (isNaN(days) || days <= 0) return { value: "", unit: "天" };
+  if (days % 365 === 0) return { value: String(days / 365), unit: "年" };
+  if (days % 30 === 0) return { value: String(days / 30), unit: "月" };
+  return { value: String(days), unit: "天" };
+}
+
+function calcDays(value: string, unit: "天" | "月" | "年"): string {
+  const v = parseInt(value, 10);
+  if (isNaN(v) || v <= 0) return "";
+  if (unit === "年") return String(v * 365);
+  if (unit === "月") return String(v * 30);
+  return String(v);
+}
+
 const toolbarButtonClass =
   "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-primary transition-all duration-300 hover:bg-primary hover:text-primary-foreground active:scale-95 shadow-sm disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -153,6 +169,14 @@ export function ProductFormModal({
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
   const jdSkuPreview = useMemo(() => normalizeJdSkuPreview(formData.jdSkuId), [formData.jdSkuId]);
+
+  const [shelfLifeVal, setShelfLifeVal] = useState("");
+  const [shelfLifeUnit, setShelfLifeUnit] = useState<"天" | "月" | "年">("天");
+  const handleShelfLifeChange = (value: string, unit: "天" | "月" | "年") => {
+    setShelfLifeVal(value);
+    setShelfLifeUnit(unit);
+    setFormData(prev => ({ ...prev, shelfLifeDays: calcDays(value, unit) }));
+  };
 
   // Lock page scroll without losing the user's current scroll position.
   useEffect(() => {
@@ -303,6 +327,9 @@ export function ProductFormModal({
           isShelfLife: initialData.isShelfLife ?? false,
           shelfLifeDays: initialData.shelfLifeDays !== null && initialData.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : ""
         });
+        const _parsed = parseShelfLife(initialData.shelfLifeDays !== null && initialData.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : "");
+        setShelfLifeVal(_parsed.value);
+        setShelfLifeUnit(_parsed.unit);
         if (initialData.id && !hideGallerySection) {
           fetchGallery(initialData.id, initialData.image || "");
         }
@@ -323,6 +350,8 @@ export function ProductFormModal({
           isShelfLife: false,
           shelfLifeDays: ""
         });
+        setShelfLifeVal("");
+        setShelfLifeUnit("天");
       }
     }
   }, [hideGallerySection, isOpen, initialData]);
@@ -1012,7 +1041,7 @@ export function ProductFormModal({
                     {!hideSkuField && (
                       <div className="space-y-2">
                           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                              <FileText size={16} /> 商品编号 (SKU)
+                              <FileText size={16} className="text-indigo-500" /> 商品编号 (SKU)
                           </label>
                           <input 
                               type="text" 
@@ -1027,7 +1056,7 @@ export function ProductFormModal({
                     {showJdSkuField && (
                       <div className="space-y-2">
                           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                              <FileText size={16} /> JD SKU ID
+                              <FileText size={16} className="text-rose-500" /> JD SKU ID
                           </label>
                           <input
                               type="text"
@@ -1046,7 +1075,7 @@ export function ProductFormModal({
                     {/* Name */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Package size={16} /> 商品名称 <span className="text-red-500">*</span>
+                            <Package size={16} className="text-blue-500" /> 商品名称 <span className="text-red-500">*</span>
                         </label>
                         <input 
                             required
@@ -1062,7 +1091,7 @@ export function ProductFormModal({
                         {/* Category */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Tag size={16} /> 分类 <span className="text-red-500">*</span>
+                                <Tag size={16} className="text-emerald-500" /> 分类 <span className="text-red-500">*</span>
                             </label>
                             <CustomSelect 
                                 value={formData.categoryId}
@@ -1080,7 +1109,7 @@ export function ProductFormModal({
                         {!hideSupplierField && (
                           <div className="space-y-2">
                                   <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                      <Truck size={16} /> 供应商
+                                      <Truck size={16} className="text-amber-500" /> 供应商
                                   </label>
                               <CustomSelect 
                                   value={formData.supplierId || ""}
@@ -1101,7 +1130,7 @@ export function ProductFormModal({
                             {!hideProductionControl && (
                               <div className="space-y-2">
                                   <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                      <Activity size={16} /> 生产状态
+                                      <Activity size={16} className="text-violet-500" /> 生产状态
                                   </label>
                                   <div className={cn(
                                       "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
@@ -1126,7 +1155,7 @@ export function ProductFormModal({
                             {!hideVisibilityControl && (
                               <div className="space-y-2">
                                   <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                      <Eye size={16} /> 展示权限
+                                      <Eye size={16} className="text-sky-500" /> 展示权限
                                   </label>
                                   <div className={cn(
                                       "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
@@ -1149,6 +1178,75 @@ export function ProductFormModal({
                             )}
                         </div>
                     )}
+
+                    {/* Shelf Life / 保质期管理 - 始终显示 */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* 是否为保质期商品 */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Activity size={16} className="text-emerald-500" />
+                                是否为保质期商品
+                            </label>
+                            <div className={cn(
+                                "rounded-full border px-4 h-[46px] flex items-center justify-between transition-all duration-300",
+                                formData.isShelfLife
+                                    ? "bg-emerald-500/5 border-emerald-500/25 dark:border-emerald-500/20"
+                                    : "bg-white/5 dark:bg-white/5 border-border dark:border-white/10"
+                            )}>
+                                <span className={cn(
+                                    "text-sm font-medium",
+                                    formData.isShelfLife ? "text-emerald-400" : "text-muted-foreground"
+                                )}>
+                                    {formData.isShelfLife ? "是 (需录入保质期)" : "否 (无需录入保质期)"}
+                                </span>
+                                <Switch
+                                    checked={formData.isShelfLife}
+                                    onChange={(checked) => {
+                                        setFormData(prev => ({ ...prev, isShelfLife: checked }));
+                                        if (checked && !shelfLifeVal) handleShelfLifeChange("6", "月");
+                                        if (!checked) setFormData(prev => ({ ...prev, shelfLifeDays: "" }));
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* 保质期时长 - 始终显示，开关关闭时置灰 */}
+                        <div className={cn("space-y-2 transition-opacity duration-300", !formData.isShelfLife && "opacity-40 pointer-events-none")}>
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <FileText size={16} className="text-emerald-500" />
+                                <span>保质期时长 <span className="text-red-500">*</span></span>
+                            </label>
+                            <div className="flex items-center rounded-full border border-border dark:border-white/10 bg-white/5 dark:bg-white/5 px-4 h-[46px] focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500/30 transition-all">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={shelfLifeVal}
+                                    onChange={(e) => handleShelfLifeChange(e.target.value, shelfLifeUnit)}
+                                    disabled={!formData.isShelfLife}
+                                    className="flex-1 bg-transparent border-none outline-none text-foreground text-sm font-medium no-spinner min-w-0"
+                                    placeholder="6"
+                                />
+                                <div className="h-4 w-px bg-border dark:bg-white/10 mx-3 shrink-0" />
+                                <CustomSelect
+                                    value={shelfLifeUnit}
+                                    onChange={(val) => handleShelfLifeChange(shelfLifeVal, val as "天" | "月" | "年")}
+                                    options={[
+                                        { value: "天", label: "天" },
+                                        { value: "月", label: "月" },
+                                        { value: "年", label: "年" }
+                                    ]}
+                                    placeholder="单位"
+                                    className="w-[80px] shrink-0 h-full"
+                                    triggerClassName="!bg-transparent !border-0 hover:!bg-transparent dark:hover:!bg-transparent focus:!ring-0 px-3 text-xs font-bold text-foreground h-full flex items-center justify-between cursor-pointer rounded-r-full !shadow-none"
+                                />
+                            </div>
+                            {formData.isShelfLife && shelfLifeVal && !isNaN(parseInt(shelfLifeVal, 10)) && parseInt(shelfLifeVal, 10) > 0 && (
+                                <p className="text-[11px] text-amber-500/80 font-medium pl-0.5">
+                                    💡 系统将智能折合为 <strong className="text-amber-500">{shelfLifeUnit === "年" ? parseInt(shelfLifeVal, 10) * 365 : shelfLifeUnit === "月" ? parseInt(shelfLifeVal, 10) * 30 : parseInt(shelfLifeVal, 10)}</strong> 天进行到期预警监控
+                                </p>
+                            )}
+                        </div>
+                    </div>
 
                     {/* Inbound History */}
                     {initialData && !disableHistorySection && (
@@ -1290,7 +1388,7 @@ export function ProductFormModal({
                     {!hideRemarkField && (
                       <div className="space-y-2 pb-2">
                           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                              <FileText size={16} /> 备忘录 / 备注
+                              <FileText size={16} className="text-teal-500" /> 备忘录 / 备注
                           </label>
                           <textarea 
                               value={formData.remark}
@@ -1341,40 +1439,7 @@ export function ProductFormModal({
                             )}
                         </div>
 
-                        {/* Shelf Life / 保质期管理 */}
-                        <div className="p-4 rounded-2xl bg-muted/20 border border-white/5 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                                        <Calendar size={16} className="text-emerald-500" /> 开启保质期管理
-                                    </label>
-                                    <p className="text-[10px] text-muted-foreground">开启后可录入商品的生产日期并跟踪保质期状态</p>
-                                </div>
-                                <Switch 
-                                    checked={formData.isShelfLife}
-                                    onChange={(checked) => setFormData({ ...formData, isShelfLife: checked })}
-                                />
-                            </div>
 
-                            {formData.isShelfLife && (
-                                <div className="space-y-2 pt-2 border-t border-white/5">
-                                    <label className="text-xs font-bold text-muted-foreground/80 uppercase tracking-wider">
-                                        保质期天数
-                                    </label>
-                                    <div className="relative flex items-center">
-                                        <input 
-                                            type="number" 
-                                            min="1"
-                                            value={formData.shelfLifeDays}
-                                            onChange={(e) => setFormData({ ...formData, shelfLifeDays: e.target.value })}
-                                            className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 pr-12 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
-                                            placeholder="请输入保质期天数，例如：365"
-                                        />
-                                        <span className="absolute right-4 text-xs text-muted-foreground font-medium">天</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                     </div>
                     )}
 
@@ -1382,7 +1447,7 @@ export function ProductFormModal({
                       <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">
                           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <Camera size={16} /> 商品封面
+                            <Camera size={16} className="text-pink-500" /> 商品封面
                           </label>
                           {formData.image && (
                             <button
@@ -1438,7 +1503,7 @@ export function ProductFormModal({
                     <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Tag size={16} /> 商品参数
+                                <Tag size={16} className="text-violet-500" /> 商品参数
                             </label>
                             <button
                                 type="button"
@@ -1492,7 +1557,7 @@ export function ProductFormModal({
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                 <label className="text-sm font-bold text-foreground flex items-center gap-2 whitespace-nowrap">
-                                    <Camera size={18} className="text-primary shrink-0" /> <span className="hidden xs:inline">实拍</span>相册管理
+                                    <Camera size={18} className="text-rose-500 shrink-0" /> <span className="hidden xs:inline">实拍</span>相册管理
                                 </label>
                             </div>
                             
