@@ -94,7 +94,9 @@ export async function GET(request: NextRequest) {
       // 合并对齐扫描：如果通过 addressBookId 匹配到了已绑定的新店，但数据库还残留有同名的空 addressBookId 老店，在此进行商品数据合并与清理，防止分裂
       if (existing) {
         const unboundOldShops = existingShops.filter(
-          (s) => s.id !== existing!.id && !s.addressBookId && isShopNameMatch(s.name, existing!.name)
+          (s) => s.id !== existing!.id && !s.addressBookId && 
+          (isShopNameMatch(s.name, existing!.name) || 
+           (s.name && existing!.name && s.name.length >= 2 && existing!.name.length >= 2 && s.name.substring(0, 2) === existing!.name.substring(0, 2)))
         );
         for (const oldShop of unboundOldShops) {
           const oldProdCount = await prisma.shopProduct.count({ where: { shopId: oldShop.id } });
@@ -135,7 +137,10 @@ export async function GET(request: NextRequest) {
         const unboundShops = existingShops.filter((s) => !s.addressBookId && !touchedShopIds.has(s.id));
         if (unboundShops.length > 0) {
           // 优先寻找店名相似的老店
-          let candidate = unboundShops.find((s) => isShopNameMatch(s.name, addr.name));
+          let candidate = unboundShops.find(
+            (s) => isShopNameMatch(s.name, addr.name) || 
+            (s.name && addr.name && s.name.length >= 2 && addr.name.length >= 2 && s.name.substring(0, 2) === addr.name.substring(0, 2))
+          );
           
           // 如果没有名字相似的，但只剩唯一一个未绑定的老店铺，且它有商品，说明是被修改了简称的那个老店
           if (!candidate && unboundShops.length === 1) {
