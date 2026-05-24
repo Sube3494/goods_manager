@@ -128,7 +128,11 @@ export async function PATCH(
     if (!product) {
       const shopProduct = await prisma.shopProduct.findFirst({
         where: {
-          id: productId,
+          OR: [
+            { id: productId },
+            { productId: productId },
+            { sourceProductId: productId }
+          ],
           shop: { userId: user.id },
         },
         select: {
