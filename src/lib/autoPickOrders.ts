@@ -3763,11 +3763,12 @@ async function resolveBrushOrderItemsForAutoPickOrder(
         jdSkuId: true,
         shop: {
           select: {
+            id: true,
             name: true,
           },
         },
-        },
-      });
+      },
+    });
   const userShops = mappedShopName || lockedResolvedShop?.id
     ? await prisma.shop.findMany({
         where: { userId },
@@ -3785,7 +3786,10 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     ? findMatchingShopRecord(userShops, { name: mappedShopName })
     : null;
   const mappedShopNameText = String(internalShop?.name || mappedShopName || "").trim();
-  const isCandidateInMappedShop = (candidateShopName: string | null | undefined) => {
+  const isCandidateInMappedShop = (candidateShopId: string | null | undefined, candidateShopName: string | null | undefined) => {
+    if (internalShop?.id) {
+      return candidateShopId === internalShop.id;
+    }
     return isShopNameMatch(candidateShopName, mappedShopNameText);
   };
 
@@ -3794,6 +3798,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    shopId: string | null;
     shopName: string | null;
   }>>();
   const shopProductSkuMap = new Map<string, Array<{
@@ -3801,6 +3806,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    shopId: string | null;
     shopName: string | null;
   }>>();
   const normalizedShopProductEntries: Array<{
@@ -3809,6 +3815,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    shopId: string | null;
     shopName: string | null;
   }> = [];
   for (const item of shopProducts) {
@@ -3817,6 +3824,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       sourceProductId: item.sourceProductId || null,
       sku: item.sku || null,
       jdSkuId: item.jdSkuId || null,
+      shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     };
     const productName = toAutoPickBaseProductName(item.productName);
@@ -3866,9 +3874,9 @@ async function resolveBrushOrderItemsForAutoPickOrder(
           )
         ).slice(0, 10)
       : [];
-    const sameSkuCandidates = allSameSkuCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopName));
-    const shopNameCandidates = allNameCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopName));
-    const fuzzyCandidates = allFuzzyCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopName));
+    const sameSkuCandidates = allSameSkuCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
+    const shopNameCandidates = allNameCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
+    const fuzzyCandidates = allFuzzyCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
     const sameShopSkuCandidate = sameSkuCandidates.find((candidate) => {
       const candidateProductId = candidate.productId || candidate.sourceProductId;
       return Boolean(candidateProductId);
@@ -3974,7 +3982,10 @@ async function resolveOutboundItemsForAutoPickOrder(
     ? { id: resolvedInternalShop.id, name: resolvedInternalShop.name }
     : null;
   const mappedShopNameText = String(internalShop?.name || mappedShopName || "").trim();
-  const isCandidateInMappedShop = (candidateShopName: string | null | undefined) => {
+  const isCandidateInMappedShop = (candidateShopId: string | null | undefined, candidateShopName: string | null | undefined) => {
+    if (internalShop?.id) {
+      return candidateShopId === internalShop.id;
+    }
     return isShopNameMatch(candidateShopName, mappedShopNameText);
   };
 
@@ -4089,7 +4100,7 @@ async function resolveOutboundItemsForAutoPickOrder(
 
       if (normalizedSku) {
         const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
-          isCandidateInMappedShop(candidate.shopName)
+          isCandidateInMappedShop(candidate.shopId, candidate.shopName)
         );
         const uniqueCandidateShopIds = Array.from(
           new Set(
@@ -4242,11 +4253,18 @@ export async function createOutboundFromAutoPickOrder(
 
     for (const item of resolved.items) {
       if (item.shopProductId) {
-        const currentShopProduct = await tx.shopProduct.findUnique({
-          where: { id: item.shopProductId },
-          select: { stock: true },
+        const activeBatches = await tx.purchaseOrderItem.findMany({
+          where: {
+            shopProductId: item.shopProductId,
+            remainingQuantity: { gt: 0 },
+            purchaseOrder: {
+              userId,
+              status: "Received",
+            },
+          },
+          select: { remainingQuantity: true },
         });
-        const currentStock = currentShopProduct?.stock || 0;
+        const currentStock = activeBatches.reduce((sum, batch) => sum + (batch.remainingQuantity || 0), 0);
         if (currentStock < item.quantity) {
           const gap = item.quantity - currentStock;
           const compensateOrderId = `PO-AUTO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
@@ -4279,11 +4297,18 @@ export async function createOutboundFromAutoPickOrder(
           });
         }
       } else if (item.productId) {
-        const currentProduct = await tx.product.findUnique({
-          where: { id: item.productId },
-          select: { stock: true },
+        const activeBatches = await tx.purchaseOrderItem.findMany({
+          where: {
+            productId: item.productId,
+            remainingQuantity: { gt: 0 },
+            purchaseOrder: {
+              userId,
+              status: "Received",
+            },
+          },
+          select: { remainingQuantity: true },
         });
-        const currentStock = currentProduct?.stock || 0;
+        const currentStock = activeBatches.reduce((sum, batch) => sum + (batch.remainingQuantity || 0), 0);
         if (currentStock < item.quantity) {
           const gap = item.quantity - currentStock;
           const compensateOrderId = `PO-AUTO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
