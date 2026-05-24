@@ -323,31 +323,87 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "缺少批次ID" }, { status: 400 });
     }
 
-    const batch = await prisma.productBatch.findFirst({
-      where: {
-        id: batchId,
-        product: {
-          userId: user.id
+    // 用事务处理原子性更新，确保多表库存一致性
+    const updatedBatch = await prisma.$transaction(async (tx) => {
+      const oldBatch = await tx.productBatch.findFirst({
+        where: {
+          id: batchId,
+          product: {
+            userId: user.id
+          }
+        }
+      });
+
+      if (!oldBatch) {
+        throw new Error("找不到指定的批次记录");
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: Record<string, any> = {};
+      let diff = 0;
+      if (remainingStock !== null && !isNaN(remainingStock) && remainingStock >= 0) {
+        data.remainingStock = remainingStock;
+        diff = remainingStock - oldBatch.remainingStock;
+      }
+      if (remark !== null) {
+        data.remark = remark;
+      }
+
+      const updated = await tx.productBatch.update({
+        where: { id: batchId },
+        data
+      });
+
+      // 如果余量发生了变化，同步更新关联表的库存总量
+      if (diff !== 0) {
+        // 1. 同步更新采购单项的余量 (PurchaseOrderItem)
+        if (oldBatch.purchaseOrderItemId) {
+          const poi = await tx.purchaseOrderItem.findUnique({
+            where: { id: oldBatch.purchaseOrderItemId }
+          });
+          if (poi) {
+            const currentRemaining = poi.remainingQuantity !== null ? poi.remainingQuantity : poi.quantity;
+            await tx.purchaseOrderItem.update({
+              where: { id: oldBatch.purchaseOrderItemId },
+              data: {
+                remainingQuantity: Math.max(0, currentRemaining + diff)
+              }
+            });
+          }
+        }
+
+        // 2. 同步更新店铺商品总库存 (ShopProduct)
+        if (oldBatch.shopProductId) {
+          const sp = await tx.shopProduct.findUnique({
+            where: { id: oldBatch.shopProductId }
+          });
+          if (sp) {
+            const currentStock = sp.stock ?? 0;
+            await tx.shopProduct.update({
+              where: { id: oldBatch.shopProductId },
+              data: {
+                stock: Math.max(0, currentStock + diff)
+              }
+            });
+          }
+        } else {
+          // 3. 同步更新主库商品总库存 (Product)
+          const p = await tx.product.findUnique({
+            where: { id: oldBatch.productId }
+          });
+          if (p) {
+            const currentStock = p.stock ?? 0;
+            await tx.product.update({
+              where: { id: oldBatch.productId },
+              data: {
+                stock: Math.max(0, currentStock + diff)
+              }
+            });
+          }
         }
       }
-    });
 
-    if (!batch) {
-      return NextResponse.json({ error: "找不到指定的批次记录" }, { status: 404 });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: Record<string, any> = {};
-    if (remainingStock !== null && !isNaN(remainingStock) && remainingStock >= 0) {
-      data.remainingStock = remainingStock;
-    }
-    if (remark !== null) {
-      data.remark = remark;
-    }
-
-    const updatedBatch = await prisma.productBatch.update({
-      where: { id: batchId },
-      data
+      return updated;
     });
 
     return NextResponse.json({
@@ -356,7 +412,9 @@ export async function PUT(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to update product batch:", error);
-    return NextResponse.json({ error: "更新批次失败" }, { status: 500 });
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : "更新批次失败" 
+    }, { status: 500 });
   }
 }
 
