@@ -25,16 +25,29 @@ export async function GET() {
       select: { shippingAddresses: true },
     });
 
-    const localShops = Array.isArray(user?.shippingAddresses)
+    const addresses = Array.isArray(user?.shippingAddresses)
       ? (user.shippingAddresses as ShippingAddress[])
-          .map((item, index) => ({
-            id: String(item?.id || `shipping-${index}`),
-            name: String(item?.label || "").trim(),
-            address: getAddressDetail(item),
-            isDefault: Boolean(item?.isDefault),
-          }))
-          .filter((item) => item.name && item.address)
       : [];
+
+    // 查询当前用户的所有本地店铺
+    const dbShops = await prisma.shop.findMany({
+      where: { userId: session.id },
+      select: { id: true, addressBookId: true }
+    });
+
+    const localShops = addresses
+      .map((item, index) => {
+        const addressBookId = String(item?.id || `shipping-${index}`);
+        const dbShop = dbShops.find((s) => s.addressBookId === addressBookId);
+        
+        return {
+          id: dbShop ? dbShop.id : addressBookId, // 优先使用真实的 Shop ID，兜底使用地址库 ID
+          name: String(item?.label || "").trim(),
+          address: getAddressDetail(item),
+          isDefault: Boolean(item?.isDefault),
+        };
+      })
+      .filter((item) => item.name && item.address);
 
     return NextResponse.json({ shops: localShops });
   } catch (error) {
