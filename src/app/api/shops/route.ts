@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getAddressDetail } from "@/lib/addressBook";
-import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopName } from "@/lib/shopIdentity";
+import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopName, isShopNameMatch } from "@/lib/shopIdentity";
 
 function sameNullableNumber(left: number | null | undefined, right: number | null | undefined) {
   const normalizedLeft = Number.isFinite(Number(left)) ? Number(left) : null;
@@ -89,7 +89,68 @@ export async function GET(request: NextRequest) {
     const touchedShopIds = new Set<string>();
 
     for (const addr of normalizedAddresses) {
-      const existing = findMatchingShopRecord(existingShops, addr);
+      let existing = findMatchingShopRecord(existingShops, addr);
+
+      // 合并对齐扫描：如果通过 addressBookId 匹配到了已绑定的新店，但数据库还残留有同名的空 addressBookId 老店，在此进行商品数据合并与清理，防止分裂
+      if (existing) {
+        const unboundOldShops = existingShops.filter(
+          (s) => s.id !== existing!.id && !s.addressBookId && isShopNameMatch(s.name, existing!.name)
+        );
+        for (const oldShop of unboundOldShops) {
+          const oldProdCount = await prisma.shopProduct.count({ where: { shopId: oldShop.id } });
+          if (oldProdCount > 0) {
+            const oldProducts = await prisma.shopProduct.findMany({ where: { shopId: oldShop.id } });
+            for (const item of oldProducts) {
+              const hasConflict = await prisma.shopProduct.findFirst({
+                where: {
+                  shopId: existing.id,
+                  OR: [
+                    item.sku ? { sku: item.sku } : {},
+                    item.jdSkuId ? { jdSkuId: item.jdSkuId } : {},
+                    { productName: item.productName }
+                  ].filter(o => Object.keys(o).length > 0)
+                }
+              });
+              if (hasConflict) {
+                await prisma.productBatch.updateMany({ where: { shopProductId: item.id }, data: { shopProductId: hasConflict.id } });
+                await prisma.purchaseOrderItem.updateMany({ where: { shopProductId: item.id }, data: { shopProductId: hasConflict.id } });
+                await prisma.shopProduct.delete({ where: { id: item.id } });
+              } else {
+                await prisma.shopProduct.update({ where: { id: item.id }, data: { shopId: existing.id } });
+              }
+            }
+          }
+          try {
+            await prisma.shop.delete({ where: { id: oldShop.id } });
+            const oIdx = existingShops.findIndex((s) => s.id === oldShop.id);
+            if (oIdx >= 0) existingShops.splice(oIdx, 1);
+          } catch (e) {
+            console.error(`Failed to delete duplicated old shop ${oldShop.id}:`, e);
+          }
+        }
+      }
+
+      // 如果未匹配到，则进行【兜底合并保护】：寻找未绑定的同名老店或该用户唯一的未绑定老店，直接复用以避免新建分裂
+      if (!existing) {
+        const unboundShops = existingShops.filter((s) => !s.addressBookId && !touchedShopIds.has(s.id));
+        if (unboundShops.length > 0) {
+          // 优先寻找店名相似的老店
+          let candidate = unboundShops.find((s) => isShopNameMatch(s.name, addr.name));
+          
+          // 如果没有名字相似的，但只剩唯一一个未绑定的老店铺，且它有商品，说明是被修改了简称的那个老店
+          if (!candidate && unboundShops.length === 1) {
+            const hasProducts = await prisma.shopProduct.count({ where: { shopId: unboundShops[0].id } }) > 0;
+            if (hasProducts) {
+              candidate = unboundShops[0];
+            }
+          }
+          
+          if (candidate) {
+            existing = candidate;
+          }
+        }
+      }
+
       if (existing) {
         const shouldUpdate =
           String(existing.name || "").trim() !== addr.name ||
