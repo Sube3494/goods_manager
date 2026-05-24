@@ -52,6 +52,12 @@ export type AutoPickInboundOrder = {
     riderName?: string;
   };
   items?: AutoPickInboundItem[];
+  unencryptedPhone?: string;
+  unencryptedMapAddress?: string;
+  unencryptedAddress?: string;
+  customerName?: string;
+  customerPhone?: string;
+  [key: string]: unknown;
 };
 
 export type AutoPickSyncStatus =
@@ -1044,7 +1050,7 @@ function parseAmountsFromDetail(detail: MaiyatianOrderDetailResponse["data"], pl
 }
 
 function buildItemsFromDetailJSON(detail: MaiyatianOrderDetailResponse["data"]): AutoPickInboundItem[] {
-  const goods = Array.isArray(detail?.goods) ? detail.goods : [];
+  const goods = detail && Array.isArray(detail.goods) ? detail.goods : [];
   return goods.map((item) => ({
     productName: String(item.goods_name || "").trim(),
     productNo: String(item.sku_code || "").trim() || undefined,
@@ -1226,7 +1232,32 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     fetchMaiyatianOrderDetailByCookie(cookie, rawOrderId).catch(() => null),
   ]);
 
-  const fullAddress = String(userInfo?.map_address || userInfo?.address || "").trim();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userInfoObj = userInfo as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const detailDataObj = detailData as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orderObj = order as any;
+
+  const unencryptedPhone = userInfoObj && String(userInfoObj.unencrypted_phone || "").trim();
+  const unencryptedMapAddress = userInfoObj && String(userInfoObj.unencrypted_map_address || "").trim();
+  const unencryptedAddress = userInfoObj && String(userInfoObj.unencrypted_address || "").trim();
+  const realName = userInfoObj && String(userInfoObj.real_name || "").trim();
+  const nickName = userInfoObj && String(userInfoObj.nick_name || "").trim();
+
+  if (unencryptedPhone) {
+    orderObj.unencryptedPhone = unencryptedPhone;
+    orderObj.customerPhone = unencryptedPhone;
+  }
+  if (realName || nickName) {
+    orderObj.customerName = realName || nickName;
+  }
+
+  const fullAddress = unencryptedMapAddress
+    || unencryptedAddress
+    || String(userInfoObj?.map_address || userInfoObj?.address || "").trim()
+    || String(detailDataObj?.map_address || detailDataObj?.address || "").trim();
+
   if (fullAddress) {
     order.userAddress = fullAddress;
   }
@@ -1248,7 +1279,8 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.deliveryId = detailDeliveryId;
   }
 
-  const detailShopId = String(detailData.shop_id || detailData.merchant_id || "").trim();
+  const isJD = order.platform === "京东" || order.channelTag === "daojia" || String(detailData.channel_tag || "").trim().toLowerCase() === "daojia";
+  const detailShopId = String(isJD ? (detailData.merchant_id || detailData.shop_id || "") : (detailData.shop_id || detailData.merchant_id || "")).trim();
   if (detailShopId) {
     order.shopId = detailShopId;
   }
@@ -1258,10 +1290,15 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.rawShopName = detailShopName;
   }
 
-  const detailShopAddress = readPreferredMaiyatianShopAddress((detailData || {}) as Record<string, unknown>);
-  if (detailShopAddress) {
-    order.shopAddress = detailShopAddress;
-    order.rawShopAddress = detailShopAddress;
+  if (!isJD) {
+    const detailShopAddress = readPreferredMaiyatianShopAddress((detailData || {}) as Record<string, unknown>);
+    if (detailShopAddress) {
+      order.shopAddress = detailShopAddress;
+      order.rawShopAddress = detailShopAddress;
+    }
+  } else {
+    order.shopAddress = undefined;
+    order.rawShopAddress = undefined;
   }
 
   const deliveryInfo = parseDeliveryInfoFromDetail(detailData);
@@ -1284,11 +1321,6 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   const detailOrderTime = String(detailData.order_time || "").trim();
   if (detailOrderTime) {
     order.orderTime = detailOrderTime;
-  }
-
-  const detailAddress = String(detailData.map_address || detailData.address || "").trim();
-  if (detailAddress) {
-    order.userAddress = detailAddress;
   }
 
   const detailLongitude = parseCoordinate(detailData.longitude);
@@ -2050,26 +2082,50 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     : null;
   const items = Array.isArray(input.items) ? input.items : [];
 
+  const unencryptedPhone = String(input.unencryptedPhone || input.unencrypted_phone || "").trim();
+  const unencryptedMapAddress = String(input.unencryptedMapAddress || input.unencrypted_map_address || "").trim();
+  const unencryptedAddress = String(input.unencryptedAddress || input.unencrypted_address || "").trim();
+  const realName = String(input.customerName || input.real_name || "").trim();
+  const nickName = String(input.nick_name || "").trim();
+
+  const platform = String(input.platform || "").trim();
+  const channelTag = String(input.channelTag || input.channel_tag || "").trim();
+  const isJD = platform === "京东" || channelTag === "daojia" || String(input.source_tag || "").trim().toLowerCase() === "daojia" || String(input.goods_channel_tag || "").trim().toLowerCase() === "daojia";
+
+  const shopIdValue = isJD
+    ? (input.merchant_id || input.merchantId || input.shop_id || input.shopId)
+    : (
+        input.shop_id
+        || input.shopId
+        || (
+          input.delivery
+          && typeof input.delivery === "object"
+          && !Array.isArray(input.delivery)
+          && ((input.delivery as Record<string, unknown>).shop_id || (input.delivery as Record<string, unknown>).shopId)
+        )
+        || input.merchant_id
+        || input.merchantId
+      );
+  const shopId = String(shopIdValue || "").trim() || undefined;
+
   const normalized: AutoPickInboundOrder = {
     id: String(input.id || "").trim(),
-    shopId: String(
-      input.shop_id
-      || (
-        input.delivery
-        && typeof input.delivery === "object"
-        && !Array.isArray(input.delivery)
-        && (input.delivery as Record<string, unknown>).shop_id
-      )
-      || ""
-    ).trim() || undefined,
+    shopId,
     deliveryId: normalizeAutoPickDeliveryId(input.deliveryId),
     city: Number.isFinite(Number(input.city)) ? Number(input.city) : undefined,
-    channelTag: String(input.channelTag || input.channel_tag || "").trim() || undefined,
-    platform: String(input.platform || "").trim(),
+    channelTag: channelTag || undefined,
+    platform: platform || (isJD ? "京东" : ""),
     dailyPlatformSequence: Number(input.dailyPlatformSequence || 0),
     orderNo: String(input.orderNo || "").trim(),
     orderTime: String(input.orderTime || "").trim(),
-    userAddress: String(input.userAddress || "").trim(),
+    userAddress: String(
+      unencryptedMapAddress
+      || unencryptedAddress
+      || input.userAddress
+      || input.map_address
+      || input.address
+      || ""
+    ).trim(),
     rawShopName: String(
       input.rawShopName
       || extend?.channel_name
@@ -2081,7 +2137,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || input.merchant_name
       || ""
     ).trim() || undefined,
-    shopAddress: String(
+    shopAddress: isJD ? undefined : String(
       input.shopAddress
       || input.rawShopAddress
       || input.storeAddress
@@ -2098,7 +2154,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || extend?.channel_address
       || ""
     ).trim() || undefined,
-    rawShopAddress: String(
+    rawShopAddress: isJD ? undefined : String(
       input.rawShopAddress
       || input.shopAddress
       || input.storeAddress
@@ -2145,6 +2201,11 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
         thumb: String(current.thumb || "").trim() || undefined,
       };
     }),
+    unencryptedPhone: unencryptedPhone || undefined,
+    unencryptedMapAddress: unencryptedMapAddress || undefined,
+    unencryptedAddress: unencryptedAddress || undefined,
+    customerName: realName || nickName || undefined,
+    customerPhone: unencryptedPhone || String(input.customerPhone || input.phone || "").trim() || undefined,
   };
 
   normalized.status = resolveAutoPickBusinessStatus(
@@ -2321,6 +2382,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       existing?.rawPayload
     );
     const existingSystemMeta = readAutoPickSystemMeta(existing?.rawPayload) || {};
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { resolvedShop: _previousResolvedShop, ...systemMetaWithoutResolvedShop } = existingSystemMeta;
     const nextSystemMeta: AutoPickSystemMeta = resolvedInternalShop
       ? {
@@ -3461,21 +3523,27 @@ export async function backfillPersistedAutoPickOrderFields(
   userId: string,
   options?: { orderIds?: string[] }
 ) {
-  const orderIds = Array.isArray(options?.orderIds)
-    ? options?.orderIds.map((item) => String(item || "").trim()).filter(Boolean)
+  const targetOrderIds = options && Array.isArray(options.orderIds)
+    ? options.orderIds.map((item) => String(item || "").trim()).filter(Boolean)
     : [];
+
+  const isForce = targetOrderIds.length > 0;
+
   const orders = await prisma.autoPickOrder.findMany({
     where: {
       userId,
-      ...(orderIds.length > 0 ? { id: { in: orderIds } } : {}),
-      OR: [
-        { shopId: null },
-        { shopAddress: null },
-        { deliveryTimeRange: null },
-        { expectedIncome: null },
-        { platform: "" },
-        { platform: "未知" },
-      ],
+      ...(isForce
+        ? { id: { in: targetOrderIds } }
+        : {
+            OR: [
+              { shopId: null },
+              { shopAddress: null },
+              { deliveryTimeRange: null },
+              { expectedIncome: null },
+              { platform: "" },
+              { platform: "未知" },
+            ],
+          }),
     },
     select: {
       id: true,
@@ -3499,33 +3567,85 @@ export async function backfillPersistedAutoPickOrderFields(
 
     const nextData: Prisma.AutoPickOrderUpdateInput = {};
 
-    if (!order.shopId && normalized.shopId) {
-      nextData.shopId = normalized.shopId;
+    // 门店 ID 更新逻辑
+    if (normalized.shopId) {
+      if (isForce) {
+        if (order.shopId !== normalized.shopId) {
+          nextData.shopId = normalized.shopId;
+        }
+      } else {
+        if (!order.shopId) {
+          nextData.shopId = normalized.shopId;
+        }
+      }
     }
 
-    if (!order.shopAddress && normalized.shopAddress) {
-      nextData.shopAddress = normalized.shopAddress;
+    // 门店地址更新逻辑
+    if (normalized.shopAddress) {
+      if (isForce) {
+        if (order.shopAddress !== normalized.shopAddress) {
+          nextData.shopAddress = normalized.shopAddress;
+        }
+      } else {
+        if (!order.shopAddress) {
+          nextData.shopAddress = normalized.shopAddress;
+        }
+      }
     }
 
-    if (!order.deliveryTimeRange && normalized.deliveryTimeRange) {
-      nextData.deliveryTimeRange = normalized.deliveryTimeRange;
+    // 配送时间范围更新逻辑
+    if (normalized.deliveryTimeRange) {
+      if (isForce) {
+        if (order.deliveryTimeRange !== normalized.deliveryTimeRange) {
+          nextData.deliveryTimeRange = normalized.deliveryTimeRange;
+        }
+      } else {
+        if (!order.deliveryTimeRange) {
+          nextData.deliveryTimeRange = normalized.deliveryTimeRange;
+        }
+      }
     }
 
-    if (order.expectedIncome == null && Number.isFinite(Number(normalized.expectedIncome))) {
-      nextData.expectedIncome = Math.round(Number(normalized.expectedIncome));
+    // 预估收益更新逻辑
+    if (Number.isFinite(Number(normalized.expectedIncome))) {
+      const nextVal = Math.round(Number(normalized.expectedIncome));
+      if (isForce) {
+        if (order.expectedIncome !== nextVal) {
+          nextData.expectedIncome = nextVal;
+        }
+      } else {
+        if (order.expectedIncome == null) {
+          nextData.expectedIncome = nextVal;
+        }
+      }
     }
 
+    // 平台更新逻辑
     const existingPlatform = String(order.platform || "").trim();
     const normalizedPlatform = String(normalized.platform || "").trim();
-    if ((!existingPlatform || existingPlatform === "未知") && normalizedPlatform) {
-      nextData.platform = normalizedPlatform;
-
-      if (Number.isFinite(Number(normalized.expectedIncome))) {
-        nextData.expectedIncome = Math.round(Number(normalized.expectedIncome));
+    if (normalizedPlatform) {
+      if (isForce) {
+        if (existingPlatform !== normalizedPlatform) {
+          nextData.platform = normalizedPlatform;
+        }
+      } else {
+        if (!existingPlatform || existingPlatform === "未知") {
+          nextData.platform = normalizedPlatform;
+        }
       }
+    }
 
-      if (Number.isFinite(Number(normalized.platformCommission))) {
-        nextData.platformCommission = Math.round(Number(normalized.platformCommission));
+    // 平台佣金更新逻辑
+    if (Number.isFinite(Number(normalized.platformCommission))) {
+      const nextVal = Math.round(Number(normalized.platformCommission));
+      if (isForce) {
+        if (order.platformCommission !== nextVal) {
+          nextData.platformCommission = nextVal;
+        }
+      } else {
+        if (nextData.platform && order.platformCommission == null) {
+          nextData.platformCommission = nextVal;
+        }
       }
     }
 

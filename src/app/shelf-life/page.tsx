@@ -213,100 +213,100 @@ export default function ShelfLifeDashboard() {
       </div>
 
       {/* 1. 核心看板 (磨砂玻璃与高级呼吸微光卡片) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {/* 已过期 */}
-        <div className="group relative rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-6 backdrop-blur-md transition-all duration-300 hover:border-red-500/30 hover:shadow-[0_12px_30px_-5px_rgba(239,68,68,0.08)] hover:-translate-y-1 bg-linear-to-br from-red-500/1.5 to-transparent overflow-hidden shadow-sm">
+        <div className="group relative rounded-2xl sm:rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-3 sm:p-6 backdrop-blur-md transition-all duration-300 hover:border-red-500/30 hover:shadow-[0_12px_30px_-5px_rgba(239,68,68,0.08)] hover:-translate-y-1 bg-linear-to-br from-red-500/1.5 to-transparent overflow-hidden shadow-sm">
           {/* 水印背景图标 */}
-          <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-red-500/3 pointer-events-none scale-150 h-28 w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
+          <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-red-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-widest text-muted-foreground/80 uppercase">已过期</span>
-            <span className="relative flex h-2.5 w-2.5">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">已过期</span>
+            <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
             </span>
           </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-4xl sm:text-5xl font-black bg-linear-to-r from-red-500 to-red-400 bg-clip-text text-transparent tracking-tight font-sans">
+          <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
+            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-red-500 to-red-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.expired.count || 0}
             </span>
-            <span className="text-xs text-muted-foreground/80 font-bold">批次变质</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">批次变质</span>
           </div>
-          <div className="mt-4 text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-3">
-            <span>积压损失估值</span>
-            <span className="font-bold text-red-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.expired.value.toFixed(2)}</span>
+          <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
+            <span>损失估值</span>
+            <span className="font-bold text-red-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.expired.value.toFixed(1)}</span>
           </div>
         </div>
 
         {/* 严重临期 */}
-        <div className="group relative rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-6 backdrop-blur-md transition-all duration-300 hover:border-orange-500/30 hover:shadow-[0_12px_30px_-5px_rgba(249,115,22,0.08)] hover:-translate-y-1 bg-linear-to-br from-orange-500/1.5 to-transparent overflow-hidden shadow-sm">
+        <div className="group relative rounded-2xl sm:rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-3 sm:p-6 backdrop-blur-md transition-all duration-300 hover:border-orange-500/30 hover:shadow-[0_12px_30px_-5px_rgba(249,115,22,0.08)] hover:-translate-y-1 bg-linear-to-br from-orange-500/1.5 to-transparent overflow-hidden shadow-sm">
           {/* 水印背景图标 */}
-          <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-orange-500/3 pointer-events-none scale-150 h-28 w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
+          <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-orange-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-widest text-muted-foreground/80 uppercase">严重临期 (≤15天)</span>
-            <span className="relative flex h-2.5 w-2.5">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">严重临期</span>
+            <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>
             </span>
           </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-4xl sm:text-5xl font-black bg-linear-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent tracking-tight font-sans">
+          <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
+            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.critical.count || 0}
             </span>
-            <span className="text-xs text-muted-foreground/80 font-bold">批次亟待处理</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">批次处理</span>
           </div>
-          <div className="mt-4 text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-3">
-            <span>面临过期风险</span>
-            <span className="font-bold text-orange-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.critical.value.toFixed(2)}</span>
+          <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
+            <span>过期风险</span>
+            <span className="font-bold text-orange-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.critical.value.toFixed(1)}</span>
           </div>
         </div>
 
         {/* 临期提醒 */}
-        <div className="group relative rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-6 backdrop-blur-md transition-all duration-300 hover:border-amber-500/30 hover:shadow-[0_12px_30px_-5px_rgba(245,158,11,0.08)] hover:-translate-y-1 bg-linear-to-br from-amber-500/1.5 to-transparent overflow-hidden shadow-sm">
+        <div className="group relative rounded-2xl sm:rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-3 sm:p-6 backdrop-blur-md transition-all duration-300 hover:border-amber-500/30 hover:shadow-[0_12px_30px_-5px_rgba(245,158,11,0.08)] hover:-translate-y-1 bg-linear-to-br from-amber-500/1.5 to-transparent overflow-hidden shadow-sm">
           {/* 水印背景图标 */}
-          <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-amber-500/3 pointer-events-none scale-150 h-28 w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
+          <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-amber-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-widest text-muted-foreground/80 uppercase">预警提醒 (15-45天)</span>
-            <span className="relative flex h-2.5 w-2.5">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">临期提醒</span>
+            <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
             </span>
           </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-4xl sm:text-5xl font-black bg-linear-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent tracking-tight font-sans">
+          <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
+            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.warning.count || 0}
             </span>
-            <span className="text-xs text-muted-foreground/80 font-bold">批次安全警报</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">批次警报</span>
           </div>
-          <div className="mt-4 text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-3">
-            <span>预警在库成本</span>
-            <span className="font-bold text-amber-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.warning.value.toFixed(2)}</span>
+          <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
+            <span>预警成本</span>
+            <span className="font-bold text-amber-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.warning.value.toFixed(1)}</span>
           </div>
         </div>
 
         {/* 安全在库 */}
-        <div className="group relative rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-6 backdrop-blur-md transition-all duration-300 hover:border-emerald-500/30 hover:shadow-[0_12px_30px_-5px_rgba(16,185,129,0.08)] hover:-translate-y-1 bg-linear-to-br from-emerald-500/1.5 to-transparent overflow-hidden shadow-sm">
+        <div className="group relative rounded-2xl sm:rounded-3xl bg-white/70 dark:bg-white/5 border border-black/5 dark:border-white/10 p-3 sm:p-6 backdrop-blur-md transition-all duration-300 hover:border-emerald-500/30 hover:shadow-[0_12px_30px_-5px_rgba(16,185,129,0.08)] hover:-translate-y-1 bg-linear-to-br from-emerald-500/1.5 to-transparent overflow-hidden shadow-sm">
           {/* 水印背景图标 */}
-          <CheckCircle className="absolute right-[-15px] bottom-[-15px] text-emerald-500/3 pointer-events-none scale-150 h-28 w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
+          <CheckCircle className="absolute right-[-15px] bottom-[-15px] text-emerald-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold tracking-widest text-muted-foreground/80 uppercase">安全在库 (&gt;45天)</span>
-            <span className="relative flex h-2.5 w-2.5">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">安全在库</span>
+            <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
             </span>
           </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-4xl sm:text-5xl font-black bg-linear-to-r from-emerald-500 to-emerald-400 bg-clip-text text-transparent tracking-tight font-sans">
+          <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
+            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-emerald-500 to-emerald-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.safe.count || 0}
             </span>
-            <span className="text-xs text-muted-foreground/80 font-bold">批次处于安全期</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">在库安全</span>
           </div>
-          <div className="mt-4 text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-3">
-            <span>安全库存总货值</span>
-            <span className="font-bold text-emerald-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.safe.value.toFixed(2)}</span>
+          <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
+            <span>总在库货值</span>
+            <span className="font-bold text-emerald-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.safe.value.toFixed(1)}</span>
           </div>
         </div>
       </div>
@@ -418,19 +418,20 @@ export default function ShelfLifeDashboard() {
                   
                   {/* Desktop Table View (电脑端表格展示) */}
                   <div className="hidden md:block rounded-2xl border border-black/5 dark:border-white/10 bg-white/20 dark:bg-white/2 overflow-hidden backdrop-blur-md">
-                    <table className="w-full text-left border-collapse table-auto text-xs">
+                    <table className="w-full text-left border-collapse table-auto text-[11px]">
                       <thead>
-                        <tr className="border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 text-muted-foreground text-[10px] font-bold uppercase tracking-widest">
-                          <th className="px-6 py-4 w-[20%]">商品</th>
-                          <th className="px-6 py-4 w-[10%] text-center">店铺</th>
-                          <th className="px-6 py-4 text-center whitespace-nowrap">保质期状态</th>
-                          <th className="px-6 py-4 text-center whitespace-nowrap">在库状态</th>
-                          <th className="px-6 py-4 w-[18%] text-center">备注说明</th>
-                          {canManage && <th className="px-6 py-4 text-center whitespace-nowrap">操作</th>}
+                        <tr className="border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 text-muted-foreground text-[9.5px] font-bold uppercase tracking-widest">
+                          <th className="px-3 py-2.5 w-[5%] text-center whitespace-nowrap">序号</th>
+                          <th className="px-3 py-2.5 w-[24%] text-center">商品</th>
+                          <th className="px-3 py-2.5 w-[12%] text-center">店铺</th>
+                          <th className="px-3 py-2.5 text-center whitespace-nowrap w-[13%]">生产日期</th>
+                          <th className="px-3 py-2.5 text-center whitespace-nowrap w-[15%]">保质期状态</th>
+                          <th className="px-3 py-2.5 text-center whitespace-nowrap w-[16%]">在库状态</th>
+                          {canManage && <th className="px-3 py-2.5 text-center whitespace-nowrap w-[15%]">操作</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                        {batches.map(batch => {
+                        {batches.map((batch, index) => {
                           const isExpired = batch.status === "expired";
                           const isCritical = batch.status === "critical";
                           const isWarning = batch.status === "warning";
@@ -445,9 +446,14 @@ export default function ShelfLifeDashboard() {
                                 isWarning && "bg-amber-500/1.5"
                               )}
                             >
+                              {/* 序号 */}
+                              <td className="px-3 py-2.5 text-center font-mono font-bold text-muted-foreground/60 w-[5%] text-[10px]">
+                                {index + 1}
+                              </td>
+
                               {/* 商品 */}
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2.5 w-fit max-w-full cursor-default">
+                              <td className="px-3 py-2.5 text-center">
+                                <div className="flex items-center justify-center gap-2.5 mx-auto w-fit max-w-full cursor-default">
                                   <div className="relative w-7 h-7 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center border border-black/5 dark:border-white/5 shadow-xs">
                                     {batch.productImage ? (
                                       <Image 
@@ -459,35 +465,42 @@ export default function ShelfLifeDashboard() {
                                       />
                                     ) : (
                                       <div className={cn(
-                                        "h-full w-full flex items-center justify-center font-bold text-xs uppercase overflow-hidden",
+                                        "h-full w-full flex items-center justify-center font-bold text-[10px] uppercase overflow-hidden",
                                         isExpired && "bg-red-500/10 text-red-500",
                                         isCritical && "bg-orange-500/10 text-orange-500",
                                         isWarning && "bg-amber-500/10 text-amber-500",
                                         batch.status === "safe" && "bg-emerald-500/10 text-emerald-500"
                                       )}>
-                                        <Package size={12} />
+                                        <Package size={11} />
                                       </div>
                                     )}
                                   </div>
-                                  <span className="text-[11px] font-medium text-foreground/90 leading-none truncate max-w-[140px] lg:max-w-[180px] group-hover:text-primary transition-colors duration-200" title={batch.productName}>
+                                  <span className="text-[10.5px] font-medium text-foreground/90 leading-none truncate max-w-[170px] lg:max-w-[220px] group-hover:text-primary transition-colors duration-200" title={batch.productName}>
                                     {batch.productName}
                                   </span>
                                 </div>
                               </td>
 
                               {/* 店铺 */}
-                              <td className="px-6 py-4 text-center">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/5 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/10 dark:border-blue-500/20 text-xs font-bold whitespace-nowrap">
-                                  <Store size={12} className="shrink-0 text-blue-500 dark:text-blue-400" />
+                              <td className="px-3 py-2.5 text-center">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/5 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/10 dark:border-blue-500/20 text-[10px] font-bold whitespace-nowrap">
+                                  <Store size={10.5} className="shrink-0 text-blue-500 dark:text-blue-400" />
                                   {batch.shopName}
                                 </span>
                               </td>
 
+                              {/* 生产日期 */}
+                              <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                <span className="font-mono font-bold text-foreground/80">
+                                  {batch.productionDate || "—"}
+                                </span>
+                              </td>
+
                               {/* 保质期状态 */}
-                              <td className="px-6 py-4 text-center whitespace-nowrap">
+                              <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                 <div className="flex flex-col items-center justify-center gap-0.5">
                                   <span className={cn(
-                                    "text-xs font-extrabold flex items-center gap-1.5",
+                                    "text-[10px] font-extrabold flex items-center gap-1.5",
                                     isExpired && "text-red-500",
                                     isCritical && "text-orange-500",
                                     isWarning && "text-amber-500",
@@ -495,13 +508,13 @@ export default function ShelfLifeDashboard() {
                                   )}>
                                     {isExpired ? (
                                       <>
-                                        <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_4px_rgba(239,68,68,0.8)]" />
+                                        <span className="h-1 w-1 rounded-full bg-red-500 animate-pulse shadow-[0_0_4px_rgba(239,68,68,0.8)]" />
                                         <span>已过期 {Math.abs(batch.remainingDays)} 天</span>
                                       </>
                                     ) : (
                                       <>
                                         <span className={cn(
-                                          "h-1.5 w-1.5 rounded-full",
+                                          "h-1 w-1 rounded-full",
                                           isCritical && "bg-orange-500 animate-pulse shadow-[0_0_4px_rgba(249,115,22,0.8)]",
                                           isWarning && "bg-amber-500",
                                           batch.status === "safe" && "bg-emerald-500"
@@ -510,19 +523,19 @@ export default function ShelfLifeDashboard() {
                                       </>
                                     )}
                                   </span>
-                                  <span className="text-[9px] text-muted-foreground/50 font-bold font-mono">到期: {batch.expirationDate}</span>
+                                  <span className="text-[8px] text-muted-foreground/50 font-bold font-mono">到期: {batch.expirationDate}</span>
                                 </div>
                               </td>
 
                               {/* 在库状态 */}
-                              <td className="px-6 py-4 text-center whitespace-nowrap">
+                              <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                 <div className="flex flex-col items-center justify-center font-mono gap-1">
                                   <div className="flex items-baseline gap-0.5 leading-none">
-                                    <span className="text-sm font-extrabold text-foreground">{batch.remainingStock}</span>
-                                    <span className="text-[10px] text-muted-foreground/60">/ {batch.quantity} 件</span>
+                                    <span className="text-[11px] font-extrabold text-foreground">{batch.remainingStock}</span>
+                                    <span className="text-[9.5px] text-muted-foreground/60">/ {batch.quantity} 件</span>
                                   </div>
                                   {/* 2px 高度的超精细进度条 */}
-                                  <div className="w-16 h-0.5 bg-black/5 dark:bg-white/10 rounded-full overflow-hidden mt-1">
+                                  <div className="w-14 h-0.5 bg-black/5 dark:bg-white/10 rounded-full overflow-hidden mt-1">
                                     <div 
                                       className={cn(
                                         "h-full rounded-full transition-all duration-500",
@@ -537,20 +550,9 @@ export default function ShelfLifeDashboard() {
                                 </div>
                               </td>
 
-                              {/* 备注说明 */}
-                              <td className="px-6 py-4 text-center">
-                                {batch.remark ? (
-                                  <span className="text-xs text-foreground/75 leading-normal break-all font-medium">
-                                    {batch.remark}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground/30 italic text-[11px]">无备注</span>
-                                )}
-                              </td>
-
                               {/* 操作 */}
                               {canManage && (
-                                <td className="px-6 py-4 text-center whitespace-nowrap">
+                                <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                   <button
                                     onClick={() => {
                                       setActiveAdjustBatch(batch);
@@ -558,10 +560,10 @@ export default function ShelfLifeDashboard() {
                                       setAdjustRemark(batch.remark);
                                       setIsAdjustModalOpen(true);
                                     }}
-                                    className="flex items-center justify-center gap-1 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all active:scale-95 cursor-pointer mx-auto"
+                                    className="flex items-center justify-center gap-1 text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-2.5 py-1 rounded-lg transition-all active:scale-95 cursor-pointer mx-auto"
                                     title="报废核销或更正库存"
                                   >
-                                    <Edit3 size={12} />
+                                    <Edit3 size={10.5} />
                                     <span>调整/核销</span>
                                   </button>
                                 </td>
@@ -575,7 +577,7 @@ export default function ShelfLifeDashboard() {
 
                   {/* Mobile Card View (移动端卡片式展示，自适应降级) */}
                   <div className="flex flex-col gap-3 md:hidden">
-                    {batches.map(batch => {
+                    {batches.map((batch, index) => {
                       const isExpired = batch.status === "expired";
                       const isCritical = batch.status === "critical";
                       const isWarning = batch.status === "warning";
@@ -615,8 +617,9 @@ export default function ShelfLifeDashboard() {
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <span className="text-[11px] font-bold text-foreground/90 truncate block leading-snug group-hover:text-primary transition-colors" title={batch.productName}>
-                                  {batch.productName}
+                                <span className="text-[11px] font-bold text-foreground/90 leading-snug group-hover:text-primary transition-colors flex items-center gap-1.5" title={batch.productName}>
+                                  <span className="inline-block font-mono bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded-sm text-[9px] text-muted-foreground shrink-0">#{index + 1}</span>
+                                  <span className="truncate">{batch.productName}</span>
                                 </span>
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-blue-500 dark:text-blue-400 mt-0.5">
                                   <Store size={9} className="shrink-0" />
@@ -635,7 +638,8 @@ export default function ShelfLifeDashboard() {
                               )}>
                                 {isExpired ? ('已过期 ' + Math.abs(batch.remainingDays) + '天') : ('剩余 ' + batch.remainingDays + '天')}
                               </span>
-                              <span className="text-[8px] text-muted-foreground/50 block font-mono font-bold mt-1">到期: {batch.expirationDate}</span>
+                              <span className="text-[8px] text-muted-foreground/50 block font-mono font-bold mt-1">生产: {batch.productionDate || "—"}</span>
+                              <span className="text-[8px] text-muted-foreground/50 block font-mono font-bold mt-0.5">到期: {batch.expirationDate}</span>
                             </div>
                           </div>
 
@@ -658,14 +662,6 @@ export default function ShelfLifeDashboard() {
                               />
                             </div>
                           </div>
-
-                          {/* 3. 卡片备注区 */}
-                          {batch.remark && (
-                            <div className="w-full text-[10px] text-foreground/75 font-medium bg-black/2 dark:bg-white/2 px-2.5 py-2 rounded-xl border border-black/5 dark:border-white/5 mt-0.5">
-                              <span className="text-muted-foreground mr-1">备注:</span>
-                              <span className="break-all">{batch.remark}</span>
-                            </div>
-                          )}
 
                           {/* 4. 卡片操作区：操作按钮居右 */}
                           {canManage && (
