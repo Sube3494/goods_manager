@@ -139,7 +139,11 @@ export default function ShelfLifeDashboard() {
       const res = await fetch("/api/shops?source=shipping-addresses");
       if (res.ok) {
         const data = await res.json();
-        setShops(Array.isArray(data?.shops) ? data.shops : []);
+        const shopList = Array.isArray(data?.shops) ? data.shops : [];
+        setShops(shopList);
+        if (shopList.length === 1) {
+          setSelectedShop(shopList[0].id);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch shops:", err);
@@ -344,10 +348,14 @@ export default function ShelfLifeDashboard() {
                 <CustomSelect
                   value={selectedShop}
                   onChange={(val) => setSelectedShop(val)}
-                  options={[
-                    { value: "all", label: "所有店铺" },
-                    ...shops.map(s => ({ value: s.id, label: s.name }))
-                  ]}
+                  options={
+                    shops.length === 1 
+                      ? shops.map(s => ({ value: s.id, label: s.name }))
+                      : [
+                          { value: "all", label: "所有店铺" },
+                          ...shops.map(s => ({ value: s.id, label: s.name }))
+                        ]
+                  }
                   triggerClassName="rounded-full h-10 px-4 text-xs text-foreground font-bold border-black/5 dark:border-white/10 bg-white dark:bg-white/5"
                 />
               </div>
@@ -369,12 +377,18 @@ export default function ShelfLifeDashboard() {
               </div>
 
               {/* 重置按钮 */}
-              {(searchQuery || selectedShop !== "all" || selectedStatus !== "all") && (
+              {(searchQuery || 
+                selectedStatus !== "all" || 
+                (shops.length > 1 ? selectedShop !== "all" : selectedShop !== (shops[0]?.id || ""))) && (
                 <button
                   onClick={() => {
                     setSearchQuery("");
-                    setSelectedShop("all");
                     setSelectedStatus("all");
+                    if (shops.length === 1 && shops[0]) {
+                      setSelectedShop(shops[0].id);
+                    } else {
+                      setSelectedShop("all");
+                    }
                   }}
                   className="h-10 px-4 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-xs shrink-0 whitespace-nowrap"
                 >
