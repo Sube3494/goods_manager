@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -1419,6 +1419,7 @@ function IntegrationModal({
               <div className="mt-3 space-y-2.5">
                 {maiyatianShops.length > 0 ? maiyatianShops.map((shop) => {
                   const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
+                  const isMappingInvalid = mapped && !localShops.some(s => s.name === mapped.localShopName);
                   return (
                     <div key={shop.id} className="rounded-2xl border border-black/8 bg-white/80 p-3 dark:border-white/10 dark:bg-white/4">
                       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
@@ -1435,42 +1436,60 @@ function IntegrationModal({
                             </div>
                             <span className={cn(
                               "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
-                              mapped
+                              isMappingInvalid
+                                ? "border border-rose-500/20 bg-rose-500/12 text-rose-600 dark:text-rose-400 animate-pulse"
+                                : mapped
                                 ? "border border-emerald-500/20 bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
                                 : "border border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4"
                             )}>
-                              {mapped ? "已映射" : "待映射"}
+                              {isMappingInvalid ? "映射已失效" : mapped ? "已映射" : "待映射"}
                             </span>
                           </div>
-                          {!mapped?.localShopName ? (
+                          {isMappingInvalid ? (
+                            <div className="mt-2.5 text-[11px] text-rose-500 font-bold">⚠️ 原绑定的系统门店 “{mapped.localShopName}” 已在管理中被删除或重命名！</div>
+                          ) : !mapped?.localShopName ? (
                             <div className="mt-2.5 text-[11px] text-muted-foreground">还没绑定系统门店。</div>
                           ) : null}
                         </div>
 
                         <div className="rounded-2xl border border-black/8 bg-black/2 p-2.5 dark:border-white/10 dark:bg-white/3">
                           <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
-                          <MappingSelect
-                            value={mapped?.localShopName || ""}
-                            options={[{ value: "", label: "暂不映射" }, ...localShopOptions]}
-                            onChange={(localShopName) => {
-                              const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
-                              if (localShopName) {
-                                nextMappings.push({
-                                  maiyatianShopId: shop.id,
-                                  maiyatianShopName: shop.name,
-                                  maiyatianShopAddress: shop.address,
-                                  localShopName,
-                                  cityCode: shop.cityCode || undefined,
-                                  cityName: shop.cityName || undefined,
-                                });
-                              }
-                              onChange({
-                                ...integrationConfig,
-                                maiyatianShopMappings: nextMappings,
+                          {(() => {
+                            const finalOptions = [{ value: "", label: "暂不映射" }, ...localShopOptions];
+                            if (mapped?.localShopName && !localShopOptions.some(opt => opt.value === mapped.localShopName)) {
+                              finalOptions.push({
+                                value: mapped.localShopName,
+                                label: `已失效 (无此门店: ${mapped.localShopName})`,
+                                hint: "原绑定的门店在系统门店管理中已不存在，请在此处重新选择一个有效门店。"
                               });
-                            }}
-                          />
-                          {!mapped?.localShopName ? (
+                            }
+                            return (
+                              <MappingSelect
+                                value={mapped?.localShopName || ""}
+                                options={finalOptions}
+                                onChange={(localShopName) => {
+                                  const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
+                                  if (localShopName) {
+                                    nextMappings.push({
+                                      maiyatianShopId: shop.id,
+                                      maiyatianShopName: shop.name,
+                                      maiyatianShopAddress: shop.address,
+                                      localShopName,
+                                      cityCode: shop.cityCode || undefined,
+                                      cityName: shop.cityName || undefined,
+                                    });
+                                  }
+                                  onChange({
+                                    ...integrationConfig,
+                                    maiyatianShopMappings: nextMappings,
+                                  });
+                                }}
+                              />
+                            );
+                          })()}
+                          {isMappingInvalid ? (
+                            <div className="mt-2 text-[11px] text-rose-500 font-bold">请在此处重新选择一个有效的系统门店并保存。</div>
+                          ) : !mapped?.localShopName ? (
                             <div className="mt-2 text-[11px] text-muted-foreground">选择后会固定这条映射。</div>
                           ) : null}
                         </div>
