@@ -15,7 +15,6 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { detectClientPlatform, inferFileExtensionFromUrl, triggerBrowserDownload, triggerFetchedBlobDownload, triggerIOSMediaShare } from "@/lib/download";
 import Image from "next/image";
-import Link from "next/link";
 import { GestureImage } from "@/components/ui/GestureImage";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
@@ -671,23 +670,21 @@ function GalleryContent() {
       
       const failedCount = results.filter(r => r.status === 'rejected').length;
       
-      setUploadForm(prev => {
-        const existingUrls = new Set(prev.urls.map(u => u.url));
-        const uniqueNewFiles = successfulFiles.filter(f => !existingUrls.has(f.url));
-        
-        if (uniqueNewFiles.length > 0) {
-          showToast(`成功上传 ${uniqueNewFiles.length} 个文件${failedCount > 0 ? `，${failedCount} 个失败` : ''}`, "success");
-        } else if (failedCount > 0) {
-          showToast(`${failedCount} 个文件上传失败`, "error");
-        } else if (successfulFiles.length > 0) {
-          showToast("所选文件已全部存在于列表中", "info");
-        }
-        
-        return { 
-          ...prev, 
-          urls: [...prev.urls, ...uniqueNewFiles] 
-        };
-      });
+      const existingUrls = new Set(uploadForm.urls.map(u => u.url));
+      const uniqueNewFiles = successfulFiles.filter(f => !existingUrls.has(f.url));
+      
+      if (uniqueNewFiles.length > 0) {
+        showToast(`成功上传 ${uniqueNewFiles.length} 个文件${failedCount > 0 ? `，${failedCount} 个失败` : ''}`, "success");
+      } else if (failedCount > 0) {
+        showToast(`${failedCount} 个文件上传失败`, "error");
+      } else if (successfulFiles.length > 0) {
+        showToast("所选文件已全部存在于列表中", "info");
+      }
+      
+      setUploadForm(prev => ({
+        ...prev,
+        urls: [...prev.urls, ...uniqueNewFiles]
+      }));
       
     } catch (error) {
       console.error("Critical upload error:", error);
@@ -695,7 +692,7 @@ function GalleryContent() {
     } finally {
       setIsUploading(false);
     }
-  }, [showToast, uploadForm.urls.length]);
+  }, [showToast, uploadForm.urls]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -825,13 +822,6 @@ function GalleryContent() {
     });
   };
 
-  const invalidateProductMedia = useCallback((productId: string) => {
-    setProductMediaMap(prev => {
-      const next = { ...prev };
-      delete next[productId];
-      return next;
-    });
-  }, []);
 
   // Navigation logic: match the same order as ProductFormModal gallery
   // (main cover image first, then by createdAt ascending)
@@ -1849,7 +1839,7 @@ function GalleryContent() {
                                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                                 transition={{ duration: 0.2 }}
-                                                className="absolute top-[calc(env(safe-area-inset-top,0px)+3.5rem)] md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/90 backdrop-blur-2xl px-5 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col gap-3 max-w-full md:max-w-md pointer-events-auto"
+                                                className="absolute top-[calc(env(safe-area-inset-top,0)+3.5rem)] md:top-[68px] left-4 right-4 md:left-6 md:right-auto z-50 bg-black/90 backdrop-blur-2xl px-5 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col gap-3 max-w-full md:max-w-md pointer-events-auto"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <div className="flex flex-col gap-1 font-rounded">

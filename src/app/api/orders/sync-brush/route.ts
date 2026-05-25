@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json().catch(() => ({}));
+    const commission = typeof body?.commission === "number" ? body.commission : 0;
     const targets = Array.isArray(body?.orders)
       ? body.orders
       : Array.isArray(body?.ids)
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
         forceInclude: true,
         preferredMappedShopName: target.matchedShopName,
         overwriteExisting: true,
+        commission,
       }).catch((error) => ({
         ok: false as const,
         skipped: true as const,

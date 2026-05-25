@@ -96,6 +96,47 @@ async function ensureUserCategories(userId: string | null | undefined, names: st
   return categoryMap;
 }
 
+async function ensureUserSuppliers(userId: string | null | undefined, names: string[]) {
+  if (!userId || names.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const normalizedNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+  if (normalizedNames.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const existing = await prisma.supplier.findMany({
+    where: {
+      userId,
+      name: { in: normalizedNames },
+    },
+    select: { id: true, name: true },
+  });
+
+  const supplierMap = new Map(existing.map((supplier) => [supplier.name, supplier.id]));
+  const missingNames = normalizedNames.filter((name) => !supplierMap.has(name));
+
+  if (missingNames.length > 0) {
+    await prisma.supplier.createMany({
+      data: missingNames.map((name) => ({ userId, name })),
+      skipDuplicates: true,
+    });
+
+    const refreshed = await prisma.supplier.findMany({
+      where: {
+        userId,
+        name: { in: normalizedNames },
+      },
+      select: { id: true, name: true },
+    });
+
+    return new Map(refreshed.map((supplier) => [supplier.name, supplier.id]));
+  }
+
+  return supplierMap;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -531,6 +572,7 @@ export async function POST(
         remark: true,
         specs: true,
         category: { select: { name: true } },
+        supplier: { select: { name: true } },
       },
     });
 
@@ -582,6 +624,11 @@ export async function POST(
       products.map((product) => product.category?.name || "").filter(Boolean)
     );
 
+    const supplierMap = await ensureUserSuppliers(
+      shop.userId,
+      products.map((product) => product.supplier?.name || "").filter(Boolean)
+    );
+
     const existingSkuSet = new Set(
       existingSkuAssignments
         .map((item) => normalizeSku(item.sku))
@@ -624,7 +671,7 @@ export async function POST(
         productImage: product.image,
         categoryId: categoryMap.get(product.category?.name || "") || null,
         categoryName: product.category?.name || null,
-        supplierId: product.supplierId || null,
+        supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name) || null) : null,
         costPrice: 0,
         stock: 0,
         isPublic: product.isPublic,

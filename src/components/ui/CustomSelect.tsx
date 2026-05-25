@@ -129,7 +129,8 @@ export function CustomSelect({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex w-full h-full items-center justify-between rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background",
+          "flex w-full h-full items-center justify-between bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background",
+          !triggerClassName?.includes("rounded-") && "rounded-lg",
           isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/5 dark:hover:bg-white/10",
           triggerClassName
         )}
@@ -181,9 +182,9 @@ export function CustomSelect({
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="rounded-lg glass shadow-2xl ring-1 ring-black/5 focus:outline-none overflow-hidden border border-border/50"
+              className="rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
             >
-              <div className="max-h-60 overflow-auto p-1 py-1.5">
+              <div className="max-h-60 overflow-auto p-1.5 py-2">
                 {filteredOptions.length > 0 ? (
                   filteredOptions.map((option, index) => (
                     <button
@@ -195,8 +196,8 @@ export function CustomSelect({
                         setSearchQuery("");
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-md py-2 pl-2.5 pr-7 text-xs outline-none transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer",
-                        option.value === value && "bg-primary/10 text-primary font-bold"
+                        "relative flex w-full select-none items-center rounded-xl py-2.5 pl-3 pr-7 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
+                        option.value === value && "bg-primary/10 text-primary font-bold dark:bg-primary/20 dark:text-primary"
                       )}
                     >
                       <span className="whitespace-nowrap font-medium">{option.label}</span>

@@ -2415,255 +2415,263 @@ export function StoreDispatchMap({
             createPortal(
               <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
                 <div
-                  className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                  className="absolute inset-0 bg-slate-900/40 dark:bg-[#020617]/75 backdrop-blur-md dark:backdrop-blur-2xl transition-all duration-300"
                   onClick={() => setIsShopListOpen(false)}
                 />
-                <aside className="relative z-10 flex h-[min(82dvh,860px)] w-full max-w-[420px] flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background shadow-2xl backdrop-blur-xl sm:max-w-[760px] sm:rounded-[28px]">
-              <div className="border-b border-border/60 px-4 py-4 sm:px-6 sm:py-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-black text-foreground sm:text-base">店铺列表</div>
-                    <div className="mt-1 text-xs text-muted-foreground sm:text-sm">搜索、定位并修改店铺信息</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isBulkManageMode && (
-                      <button
-                        onClick={() => setIsBulkManageMode(true)}
-                        className="inline-flex h-8 items-center justify-center rounded-full border border-border bg-card px-3 text-[11px] font-bold text-foreground transition-all hover:bg-muted"
-                      >
-                        批量删除
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setIsShopListOpen(false)}
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="relative mt-4">
-                  <Search
-                    size={14}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <input
-                    value={shopSearchQuery}
-                    onChange={(event) => setShopSearchQuery(event.target.value)}
-                    placeholder="搜索店名 / POI_ID / 地址"
-                    className="h-10 w-full rounded-2xl border border-border bg-card px-9 pr-3 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-                  />
-                </div>
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {[
-                      { value: "all", label: "全部" },
-                      { value: "resolved", label: "已定位" },
-                      { value: "pending", label: "待处理" },
-                    ].map((filter) => (
-                      <button
-                        key={filter.value}
-                        type="button"
-                        onClick={() => setShopLocationFilter(filter.value as "all" | "resolved" | "pending")}
-                        className={cn(
-                          "inline-flex h-8 items-center justify-center rounded-full px-3 text-xs font-bold transition-all",
-                          shopLocationFilter === filter.value
-                            ? "bg-primary/12 text-primary ring-1 ring-primary/20"
-                            : "border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
-                        )}
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground sm:justify-end">
-                    <div className="inline-flex h-8 items-center rounded-full border border-border/70 bg-white/3 px-3 text-xs font-medium text-foreground">
-                      当前 {searchedShops.length} 家
-                    </div>
-                    <div className="inline-flex h-8 items-center rounded-full border border-border/70 bg-white/3 px-3 text-xs font-medium text-muted-foreground">
-                      总计 {shops.length} 家
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/70 opacity-75" />
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      </span>
-                      已定位
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500/70 opacity-75" />
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-                      </span>
-                      待处理
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  {isBulkManageMode && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => {
-                          const visibleIds = searchedShops.map((shop) => shop.id);
-                          const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedShopIds.includes(id));
-                          setSelectedShopIds(allVisibleSelected ? [] : visibleIds);
-                        }}
-                        className={cn(
-                          "inline-flex h-9 items-center justify-center rounded-full px-4 text-xs font-bold transition-all",
-                          searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id))
-                            ? "bg-primary/12 text-primary ring-1 ring-primary/20"
-                            : "border border-border bg-card text-foreground hover:bg-muted"
-                        )}
-                      >
-                        {searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id)) ? "取消全选" : "全选当前列表"}
-                      </button>
-                      <div className="inline-flex h-9 items-center justify-center rounded-full bg-white/4 px-4 text-xs font-medium text-muted-foreground">
-                        已选 <span className="mx-1 font-bold text-foreground">{selectedShopIds.length}</span> / 当前 {searchedShops.length}
+                <aside className="relative z-10 flex h-[min(85dvh,860px)] w-full max-w-[420px] flex-col overflow-hidden rounded-[24px] sm:rounded-[28px] border border-black/[0.08] dark:border-white/10 bg-white/95 dark:bg-[#0a0f1d]/95 backdrop-blur-3xl shadow-2xl dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.9)] sm:max-w-[760px] animate-in fade-in zoom-in-95 duration-300">
+                  
+                  {/* Modal Header */}
+                  <div className="border-b border-black/[0.05] dark:border-white/5 px-5 py-4 sm:px-6 sm:py-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-base sm:text-lg font-black bg-gradient-to-r from-slate-900 via-slate-800 to-slate-600 dark:from-white dark:via-slate-100 dark:to-slate-400 bg-clip-text text-transparent">店铺列表</h2>
+                        <p className="mt-1 text-[11px] sm:text-xs font-semibold text-slate-400 dark:text-slate-500">搜索、定位并修改店铺信息</p>
                       </div>
-                      <button
-                        onClick={() => {
-                          setIsBulkManageMode(false);
-                          setSelectedShopIds([]);
-                        }}
-                        className="inline-flex h-9 items-center justify-center rounded-full px-3 text-xs font-medium text-muted-foreground transition-all hover:text-foreground"
-                      >
-                        退出
-                      </button>
-                      <button
-                        onClick={() => void handleBulkDeleteShops()}
-                        disabled={selectedShopIds.length === 0 || isDeletingShops}
-                        className="ml-auto inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-destructive/85 px-4 text-xs font-bold text-white transition-all hover:bg-destructive disabled:cursor-not-allowed disabled:bg-destructive/35 disabled:text-white/60"
-                      >
-                        {isDeletingShops ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                        删除 ({selectedShopIds.length})
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {searchedShops.map((shop) => {
-                    const region = extractRegionParts(shop);
-                    const isSelected = selectedShopIds.includes(shop.id);
-                    const hasResolvedLocation = typeof shop.longitude === "number" && typeof shop.latitude === "number";
-                    return (
-                      <div
-                        key={shop.id}
-                        className={cn(
-                          "rounded-3xl border bg-card p-4 transition-all sm:p-5",
-                          isSelected ? "border-primary ring-2 ring-primary/15" : "border-border"
-                        )}
-                      >
-                        <div className="flex min-w-0 items-start gap-3">
-                            {isBulkManageMode && (
-                              <button
-                                onClick={() => {
-                                  setSelectedShopIds((prev) =>
-                                    prev.includes(shop.id)
-                                      ? prev.filter((id) => id !== shop.id)
-                                      : [...prev, shop.id]
-                                  );
-                                }}
-                                className={cn(
-                                  "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
-                                  isSelected
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-muted-foreground/30 bg-background text-transparent"
-                                )}
-                              >
-                                <Check size={12} />
-                              </button>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start gap-2">
-                                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                                  <span
-                                    className={cn(
-                                      "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-                                      hasResolvedLocation ? "bg-emerald-500/70" : "bg-red-500/70"
-                                    )}
-                                  />
-                                  <span
-                                    className={cn(
-                                      "relative inline-flex h-2.5 w-2.5 rounded-full",
-                                      hasResolvedLocation ? "bg-emerald-500" : "bg-red-500"
-                                    )}
-                                  />
-                                </span>
-                                <div className="min-w-0">
-                                  <div className="truncate text-[15px] font-black text-foreground sm:text-[16px]" title={shop.name}>
-                                    {shop.name}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                {region.regionLabel || "未分类"}
-                                <span className={cn(
-                                  "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                                  hasResolvedLocation
-                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                    : "bg-red-500/10 text-red-500"
-                                )}>
-                                  {hasResolvedLocation ? "定位正常" : "待定位"}
-                                </span>
-                              </div>
-                              {shop.externalId && (
-                                <div className="mt-3 inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                                  POI_ID: {shop.externalId}
-                                </div>
-                              )}
-                              {shop.address && (
-                                <div className="mt-4 min-h-[56px] text-sm leading-7 text-muted-foreground">
-                                  {shop.address}
-                                </div>
-                              )}
-                            </div>
-                        </div>
+                      <div className="flex items-center gap-2">
                         {!isBulkManageMode && (
-                          <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/60 pt-4">
-                            <button
-                              onClick={() => {
-                                void handleLocateShop(shop);
-                              }}
-                              className="rounded-full border border-border bg-background px-4 py-2 text-xs font-bold text-foreground transition-all hover:bg-muted"
-                            >
-                              定位
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingShop(shop);
-                                setIsShopModalOpen(true);
-                              }}
-                              className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black transition-all hover:bg-white/90"
-                            >
-                              编辑
-                            </button>
-                            <button
-                              onClick={() => {
-                                void handleDeleteSingleShop(shop);
-                              }}
-                              disabled={isDeletingShops}
-                              className="rounded-full px-3 py-2 text-xs font-medium text-destructive transition-all hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              删除
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => setIsBulkManageMode(true)}
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 px-3.5 text-[11px] font-bold transition-all active:scale-95 shadow-sm whitespace-nowrap"
+                          >
+                            批量删除
+                          </button>
                         )}
+                        <button
+                          onClick={() => setIsShopListOpen(false)}
+                          className="p-1.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90"
+                        >
+                          <X size={18} />
+                        </button>
                       </div>
-                    );
-                  })}
-                  {!searchedShops.length && (
-                    <div className="sm:col-span-2 rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-                      没有找到匹配的店铺
                     </div>
-                  )}
-                </div>
-              </div>
+
+                    {/* Search Input Box */}
+                    <div className="relative mt-4">
+                      <Search
+                        size={14}
+                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                      />
+                      <input
+                        value={shopSearchQuery}
+                        onChange={(event) => setShopSearchQuery(event.target.value)}
+                        placeholder="搜索店名 / POI_ID / 地址"
+                        className="h-10 w-full rounded-full border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-10 pr-4 text-xs sm:text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 text-foreground placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                    </div>
+
+                    {/* Filter Tabs & Stats Badge */}
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {[
+                          { value: "all", label: "全部" },
+                          { value: "resolved", label: "已定位" },
+                          { value: "pending", label: "待处理" },
+                        ].map((filter) => (
+                          <button
+                            key={filter.value}
+                            type="button"
+                            onClick={() => setShopLocationFilter(filter.value as "all" | "resolved" | "pending")}
+                            className={cn(
+                              "inline-flex h-7 items-center justify-center rounded-full px-3 text-xs font-bold transition-all active:scale-95 shadow-sm",
+                              shopLocationFilter === filter.value
+                                ? "bg-primary text-primary-foreground"
+                                : "border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
+                            )}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 sm:justify-end">
+                        <div className="inline-flex h-7 items-center rounded-full border border-black/[0.04] dark:border-white/5 bg-slate-50/60 dark:bg-white/[0.02] px-3 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          当前 {searchedShops.length} 家
+                        </div>
+                        <div className="inline-flex h-7 items-center rounded-full border border-black/[0.04] dark:border-white/5 bg-slate-50/60 dark:bg-white/[0.02] px-3 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                          总计 {shops.length} 家
+                        </div>
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/70 opacity-75" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                          </span>
+                          <span>已定位</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500/70 opacity-75" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+                          </span>
+                          <span>待处理</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bulk Manage Bar */}
+                    <div className="mt-4">
+                      {isBulkManageMode && (
+                        <div className="flex flex-wrap items-center gap-2 bg-black/[0.02] dark:bg-white/[0.02] p-2 rounded-2xl border border-black/[0.04] dark:border-white/5">
+                          <button
+                            onClick={() => {
+                              const visibleIds = searchedShops.map((shop) => shop.id);
+                              const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedShopIds.includes(id));
+                              setSelectedShopIds(allVisibleSelected ? [] : visibleIds);
+                            }}
+                            className={cn(
+                              "inline-flex h-8 items-center justify-center rounded-full px-3 text-xs font-bold transition-all active:scale-95 shadow-sm",
+                              searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id))
+                                ? "bg-primary/12 text-primary ring-1 ring-primary/20"
+                                : "border border-black/5 dark:border-white/10 bg-white dark:bg-white/5 text-foreground hover:bg-black/5 dark:hover:bg-white/10"
+                            )}
+                          >
+                            {searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id)) ? "取消全选" : "全选当前列表"}
+                          </button>
+                          <div className="inline-flex h-8 items-center justify-center rounded-full bg-slate-100 dark:bg-white/5 px-3 text-xs font-bold text-slate-500 dark:text-slate-400">
+                            已选 <span className="mx-1 font-extrabold text-foreground">{selectedShopIds.length}</span> / 当前 {searchedShops.length}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setIsBulkManageMode(false);
+                              setSelectedShopIds([]);
+                            }}
+                            className="inline-flex h-8 items-center justify-center rounded-full px-2.5 text-xs font-bold text-slate-500 dark:text-slate-400 transition-all hover:text-foreground active:scale-95"
+                          >
+                            退出
+                          </button>
+                          <button
+                            onClick={() => void handleBulkDeleteShops()}
+                            disabled={selectedShopIds.length === 0 || isDeletingShops}
+                            className="ml-auto inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 disabled:bg-rose-500/35 px-4 text-xs font-black text-white transition-all active:scale-95 disabled:cursor-not-allowed shadow-md shadow-rose-500/10"
+                          >
+                            {isDeletingShops ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                            删除 ({selectedShopIds.length})
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Modal Body - Grid Cards List */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                      {searchedShops.map((shop) => {
+                        const region = extractRegionParts(shop);
+                        const isSelected = selectedShopIds.includes(shop.id);
+                        const hasResolvedLocation = typeof shop.longitude === "number" && typeof shop.latitude === "number";
+                        return (
+                          <div
+                            key={shop.id}
+                            className={cn(
+                              "rounded-2xl border p-4 sm:p-5 transition-all duration-300 bg-white dark:bg-white/[0.03] border-black/[0.05] dark:border-white/10 hover:border-black/[0.1] dark:hover:border-white/20 hover:bg-slate-50/60 dark:hover:bg-white/[0.05] hover:-translate-y-0.5 shadow-xs dark:shadow-none group",
+                              isSelected ? "border-primary/50 dark:border-primary/50 bg-primary/5 dark:bg-primary/5 ring-1 ring-primary/20 shadow-md shadow-primary/5" : ""
+                            )}
+                          >
+                            <div className="flex min-w-0 items-start gap-3">
+                                {isBulkManageMode && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShopIds((prev) =>
+                                        prev.includes(shop.id)
+                                          ? prev.filter((id) => id !== shop.id)
+                                          : [...prev, shop.id]
+                                      );
+                                    }}
+                                    className={cn(
+                                      "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all active:scale-90",
+                                      isSelected
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-muted-foreground/30 bg-background text-transparent"
+                                    )}
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start gap-2">
+                                    <span className="relative flex h-2.5 w-2.5 shrink-0 mt-1">
+                                      <span
+                                        className={cn(
+                                          "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                                          hasResolvedLocation ? "bg-emerald-500/70" : "bg-rose-500/70"
+                                        )}
+                                      />
+                                      <span
+                                        className={cn(
+                                          "relative inline-flex h-2.5 w-2.5 rounded-full",
+                                          hasResolvedLocation ? "bg-emerald-500" : "bg-rose-500"
+                                        )}
+                                      />
+                                    </span>
+                                    <div className="min-w-0">
+                                      <h3 className="truncate text-sm sm:text-base font-black text-slate-900 dark:text-white group-hover:text-primary transition-colors" title={shop.name}>
+                                        {shop.name}
+                                      </h3>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-400 dark:text-slate-500">
+                                    <span>{region.regionLabel || "未分类"}</span>
+                                    <span className={cn(
+                                      "rounded-full px-2 py-0.5 text-[9px] font-black tracking-wide",
+                                      hasResolvedLocation
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                        : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                                    )}>
+                                      {hasResolvedLocation ? "定位正常" : "待定位"}
+                                    </span>
+                                  </div>
+                                  {shop.externalId && (
+                                    <div className="mt-2.5 inline-flex rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-black tracking-wide">
+                                      POI_ID: {shop.externalId}
+                                    </div>
+                                  )}
+                                  {shop.address && (
+                                    <p className="mt-3.5 min-h-[36px] text-xs leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2 select-all" title={shop.address}>
+                                      {shop.address}
+                                    </p>
+                                  )}
+                                </div>
+                            </div>
+                            
+                            {/* Card Hover Actions */}
+                            {!isBulkManageMode && (
+                              <div className="mt-4 flex items-center justify-end gap-2 border-t border-black/[0.04] dark:border-white/5 pt-3.5">
+                                <button
+                                  onClick={() => {
+                                    void handleLocateShop(shop);
+                                  }}
+                                  className="h-8 px-4 flex items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all active:scale-95 shadow-xs cursor-pointer"
+                                >
+                                  定位
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingShop(shop);
+                                    setIsShopModalOpen(true);
+                                  }}
+                                  className="h-8 px-4 flex items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-800 dark:bg-gradient-to-b dark:from-slate-100 dark:to-slate-200 dark:hover:from-white dark:hover:to-slate-100 dark:text-slate-900 text-xs font-black transition-all active:scale-95 shadow-sm cursor-pointer"
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    void handleDeleteSingleShop(shop);
+                                  }}
+                                  disabled={isDeletingShops}
+                                  className="h-8 px-3.5 flex items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 text-xs font-bold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {!searchedShops.length && (
+                        <div className="sm:col-span-2 rounded-2xl border border-dashed border-black/10 dark:border-white/10 bg-black/[0.01] dark:bg-white/[0.01] px-4 py-10 text-center text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-bold">
+                          没有找到匹配的店铺
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </aside>
               </div>,
               document.body

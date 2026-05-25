@@ -322,8 +322,8 @@ export default function OutboundPage() {
                     ]}
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full border text-[10px] sm:text-sm font-medium transition-all px-2 sm:px-4",
-                        typeFilter !== "all" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                        "h-full rounded-full border shadow-sm text-[10px] sm:text-sm font-normal transition-all px-3 sm:px-4",
+                        typeFilter !== "all" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
                     )}
                 />
             </div>
@@ -339,8 +339,8 @@ export default function OutboundPage() {
                     placeholder="全部平台"
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
-                        platformFilter !== "全部平台" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                        "h-full rounded-full border shadow-sm text-[10px] sm:text-sm font-normal transition-all px-3 sm:px-4",
+                        platformFilter !== "全部平台" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
                     )}
                 />
             </div>
@@ -356,8 +356,8 @@ export default function OutboundPage() {
                     placeholder="全部门店"
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
-                        selectedShop !== "全部门店" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                        "h-full rounded-full border shadow-sm text-[10px] sm:text-sm font-normal transition-all px-3 sm:px-4",
+                        selectedShop !== "全部门店" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
                     )}
                 />
             </div>

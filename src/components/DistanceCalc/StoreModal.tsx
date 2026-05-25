@@ -84,62 +84,62 @@ export function StoreModal({
   return createPortal(
     <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+        className="absolute inset-0 bg-slate-900/40 dark:bg-[#020617]/75 backdrop-blur-md dark:backdrop-blur-2xl transition-all duration-300" 
         onClick={onClose} 
       />
       
-      <div className="relative w-full max-w-[560px] overflow-hidden rounded-[24px] border border-border/60 bg-background shadow-2xl animate-in fade-in zoom-in duration-200 backdrop-blur-xl sm:rounded-[28px]">
-        <div className="border-b border-border/60 bg-white/2 px-5 py-5 dark:bg-white/3 sm:px-7 sm:py-6">
+      <div className="relative w-full max-w-[480px] overflow-hidden rounded-3xl border border-black/[0.08] dark:border-white/10 bg-white/98 dark:bg-[#0c101d] shadow-2xl dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.95)] animate-in fade-in zoom-in-95 duration-300">
+        <div className="pt-7 px-7 pb-3 sm:pt-8 sm:px-8 sm:pb-4 bg-transparent">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-[24px] font-black tracking-tight text-foreground sm:text-[28px]">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-wide">
                 {title !== "店铺信息" ? title : (initialData?.id ? "编辑店铺" : "新增店铺")}
               </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 leading-normal">
                 录入门店名称、POI_ID 和详细地址后即可加入调货测算。
               </p>
             </div>
             <button
               onClick={onClose}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted/70 text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-200 dark:hover:text-white bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] transition-all duration-300 hover:rotate-90 active:scale-90"
             >
-              <X size={20} />
+              <X size={15} />
             </button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 sm:p-7">
-          <div className="space-y-6">
-            <div className="grid gap-5">
-              <div className="space-y-2.5">
-                <label className="text-sm font-semibold text-foreground">
-                  门店名称 <span className="text-red-500">*</span>
+        <form onSubmit={handleSubmit} className="px-7 pb-7 sm:px-8 sm:pb-8 pt-2">
+          <div className="space-y-5">
+            <div className="grid gap-4.5">
+              <div className="space-y-2">
+                <label className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  门店名称 <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="请输入门店名称"
-                  className="h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none ring-1 ring-transparent transition-all placeholder:text-muted-foreground/70 focus:border-primary/20 focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:hover:bg-white/[0.07]"
+                  className="h-12 w-full rounded-2xl border border-black/10 dark:border-white/[0.05] bg-black/[0.01] dark:bg-[#131926] px-4.5 text-xs sm:text-sm text-slate-900 dark:text-white outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500/80 focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#161d2d] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-blue-500/5"
                 />
               </div>
 
-              <div className="space-y-2.5">
-                <label className="text-sm font-semibold text-foreground">
-                  POI_ID <span className="text-red-500">*</span>
+              <div className="space-y-2">
+                <label className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  POI_ID <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   required
                   value={formData.externalId || ""}
                   onChange={(e) => setFormData({ ...formData, externalId: e.target.value })}
                   placeholder="例如：27678090"
-                  className="h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none ring-1 ring-transparent transition-all placeholder:text-muted-foreground/70 focus:border-primary/20 focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:hover:bg-white/[0.07]"
+                  className="h-12 w-full rounded-2xl border border-black/10 dark:border-white/[0.05] bg-black/[0.01] dark:bg-[#131926] px-4.5 text-xs sm:text-sm text-slate-900 dark:text-white outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500/80 focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#161d2d] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-blue-500/5"
                 />
               </div>
 
-              <div className="space-y-2.5">
-                <label className="text-sm font-semibold text-foreground">
-                  详细地址 <span className="text-red-500">*</span>
+              <div className="space-y-2">
+                <label className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  详细地址 <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <textarea
                   required
@@ -147,30 +147,34 @@ export function StoreModal({
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="例如：广东省广州市天河区广州大道中..."
                   rows={3}
-                  className="w-full resize-none rounded-2xl border border-border bg-white px-4 py-3 text-sm text-foreground outline-none ring-1 ring-transparent transition-all placeholder:text-muted-foreground/70 focus:border-primary/20 focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:hover:bg-white/[0.07]"
+                  className="w-full resize-none rounded-2xl border border-black/10 dark:border-white/[0.05] bg-black/[0.01] dark:bg-[#131926] px-4.5 py-3.5 text-xs sm:text-sm text-slate-900 dark:text-white outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500/80 focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#161d2d] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-blue-500/5"
                 />
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border/60 bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+            <div className="rounded-2xl border border-black/[0.03] dark:border-white/[0.02] bg-slate-50/60 dark:bg-[#131926]/40 px-4 py-3.5 text-xs text-slate-500 dark:text-slate-400/80 font-medium leading-relaxed">
               三项均为必填，用于门店去重、定位和路线测算。
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col-reverse gap-3 border-t border-border/60 pt-6 sm:flex-row sm:justify-end">
+          <div className="mt-7 flex flex-col-reverse gap-3 border-t border-black/[0.05] dark:border-white/[0.05] pt-6 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-border bg-background px-6 py-3 text-sm font-bold text-foreground transition-all hover:bg-muted sm:min-w-[120px]"
+              className="h-11 px-6 flex items-center justify-center rounded-full border border-black/5 dark:border-white/10 bg-slate-100 dark:bg-transparent hover:bg-slate-200 dark:hover:bg-white/5 text-slate-700 dark:text-white text-xs sm:text-sm font-bold transition-all active:scale-95 cursor-pointer sm:min-w-[110px]"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !formData.name || !formData.externalId || !formData.address}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[140px]"
+              className={`h-11 flex items-center justify-center gap-1.5 rounded-full px-6 text-xs sm:text-sm font-bold transition-all active:scale-95 cursor-pointer sm:min-w-[140px] ${
+                !formData.name || !formData.externalId || !formData.address
+                  ? "bg-slate-200/80 text-slate-400 dark:bg-[#202737] dark:text-[#555d70] cursor-not-allowed border-transparent shadow-none"
+                  : "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-[#0c101d] dark:hover:bg-slate-100 shadow-lg dark:shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
+              }`}
             >
-              {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
               {initialData?.id ? "保存修改" : "确认新增"}
             </button>
           </div>

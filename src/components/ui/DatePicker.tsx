@@ -178,7 +178,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
               maxWidth: 'calc(100vw - 2rem)',
               pointerEvents: 'auto'
             }}
-            className="z-1000001 rounded-[24px] bg-white dark:bg-[#121826] p-3 shadow-2xl border border-black/5 dark:border-white/5"
+            className="z-1000001 rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl p-3.5 border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]"
           >
             <div className="max-w-[280px] mx-auto">
               <div className="flex items-center justify-between mb-4 px-1">
@@ -186,7 +186,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); prevYear(); }}
-                        className="rounded-lg p-1 hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-all"
+                        className="rounded-xl p-1 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground/50 hover:text-foreground transition-all"
                         title="上一年"
                     >
                         <ChevronLeft size={14} strokeWidth={3} />
@@ -197,7 +197,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); nextYear(); }}
-                        className="rounded-lg p-1 hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-all"
+                        className="rounded-xl p-1 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground/50 hover:text-foreground transition-all"
                         title="下一年"
                     >
                         <ChevronRight size={14} strokeWidth={3} />
@@ -207,7 +207,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); prevMonth(); }}
-                    className="rounded-lg p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                    className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground hover:text-foreground transition-all"
                     title="上一月"
                   >
                     <ChevronLeft size={18} />
@@ -215,7 +215,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); nextMonth(); }}
-                    className="rounded-lg p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                    className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground hover:text-foreground transition-all"
                     title="下一月"
                   >
                     <ChevronRight size={18} />
@@ -247,7 +247,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                       disabled={isDisabled}
                       onClick={() => handleDateClick(day)}
                       className={cn(
-                        "aspect-square w-full rounded-lg text-xs flex items-center justify-center transition-all duration-200 relative",
+                        "aspect-square w-full rounded-xl text-xs flex items-center justify-center transition-all duration-200 relative",
                         !isCurrentMonth && "text-muted-foreground/50",
                         isCurrentMonth && !isDisabled && "text-foreground hover:bg-primary/10 hover:text-primary",
                         isDisabled && "text-muted-foreground/20 cursor-not-allowed",

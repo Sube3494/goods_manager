@@ -237,6 +237,7 @@ export interface AutoPickIntegrationConfig {
   maiyatianCookie: string;
   maiyatianShopMappings: AutoPickMaiyatianShopMapping[];
   selfDeliveryTiming: AutoPickSelfDeliveryTimingConfig;
+  defaultBrushCommission: number;
 }
 
 export interface AutoPickSelfDeliveryTimingConfig {

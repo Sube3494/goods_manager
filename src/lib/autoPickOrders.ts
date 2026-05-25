@@ -570,6 +570,11 @@ export function normalizeAutoPickIntegrationConfig(input: unknown): AutoPickInte
           .filter((item): item is AutoPickMaiyatianShopMapping => Boolean(item))
       : [],
     selfDeliveryTiming: normalizeAutoPickSelfDeliveryTimingConfig(payload.selfDeliveryTiming),
+    defaultBrushCommission: typeof payload.defaultBrushCommission === "number"
+      ? payload.defaultBrushCommission
+      : typeof payload.defaultBrushCommission === "string"
+        ? parseFloat(payload.defaultBrushCommission) || 0
+        : 0,
   };
 }
 
@@ -2513,7 +2518,11 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
   const becameCompleted = isAutoPickOrderCompletedStatus(order.status) && !isAutoPickOrderCompletedStatus(previousStatus);
   if (becameCompleted) {
-    await syncBrushOrderFromCompletedAutoPickOrder(userId, order.id).catch((brushError) => {
+    const integrationConfig = await getAutoPickIntegrationConfigByUserId(userId);
+    const defaultBrushCommission = integrationConfig.defaultBrushCommission ?? 0;
+    await syncBrushOrderFromCompletedAutoPickOrder(userId, order.id, {
+      commission: defaultBrushCommission,
+    }).catch((brushError) => {
       console.error("Failed to sync brush order after webhook upsert:", brushError);
     });
     await syncAutoOutboundFromCompletedAutoPickOrder(userId, order.id).catch((outboundError) => {
@@ -4608,6 +4617,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     forceInclude?: boolean;
     preferredMappedShopName?: string | null;
     overwriteExisting?: boolean;
+    commission?: number;
   }
 ) {
   const order = await prisma.autoPickOrder.findFirst({
@@ -4689,6 +4699,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     : Number(order.actualPaid || 0);
   const receivedAmount = FinanceMath.add(receivedBase / 100, 0);
   const brushImportNote = options?.forceInclude === true ? "人工纳入刷单" : "推送导入";
+  const commission = options?.commission !== undefined ? options.commission : 0;
 
   if (existing && options?.overwriteExisting === true) {
     const brushOrder = await prisma.$transaction(async (tx) => {
@@ -4708,7 +4719,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
           status: "Completed",
           paymentAmount,
           receivedAmount,
-          commission: 0,
+          commission,
           note: brushImportNote,
           shopName: resolved.mappedShopName,
           items: {
@@ -4747,7 +4758,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
       userId,
       paymentAmount,
       receivedAmount,
-      commission: 0,
+      commission,
       note: brushImportNote,
       shopName: resolved.mappedShopName,
       platformOrderId: order.orderNo,

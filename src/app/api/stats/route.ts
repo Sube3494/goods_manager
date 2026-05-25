@@ -20,7 +20,10 @@ function endOfDay(input: Date) {
 }
 
 function formatDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatDateLabel(date: Date) {
@@ -312,6 +315,8 @@ export async function GET(request: NextRequest) {
           shopId: true,
           stock: true,
           costPrice: true,
+          sku: true,
+          productName: true,
           sourceProductId: true,
           shop: { select: { id: true, name: true } },
         },
@@ -389,13 +394,24 @@ export async function GET(request: NextRequest) {
           orderTime: true,
           shopId: true,
           rawPayload: true,
+          actualPaid: true,
+          delivery: true,
+          expectedIncome: true,
+          platformCommission: true,
+          items: {
+            select: {
+              quantity: true,
+              productNo: true,
+              productName: true,
+            },
+          },
         },
         orderBy: { orderTime: "asc" },
       }),
     ]);
     perf.lap("core-queries");
 
-    const [brushOrdersInRange, settlementsInRange] = await Promise.all([
+    const [brushOrdersInRange, promotionExpensesInRange] = await Promise.all([
       prisma.brushOrder.findMany({
         where: {
           userId: user.id,
@@ -413,30 +429,14 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { date: "asc" },
       }),
-      prisma.settlement.findMany({
+      prisma.dailyPromotionExpense.findMany({
         where: {
           userId: user.id,
-          ...(shopName
-            ? {
-                OR: [
-                  { shopName },
-                  { items: { some: { shopName } } },
-                ],
-              }
-            : {}),
           date: { gte: startDate, lte: endDate },
         },
         select: {
-          id: true,
           date: true,
-          serviceFee: true,
-          items: {
-            select: {
-              platformName: true,
-              received: true,
-              brushing: true,
-            },
-          },
+          amount: true,
         },
       }),
     ]);
@@ -489,42 +489,84 @@ export async function GET(request: NextRequest) {
     });
     const duplicateSourceProductCount = Array.from(duplicateSourceMap.values()).filter((shops) => shops.size > 1).length;
 
+    // 先获取收货地址库中的店铺抽出率
+    const userDb = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { shippingAddresses: true }
+    });
+    const userAddresses = userDb && Array.isArray(userDb.shippingAddresses) 
+      ? (userDb.shippingAddresses as Array<Record<string, unknown>>) 
+      : [];
+    const shopRateMap = new Map<string, number>();
+    userAddresses.forEach((addr) => {
+      const label = String(addr.label || "").trim();
+      if (label && typeof addr.serviceFeeRate === "number") {
+        shopRateMap.set(label, addr.serviceFeeRate);
+      }
+    });
+    const productCostMap = new Map<string, number>();
+    shopProductRows.forEach((row) => {
+      const sku = String(row.sku || "").trim();
+      if (sku) {
+        productCostMap.set(sku, row.costPrice || 0);
+      }
+      const productName = String(row.productName || "").trim();
+      if (productName) {
+        productCostMap.set(productName, row.costPrice || 0);
+      }
+    });
+
+    function getDeliveryFee(delivery: unknown) {
+      if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+        return 0;
+      }
+      const value = Number((delivery as Record<string, unknown>).sendFee || 0);
+      return Number.isFinite(value) ? Math.max(0, value) : 0;
+    }
+
     const purchaseAmount = purchaseOrdersInRange.reduce((sum, order) => FinanceMath.add(sum, order.totalAmount || 0), 0);
-    const outboundAmount = outboundOrdersInRange.reduce(
-      (sum, order) => FinanceMath.add(sum, order.items.reduce((inner, item) => FinanceMath.add(inner, FinanceMath.multiply(item.price || 0, item.quantity || 0)), 0)),
-      0
-    );
     const brushExpense = brushOrdersInRange.reduce(
       (sum, order) => FinanceMath.add(sum, FinanceMath.add((order.paymentAmount || 0) - (order.receivedAmount || 0), order.commission || 0)),
       0
     );
-    const platformCommission = settlementsInRange.reduce((sum, item) => FinanceMath.add(sum, item.serviceFee || 0), 0);
-    const userPaid = outboundAmount;
-    const promotionExpense = 0;
-    const otherExpense = 0;
-    const deliveryExpense = 0;
 
-    const outboundProductCost = await prisma.outboundOrderItem.findMany({
-      where: {
-        outboundOrder: {
-          userId: user.id,
-          ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
-          date: { gte: startDate, lte: endDate },
-        },
-      },
-      select: {
-        quantity: true,
-        shopProduct: { select: { costPrice: true } },
-        product: { select: { costPrice: true } },
-        outboundOrder: { select: { date: true, note: true } },
-      },
+    let userPaid = 0;
+    let platformCommission = 0;
+    let deliveryExpense = 0;
+    let productCost = 0;
+
+    filteredAutoPickOrdersInRange.forEach((order) => {
+      const isCancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+      if (!isCancelled) {
+        const paidYuan = (order.actualPaid || 0) / 100;
+        const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
+        const rate = shopRateMap.get(matchedShopName) ?? 0.06;
+        const commissionYuan = paidYuan * rate;
+        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+
+        let orderCostYuan = 0;
+        if (Array.isArray(order.items)) {
+          order.items.forEach((item) => {
+            const sku = String(item.productNo || "").trim();
+            const name = String(item.productName || "").trim();
+            const unitCost = productCostMap.get(sku) ?? productCostMap.get(name) ?? 0;
+            orderCostYuan += unitCost * (item.quantity || 0);
+          });
+        }
+
+        userPaid = FinanceMath.add(userPaid, paidYuan);
+        platformCommission = FinanceMath.add(platformCommission, commissionYuan);
+        deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
+        productCost = FinanceMath.add(productCost, orderCostYuan);
+      }
     });
-    perf.lap("outbound-cost-query");
 
-    const productCost = outboundProductCost.reduce((sum, item) => {
-      const unitCost = item.shopProduct?.costPrice ?? item.product?.costPrice ?? 0;
-      return FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
-    }, 0);
+    const outboundAmount = userPaid;
+    const promotionExpense = promotionExpensesInRange.reduce(
+      (sum, item) => FinanceMath.add(sum, item.amount || 0),
+      0
+    );
+    const otherExpense = 0;
 
     const netProfit = FinanceMath.add(
       userPaid,
@@ -536,18 +578,26 @@ export async function GET(request: NextRequest) {
       trueOrderCount: 0,
       brushOrderCount: 0,
       otherOrderCount: 0,
+      userPaid: 0,
+      brushPaid: 0,
+      platformCommission: 0,
+      deliveryExpense: 0,
       productCost: 0,
       brushExpense: 0,
-      netProfit: 0,
+      promotionExpense: 0,
     });
 
     const businessTrendMap = new Map<string, {
       trueOrderCount: number;
       brushOrderCount: number;
       otherOrderCount: number;
+      userPaid: number;
+      brushPaid: number;
+      platformCommission: number;
+      deliveryExpense: number;
       productCost: number;
       brushExpense: number;
-      netProfit: number;
+      promotionExpense: number;
     }>();
     dateSeries.forEach((item) => {
       businessTrendMap.set(item.date, createTrendBucket());
@@ -560,11 +610,6 @@ export async function GET(request: NextRequest) {
       if (raw.includes("京东")) return "京东";
       if (raw.includes("淘宝") || raw.includes("天猫")) return "淘宝";
       return "其他";
-    };
-
-    const extractPlatformFromNote = (note: string | null | undefined) => {
-      const match = String(note || "").match(/\[([^\[\]]+)导入\]/);
-      return normalizePlatform(match?.[1]);
     };
 
     const platformBuckets = new Map<string, { trueOrderCount: number; brushOrderCount: number }>();
@@ -611,6 +656,51 @@ export async function GET(request: NextRequest) {
         current.trueOrderCount += 1;
       }
       platformBuckets.set(platform, current);
+
+      if (!isOther) {
+        const paidYuan = (order.actualPaid || 0) / 100;
+        const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
+        const rate = shopRateMap.get(matchedShopName) ?? 0.06;
+        const commissionYuan = paidYuan * rate;
+        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+
+        if (point) {
+          point.userPaid = FinanceMath.add(point.userPaid, paidYuan);
+          point.platformCommission = FinanceMath.add(point.platformCommission, commissionYuan);
+          point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
+        }
+        if (platformPoint) {
+          platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, paidYuan);
+          platformPoint.platformCommission = FinanceMath.add(platformPoint.platformCommission, commissionYuan);
+          platformPoint.deliveryExpense = FinanceMath.add(platformPoint.deliveryExpense, deliveryYuan);
+        }
+
+        if (isBrush) {
+          if (point) {
+            point.brushPaid = FinanceMath.add(point.brushPaid, paidYuan);
+          }
+          if (platformPoint) {
+            platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, paidYuan);
+          }
+        } else {
+          let orderCostYuan = 0;
+          if (Array.isArray(order.items)) {
+            order.items.forEach((item) => {
+              const sku = String(item.productNo || "").trim();
+              const name = String(item.productName || "").trim();
+              const unitCost = productCostMap.get(sku) ?? productCostMap.get(name) ?? 0;
+              orderCostYuan += unitCost * (item.quantity || 0);
+            });
+          }
+
+          if (point) {
+            point.productCost = FinanceMath.add(point.productCost, orderCostYuan);
+          }
+          if (platformPoint) {
+            platformPoint.productCost = FinanceMath.add(platformPoint.productCost, orderCostYuan);
+          }
+        }
+      }
     });
 
     brushOrdersInRange.forEach((order) => {
@@ -627,40 +717,12 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    outboundProductCost.forEach((item) => {
-      const key = formatDateKey(new Date(item.outboundOrder.date));
+    promotionExpensesInRange.forEach((item) => {
+      const key = formatDateKey(new Date(item.date));
       const point = businessTrendMap.get(key);
-      const platform = extractPlatformFromNote(item.outboundOrder.note);
-      const platformPoint = platformTrendMaps.get(platform)?.get(key);
-      if (!point) return;
-      const unitCost = item.shopProduct?.costPrice ?? item.product?.costPrice ?? 0;
-      const cost = FinanceMath.multiply(unitCost, item.quantity || 0);
-      point.productCost = FinanceMath.add(point.productCost, cost);
-      if (platformPoint) {
-        platformPoint.productCost = FinanceMath.add(platformPoint.productCost, cost);
+      if (point) {
+        point.promotionExpense = FinanceMath.add(point.promotionExpense, item.amount || 0);
       }
-    });
-
-    settlementsInRange.forEach((settlement) => {
-      const key = formatDateKey(new Date(settlement.date));
-      const point = businessTrendMap.get(key);
-      if (!point) return;
-      const trueRevenue = settlement.items.reduce((sum, item) => FinanceMath.add(sum, item.received || 0), 0);
-      point.netProfit = FinanceMath.add(point.netProfit, FinanceMath.add(trueRevenue, -(settlement.serviceFee || 0)));
-
-      settlement.items.forEach((item) => {
-        const platform = normalizePlatform(item.platformName);
-        const platformPoint = platformTrendMaps.get(platform)?.get(key);
-        if (!platformPoint) return;
-        const received = item.received || 0;
-        const serviceFeeShare = trueRevenue > 0
-          ? FinanceMath.multiply(settlement.serviceFee || 0, received / trueRevenue)
-          : 0;
-        platformPoint.netProfit = FinanceMath.add(
-          platformPoint.netProfit,
-          FinanceMath.add(received, -serviceFeeShare)
-        );
-      });
     });
 
     const buildTrendSeries = (source: Map<string, ReturnType<typeof createTrendBucket>>) => {
@@ -669,6 +731,17 @@ export async function GET(request: NextRequest) {
         const point = source.get(item.date);
         const orderCount = (point?.trueOrderCount || 0) + (point?.brushOrderCount || 0) + (point?.otherOrderCount || 0);
         cumulativeOrders += orderCount;
+        
+        const profit = FinanceMath.add(
+          point?.userPaid || 0,
+          -(point?.brushPaid || 0)
+          - (point?.platformCommission || 0)
+          - (point?.brushExpense || 0)
+          - (point?.deliveryExpense || 0)
+          - (point?.productCost || 0)
+          - (point?.promotionExpense || 0)
+        );
+
         return {
           date: item.date,
           label: item.label,
@@ -678,7 +751,7 @@ export async function GET(request: NextRequest) {
           cumulativeOrderCount: cumulativeOrders,
           productCost: point?.productCost || 0,
           brushExpense: point?.brushExpense || 0,
-          netProfit: FinanceMath.add(point?.netProfit || 0, -((point?.productCost || 0) + (point?.brushExpense || 0))),
+          netProfit: profit,
         };
       });
     };

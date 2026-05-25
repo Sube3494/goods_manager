@@ -26,12 +26,16 @@ export default function Home() {
   const [statsData, setStatsData] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
-  const [rangePreset, setRangePreset] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const today = new Date();
+  const initialEnd = format(today, "yyyy-MM-dd");
+  const initialStart = format(new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+
+  const [rangePreset, setRangePreset] = useState("7d");
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
   const [shopOptions, setShopOptions] = useState<Shop[]>([]);
   const [selectedShopName, setSelectedShopName] = useState("");
-  const todayDate = format(new Date(), "yyyy-MM-dd");
+  const todayDate = initialEnd;
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -169,7 +173,7 @@ export default function Home() {
             <button
               onClick={() => fetchData(false)}
               disabled={isLoading}
-              className="group relative flex h-11 shrink-0 items-center gap-2.5 rounded-2xl border border-black/8 bg-white/75 px-3 transition-all hover:border-primary/30 hover:bg-white sm:gap-3 sm:px-4 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+              className="group relative flex h-11 shrink-0 items-center gap-2.5 rounded-2xl border border-black/8 bg-white/75 px-3 transition-all hover:border-primary/30 hover:bg-white sm:gap-3 sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className={`flex h-6 w-6 items-center justify-center rounded-full ${isLoading ? "bg-primary/20" : "bg-black/5 transition-colors group-hover:bg-primary/15 dark:bg-white/10"}`}>
                 <RefreshCw

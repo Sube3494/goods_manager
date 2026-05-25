@@ -36,27 +36,25 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
     } else {
       showToast("复制失败，请手动选择复制", "error");
     }
-  };
-
-  const totalQuantity = order.items.reduce((acc, item) => acc + item.quantity, 0);
+  };  const totalQuantity = order.items.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 lg:pl-(--sidebar-width) transition-[padding] duration-200">
       {/* Background overlay with high end glass blur */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-xl transition-all duration-300"
+        className="absolute inset-0 bg-slate-900/40 dark:bg-[#020617]/75 backdrop-blur-md dark:backdrop-blur-2xl transition-all duration-300"
         onClick={onClose}
       />
 
       {/* Modal Content - Styled with refined glass panel */}
-      <div className="relative w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] flex flex-col glass-panel rounded-[24px] sm:rounded-[26px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] flex flex-col bg-white/95 dark:bg-[#0a0f1d]/95 backdrop-blur-3xl border border-black/[0.08] dark:border-white/5 rounded-[24px] sm:rounded-[28px] shadow-2xl dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.9)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 sm:px-8 py-4 sm:py-5 border-b border-black/5 dark:border-white/5 bg-transparent">
+        <div className="flex items-center justify-between px-5 sm:px-8 py-4 sm:py-5 border-b border-black/[0.05] dark:border-white/5 bg-transparent">
           <div className="flex items-center gap-3">
-            <h2 className="text-base sm:text-lg font-bold text-foreground">出库单详情</h2>
+            <h2 className="text-base sm:text-lg font-black bg-gradient-to-r from-slate-900 via-slate-800 to-slate-600 dark:from-white dark:via-slate-100 dark:to-slate-400 bg-clip-text text-transparent">出库单详情</h2>
             {isReturned && (
-              <span className="flex items-center gap-1 text-[10px] font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/20">
+              <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.1)] animate-pulse">
                 <AlertCircle size={10} />
                 已对冲
               </span>
@@ -64,131 +62,147 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-full text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition-all active:scale-95"
+            className="p-1.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Modal Body (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-5 sm:space-y-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 custom-scrollbar">
           
-          {/* Main Info Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+          {/* Main Info Dashboard - Unified One-Box Panel */}
+          <div className="space-y-4 p-5 rounded-2xl bg-slate-50/60 dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/10 shadow-[inner_0_1px_1px_rgba(255,255,255,0.05)] animate-in fade-in slide-in-from-top-2 duration-300">
+            <h3 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5">
+              <FileText size={12} className="text-blue-500 dark:text-blue-400" />
+              订单基本信息
+            </h3>
             
-            {/* Left Block: Basic Details */}
-            <div className="space-y-4 p-4 sm:p-5 rounded-2xl glass-card">
-              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.12em] mb-2 flex items-center gap-1.5">
-                <FileText size={12} className="text-primary/70" />
-                基础信息
-              </h3>
-              
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">流水单号</span>
-                  <span className="font-mono font-black text-foreground">
-                    {parsed.serialNum ? `#${parsed.serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">出库类型</span>
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                    order.type === 'Sale' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
-                    order.type === 'Sample' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
-                    'bg-orange-500/10 text-orange-600 border-orange-500/20'
-                  }`}>
-                    {order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">出库门店</span>
-                  <span className="flex items-center gap-1 font-semibold text-foreground">
-                    <Store size={13} className="text-blue-500/80" />
-                    {parsed.shopName || order.shopName || "未知门店"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">出库时间</span>
-                  <span className="flex items-center gap-1 font-mono text-foreground font-medium">
-                    <Clock size={13} className="text-muted-foreground/50" />
-                    {format(new Date(order.date), 'yyyy-MM-dd HH:mm:ss', { locale: zhCN })}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Block: Platform & Shipping Info */}
-            <div className="space-y-4 p-4 sm:p-5 rounded-2xl glass-card">
-              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.12em] mb-2 flex items-center gap-1.5">
-                <Tag size={12} className="text-primary/70" />
-                渠道与配送
-              </h3>
-              
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">平台渠道</span>
-                  {platformMeta ? (
-                    <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black shadow-xs", platformMeta.className)}>
-                      <span className="inline-flex h-5 w-5 items-center justify-center shrink-0">
-                        <Image
-                          src={platformMeta.iconSrc}
-                          alt={platformMeta.name}
-                          width={20}
-                          height={20}
-                          className="h-5 w-5 object-cover"
-                          unoptimized
-                        />
+            <div className="grid grid-cols-2 gap-3">
+              {/* 流水号与平台渠道集成卡片 (完美复刻订单列表的平台+流水号集成Badge形式) */}
+              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3.5 rounded-xl transition-all duration-300 shadow-sm dark:shadow-none flex items-center justify-between group">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                    <FileText size={12} className="text-blue-500 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span>流水号与平台</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    {platformMeta ? (
+                      <span className={cn("inline-flex h-7 items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black border shadow-xs whitespace-nowrap", platformMeta.className)}>
+                        <span className="inline-flex h-3.5 w-3.5 items-center justify-center shrink-0">
+                          <Image
+                            src={platformMeta.iconSrc}
+                            alt={platformMeta.name}
+                            width={14}
+                            height={14}
+                            className="h-3.5 w-3.5 object-cover"
+                            unoptimized
+                          />
+                        </span>
+                        <span>
+                          {parsed.serialNum 
+                            ? `${platformMeta.name} #${parsed.serialNum}` 
+                            : `${platformMeta.name} #${order.id.slice(-6).toUpperCase()}`}
+                        </span>
                       </span>
-                      <span>{platformMeta.name}</span>
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground/60">手动登记</span>
-                  )}
-                </div>
-
-                <div className="flex justify-between items-center gap-4">
-                  <span className="text-muted-foreground shrink-0">平台单号</span>
-                  {parsed.platformId ? (
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-mono text-xs text-foreground truncate select-all">{parsed.platformId}</span>
-                      <button
-                        onClick={() => handleCopy(parsed.platformId!, "platformId")}
-                        className="p-1 rounded text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground shrink-0 transition-colors"
-                        title="复制平台单号"
-                      >
-                        {copiedField === "platformId" ? <Check size={11} className="text-green-500" /> : <Copy size={11} />}
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground/40">-</span>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">配送地址</span>
-                    {parsed.address && (
-                      <button
-                        onClick={() => handleCopy(parsed.address!, "address")}
-                        className="flex items-center gap-1 text-[11px] text-primary hover:underline transition-all font-semibold"
-                      >
-                        {copiedField === "address" ? <Check size={11} className="text-green-500" /> : <Copy size={11} />}
-                        <span>复制</span>
-                      </button>
+                    ) : (
+                      <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
+                        {parsed.serialNum ? `#${parsed.serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
+                      </span>
                     )}
                   </div>
-                  {parsed.address ? (
-                    <div className="flex items-start gap-1.5 mt-1 p-2.5 rounded-xl bg-black/5 dark:bg-black/20 text-xs text-foreground leading-relaxed break-all border border-black/5 dark:border-white/5">
-                      <MapPin size={12} className="text-primary shrink-0 mt-0.5" />
-                      <span>{parsed.address}</span>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground/40 text-right">-</span>
-                  )}
                 </div>
+
+              </div>
+
+              {/* 出库类型 (col-span-1 平行) */}
+              {(() => {
+                const typeConfig = {
+                  Sale: { label: '销售出库', color: 'from-blue-500/10 to-cyan-500/5 text-blue-600 dark:text-cyan-400 border-blue-200 dark:border-cyan-500/30' },
+                  Sample: { label: '领用出库', color: 'from-purple-500/10 to-pink-500/5 text-purple-600 dark:text-pink-400 border-purple-200 dark:border-pink-500/30' },
+                  Return: { label: '退货出库', color: 'from-amber-500/10 to-orange-500/5 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30' },
+                  Loss: { label: '损耗出库', color: 'from-rose-500/10 to-red-500/5 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30' }
+                };
+                const activeType = typeConfig[order.type as keyof typeof typeConfig] || { label: '其他出库', color: 'from-slate-500/10 to-slate-500/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/30' };
+                return (
+                  <div className="col-span-1 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                      <Tag size={12} className="text-pink-500 dark:text-pink-400 group-hover:scale-110 transition-transform" />
+                      <span>出库类型</span>
+                    </div>
+                    <div className="mt-1">
+                      <span className={cn("inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold border bg-gradient-to-br shadow-xs", activeType.color)}>
+                        {activeType.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 出库门店 (col-span-1 平行) */}
+              <div className="col-span-1 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                  <Store size={12} className="text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+                  <span>出库门店</span>
+                </div>
+                <div className="font-bold text-xs text-slate-900 dark:text-white truncate mt-0.5" title={parsed.shopName || order.shopName || "未知门店"}>
+                  {parsed.shopName || order.shopName || "未知门店"}
+                </div>
+              </div>
+
+              {/* 出库时间 (col-span-2) */}
+              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                  <Clock size={12} className="text-emerald-500 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                  <span>出库时间</span>
+                </div>
+                <div className="font-mono text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                  {format(new Date(order.date), 'yyyy-MM-dd HH:mm:ss', { locale: zhCN })}
+                </div>
+              </div>
+
+              {/* 平台订单号 (col-span-2 独立一行全宽平铺，右置复制) */}
+              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group flex items-center justify-between gap-4 shadow-sm dark:shadow-none">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                    <FileText size={12} className="text-cyan-500 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
+                    <span>平台订单号</span>
+                  </div>
+                  <div className="font-mono text-xs text-slate-900 dark:text-white truncate font-bold mt-0.5 select-all" title={parsed.platformId || "-"}>
+                    {parsed.platformId || "-"}
+                  </div>
+                </div>
+                {parsed.platformId && (
+                  <button
+                    onClick={() => handleCopy(parsed.platformId!, "platformId")}
+                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-all shrink-0 self-end mb-0.5"
+                    title="复制平台订单号"
+                  >
+                    {copiedField === "platformId" ? <Check size={12} className="text-emerald-500 dark:text-emerald-400 animate-bounce" /> : <Copy size={12} />}
+                  </button>
+                )}
+              </div>
+
+              {/* 配送地址 (去除累赘嵌套黑框，右置一键复制，与上面的平台订单号完美对称) */}
+              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group flex items-center justify-between gap-4 shadow-sm dark:shadow-none">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                    <MapPin size={12} className="text-rose-500 dark:text-rose-400 group-hover:scale-110 transition-transform" />
+                    <span>配送地址</span>
+                  </div>
+                  <div className="font-bold text-xs text-slate-900 dark:text-white leading-relaxed break-all mt-0.5">
+                    {parsed.address || "-"}
+                  </div>
+                </div>
+                {parsed.address && (
+                  <button
+                    onClick={() => handleCopy(parsed.address!, "address")}
+                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-all shrink-0 self-end mb-0.5"
+                    title="复制配送地址"
+                  >
+                    {copiedField === "address" ? <Check size={12} className="text-emerald-500 dark:text-emerald-400 animate-bounce" /> : <Copy size={12} />}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -197,21 +211,32 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
           {(parsed.userNote || isReturned) && (
             <div className="space-y-4">
               {parsed.userNote && (
-                <div className="p-4 sm:p-5 rounded-2xl border border-primary/10 bg-primary/5 dark:bg-primary/10">
-                  <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.12em] mb-1">用户备注</h4>
-                  <p className="text-xs font-semibold text-foreground leading-relaxed">
-                    {parsed.userNote}
-                  </p>
+                <div className="p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.03)] flex gap-3">
+                  <div className="p-2 h-fit rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 shrink-0">
+                    <FileText size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">用户备注</h4>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed break-words">
+                      {parsed.userNote}
+                    </p>
+                  </div>
                 </div>
               )}
               {isReturned && (
-                <div className="p-4 sm:p-5 rounded-2xl border border-destructive/15 bg-destructive/5 dark:bg-destructive/10 flex items-start gap-2.5">
-                  <ArrowLeftRight className="text-destructive shrink-0 mt-0.5" size={15} />
-                  <div>
-                    <h4 className="text-[10px] font-bold text-destructive uppercase tracking-[0.12em] mb-0.5">退回对冲详情</h4>
-                    <p className="text-xs text-foreground/80 leading-relaxed">
+                <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(244,63,94,0.03)] flex gap-3">
+                  <div className="p-2 h-fit rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 shrink-0">
+                    <ArrowLeftRight size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-[10px] font-black text-rose-500 dark:text-rose-400 uppercase tracking-widest mb-0.5">退回对冲详情</h4>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed break-words">
                       该笔交易已进行财务对冲并恢复库存。
-                      {returnReason && <span className="block mt-1.5 font-bold text-destructive">退回原因: {returnReason}</span>}
+                      {returnReason && (
+                        <span className="block mt-1.5 font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded w-fit text-[10px] break-all">
+                          退回原因: {returnReason}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -219,72 +244,74 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
             </div>
           )}
 
-          {/* Product Items Table */}
+          {/* Product Items Section */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-foreground flex items-center gap-2 tracking-[0.06em]">
-              <ShoppingBag size={14} className="text-primary" />
-              出库商品明细 ({order.items.length} 种, 共 {totalQuantity} 件)
+            <h3 className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-2 tracking-widest uppercase">
+              <ShoppingBag size={14} className="text-blue-500 dark:text-blue-400" />
+              出库商品明细
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-black/[0.05] dark:border-white/5">
+                {order.items.length} 种 · 共 {totalQuantity} 件
+              </span>
             </h3>
             
-            <div className="glass-card rounded-2xl overflow-hidden">
-              <table className="w-full text-left border-collapse table-auto text-xs">
-                <thead>
-                  <tr className="border-b border-black/5 dark:border-white/5 bg-black/2 dark:bg-white/2 text-muted-foreground text-[10px] font-bold uppercase tracking-[0.1em]">
-                    <th className="px-3 sm:px-5 py-3 w-full">商品</th>
-                    <th className="px-3 sm:px-5 py-3 text-center whitespace-nowrap">规格/SKU</th>
-                    <th className="px-3 sm:px-5 py-3 text-center whitespace-nowrap">出库数量</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                  {order.items.map((item: OutboundOrderItem) => {
-                    const name = item.shopProduct?.name || item.product?.name || '未知商品';
-                    const img = item.shopProduct?.image || item.product?.image;
-                    const sku = item.shopProduct?.sku || item.product?.sku || '-';
-                    
-                    return (
-                      <tr key={item.id} className="hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
-                        <td className="px-3 sm:px-5 py-3">
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="relative w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl overflow-hidden bg-white dark:bg-black/20 flex items-center justify-center border border-black/5 dark:border-white/5">
-                              {img ? (
-                                <Image src={img} className="object-cover" alt="" fill sizes="40px" />
-                              ) : (
-                                <ShoppingBag size={16} className="text-muted-foreground/30" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-foreground truncate max-w-[120px] sm:max-w-[240px]" title={name}>
-                                {name}
-                              </p>
-                              {item.shopProduct?.shopName && (
-                                <span className="inline-block mt-0.5 px-1 py-0.2 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                  {item.shopProduct.shopName}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 sm:px-5 py-3 text-center font-mono text-[11px] text-muted-foreground whitespace-nowrap">
-                          {sku}
-                        </td>
-                        <td className="px-3 sm:px-5 py-3 text-center font-black text-primary sm:text-sm whitespace-nowrap">
-                          x{item.quantity}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            {/* Products Card List */}
+            <div className="space-y-2.5">
+              {order.items.map((item: OutboundOrderItem) => {
+                const name = item.shopProduct?.name || item.product?.name || '未知商品';
+                const img = item.shopProduct?.image || item.product?.image;
+                const sku = item.shopProduct?.sku || item.product?.sku || '-';
+                
+                return (
+                  <div 
+                    key={item.id} 
+                    className="flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/10 hover:border-black/[0.1] dark:hover:border-white/20 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-300 hover:-translate-y-0.5 group shadow-xs dark:shadow-none"
+                  >
+                    {/* Left: Product Info */}
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                      <div className="relative w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-900 flex items-center justify-center border border-black/[0.08] dark:border-white/15 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                        {img ? (
+                          <Image src={img} className="object-cover" alt="" fill sizes="48px" />
+                        ) : (
+                          <ShoppingBag size={18} className="text-slate-400 dark:text-slate-500" />
+                        )}
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        {/* 商品名称折行限制 line-clamp-2，以完美消化长商品名并减少空白区域 */}
+                        <p className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white leading-snug line-clamp-2 max-w-[280px] sm:max-w-[420px]" title={name}>
+                          {name}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {item.shopProduct?.shopName && (
+                            <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              {item.shopProduct.shopName}
+                            </span>
+                          )}
+                          <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 bg-slate-200/50 dark:bg-white/5 px-2 py-0.5 rounded border border-black/[0.04] dark:border-white/5">
+                            SKU: {sku}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Quantity Badge */}
+                    <div className="shrink-0 flex items-center pl-2">
+                      <div className="font-mono text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-1.2 rounded-full shadow-sm dark:shadow-[0_0_15px_rgba(16,185,129,0.05)]">
+                        x{item.quantity}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 sm:px-8 py-4 sm:py-5 border-t border-black/5 dark:border-white/5 bg-transparent flex justify-end">
+        <div className="px-5 sm:px-8 py-4 sm:py-5 border-t border-black/[0.05] dark:border-white/5 bg-transparent flex justify-end">
           <button 
             onClick={onClose}
-            className="px-5 sm:px-6 py-2 bg-black text-white dark:bg-white dark:text-black hover:opacity-90 rounded-full text-xs font-black transition-all hover:scale-105 active:scale-95 shadow-lg shadow-black/10"
+            className="px-6 py-2.5 bg-slate-900 text-white hover:bg-slate-800 dark:bg-gradient-to-b dark:from-slate-100 dark:to-slate-200 dark:hover:from-white dark:hover:to-slate-100 dark:text-slate-900 font-black text-xs rounded-full transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-lg dark:shadow-[0_4px_20px_rgba(255,255,255,0.08)] cursor-pointer"
           >
             关闭详情
           </button>

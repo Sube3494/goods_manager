@@ -247,6 +247,7 @@ model User {
   deviceSessions     UserDeviceSession[]
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
   batches            ProductBatch[]
+  dailyPromotionExpenses DailyPromotionExpense[]
 }
 
 model UserDeviceSession {
@@ -748,4 +749,19 @@ model ProductBatch {
   @@index([expirationDate])
   @@index([purchaseOrderItemId])
   @@index([userId])
+}
+model DailyPromotionExpense {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime
+  amount          Float    @default(0)
+  amountMeituan   Float    @default(0)
+  amountJingdong  Float    @default(0)
+  amountTaobao    Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }

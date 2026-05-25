@@ -31,7 +31,6 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import {
-  doesAutoPickOrderRequirePickConfirmation,
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
@@ -115,16 +114,18 @@ function readIntegrationConfigResponse(data: unknown): AutoPickIntegrationConfig
     maiyatianCookie: String(payload.maiyatianCookie || ""),
     maiyatianShopMappings: Array.isArray(payload.maiyatianShopMappings) ? payload.maiyatianShopMappings : [],
     selfDeliveryTiming: normalizeSelfDeliveryTiming(payload.selfDeliveryTiming),
+    defaultBrushCommission: typeof payload.defaultBrushCommission === "number" ? payload.defaultBrushCommission : 0,
   };
 }
 
-function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "pluginBaseUrl" | "inboundApiKey" | "maiyatianCookie" | "maiyatianShopMappings" | "selfDeliveryTiming">) {
+function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "pluginBaseUrl" | "inboundApiKey" | "maiyatianCookie" | "maiyatianShopMappings" | "selfDeliveryTiming" | "defaultBrushCommission">) {
   return JSON.stringify({
     pluginBaseUrl: String(config.pluginBaseUrl || ""),
     inboundApiKey: String(config.inboundApiKey || ""),
     maiyatianCookie: String(config.maiyatianCookie || ""),
     maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : [],
     selfDeliveryTiming: normalizeSelfDeliveryTiming(config.selfDeliveryTiming),
+    defaultBrushCommission: typeof config.defaultBrushCommission === "number" ? config.defaultBrushCommission : 0,
   });
 }
 
@@ -541,10 +542,6 @@ function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDea
   return firstTimeMatch?.[1]?.trim() || "-";
 }
 
-function isSubscribeOrder(order: Pick<AutoPickOrder, "isSubscribe" | "isPickup">) {
-  return Boolean(order.isSubscribe) && !order.isPickup;
-}
-
 function MetricCard({
   label,
   value,
@@ -562,6 +559,173 @@ function MetricCard({
     </div>
   );
 }
+
+type PromotionPlatformAmounts = {
+  amountMeituan: number;
+  amountJingdong: number;
+  amountTaobao: number;
+};
+
+const PROMOTION_PLATFORM_ROWS: { key: keyof PromotionPlatformAmounts; label: string; icon: string }[] = [
+  { key: "amountMeituan", label: "美团", icon: "/platform/美团.svg" },
+  { key: "amountJingdong", label: "京东", icon: "/platform/京东.svg" },
+  { key: "amountTaobao", label: "淘宝", icon: "/platform/淘宝.svg" },
+];
+
+function PromotionEditModal({
+  platforms,
+  date,
+  onSave,
+  onClose,
+}: {
+  platforms: PromotionPlatformAmounts;
+  date: string;
+  onSave: (vals: PromotionPlatformAmounts) => Promise<boolean>;
+  onClose: () => void;
+}) {
+  const [vals, setVals] = useState<PromotionPlatformAmounts>({ ...platforms });
+  const [isSaving, setIsSaving] = useState(false);
+  const total = vals.amountMeituan + vals.amountJingdong + vals.amountTaobao;
+
+  const setField = (key: keyof PromotionPlatformAmounts, raw: string) => {
+    const v = parseFloat(raw);
+    setVals((prev) => ({ ...prev, [key]: isNaN(v) ? 0 : Math.max(0, v) }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    const ok = await onSave(vals);
+    setIsSaving(false);
+    if (ok) onClose();
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-100000 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98">
+        {/* 头部 */}
+        <div className="flex items-start justify-between gap-3 px-6 pt-6 pb-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费录入</div>
+            <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">{date}</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground dark:border-white/10 dark:bg-white/4"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* 三平台输入 */}
+        <div className="px-6 flex flex-col gap-3">
+          {PROMOTION_PLATFORM_ROWS.map((row, i) => (
+            <label key={row.key} className="flex items-center gap-3 rounded-2xl border border-black/8 bg-black/2 px-4 dark:border-white/10 dark:bg-white/3 focus-within:ring-2 focus-within:ring-primary/12 focus-within:border-primary/30 transition-all">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={row.icon}
+                alt={row.label}
+                className="h-5 w-5 shrink-0 rounded-md object-contain"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+              <span className="w-10 shrink-0 text-sm font-semibold text-foreground">{row.label}</span>
+              <span className="text-sm font-bold text-muted-foreground">¥</span>
+              <input
+                autoFocus={i === 0}
+                type="number"
+                step="0.01"
+                min="0"
+                value={vals[row.key] === 0 ? "" : String(vals[row.key])}
+                onChange={(e) => setField(row.key, e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSave(); else if (e.key === "Escape") onClose(); }}
+                disabled={isSaving}
+                placeholder="0.00"
+                className="h-12 flex-1 bg-transparent text-sm font-semibold text-foreground outline-none placeholder:text-muted-foreground/50"
+              />
+            </label>
+          ))}
+        </div>
+
+        {/* 合计 + 按钮 */}
+        <div className="mt-5 flex items-center justify-between gap-3 border-t border-black/6 dark:border-white/8 px-6 py-4">
+          <div className="text-sm text-muted-foreground">
+            合计 <span className="text-lg font-black text-foreground">¥{total.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="h-10 px-4 rounded-xl border border-black/8 bg-white/85 text-sm font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="h-10 px-5 rounded-xl bg-foreground text-sm font-black text-background transition-all hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-black flex items-center gap-2"
+            >
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              保存
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function PromotionMetricCard({
+  amount,
+  platforms,
+  date,
+  onSave,
+}: {
+  amount: number;
+  platforms: PromotionPlatformAmounts;
+  date: string;
+  onSave: (vals: PromotionPlatformAmounts) => Promise<boolean>;
+}) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsMounted(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <>
+      <div className="group relative rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 transition-all duration-300">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-black text-primary hover:underline cursor-pointer"
+          >
+            录入/编辑
+          </button>
+        </div>
+        <div
+          onClick={() => setIsModalOpen(true)}
+          className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground cursor-pointer hover:opacity-85 transition-opacity duration-200"
+        >
+          ¥{amount.toFixed(2)}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">{date} 推广费录入</p>
+      </div>
+
+      {isMounted && isModalOpen && (
+        <PromotionEditModal
+          platforms={platforms}
+          date={date}
+          onSave={onSave}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
 
 function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted"> }) {
   const display = getDisplayStatus(order);
@@ -1387,6 +1551,7 @@ function IntegrationModal({
               </div>
             </div>
 
+
             <div className="rounded-[20px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1546,7 +1711,29 @@ function IntegrationModal({
               </div>
             </div>
 
-            <div className="lg:col-start-1 lg:row-start-4">
+            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-4 lg:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">自动推送刷单佣金</div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">订单自动同步刷单时，系统将采用此处设定的佣金金额。</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={integrationConfig.defaultBrushCommission ?? 0}
+                  onChange={(event) => onChange({ ...integrationConfig, defaultBrushCommission: parseFloat(event.target.value) || 0 })}
+                  placeholder="例如 3.0"
+                  className="h-11 w-full bg-transparent text-sm font-medium outline-none"
+                />
+                <span className="text-sm text-muted-foreground shrink-0 pr-1">元 / 单</span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">同步时手动挑单的初始佣金也将默认读取该值。</p>
+            </div>
+
+            <div className="lg:col-start-1 lg:row-start-5">
               <ActionButton
                 label={isTestingPlugin ? "测试中..." : "测试脚本"}
                 icon={isTestingPlugin ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -1555,7 +1742,7 @@ function IntegrationModal({
               />
             </div>
 
-            <div className="lg:col-start-2 lg:row-start-4">
+            <div className="lg:col-start-2 lg:row-start-5">
               <ActionButton
                 label={isTestingCookie ? "测试中..." : "测试 Cookie"}
                 icon={isTestingCookie ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -1570,25 +1757,11 @@ function IntegrationModal({
   );
 }
 
-function BrushSyncPickerModal({
-  orders,
-  selectedIds,
-  isSubmitting,
-  modalRef,
-  onClose,
-  onToggle,
-  onSetSelected,
-  onConfirm,
-}: {
-  orders: AutoPickOrder[];
-  selectedIds: string[];
-  isSubmitting: boolean;
-  modalRef: React.RefObject<HTMLDivElement | null>;
-  onClose: () => void;
-  onToggle: (id: string) => void;
-  onSetSelected: (ids: string[]) => void;
-  onConfirm: () => void;
-}) {
+function BrushSyncPickerModal({ orders, selectedIds, isSubmitting, modalRef, onClose, onToggle, onSetSelected, onConfirm, integrationConfig, }: { orders: AutoPickOrder[]; selectedIds: string[]; isSubmitting: boolean; modalRef: React.RefObject<HTMLDivElement | null>; onClose: () => void; onToggle: (id: string) => void; onSetSelected: (ids: string[]) => void; onConfirm: (commission: number) => void; integrationConfig: AutoPickIntegrationConfig; }) {
+
+  const [commission, setCommission] = useState<string>(
+    String(integrationConfig.defaultBrushCommission > 0 ? integrationConfig.defaultBrushCommission : 0)
+  );
   const [query, setQuery] = useState("");
   const filteredOrders = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -1736,9 +1909,24 @@ function BrushSyncPickerModal({
           </div>
         </div>
 
-        <div className="border-t border-black/6 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] dark:border-white/6 sm:px-6 sm:py-4 sm:pb-4">
+        <div className="border-t border-black/6 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] dark:border-white/6 sm:px-6 sm:py-4 sm:pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-muted-foreground">已选 <span className="font-black text-foreground">{selectedCount}</span> 单</div>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-muted-foreground">已选 <span className="font-black text-foreground">{selectedCount}</span> 单</div>
+              <div className="flex items-center gap-1.5 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-white/5">
+                <span className="text-xs text-muted-foreground shrink-0">佣金</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={commission}
+                  onChange={(e) => setCommission(e.target.value)}
+                  className="h-9 w-20 bg-transparent text-sm font-medium outline-none text-center"
+                  placeholder="0"
+                />
+                <span className="text-xs text-muted-foreground shrink-0">元/单</span>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
             <button
               type="button"
@@ -1749,7 +1937,7 @@ function BrushSyncPickerModal({
             </button>
             <button
               type="button"
-              onClick={onConfirm}
+              onClick={() => onConfirm(parseFloat(commission) || 0)}
               disabled={selectedCount === 0 || isSubmitting}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-foreground px-4 text-sm font-black text-background transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
             >
@@ -1805,6 +1993,68 @@ export default function OrdersPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [promotionAmount, setPromotionAmount] = useState(0);
+  const [promotionPlatforms, setPromotionPlatforms] = useState<PromotionPlatformAmounts>({
+    amountMeituan: 0,
+    amountJingdong: 0,
+    amountTaobao: 0,
+  });
+
+  const effectivePromotionDate = useMemo(() => {
+    return activeTab === "today" ? todayDate : (startDate || todayDate);
+  }, [activeTab, startDate, todayDate]);
+
+  const fetchPromotionExpense = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/promotion?date=${effectivePromotionDate}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        const meituan = data.amountMeituan ?? 0;
+        const jingdong = data.amountJingdong ?? 0;
+        const taobao = data.amountTaobao ?? 0;
+        setPromotionPlatforms({ amountMeituan: meituan, amountJingdong: jingdong, amountTaobao: taobao });
+        setPromotionAmount(data.amount ?? (meituan + jingdong + taobao));
+      }
+    } catch (error) {
+      console.error("Failed to fetch promotion amount:", error);
+    }
+  }, [effectivePromotionDate]);
+
+  useEffect(() => {
+    fetchPromotionExpense();
+  }, [fetchPromotionExpense]);
+
+  const handleSavePromotionExpense = async (vals: PromotionPlatformAmounts) => {
+    try {
+      const res = await fetch("/api/promotion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: effectivePromotionDate,
+          amountMeituan: vals.amountMeituan,
+          amountJingdong: vals.amountJingdong,
+          amountTaobao: vals.amountTaobao,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const meituan = data.amountMeituan ?? vals.amountMeituan;
+        const jingdong = data.amountJingdong ?? vals.amountJingdong;
+        const taobao = data.amountTaobao ?? vals.amountTaobao;
+        setPromotionPlatforms({ amountMeituan: meituan, amountJingdong: jingdong, amountTaobao: taobao });
+        setPromotionAmount(data.amount ?? (meituan + jingdong + taobao));
+        showToast(`${effectivePromotionDate} 推广费已保存`, "success");
+        return true;
+      } else {
+        showToast("保存失败，请重试", "error");
+        return false;
+      }
+    } catch (error) {
+      console.error("Failed to save promotion expense:", error);
+      showToast("网络请求失败", "error");
+      return false;
+    }
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -1829,6 +2079,7 @@ export default function OrdersPage() {
     maiyatianCookie: "",
     maiyatianShopMappings: [],
     selfDeliveryTiming: createDefaultSelfDeliveryTiming(),
+    defaultBrushCommission: 0,
   });
   const [maiyatianShops, setMaiyatianShops] = useState<AutoPickMaiyatianShop[]>([]);
   const [localShops, setLocalShops] = useState<LocalShopOption[]>([]);
@@ -1846,6 +2097,7 @@ export default function OrdersPage() {
     maiyatianCookie: "",
     maiyatianShopMappings: [],
     selfDeliveryTiming: createDefaultSelfDeliveryTiming(),
+    defaultBrushCommission: 0,
   }));
   const [savedMappingsDigest, setSavedMappingsDigest] = useState(() => serializeMaiyatianMappings({
     maiyatianShopMappings: [],
@@ -1917,6 +2169,7 @@ export default function OrdersPage() {
         maiyatianCookie: nextConfig.maiyatianCookie,
         maiyatianShopMappings: nextConfig.maiyatianShopMappings,
         selfDeliveryTiming: nextConfig.selfDeliveryTiming,
+        defaultBrushCommission: nextConfig.defaultBrushCommission,
       }));
       setSavedMappingsDigest(serializeMaiyatianMappings({
         maiyatianShopMappings: nextConfig.maiyatianShopMappings,
@@ -2280,17 +2533,7 @@ export default function OrdersPage() {
       if (!response.ok) {
         throw new Error(data?.error || "保存对接配置失败");
       }
-
-      const savedConfig = readIntegrationConfigResponse(data);
-      setIntegrationConfig(savedConfig);
-      setSavedIntegrationDigest(serializeIntegrationConfig({
-        pluginBaseUrl: savedConfig.pluginBaseUrl,
-        inboundApiKey: savedConfig.inboundApiKey,
-        maiyatianCookie: savedConfig.maiyatianCookie,
-        maiyatianShopMappings: savedConfig.maiyatianShopMappings,
-        selfDeliveryTiming: savedConfig.selfDeliveryTiming,
-      }));
-      setSavedMappingsDigest(serializeMaiyatianMappings({
+      const savedConfig = readIntegrationConfigResponse(data); setIntegrationConfig(savedConfig); setSavedIntegrationDigest(serializeIntegrationConfig({ pluginBaseUrl: savedConfig.pluginBaseUrl, inboundApiKey: savedConfig.inboundApiKey, maiyatianCookie: savedConfig.maiyatianCookie, maiyatianShopMappings: savedConfig.maiyatianShopMappings, selfDeliveryTiming: savedConfig.selfDeliveryTiming, defaultBrushCommission: savedConfig.defaultBrushCommission })); setSavedMappingsDigest(serializeMaiyatianMappings({
         maiyatianShopMappings: savedConfig.maiyatianShopMappings,
       }));
       if (!options?.silent) {
@@ -2498,7 +2741,7 @@ export default function OrdersPage() {
     }
   };
 
-  const syncBrushOrders = async (targetIds?: string[]) => {
+  const syncBrushOrders = async (targetIds?: string[], commission?: number) => {
     const scopedIds = Array.isArray(targetIds) ? targetIds.filter(Boolean) : [];
     if (scopedIds.length === 0) {
       showToast("请先选择要同步刷单的订单", "error");
@@ -2522,7 +2765,7 @@ export default function OrdersPage() {
       const response = await fetch("/api/orders/sync-brush", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orders: targetOrders }),
+        body: JSON.stringify({ orders: targetOrders, commission: commission ?? 0 }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -2808,13 +3051,15 @@ export default function OrdersPage() {
               </button>
             </div>
 
-            <div className="grid items-start gap-3 lg:grid-cols-3">
+            <div className="grid items-start gap-3 lg:grid-cols-3 xl:grid-cols-4">
               <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                   <div className="min-w-0">
                     <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
                     <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{overviewOrderCount}</div>
-                    <p className="mt-2 text-xs text-muted-foreground">{activeTab === "today" ? "今日订单分布" : (shop === "all" ? `当前筛选共 ${meta.total} 单` : `当前筛选共 ${meta.total} 单，分类为已加载店铺部分`)}</p>
+                    {activeTab !== "today" && (
+                      <p className="mt-2 text-xs text-muted-foreground">{shop === "all" ? `当前筛选共 ${meta.total} 单` : `当前筛选共 ${meta.total} 单，分类为已加载店铺部分`}</p>
+                    )}
                   </div>
                   <div className="flex min-w-24.5 max-w-31.5 flex-col items-stretch gap-1">
                     <div className="inline-flex items-center justify-between rounded-full border border-sky-500/18 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400">
@@ -2834,13 +3079,19 @@ export default function OrdersPage() {
               </div>
               <MetricCard
                 label="商家实收"
-                value={toCurrency(displayedSummary.receivedAmount)}
+                value={toCurrency(displayedSummary.receivedAmount - promotionAmount)}
                 hint={`有效订单 ${displayedSummary.validOrderCount} 单`}
               />
               <MetricCard
                 label="总配送费"
                 value={toCurrency(displayedSummary.totalDeliveryFee)}
                 hint={activeTab === "today" ? "今日订单汇总" : (shop === "all" ? "当前筛选汇总" : "当前已加载店铺汇总")}
+              />
+              <PromotionMetricCard
+                amount={promotionAmount}
+                platforms={promotionPlatforms}
+                date={effectivePromotionDate}
+                onSave={handleSavePromotionExpense}
               />
             </div>
 
@@ -3045,7 +3296,8 @@ export default function OrdersPage() {
               onClose={() => setIsBrushSyncPickerOpen(false)}
               onToggle={toggleBrushSyncSelection}
               onSetSelected={setSelectedBrushOrderIds}
-              onConfirm={() => void syncBrushOrders(selectedBrushOrderIds)}
+              integrationConfig={integrationConfig}
+              onConfirm={(commission) => void syncBrushOrders(selectedBrushOrderIds, commission)}
             />,
             document.body
           )

@@ -23,7 +23,7 @@ function Panel({
   actionMobileStack?: boolean;
 }) {
   return (
-    <section className={cn("rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5", className)}>
+    <section className={cn("rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 sm:p-5", className)}>
       <div className={cn("mb-4 flex gap-4", actionMobileStack ? "flex-col sm:flex-row sm:items-start sm:justify-between" : "items-start justify-between")}>
         <div className="min-w-0">
           <h2 className="text-base font-black tracking-tight text-foreground sm:text-lg">{title}</h2>
@@ -48,7 +48,7 @@ function HeroMetric({
   tone?: "default" | "danger" | "success";
 }) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-[20px] border border-black/8 bg-white/80 px-3.5 py-3.5 dark:border-white/10 dark:bg-white/[0.05] sm:px-4 sm:py-4">
+    <div className="min-w-0 overflow-hidden rounded-[20px] border border-black/8 bg-white/80 px-3.5 py-3.5 dark:border-white/10 dark:bg-white/5 sm:px-4 sm:py-4">
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
       <div
         className={cn(
@@ -75,7 +75,7 @@ function CompactMetric({
   tone?: "default" | "danger" | "success";
 }) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-[18px] border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04] sm:px-4 sm:py-3.5">
+    <div className="min-w-0 overflow-hidden rounded-[18px] border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/4 sm:px-4 sm:py-3.5">
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
       <div
         className={cn(
@@ -204,7 +204,7 @@ export function DataOverview({
 
   return (
     <div className="space-y-5 sm:space-y-8">
-      <section className="rounded-[24px] border border-black/8 bg-zinc-50/45 px-4 py-3 shadow-xs dark:border-white/10 dark:bg-white/[0.04]">
+      <section className="rounded-[24px] border border-black/8 bg-zinc-50/45 px-4 py-3 shadow-xs dark:border-white/10 dark:bg-white/4">
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <div className="col-span-1 space-y-2">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">店铺范围</label>
@@ -263,7 +263,7 @@ export function DataOverview({
 
       <section className="overflow-hidden rounded-[28px] border border-black/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.97),rgba(244,244,245,0.82)_45%,rgba(240,253,244,0.72)_100%)] p-3.5 shadow-sm dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),rgba(255,255,255,0.04)_40%,rgba(16,185,129,0.06)_100%)] sm:p-5 lg:p-6">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-          <div className="min-w-0 rounded-[24px] border border-black/8 bg-white/86 p-4 shadow-xs dark:border-white/10 dark:bg-white/[0.05] sm:p-5">
+          <div className="min-w-0 rounded-[24px] border border-black/8 bg-white/86 p-4 shadow-xs dark:border-white/10 dark:bg-white/5 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">经营概述</div>
@@ -291,14 +291,14 @@ export function DataOverview({
             </div>
           </div>
 
-          <div className="min-w-0 rounded-[24px] border border-black/8 bg-black/[0.02] p-4 shadow-xs dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
+          <div className="min-w-0 rounded-[24px] border border-black/8 bg-black/2 p-4 shadow-xs dark:border-white/10 dark:bg-white/4 sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">订单结构</div>
                 <div className="mt-2 overflow-hidden text-[clamp(1.8rem,2.8vw,2.7rem)] font-black leading-none tracking-tight text-foreground">{int(totalOrders)}</div>
                 <p className="mt-2 text-sm text-muted-foreground">当前范围累计订单</p>
               </div>
-              <div className="rounded-2xl border border-black/8 bg-white/85 px-3 py-2 text-right dark:border-white/10 dark:bg-white/[0.05]">
+              <div className="rounded-2xl border border-black/8 bg-white/85 px-3 py-2 text-right dark:border-white/10 dark:bg-white/5">
                 <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">真单占比</div>
                 <div className="mt-1 text-lg font-black text-emerald-500">{percent(trueShare)}</div>
               </div>
@@ -353,14 +353,14 @@ export function DataOverview({
               values: matrix?.columns.map((col) => ({ platform: col.platform, value: col.totalCount })) || [],
             },
           ].map((row) => (
-            <div key={row.key} className="rounded-[18px] border border-black/6 bg-black/[0.02] px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.03]">
+            <div key={row.key} className="rounded-[18px] border border-black/6 bg-black/2 px-4 py-3.5 dark:border-white/10 dark:bg-white/3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-black text-foreground">{row.label}</span>
                 <span className={cn("text-lg font-black tabular-nums", row.tone)}>{int(row.total)}</span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {row.values.map((item) => (
-                  <div key={`${row.key}-${item.platform}`} className="rounded-[14px] border border-black/6 bg-white/70 px-3 py-2 dark:border-white/10 dark:bg-white/[0.04]">
+                  <div key={`${row.key}-${item.platform}`} className="rounded-[14px] border border-black/6 bg-white/70 px-3 py-2 dark:border-white/10 dark:bg-white/4">
                     <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{item.platform}</div>
                     <div className={cn("mt-1 text-base font-black tabular-nums", row.tone)}>{int(item.value)}</div>
                   </div>
@@ -372,7 +372,7 @@ export function DataOverview({
 
         <div className="hidden overflow-hidden rounded-[22px] border border-black/6 dark:border-white/10 sm:block">
           <table className="w-full table-fixed text-sm">
-            <thead className="bg-black/[0.025] dark:bg-white/[0.03]">
+            <thead className="bg-black/2.5 dark:bg-white/3">
               <tr className="text-muted-foreground">
                 <th className="px-3 py-3 text-left font-bold">类型</th>
                 {matrix?.columns.map((col) => (
@@ -402,7 +402,7 @@ export function DataOverview({
                 ))}
                 <td className="px-2 py-4 text-center font-black tabular-nums text-red-500">{int(matrix?.brushOrderTotal)}</td>
               </tr>
-              <tr className="border-t border-black/6 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]">
+              <tr className="border-t border-black/6 bg-black/2 dark:border-white/10 dark:bg-white/3">
                 <td className="px-3 py-4 font-black">合计</td>
                 {matrix?.columns.map((col) => (
                   <td key={`total-${col.platform}`} className="px-2 py-4 text-center font-black tabular-nums">
@@ -419,7 +419,7 @@ export function DataOverview({
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel
           title="每日盈亏"
-          subtitle="净利润与刷单支出"
+          subtitle="每日净利润走势"
           action={(
             <CustomSelect
               value={profitPlatform}
@@ -442,9 +442,8 @@ export function DataOverview({
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={52} />
-                <Tooltip content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润", brushExpense: "刷单支出" }} />} />
-                <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="#22c55e" fill="url(#netProfitFill)" strokeWidth={2.5} />
-                <Line type="monotone" dataKey="brushExpense" name="brushExpense" stroke="#ef4444" strokeWidth={2.2} dot={false} />
+                <Tooltip content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润" }} />} />
+                <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="#22c55e" fill="url(#netProfitFill)" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
