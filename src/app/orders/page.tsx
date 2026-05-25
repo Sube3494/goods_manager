@@ -203,9 +203,20 @@ function summarizeOrders(orders: AutoPickOrder[]) {
       acc.receivedAmount += Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
       acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
       acc.validOrderCount += 1;
+      acc.totalDeliveryFee += getDeliveryFee(order.delivery);
+    } else {
+      const platformStr = String(order.platform || "").trim().toLowerCase();
+      const deliveryObj = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+        ? order.delivery as Record<string, unknown>
+        : {};
+      const logisticNameStr = String(deliveryObj.logisticName || deliveryObj.logistic_name || "").trim().toLowerCase();
+      const isMeituanRelated = platformStr.includes("美团") || platformStr.includes("meituan") ||
+                               logisticNameStr.includes("美团") || logisticNameStr.includes("meituan");
+      if (!isMeituanRelated) {
+        acc.totalDeliveryFee += getDeliveryFee(order.delivery);
+      }
     }
     acc.itemCount += getItemCount(order.items);
-    acc.totalDeliveryFee += getDeliveryFee(order.delivery);
     return acc;
   }, {
     receivedAmount: 0,

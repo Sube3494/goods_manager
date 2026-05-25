@@ -558,6 +558,18 @@ export async function GET(request: NextRequest) {
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
         productCost = FinanceMath.add(productCost, orderCostYuan);
+      } else {
+        const platformStr = String(order.platform || "").trim().toLowerCase();
+        const deliveryObj = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+          ? order.delivery as Record<string, unknown>
+          : {};
+        const logisticNameStr = String(deliveryObj.logisticName || deliveryObj.logistic_name || "").trim().toLowerCase();
+        const isMeituanRelated = platformStr.includes("美团") || platformStr.includes("meituan") ||
+                                 logisticNameStr.includes("美团") || logisticNameStr.includes("meituan");
+        if (!isMeituanRelated) {
+          const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+          deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
+        }
       }
     });
 
@@ -698,6 +710,23 @@ export async function GET(request: NextRequest) {
           }
           if (platformPoint) {
             platformPoint.productCost = FinanceMath.add(platformPoint.productCost, orderCostYuan);
+          }
+        }
+      } else {
+        const platformStr = String(order.platform || "").trim().toLowerCase();
+        const deliveryObj = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+          ? order.delivery as Record<string, unknown>
+          : {};
+        const logisticNameStr = String(deliveryObj.logisticName || deliveryObj.logistic_name || "").trim().toLowerCase();
+        const isMeituanRelated = platformStr.includes("美团") || platformStr.includes("meituan") ||
+                                 logisticNameStr.includes("美团") || logisticNameStr.includes("meituan");
+        if (!isMeituanRelated) {
+          const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+          if (point) {
+            point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
+          }
+          if (platformPoint) {
+            platformPoint.deliveryExpense = FinanceMath.add(platformPoint.deliveryExpense, deliveryYuan);
           }
         }
       }
