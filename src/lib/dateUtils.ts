@@ -106,8 +106,8 @@ export function parseAsShanghaiTime(input: string | Date | null | undefined): Da
       normalized = normalized.replace(' ', 'T');
     }
     
-    // 追加时区
-    const shanghaiStr = normalized + '+08:00';
+    // 追加时区 (强行当做 UTC 写入，以顺应 PostgreSQL 不带时区 TIMESTAMP 的字面值读取特性)
+    const shanghaiStr = normalized + 'Z';
     const d = new Date(shanghaiStr);
     
     if (!isNaN(d.getTime())) return d;
