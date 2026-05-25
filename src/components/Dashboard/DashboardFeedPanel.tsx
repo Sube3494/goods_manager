@@ -31,7 +31,7 @@ interface Props {
 }
 
 const cardClass =
-  "h-full w-full overflow-hidden rounded-[30px] border border-black/8 bg-white/75 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04]";
+  "h-full w-full overflow-hidden rounded-[30px] border border-black/8 bg-white/75 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4";
 
 const tabClass =
   "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors";
@@ -114,7 +114,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
           return (
             <div
               key={item.id}
-              className="flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/[0.03] dark:hover:border-white/12 dark:hover:bg-white/[0.05] sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
+              className="flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20 sm:h-10 sm:w-10 sm:rounded-lg">
@@ -163,7 +163,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
       return (
         <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center gap-3 rounded-[16px] border border-black/6 bg-white/75 px-3 py-2.5 animate-pulse dark:border-white/8 dark:bg-white/[0.04]">
+            <div key={i} className="flex items-center gap-3 rounded-[16px] border border-black/6 bg-white/75 px-3 py-2.5 animate-pulse dark:border-white/8 dark:bg-white/4">
               <div className="h-12 w-12 shrink-0 rounded-lg border border-black/3 bg-black/3 dark:border-white/5 dark:bg-white/5" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 w-2/3 rounded-full bg-black/3 dark:bg-white/5" />
@@ -194,14 +194,14 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, delay: index * 0.03 }}
-              className="group flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/[0.03] dark:hover:border-white/12 dark:hover:bg-white/[0.05] sm:flex-row sm:items-center sm:gap-3 sm:py-2.5"
+              className="group flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5"
             >
               <div className="flex items-start gap-3">
                 <div className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border text-[10px] font-black tabular-nums shadow-inner",
                   index < 3
                     ? "border-amber-500/25 bg-amber-500/12 text-amber-500"
-                    : "border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+                    : "border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4"
                 )}>
                   {index + 1}
                 </div>
@@ -260,7 +260,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
 
       <div className="flex items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
         <div className="min-w-0 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4">
             {headerMeta.icon}
           </div>
           <div className="min-w-0">
@@ -278,7 +278,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
             <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
           </button>
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+          <span className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/3 px-2.5 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/4">
             <Trophy size={11} />
             {headerMeta.actionLabel}
           </span>
@@ -286,14 +286,14 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
       </div>
 
       <div className="border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
-        <div className="inline-flex max-w-full rounded-full border border-black/8 bg-black/[0.03] p-1 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="inline-flex max-w-full rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
           <button
             type="button"
             onClick={() => setActiveTab("inbound")}
             className={cn(
               `${tabClass} min-w-[88px] justify-center`,
               activeTab === "inbound"
-                ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/[0.08]"
+                ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
                 : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
             )}
           >
@@ -305,7 +305,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
             className={cn(
               `${tabClass} min-w-[88px] justify-center`,
               activeTab === "top"
-                ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/[0.08]"
+                ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
                 : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
             )}
           >
