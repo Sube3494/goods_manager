@@ -55,11 +55,11 @@ const PurchaseItemRow = memo(({
         const p = products.find(g => g.id === itemKey);
         const supplierId = item.shopProduct?.supplierId || item.supplierId;
         return {
-            imageUrl: item.shopProduct?.image || item.image || p?.image,
-            productName: item.shopProduct?.productName || item.shopProduct?.name || p?.name || "加载中...",
-            productSku: item.shopProduct?.sku || p?.sku,
+            imageUrl: item.shopProduct?.image || item.image || item.product?.image || p?.image,
+            productName: item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || p?.name || "加载中...",
+            productSku: item.shopProduct?.sku || item.product?.sku || p?.sku,
             supplierName: suppliers.find(s => s.id === supplierId)?.name,
-            remark: item.shopProduct?.remark || p?.remark
+            remark: item.shopProduct?.remark || item.product?.remark || p?.remark
         };
     }, [item, products, suppliers, itemKey]);
 
@@ -1014,7 +1014,7 @@ export function PurchaseOrderModal({
 
                                     <div className="rounded-2xl border border-border/50 bg-white/70 px-4 py-3 shadow-sm dark:bg-white/5">
                                         <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                            <Calendar size={13} /> {readOnly ? "订单时间" : "下单时间"}
+                                            <Calendar size={13} /> {effectiveReadOnly ? "订单时间" : "下单时间"}
                                         </div>
                                         <div className="mt-2 text-sm font-semibold text-foreground">
                                             {formatLocalDateTime(formData.date)}
@@ -1026,7 +1026,7 @@ export function PurchaseOrderModal({
                                     <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                         <MapPin size={13} /> 收货地址
                                     </div>
-                                    {readOnly ? (
+                                    {effectiveReadOnly ? (
                                         <div className="flex min-h-[42px] items-center text-sm font-semibold text-foreground">
                                             {formData.shippingAddress || "未设置地址"}
                                         </div>
@@ -1071,9 +1071,9 @@ export function PurchaseOrderModal({
                                 </div>
                                 <div className="flex flex-col gap-2">
                                     <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                                        <Calendar size={14} /> {formData.type === "Inbound" ? "入库时间" : (readOnly ? "订单时间" : "时间")}
+                                        <Calendar size={14} /> {formData.type === "Inbound" ? "入库时间" : (effectiveReadOnly ? "订单时间" : "时间")}
                                     </label>
-                                    <div className={`w-full h-[42px] ${readOnly ? "pointer-events-none opacity-80" : ""}`}>
+                                    <div className={`w-full h-[42px] ${effectiveReadOnly ? "pointer-events-none opacity-80" : ""}`}>
                                         <DatePicker 
                                             value={formData.date}
                                             onChange={(val) => setFormData({...formData, date: val})}
@@ -1095,7 +1095,7 @@ export function PurchaseOrderModal({
                                 <label className="text-sm font-bold text-foreground flex items-center gap-2 shrink-0">
                                     <ListOrdered size={16} className="text-primary" /> {formData.type === "Inbound" ? "入库项目" : "采购项目"} {formData.items.length > 0 && `(${formData.items.length})`}
                                 </label>
-                                {formData.items.length > 0 && !readOnly && (
+                                {formData.items.length > 0 && !effectiveReadOnly && (
                                     <div className="flex items-center gap-1">
                                         {batchMode ? (
                                             <>
@@ -1191,13 +1191,13 @@ export function PurchaseOrderModal({
                         <div className="space-y-3 bg-muted/20 dark:bg-white/5 p-2 sm:p-4 rounded-3xl border border-border/50">
                             {/* Desktop Header */}
                             {formData.items.length > 0 && (
-                                <div className={`hidden sm:grid ${batchMode ? (readOnly ? 'grid-cols-[24px_1fr_100px_120px_120px]' : 'grid-cols-[24px_1fr_80px_120px_120px_40px]') : (readOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_80px_120px_120px_40px]')} gap-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/10 mb-2`}>
+                                <div className={`hidden sm:grid ${batchMode ? (effectiveReadOnly ? 'grid-cols-[24px_1fr_100px_120px_120px]' : 'grid-cols-[24px_1fr_80px_120px_120px_40px]') : (effectiveReadOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_80px_120px_120px_40px]')} gap-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/10 mb-2`}>
                                     {batchMode && <div />}
                                     <div className="text-left pl-2">商品信息 <span className="text-red-500">*</span></div>
                                     <div className="text-center">数量 <span className="text-red-500">*</span></div>
                                     <div className="text-center">单价 <span className="text-red-500">*</span></div>
                                     <div className="text-right pr-4">小计</div>
-                                    {!readOnly && <div></div>}
+                                    {!effectiveReadOnly && <div></div>}
                                 </div>
                             )}
 
@@ -1244,9 +1244,9 @@ export function PurchaseOrderModal({
                                         <Plus size={20} />
                                     </div>
                                     <div className="flex flex-col text-center">
-                                        <span className="text-sm font-bold">{readOnly ? "暂无采购项目" : "添加采购项目"}</span>
+                                        <span className="text-sm font-bold">{effectiveReadOnly ? "暂无采购项目" : "添加采购项目"}</span>
                                         <span className="text-xs opacity-60">
-                                            {readOnly ? "该采购单中不包含任何商品明细" : "点击开始为这张采购单添加商品项目"}
+                                            {effectiveReadOnly ? "该采购单中不包含任何商品明细" : "点击开始为这张采购单添加商品项目"}
                                         </span>
                                     </div>
                                 </button>
@@ -1279,7 +1279,7 @@ export function PurchaseOrderModal({
                                         setShippingFeeInput(val);
                                         setFormData(prev => ({...prev, shippingFees: parseFloat(val) || 0}));
                                     }}
-                                    readOnly={readOnly}
+                                    readOnly={effectiveReadOnly}
                                     colorClass="hover:border-orange-500/30"
                                 />
                                 <FeePill 
@@ -1291,7 +1291,7 @@ export function PurchaseOrderModal({
                                         setExtraFeeInput(val);
                                         setFormData(prev => ({...prev, extraFees: parseFloat(val) || 0}));
                                     }}
-                                    readOnly={readOnly}
+                                    readOnly={effectiveReadOnly}
                                     colorClass="hover:border-blue-500/30"
                                 />
                                 <FeePill 
@@ -1303,7 +1303,7 @@ export function PurchaseOrderModal({
                                         setDiscountInput(val);
                                         setFormData(prev => ({...prev, discountAmount: parseFloat(val) || 0}));
                                     }}
-                                    readOnly={readOnly}
+                                    readOnly={effectiveReadOnly}
                                     colorClass="bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40"
                                 />
                             </div>

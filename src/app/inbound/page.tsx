@@ -110,7 +110,7 @@ function InboundContent() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/purchases?type=Inbound");
+      const res = await fetch("/api/purchases?type=Inbound&page=1&pageSize=99999&_ts=" + Date.now());
       if (res.ok) {
         const data = await res.json();
         setInbounds(Array.isArray(data) ? data : (data.items || []));
