@@ -4700,9 +4700,18 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
   }
 
   const paymentAmount = FinanceMath.add(Number(order.actualPaid || 0) / 100, 0);
-  const receivedBase = Number.isFinite(Number(order.expectedIncome))
-    ? Number(order.expectedIncome || 0)
-    : Number(order.actualPaid || 0);
+  
+  let receivedBase: number;
+  if (String(order.platform || "").includes("京东")) {
+    const settledBase = Math.max(0, Math.round(Number(order.actualPaid || 0) - 100));
+    const platformCommission = Math.max(0, Math.round(settledBase * 0.06));
+    receivedBase = Math.max(0, settledBase - platformCommission);
+  } else {
+    receivedBase = Number.isFinite(Number(order.expectedIncome))
+      ? Number(order.expectedIncome || 0)
+      : Number(order.actualPaid || 0);
+  }
+  
   const receivedAmount = FinanceMath.add(receivedBase / 100, 0);
   const brushImportNote = options?.forceInclude === true ? "人工纳入刷单" : "推送导入";
   let commission = 0;
