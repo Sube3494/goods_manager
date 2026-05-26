@@ -1324,7 +1324,9 @@ export function ProductFormModal({
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <div className="text-[10px] text-muted-foreground">成本: ￥{item.costPrice}</div>
+                                                         <div className="text-[10px] text-muted-foreground">
+                                                             单价: ￥{item.costPrice} | 合计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}
+                                                         </div>
                                                     </div>
                                                 </div>
 
