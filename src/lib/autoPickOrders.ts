@@ -4699,7 +4699,13 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     : Number(order.actualPaid || 0);
   const receivedAmount = FinanceMath.add(receivedBase / 100, 0);
   const brushImportNote = options?.forceInclude === true ? "人工纳入刷单" : "推送导入";
-  const commission = options?.commission !== undefined ? options.commission : 0;
+  let commission = 0;
+  if (options?.commission !== undefined) {
+    commission = options.commission;
+  } else {
+    const integrationConfig = await getAutoPickIntegrationConfigByUserId(userId);
+    commission = integrationConfig.defaultBrushCommission ?? 0;
+  }
 
   if (existing && options?.overwriteExisting === true) {
     const brushOrder = await prisma.$transaction(async (tx) => {
