@@ -2274,7 +2274,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     throw new Error(`Invalid auto-pick order payload: ${getInvalidAutoPickOrderPayloadReason(payload)}`);
   }
 
-  const orderTime = parseAsShanghaiTime(normalized.orderTime);
+  let orderTime = parseAsShanghaiTime(normalized.orderTime);
+  // 智能防错时区纠偏：如果订单的发生时间（orderTime）比当前服务器时间还要晚 1 小时以上，
+  // 说明在客户端插件采集推送或格式化时重复累加了 8 小时。我们在此主动减去 8 小时进行回退校准，
+  // 从而彻底根治由于时区溢出导致今天下午/晚上的订单在界面上跨天显示为“明天”的严重 Bug。
+  if (orderTime.getTime() > Date.now() + 60 * 60 * 1000) {
+    orderTime = new Date(orderTime.getTime() - 8 * 60 * 60 * 1000);
+  }
   const normalizedItems = normalized.items
     ?.filter((item) => item.productName && Number(item.quantity) > 0)
     .map((item) => ({
