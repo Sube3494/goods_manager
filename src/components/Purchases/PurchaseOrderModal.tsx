@@ -212,7 +212,7 @@ const PurchaseItemRow = memo(({
                     {readOnly ? (
                         <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono text-foreground">
                             <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
-                            {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                            {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                     ) : (
                         <div className="relative w-full">
@@ -234,7 +234,7 @@ const PurchaseItemRow = memo(({
                     {readOnly ? (
                         <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs overflow-hidden whitespace-nowrap">
                             <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
-                            {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                            {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                     ) : (
                         <div className="relative w-full">

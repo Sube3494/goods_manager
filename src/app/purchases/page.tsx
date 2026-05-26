@@ -991,7 +991,7 @@ function PurchasesContent() {
                     <td className="px-4 py-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center text-foreground font-bold">
                         <span className="mr-0.5 opacity-60">￥</span>
-                        {po.totalAmount.toLocaleString()}
+                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center whitespace-nowrap">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Filter } from "lucide-react";
+import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Filter, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
 import { OutboundDetailModal } from "@/components/Outbound/OutboundDetailModal";
@@ -451,7 +451,10 @@ export default function OutboundPage() {
                               <span>{platformMeta.name}</span>
                             </span>
                           ) : (
-                            <span className="text-[10px] text-muted-foreground/40 font-medium">手动登记</span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 dark:bg-slate-500/20 dark:border-slate-500/30 shadow-xs whitespace-nowrap">
+                              <Pencil size={11} className="shrink-0" />
+                              <span>手动登记</span>
+                            </span>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -582,9 +585,15 @@ export default function OutboundPage() {
                             <span>{serialNum ? `#${serialNum}` : `#${order.id.slice(-4).toUpperCase()}`}</span>
                           </span>
                         ) : (
-                          <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
-                            {serialNum ? `#${serialNum}` : `#${order.id.slice(-4).toUpperCase()}`}
-                          </span>
+                          <>
+                            <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
+                              {serialNum ? `#${serialNum}` : `#${order.id.slice(-4).toUpperCase()}`}
+                            </span>
+                            <span className="inline-flex h-7 items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 dark:bg-slate-500/20 dark:border-slate-500/30 shadow-xs whitespace-nowrap">
+                              <Pencil size={11} className="shrink-0" />
+                              <span>手动登记</span>
+                            </span>
+                          </>
                         )}
 
                         {/* 2. 出库门店 Badge */}

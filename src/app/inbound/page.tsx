@@ -382,7 +382,7 @@ function InboundContent() {
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center font-bold text-sm text-foreground">
                         <span className="mr-0.5 opacity-60">￥</span>
-                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -501,7 +501,7 @@ function InboundContent() {
                     <div className="font-bold text-foreground text-sm flex items-center gap-1">
                         <span className="text-[10px] text-muted-foreground font-normal">金额:</span>
                         <span className="text-[10px] text-muted-foreground">￥</span>
-                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                 </div>
