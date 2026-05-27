@@ -17,6 +17,7 @@ interface UserImportProfile {
 
 type MatchableProduct = {
   id: string;
+  shopProductId?: string | null;
   name: string;
   sku: string | null;
   stock: number;
@@ -419,6 +420,7 @@ export async function POST(req: NextRequest) {
 
         return {
           id: resolvedId,
+          shopProductId: item.id,
           name: item.productName || "未命名商品",
           sku: item.sku,
           stock: item.stock,
@@ -566,7 +568,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 匹配商品库
-        const matchedItems: { productId: string, quantity: number }[] = [];
+        const matchedItems: { productId: string, shopProductId: string | null, quantity: number }[] = [];
         let matchFailed = false;
         for (const item of parsedItems) {
           const shopScopedProducts = shopName
@@ -594,8 +596,10 @@ export async function POST(req: NextRequest) {
             matchFailed = true;
             break;
           }
+          const matchable = product as MatchableProduct;
           matchedItems.push({
-            productId: product.id,
+            productId: matchable.id,
+            shopProductId: matchable.shopProductId || null,
             quantity: item.quantity,
           });
         }
@@ -712,7 +716,7 @@ export async function POST(req: NextRequest) {
               // 查询当前在库有余量的批次总和
               const activeBatches = await tx.purchaseOrderItem.findMany({
                 where: {
-                  productId: item.productId,
+                  ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId }),
                   remainingQuantity: { gt: 0 },
                   purchaseOrder: {
                     userId,
@@ -741,6 +745,7 @@ export async function POST(req: NextRequest) {
                     items: {
                       create: [{
                         productId: item.productId,
+                        shopProductId: item.shopProductId,
                         quantity: batchGap,
                         remainingQuantity: batchGap,
                         costPrice: 0
@@ -762,6 +767,22 @@ export async function POST(req: NextRequest) {
                     where: { id: item.productId },
                     data: { stock: { increment: systemCompensateQty } }
                   });
+                }
+
+                // 对称补齐对应店铺商品的物理库存
+                if (item.shopProductId) {
+                  const currentShopProduct = await tx.shopProduct.findUnique({
+                    where: { id: item.shopProductId },
+                    select: { stock: true }
+                  });
+                  const currentShopStock = currentShopProduct?.stock || 0;
+                  const shopCompensateQty = Math.max(0, item.quantity - currentShopStock);
+                  if (shopCompensateQty > 0) {
+                    await tx.shopProduct.update({
+                      where: { id: item.shopProductId },
+                      data: { stock: { increment: shopCompensateQty } }
+                    });
+                  }
                 }
               }
             }
@@ -791,6 +812,7 @@ export async function POST(req: NextRequest) {
             // 4.3 调用带并发安全锁的 FIFO 出库扣减服务
             await InventoryService.processOutboundFIFO(tx, userId, matchedItems.map(i => ({
               productId: i.productId,
+              shopProductId: i.shopProductId,
               quantity: i.quantity
             })));
           });
