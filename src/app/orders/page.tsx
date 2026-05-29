@@ -1092,57 +1092,66 @@ function OrderCard({
             ) : null}
           </div>
 
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 lg:min-w-110">
+          <div className={cn(
+            "grid gap-2 lg:min-w-110",
+            order.platform === "线下交易"
+              ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
+              : "grid-cols-4 sm:grid-cols-4"
+          )}>
             <ActionButton
               label={expanded ? "收起详情" : "展开详情"}
               icon={expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               onClick={() => onToggleExpanded(order.id)}
-              mobileIconOnly
+              mobileIconOnly={order.platform !== "线下交易"}
               title={expanded ? "收起详情" : "展开详情"}
             />
-            <ActionButton
-              label="同步"
-              title={cancelled ? "订单已取消，不需要再次同步" : undefined}
-              icon={actingId === `${order.id}:sync` ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              onClick={() => onRunAction(order.id, "sync")}
-              disabled={Boolean(actingId) || cancelled}
-              mobileIconOnly
-            />
-            <ActionButton
-              label="自配"
-              icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
-              onClick={() => onRunAction(order.id, "self-delivery")}
-              disabled={Boolean(actingId) || terminal || delivering || pickup}
-              mobileIconOnly
-              title={
-                pickup
-                  ? "到店自取订单不需要发起自配送"
-                  : terminal
-                  ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
-                  : delivering
-                    ? "订单已在配送中，不能重复发起自配"
-                    : undefined
-              }
-            />
-            <ActionButton
-              label={pickup ? "完成取货" : "完成配送"}
-              variant="primary"
-              icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
-              onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
-              disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !order.isMainSystemSelfDelivery))}
-              mobileIconOnly
-              title={
-                pickup
-                  ? (terminal ? (cancelled ? "订单已取消，不能完成取货" : "订单已取货，不能重复完成取货") : undefined)
-                  : terminal
-                    ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
-                    : !order.isMainSystemSelfDelivery
-                      ? "当前是平台骑手配送，不能在主系统直接完成配送"
-                    : !delivering
-                      ? "订单还未进入配送中，不能直接完成配送"
-                      : undefined
-              }
-            />
+            {order.platform !== "线下交易" && (
+              <>
+                <ActionButton
+                  label="同步"
+                  title={cancelled ? "订单已取消，不需要再次同步" : undefined}
+                  icon={actingId === `${order.id}:sync` ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  onClick={() => onRunAction(order.id, "sync")}
+                  disabled={Boolean(actingId) || cancelled}
+                  mobileIconOnly
+                />
+                <ActionButton
+                  label="自配"
+                  icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                  onClick={() => onRunAction(order.id, "self-delivery")}
+                  disabled={Boolean(actingId) || terminal || delivering || pickup}
+                  mobileIconOnly
+                  title={
+                    pickup
+                      ? "到店自取订单不需要发起自配送"
+                      : terminal
+                      ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
+                      : delivering
+                        ? "订单已在配送中，不能重复发起自配"
+                        : undefined
+                  }
+                />
+                <ActionButton
+                  label={pickup ? "完成取货" : "完成配送"}
+                  variant="primary"
+                  icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+                  onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
+                  disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !order.isMainSystemSelfDelivery))}
+                  mobileIconOnly
+                  title={
+                    pickup
+                      ? (terminal ? (cancelled ? "订单已取消，不能完成取货" : "订单已取货，不能重复完成取货") : undefined)
+                      : terminal
+                        ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
+                        : !order.isMainSystemSelfDelivery
+                          ? "当前是平台骑手配送，不能在主系统直接完成配送"
+                        : !delivering
+                          ? "订单还未进入配送中，不能直接完成配送"
+                          : undefined
+                  }
+                />
+              </>
+            )}
           </div>
         </div>
       </div>
