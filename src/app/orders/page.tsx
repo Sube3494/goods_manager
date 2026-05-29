@@ -23,6 +23,7 @@ import {
   TimerReset,
   Truck,
   X,
+  Plus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
@@ -30,6 +31,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
+import { CreateOfflineOrderModal } from "@/components/Orders/CreateOfflineOrderModal";
 import {
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderAbnormalStatus,
@@ -2010,6 +2012,7 @@ export default function OrdersPage() {
     amountJingdong: 0,
     amountTaobao: 0,
   });
+  const [isCreateOfflineOpen, setIsCreateOfflineOpen] = useState(false);
 
   const effectivePromotionDate = useMemo(() => {
     return activeTab === "today" ? todayDate : (startDate || todayDate);
@@ -2625,6 +2628,10 @@ export default function OrdersPage() {
     }
   }, [showToast]);
 
+  useEffect(() => {
+    void fetchLocalShops({ silent: true });
+  }, [fetchLocalShops]);
+
   const fetchMaiyatianShops = useCallback(async () => {
     const cookie = integrationConfig.maiyatianCookie.trim();
     if (!cookie) {
@@ -3006,15 +3013,7 @@ export default function OrdersPage() {
                   {isBulkSyncing ? <Loader2 size={15} className="animate-spin" /> : <ArrowUpRight size={15} />}
                   一键同步
                 </button>
-                <button
-                  type="button"
-                  onClick={() => fetchOrders()}
-                  disabled={isLoading || isRefreshing}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
-                >
-                  {isLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-                  刷新订单
-                </button>
+
                 <button
                   type="button"
                   onClick={openBrushSyncPicker}
@@ -3023,6 +3022,14 @@ export default function OrdersPage() {
                 >
                   {isBulkBrushSyncing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                   同步刷单
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOfflineOpen(true)}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                >
+                  <Plus size={15} />
+                  录入线下
                 </button>
                 <button
                   type="button"
@@ -3296,6 +3303,16 @@ export default function OrdersPage() {
             document.body
           )
         : null}
+
+      {isMounted && isCreateOfflineOpen ? (
+        <CreateOfflineOrderModal
+          shopOptions={localShops}
+          onClose={() => setIsCreateOfflineOpen(false)}
+          onSuccess={() => {
+            void fetchOrders();
+          }}
+        />
+      ) : null}
 
       {isMounted && isBrushSyncPickerOpen
         ? createPortal(

@@ -540,8 +540,9 @@ export async function GET(request: NextRequest) {
       if (!isCancelled) {
         const paidYuan = (order.actualPaid || 0) / 100;
         const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
-        const rate = shopRateMap.get(matchedShopName) ?? 0.06;
-        const commissionYuan = paidYuan * rate;
+        const isOffline = order.platform === "线下交易";
+        const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
+        const commissionYuan = isOffline ? 0 : (paidYuan * rate);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
 
         let orderCostYuan = 0;
@@ -672,8 +673,9 @@ export async function GET(request: NextRequest) {
       if (!isOther) {
         const paidYuan = (order.actualPaid || 0) / 100;
         const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
-        const rate = shopRateMap.get(matchedShopName) ?? 0.06;
-        const commissionYuan = paidYuan * rate;
+        const isOffline = order.platform === "线下交易";
+        const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
+        const commissionYuan = isOffline ? 0 : (paidYuan * rate);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
 
         if (point) {
