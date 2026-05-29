@@ -893,7 +893,7 @@ function OrderCard({
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
-  const pickup = Boolean(order.isPickup) && order.platform !== "线下交易";
+  const pickup = Boolean(order.isPickup) || order.platform === "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal && !pickup;
@@ -939,7 +939,7 @@ function OrderCard({
                       {orderTypeLabel}
                     </span>
                   ) : null}
-                  {pickup ? (
+                  {pickup && order.platform !== "线下交易" ? (
                     <span className="inline-flex h-8 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2.5 text-[13px] font-medium leading-none text-sky-700 dark:text-sky-400">
                       到店自取
                     </span>
@@ -1048,10 +1048,10 @@ function OrderCard({
                 <CheckCheck size={12} />
                 {order.completedAt ? (
                   <>
-                    <span className="truncate sm:hidden">{`${compactCompletedAt} ${pickup ? "自提" : "完成"}`}</span>
-                    <span className="hidden sm:inline">{`${formatLocalDateTime(order.completedAt)} ${pickup ? "已取货" : "已完成"}`}</span>
+                    <span className="truncate sm:hidden">{`${compactCompletedAt} ${pickup && order.platform !== "线下交易" ? "自提" : "完成"}`}</span>
+                    <span className="hidden sm:inline">{`${formatLocalDateTime(order.completedAt)} ${pickup && order.platform !== "线下交易" ? "已取货" : "已完成"}`}</span>
                   </>
-                ) : pickup ? "已取货" : "订单已完成"}
+                ) : pickup && order.platform !== "线下交易" ? "已取货" : "订单已完成"}
               </span>
             ) : null}
             {cancelled ? (
