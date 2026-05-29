@@ -109,6 +109,26 @@ export async function POST(request: NextRequest) {
 
     // 开启数据库事务写入订单
     const order = await prisma.$transaction(async (tx) => {
+      // 计算当天已有的线下订单数量，生成每日递增的流水号
+      const startOfDay = new Date(finalOrderTime);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(finalOrderTime);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const countTodayOffline = await tx.autoPickOrder.count({
+        where: {
+          userId: session.id,
+          platform: "线下交易",
+          orderTime: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+      });
+
+      const dailySequence = countTodayOffline + 1;
+      const defaultAddress = deliveryCents > 0 ? "线下送货上门" : "线下柜台交易";
+
       const newOrder = await tx.autoPickOrder.create({
         data: {
           userId: session.id,
@@ -116,13 +136,14 @@ export async function POST(request: NextRequest) {
           platform: "线下交易",
           orderNo: finalOrderNo,
           orderTime: finalOrderTime,
-          userAddress: userAddress || "线下顾客自提",
+          userAddress: userAddress || defaultAddress,
           shopId: shop.id,
           shopAddress: shop.address || "",
           status: "已完成",
           actualPaid: actualPaidCents,
           expectedIncome: expectedIncomeCents,
           platformCommission: 0,
+          dailyPlatformSequence: dailySequence,
           delivery: {
             sendFee: deliveryCents,
             isOffline: true,

@@ -347,6 +347,9 @@ function getAutoPickSyncSkippedReasonText(raw: unknown) {
 
 function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted">) {
   const baseStatus = getBaseAutoPickStatusDisplay(order.status);
+  if (order.platform === "线下交易") {
+    return baseStatus;
+  }
   if (!order.isPickup) {
     return baseStatus;
   }
@@ -437,6 +440,13 @@ function hasAutoOutboundFailure(order: Pick<AutoPickOrder, "autoOutboundStatus" 
 function getPlatformBadgeMeta(platform?: string | null) {
   const text = String(platform || "").trim();
   const normalized = text.toLowerCase();
+
+  if (normalized.includes("线下交易") || normalized.includes("线下")) {
+    return {
+      iconSrc: "/platform/线下交易.svg",
+      iconAlt: "线下交易",
+    };
+  }
 
   if (normalized.includes("美团")) {
     return {
@@ -883,7 +893,7 @@ function OrderCard({
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
-  const pickup = Boolean(order.isPickup);
+  const pickup = Boolean(order.isPickup) && order.platform !== "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal && !pickup;
