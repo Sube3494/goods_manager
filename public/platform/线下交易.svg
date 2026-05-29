@@ -1,5 +1,34 @@
 <svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-  <rect x="64" y="64" width="896" height="896" rx="200" fill="#10b981" />
-  <path d="M832 384l-272-194.2c-28.4-20.3-67.6-20.3-96 0L192 384c-22.1 15.8-17.7 50.4 9.6 50.4h620.8c27.3 0 31.7-34.6 9.6-50.4z" fill="#ffffff" />
-  <path d="M256 480v320c0 17.7 14.3 32 32 32h160V608h128v224h160c17.7 0 32-14.3 32-32V480H256z" fill="#ffffff" opacity="0.95" />
+  <defs>
+    <!-- 极简渐变：薄荷绿向翠绿渐变 -->
+    <linearGradient id="simpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+
+  <!-- 只有主体图案本身：实心渐变绿双钞票（配纯白细节），无外框，无背景 -->
+  <g>
+    <!-- 1. 下层钞票 (实心渐变绿底 + 纯白细节，低透明度以营造重叠景深) -->
+    <g transform="translate(-40, -40) rotate(-12, 512, 512)" opacity="0.6">
+      <!-- 钞票实心底板 -->
+      <rect x="242" y="362" width="540" height="300" rx="36" fill="url(#simpleGrad)" />
+      <!-- 中心水印圆环 -->
+      <circle cx="512" cy="512" r="64" fill="none" stroke="#FFFFFF" stroke-width="32" />
+      <!-- 左右防伪竖线条 -->
+      <line x1="330" y1="422" x2="330" y2="602" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" />
+      <line x1="694" y1="422" x2="694" y2="602" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" />
+    </g>
+
+    <!-- 2. 上层主钞票 (实心渐变绿底 + 纯白细节，不透明，向右下平移并右倾偏转，主视觉核心) -->
+    <g transform="translate(40, 40) rotate(8, 512, 512)">
+      <!-- 钞票实心底板 -->
+      <rect x="242" y="362" width="540" height="300" rx="36" fill="url(#simpleGrad)" />
+      <!-- 中心水印圆环 -->
+      <circle cx="512" cy="512" r="64" fill="none" stroke="#FFFFFF" stroke-width="32" />
+      <!-- 左右防伪竖线条 -->
+      <line x1="330" y1="422" x2="330" y2="602" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" />
+      <line x1="694" y1="422" x2="694" y2="602" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" />
+    </g>
+  </g>
 </svg>

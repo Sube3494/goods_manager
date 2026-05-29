@@ -436,26 +436,28 @@ export default function OutboundPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {platformMeta ? (
-                            <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] shadow-xs", platformMeta.className)}>
-                              <span className="inline-flex h-4.5 w-4.5 items-center justify-center shrink-0">
-                                <Image
-                                  src={platformMeta.iconSrc}
-                                  alt={platformMeta.name}
-                                  width={18}
-                                  height={18}
-                                  className="h-4.5 w-4.5 object-cover"
-                                  unoptimized
-                                />
+                          <div className="flex items-center justify-center">
+                            {platformMeta ? (
+                              <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] shadow-xs", platformMeta.className)}>
+                                <span className="inline-flex h-4.5 w-4.5 items-center justify-center shrink-0">
+                                  <Image
+                                    src={platformMeta.iconSrc}
+                                    alt={platformMeta.name}
+                                    width={18}
+                                    height={18}
+                                    className="h-4.5 w-4.5 object-cover"
+                                    unoptimized
+                                  />
+                                </span>
+                                <span>{platformMeta.name}</span>
                               </span>
-                              <span>{platformMeta.name}</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 dark:bg-slate-500/20 dark:border-slate-500/30 shadow-xs whitespace-nowrap">
-                              <Pencil size={11} className="shrink-0" />
-                              <span>手动登记</span>
-                            </span>
-                          )}
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 dark:bg-slate-500/20 dark:border-slate-500/30 shadow-xs whitespace-nowrap">
+                                <Pencil size={11} className="shrink-0" />
+                                <span>手动登记</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className={`flex items-center justify-center gap-1.5 text-xs font-mono transition-colors ${isReturned ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
