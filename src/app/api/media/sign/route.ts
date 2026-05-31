@@ -7,8 +7,17 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 export async function GET(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!session || !session.id || !hasPermission(session, "gallery:copy")) {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { id: "system" },
+    });
+    const requireLoginForLightbox = setting?.requireLoginForLightbox ?? false;
+
+    if ((!session || !session.id) && requireLoginForLightbox) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (session?.id && !hasPermission(session, "gallery:copy")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -17,10 +26,6 @@ export async function GET(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "Missing media id" }, { status: 400 });
     }
-
-    const setting = await prisma.systemSetting.findUnique({
-      where: { id: "system" },
-    });
 
     const duration = setting?.shareExpireDuration || 1;
     const unit = setting?.shareExpireUnit || "hours";

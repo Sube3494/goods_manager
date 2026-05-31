@@ -268,18 +268,27 @@ function GalleryContent() {
   const { showToast } = useToast();
   
   // 统一权限拦截与游客引导逻辑
+  const promptLogin = useCallback((callbackUrl?: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "请登录后继续",
+      message: "当前操作需登录后方可使用。",
+      mode: "login",
+      onConfirm: () => {
+        const target = callbackUrl || window.location.pathname;
+        window.location.href = `/login?callbackUrl=${encodeURIComponent(target)}`;
+      },
+    });
+  }, []);
+
   const checkAction = useCallback((permissionKey: "gallery:upload" | "gallery:download" | "gallery:copy", action: () => void) => {
     if (!user) {
-      // 游客身份：引导登录
-      setConfirmConfig({
-        isOpen: true,
-        title: "请登录后继续",
-        message: "当前操作需登录后方可使用。",
-        mode: "login",
-        onConfirm: () => {
-          window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
-        },
-      });
+      if (permissionKey === "gallery:upload" || requireLoginForLightbox) {
+        promptLogin();
+        return;
+      }
+
+      action();
       return;
     }
 
@@ -297,7 +306,7 @@ function GalleryContent() {
     } else {
       showToast("当前账号还没有这个权限", "error");
     }
-  }, [user, isUploadAllowed, showToast]);
+  }, [user, isUploadAllowed, showToast, requireLoginForLightbox, promptLogin]);
   
   // Lightbox Enhancements
   const activeScale = useMotionValue(1);
@@ -1103,16 +1112,8 @@ function GalleryContent() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!user) {
-                    setConfirmConfig({
-                      isOpen: true,
-                      title: "请登录后查看",
-                      message: "当前内容需登录后方可查看。",
-                      mode: "login",
-                      onConfirm: () => {
-                        window.location.href = `/login?callbackUrl=${encodeURIComponent("/gallery/faq")}`;
-                      },
-                    });
+                  if (!user && requireLoginForLightbox) {
+                    promptLogin("/gallery/faq");
                     return;
                   }
 

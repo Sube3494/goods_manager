@@ -65,8 +65,8 @@ function getFaqEntries(faq: { id: string; question: string; answer: string; entr
   ];
 }
 
-function canReadGalleryFaq(session: SessionUser | null) {
-  if (!session?.id) return false;
+function canReadGalleryFaq(session: SessionUser | null, requireLoginForLightbox: boolean) {
+  if (!session?.id) return !requireLoginForLightbox;
   return (
     session.role === "SUPER_ADMIN" ||
     hasPermission(session, "gallery:upload") ||
@@ -125,7 +125,13 @@ async function getVisibleProducts(productIds: string[], session: SessionUser | n
 export async function GET(request: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
-    if (!canReadGalleryFaq(session)) {
+    const settings = await prisma.systemSetting.findUnique({
+      where: { id: "system" },
+      select: { requireLoginForLightbox: true },
+    });
+    const requireLoginForLightbox = settings?.requireLoginForLightbox ?? false;
+
+    if (!canReadGalleryFaq(session, requireLoginForLightbox)) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: session?.id ? 403 : 401 });
     }
 
