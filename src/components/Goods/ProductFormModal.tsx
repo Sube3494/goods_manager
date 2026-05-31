@@ -81,6 +81,7 @@ interface ProductFormModalProps {
   hidePricingFields?: boolean;
   hideStockField?: boolean;
   hideRemarkField?: boolean;
+  hideShelfLifeSection?: boolean;
   disableHistorySection?: boolean;
   showCoverSection?: boolean;
   mainImageUploadEndpoint?: string;
@@ -107,6 +108,7 @@ export function ProductFormModal({
   hidePricingFields = false,
   hideStockField = false,
   hideRemarkField = false,
+  hideShelfLifeSection = false,
   disableHistorySection = false,
   showCoverSection = false,
   mainImageUploadEndpoint,
@@ -1185,7 +1187,8 @@ export function ProductFormModal({
                         </div>
                     )}
 
-                    {/* Shelf Life / 保质期管理 - 始终显示 */}
+                    {/* Shelf Life / 保质期管理 */}
+                    {!hideShelfLifeSection && (
                     <div className="grid grid-cols-2 gap-4">
                         {/* 是否为保质期商品 */}
                         <div className="space-y-2">
@@ -1253,6 +1256,7 @@ export function ProductFormModal({
                             )}
                         </div>
                     </div>
+                    )}
 
                     {/* Inbound History */}
                     {initialData && !disableHistorySection && (

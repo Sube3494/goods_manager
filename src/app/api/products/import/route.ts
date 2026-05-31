@@ -64,10 +64,6 @@ export async function POST(request: Request) {
             
             const remarkText = String(item['备注'] || item.remark || "");
 
-            const isShelfLifeText = String(item['是否管理保质期'] || item['是否保质期管理'] || item['保质期管理'] || item.isShelfLife || "");
-            const isShelfLife = isShelfLifeText === "是" || isShelfLifeText === "true" || isShelfLifeText === "1" ? true : false;
-            const shelfLifeDays = item['保质期天数'] || item['保质期'] || item.shelfLifeDays ? Number(item['保质期天数'] || item['保质期'] || item.shelfLifeDays) : null;
-
             // 2. 解析规格参数 (specs)
             const specs: Record<string, string> = {};
             
@@ -128,8 +124,6 @@ export async function POST(request: Request) {
                     pinyin: name ? generatePinyinSearchText(name) : undefined,
                     isPublic,
                     isDiscontinued,
-                    isShelfLife,
-                    shelfLifeDays: isShelfLife && Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
                     specs: Object.keys(specs).length > 0 ? specs : undefined,
                     ...(remarkText ? { remark: remarkText } : {})
                 };
@@ -300,9 +294,7 @@ export async function POST(request: Request) {
                         isPublic,
                         isDiscontinued,
                         remark: remarkText || undefined,
-                        specs: Object.keys(specs).length > 0 ? specs : undefined,
-                        isShelfLife,
-                        shelfLifeDays: isShelfLife && Number.isFinite(shelfLifeDays) ? shelfLifeDays : null
+                        specs: Object.keys(specs).length > 0 ? specs : undefined
                     }
                 });
 

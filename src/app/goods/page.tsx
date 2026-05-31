@@ -315,8 +315,6 @@ export default function GoodsPage() {
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
     costPrice?: number;
-    isShelfLife?: boolean;
-    shelfLifeDays?: number;
   }) => {
     const count = selectedIds.length;
     try {
@@ -839,7 +837,7 @@ export default function GoodsPage() {
         initialData={editingProduct}
         disableHistorySection={true}
         hideStockField={true}
-        showJdSkuField={true}
+        hideShelfLifeSection={true}
       />
 
       <BatchEditModal 
@@ -849,6 +847,7 @@ export default function GoodsPage() {
         categories={categories}
         suppliers={suppliers}
         selectedCount={selectedIds.length}
+        hideShelfLifeSection={true}
       />
 
       <ConfirmModal 
