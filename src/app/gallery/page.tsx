@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
-import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard, Upload, CircleHelp } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard, Upload } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -1109,22 +1109,6 @@ function GalleryContent() {
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-3">
               <h1 className="text-4xl sm:text-4xl font-bold leading-none tracking-tight text-foreground truncate">实物<span className="text-primary">相册</span></h1>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!user && requireLoginForLightbox) {
-                    promptLogin("/gallery/faq");
-                    return;
-                  }
-
-                  window.location.href = "/gallery/faq";
-                }}
-                className="inline-flex h-9 w-9 sm:w-auto shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-white px-0 sm:px-3 text-sm font-bold leading-none text-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary hover:text-primary-foreground active:scale-95 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20"
-                title="常见问题解答"
-              >
-                <CircleHelp size={17} />
-                <span className="hidden sm:inline">常见问题</span>
-              </button>
             </div>
             <p className="block text-muted-foreground mt-1 sm:mt-2 text-[10px] sm:text-lg truncate max-w-2xl opacity-80">
                 {isUserLoading ? "商品实拍图与细节展示" : user ? (isAdmin ? "仓库实拍、验货详情与内部档案库" : "商品实拍图与细节展示") : "登录可探索更多实拍详情与下载功能"}
