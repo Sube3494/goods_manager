@@ -13,6 +13,13 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 export const metadata: Metadata = {
   title: "腾荣科技",
   description: "腾荣科技专业管理平台",
+  icons: {
+    icon: [
+      { url: "/teng-rong-tech-icon.svg", type: "image/svg+xml" },
+      { url: "/teng-rong-tech-icon-dark.svg", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
+    ],
+    apple: "/teng-rong-tech-icon.svg",
+  },
 };
 
 export const viewport: Viewport = {
