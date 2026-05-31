@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, ArrowLeft, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { BrandLogo } from "@/components/BrandLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import md5 from "blueimp-md5";
 import { canAccessPath, getDefaultAuthorizedPath, SessionUser } from "@/lib/permissions";
@@ -439,13 +440,11 @@ export default function LoginPage() {
               transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
               className="inline-flex items-center justify-center mb-6"
             >
-              <Image 
-                src="/picknote.png" 
-                alt="PickNote 图标" 
-                width={140} 
-                height={50} 
+              <BrandLogo
+                width={140}
+                height={50}
                 priority
-                className="object-contain drop-shadow-md hover:scale-105 transition-transform duration-300" 
+                className="object-contain drop-shadow-md hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
             
@@ -455,7 +454,7 @@ export default function LoginPage() {
               transition={{ delay: 0.3 }}
               className="text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70"
             >
-              PickNote
+              腾荣科技
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0 }}
@@ -909,7 +908,7 @@ export default function LoginPage() {
             className="mt-8 text-center"
         >
             <p className="text-xs text-muted-foreground opacity-60">
-                &copy; {new Date().getFullYear()} PickNote · 此系统仅限授权人员访问
+                &copy; {new Date().getFullYear()} 腾荣科技 · 此系统仅限授权人员访问
             </p>
         </motion.div>
       </motion.div>

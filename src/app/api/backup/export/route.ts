@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="PickNote_Backup_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
+        'Content-Disposition': `attachment; filename="腾荣科技_Backup_${new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).replace(/[-: ]/g, '')}.pnk"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     });

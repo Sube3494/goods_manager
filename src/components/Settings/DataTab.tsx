@@ -479,7 +479,7 @@ export function DataTab({
                     <input type="text" value={webdavUrl} onChange={(e) => { setWebdavUrl(e.target.value); saveSettings({ webdavUrl: e.target.value }, { silent: true }); }} placeholder="https://nas.example.com/dav" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all lg:col-span-2" />
                     <input type="text" value={webdavUser} onChange={(e) => { setWebdavUser(e.target.value); saveSettings({ webdavUser: e.target.value }, { silent: true }); }} placeholder="账号" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
                     <input type="password" value={webdavPassword} onChange={(e) => { setWebdavPassword(e.target.value); saveSettings({ webdavPassword: e.target.value }, { silent: true }); }} placeholder="密码" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
-                    <input type="text" value={webdavPath} onChange={(e) => { setWebdavPath(e.target.value); saveSettings({ webdavPath: e.target.value }, { silent: true }); }} placeholder="/PickNote/Backups" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all lg:col-span-2" />
+                    <input type="text" value={webdavPath} onChange={(e) => { setWebdavPath(e.target.value); saveSettings({ webdavPath: e.target.value }, { silent: true }); }} placeholder="/腾荣科技/Backups" className="h-11 rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all lg:col-span-2" />
                   </div>
                 </motion.div>
               )}
@@ -593,7 +593,7 @@ export function DataTab({
           if (!res.ok) { const err = await res.json(); throw new Error(err.error || "导出失败"); }
           const blob = await res.blob();
           onProgress(100);
-          triggerBlobDownload(blob, `PickNote_备份数据_${new Date().toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(" ", "_").replace(/:/g, "")}.pnk`);
+          triggerBlobDownload(blob, `腾荣科技_备份数据_${new Date().toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(" ", "_").replace(/:/g, "")}.pnk`);
           return;
         }
         const isServerRestore = !backupConfig.file || !("size" in backupConfig.file);

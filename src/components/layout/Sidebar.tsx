@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@/hooks/useUser";
 import md5 from "blueimp-md5";
+import { BrandLogo } from "@/components/BrandLogo";
 
 import { getVisibleNavItems, NavItem } from "@/lib/navigation";
 import { hasPermission, SessionUser } from "@/lib/permissions";
@@ -146,7 +147,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
               title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
             >
               <div className="h-9 w-9 shrink-0">
-                <Image src="/picknote.png" alt="PickNote 图标" width={36} height={36} className="rounded-xl" />
+                <BrandLogo width={36} height={36} className="rounded-xl" />
               </div>
               {!isCollapsed && (
                 <motion.div 
@@ -155,7 +156,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                     className="flex flex-col whitespace-nowrap"
                 >
                     <span className="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70">
-                    PickNote
+                    腾荣科技
                     </span>
                 </motion.div>
               )}

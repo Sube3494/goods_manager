@@ -11,8 +11,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "PickNote",
-  description: "PickNote 专业管理平台",
+  title: "腾荣科技",
+  description: "腾荣科技专业管理平台",
 };
 
 export const viewport: Viewport = {

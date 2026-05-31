@@ -32,7 +32,6 @@ export default function GoodsPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
-  const [isSyncingStandalone, setIsSyncingStandalone] = useState(false);
   
   const [items, setItems] = useState<Product[]>([]);
   const itemsRef = useRef<Product[]>([]);
@@ -130,7 +129,6 @@ export default function GoodsPage() {
         status: selectedStatus,
         supplierId: selectedSupplier,
         sortBy: sortBy,
-        includeShopOnly: "true",
       });
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
@@ -292,7 +290,6 @@ export default function GoodsPage() {
         supplierId: selectedSupplier,
         sortBy: sortBy,
         idsOnly: "true",
-        includeShopOnly: "true",
       });
 
 
@@ -475,7 +472,6 @@ export default function GoodsPage() {
         status: selectedStatus,
         supplierId: selectedSupplier,
         sortBy: sortBy,
-        includeShopOnly: "true",
       });
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
@@ -493,10 +489,10 @@ export default function GoodsPage() {
         // 基础数据
         const baseData: Record<string, string | number | boolean | null | undefined> = {
           "商品名称": g.name,
-          "SKU/店内码": g.sku || "",
+          "SKU/编号": g.sku || "",
           "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
           "进货单价": g.costPrice,
-          "关联门店数": g.assignedShopIds?.length || 0,
+          "媒体数量": Array.isArray(g.gallery) ? g.gallery.length : 0,
           "供应商": g.supplier?.name || "未知供应商",
           "商品图片": g.image || "暂无图片",
           "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
@@ -584,36 +580,6 @@ export default function GoodsPage() {
     }
   }, []);
 
-  const handleSyncStandaloneProducts = useCallback(async () => {
-    try {
-      setIsSyncingStandalone(true);
-      const res = await fetch("/api/products/sync-shop-standalone", {
-        method: "POST",
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        showToast(data?.error || "同步失败", "error");
-        return;
-      }
-
-      const synced = Number(data?.synced || 0);
-      const scanned = Number(data?.scanned || 0);
-      showToast(
-        scanned > 0
-          ? `已同步 ${synced} 条历史自建商品到主库`
-          : "没有需要同步的历史自建商品",
-        "success"
-      );
-      fetchGoods(true);
-    } catch (error) {
-      console.error("Failed to sync standalone shop products:", error);
-      showToast("同步失败", "error");
-    } finally {
-      setIsSyncingStandalone(false);
-    }
-  }, [fetchGoods, showToast]);
-  
-  
   // Sync URL filter to state on mount if needed, or just use state
   // For simplicity and unified UI, we prioritize local state controlled by dropdowns
   
@@ -630,7 +596,7 @@ export default function GoodsPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品模板库</h1>
           <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
-            {isLoading ? "正在从数据库加载模板..." : "统一管理商品模板、SKU 与默认资料"}
+            {isLoading ? "正在从数据库加载资料..." : "统一管理商品资料、SKU 与相册默认信息"}
           </p>
         </div>
         
@@ -654,17 +620,6 @@ export default function GoodsPage() {
                   <Download size={16} className="sm:size-[18px]" />
                   <span className="hidden sm:inline ml-2">导入</span>
                 </button>
-                <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
-                <button
-                  onClick={handleSyncStandaloneProducts}
-                  disabled={isSyncingStandalone}
-                  className="flex items-center justify-center rounded-full w-7 h-7 sm:w-auto sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  title="同步历史单店自建商品"
-                >
-                  <span className="hidden sm:inline">{isSyncingStandalone ? "同步自建中..." : "同步自建"}</span>
-                  <span className="inline sm:hidden text-[10px]">{isSyncingStandalone ? "同步中" : "自建"}</span>
-                </button>
-                <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
                 <button 
                   onClick={handleCreate}
                   className="flex items-center gap-2 rounded-full bg-primary px-3 sm:px-6 h-7 sm:h-8 text-[11px] sm:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all whitespace-nowrap"
@@ -806,7 +761,7 @@ export default function GoodsPage() {
           {filteredGoods.map((product, index) => (
             <GoodsCard 
               key={product.id} 
-              product={{ ...product, stock: product.assignedShopIds?.length || 0 }} 
+              product={{ ...product, stock: Array.isArray(product.gallery) ? product.gallery.length : (product.image ? 1 : 0) }} 
               onEdit={canUpdate ? handleEdit : undefined} 
               onDelete={canDelete ? handleDelete : undefined} 
               lowStockThreshold={0}
@@ -814,8 +769,8 @@ export default function GoodsPage() {
               anySelected={selectedIds.length > 0}
               onToggleSelect={toggleSelectProduct}
               priority={index < 4}
-              stockTitle="关联门店"
-              stockUnit="店"
+              stockTitle="媒体数量"
+              stockUnit="项"
               disableLowStockTone={true}
             />
           ))}

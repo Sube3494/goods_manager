@@ -22,7 +22,6 @@ import { Product, GalleryItem, Category, GalleryGroupSummary } from "@/lib/types
 import { SessionUser } from "@/lib/permissions";
 import { useCallback } from "react";
 import { validateUploadFileSize } from "@/lib/uploadValidation";
-import md5 from "blueimp-md5";
 
 
 interface LightboxMediaItemProps {
@@ -233,7 +232,6 @@ function GalleryContent() {
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [hoveredDev, setHoveredDev] = useState(false);
   // iOS 兼容性状态
   const [copyModalConfig, setCopyModalConfig] = useState<{
     isOpen: boolean;
@@ -1132,55 +1130,6 @@ function GalleryContent() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 -translate-y-1">
-            {/* Developer & Contributors Avatar Group - Capsule Styled */}
-            {(!isUserLoading && (user === null || user.roleProfile?.name === "基础访客")) && (
-              <div 
-                className={cn(
-                    "flex items-center gap-3 px-4 py-2 rounded-full bg-white dark:bg-white/5 border transition-all shadow-sm",
-                    hoveredDev 
-                        ? "border-primary/50 bg-black/5 dark:bg-white/10 shadow-md ring-1 ring-primary/10" 
-                        : "border-border dark:border-white/10"
-                )}
-                onMouseEnter={() => setHoveredDev(true)}
-                onMouseLeave={() => setHoveredDev(false)}
-              >
-                <div className="flex -space-x-4 items-center">
-                  {/* Contributor Avatar */}
-                  <div className="relative h-10 w-10 sm:h-14 sm:w-14 rounded-full border-2 border-background ring-1 ring-zinc-200/50 dark:ring-white/10 overflow-hidden bg-muted transition-transform hover:z-20 hover:scale-110">
-                    <Image 
-                      src="/contributors/member.jpg" 
-                      alt="Contributor" 
-                      fill 
-                      className="object-cover"
-                    />
-                  </div>
-                  {/* Main Developer Avatar */}
-                  <div 
-                    className="relative h-10 w-10 sm:h-14 sm:w-14 rounded-full border-2 border-background ring-1 ring-zinc-200/50 dark:ring-white/10 overflow-hidden bg-muted transition-transform hover:z-20 hover:scale-110 cursor-pointer"
-                    onClick={() => {
-                      if (window.innerWidth >= 640) window.open('https://sube.top', '_blank');
-                    }}
-                    onDoubleClick={() => {
-                      if (window.innerWidth < 640) window.open('https://sube.top', '_blank');
-                    }}
-                    title="PC单击 / 移动端双击访问主页"
-                  >
-                    <Image 
-                      src={`https://cravatar.cn/avatar/${md5("2237608602@qq.com")}?d=mp`} 
-                      alt="Sube"
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-0.5 justify-center items-center">
-                  <span className="text-[10px] sm:text-[13px] font-bold text-foreground/80 tracking-tight leading-none">素材提供 & 开发者</span>
-                  <span className="text-[8px] sm:text-[10px] font-black text-primary tracking-widest opacity-80">贡献者</span>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="flex flex-row gap-2 items-center w-full transition-all mb-6 md:mb-10">

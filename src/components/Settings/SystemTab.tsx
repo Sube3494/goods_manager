@@ -62,7 +62,7 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
               <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" />
               <div>
                 <div className="text-sm font-black text-amber-500/90">系统诊断提示</div>
-                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">PickNote 正在生产环境下运行。请定期执行数据备份，并确认当前版本与运行环境保持在预期状态。</div>
+                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">腾荣科技正在生产环境下运行。请定期执行数据备份，并确认当前版本与运行环境保持在预期状态。</div>
               </div>
             </div>
           </div>
@@ -150,12 +150,12 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
                 <Shield size={20} />
               </div>
               <div>
-                <div className="text-sm font-black text-foreground">PickNote 库存管理系统</div>
-                <div className="text-[11px] text-muted-foreground">Copyright © {new Date().getFullYear()} PickNote. All rights reserved.</div>
+                <div className="text-sm font-black text-foreground">腾荣科技管理系统</div>
+                <div className="text-[11px] text-muted-foreground">Copyright © {new Date().getFullYear()} 腾荣科技. All rights reserved.</div>
               </div>
             </div>
             <div className="mt-4 border-t border-border/40 pt-4 text-xs leading-relaxed text-muted-foreground">
-              <p>本系统为 PickNote 内部业务管理工具，涵盖商品管理、采购结算、库存追踪、实物相册及刷单管理等核心业务场景。</p>
+              <p>本系统为腾荣科技内部业务管理工具，涵盖商品管理、资料维护、实物相册及系统配置等核心业务场景。</p>
               <p className="mt-2">未经授权不得转载、修改或用于商业用途。系统数据仅供授权人员访问，请妥善保管账号凭证。</p>
             </div>
           </div>

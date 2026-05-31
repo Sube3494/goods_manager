@@ -16,6 +16,23 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const sessionUser = (user as unknown as SessionUser | null) ?? null;
+  const isAlbumOnlyPath =
+    pathname === "/login" ||
+    pathname === "/profile" ||
+    pathname === "/goods" ||
+    pathname.startsWith("/goods/") ||
+    pathname === "/categories" ||
+    pathname.startsWith("/categories/") ||
+    pathname === "/gallery" ||
+    pathname.startsWith("/gallery/") ||
+    pathname === "/admin/members" ||
+    pathname.startsWith("/admin/members/") ||
+    pathname === "/admin/roles" ||
+    pathname.startsWith("/admin/roles/") ||
+    pathname === "/settings" ||
+    pathname.startsWith("/settings/") ||
+    pathname === "/media" ||
+    pathname.startsWith("/media/");
 
   const isAuthorized = useMemo(() => {
     // 1. Instant allow for public entry points to prevent flickering while loading user session
@@ -33,6 +50,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     }
 
     if (isLoading) return null;
+    if (!isAlbumOnlyPath) return false;
 
     // Check if the current path is in navItems and requires permission
     // Sort by path length descending to ensure the most specific match is found first
@@ -70,7 +88,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     }
 
     return true;
-  }, [pathname, sessionUser, user, isLoading]);
+  }, [isAlbumOnlyPath, isLoading, pathname, sessionUser, user]);
 
   const currentNavItem = useMemo(() => {
     const sortedNavItems = [...navItems].sort((a, b) => b.href.length - a.href.length);
@@ -88,7 +106,14 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    if (isLoading || !sessionUser || isAuthorized !== false) return;
+    if (isLoading || isAuthorized !== false) return;
+
+    if (!isAlbumOnlyPath) {
+      router.replace("/gallery");
+      return;
+    }
+
+    if (!sessionUser) return;
 
     if (pathname === "/" || !canAccessPath(sessionUser, pathname)) {
       const target = getDefaultAuthorizedPath(sessionUser);
@@ -96,7 +121,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
         router.replace(target);
       }
     }
-  }, [isAuthorized, isLoading, pathname, router, sessionUser]);
+  }, [isAlbumOnlyPath, isAuthorized, isLoading, pathname, router, sessionUser]);
 
   if (isLoading || isAuthorized === null) {
     return null; // Let the parent layout (MainLayout) handle the global loader for better UX

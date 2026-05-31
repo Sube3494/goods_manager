@@ -40,7 +40,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
   const visibleItems = getVisibleNavItems(user as SessionUser | null);
-  const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 1;
+  const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 0;
 
   // Track initialization to prevent initial mount transition
   useEffect(() => {
@@ -183,7 +183,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                                 </div>
                             </div>
                             <p className="text-sm text-muted-foreground font-medium animate-pulse tracking-wide">
-                                正在准备 PickNote 空间...
+                                正在准备腾荣科技空间...
                             </p>
                         </div>
                     ) : (
