@@ -19,22 +19,19 @@ import {
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/components/ui/Toast";
-import { Switch } from "@/components/ui/Switch";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import md5 from "blueimp-md5";
 import { User as UserType, AddressItem } from "@/lib/types";
-import { hasPermission, SessionUser } from "@/lib/permissions";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
   const typedUser = user as unknown as UserType;
   const { showToast } = useToast();
-  const canUseBrushSimulation = hasPermission(user as SessionUser | null, "brush:simulate");
   const [name, setName] = useState("");
   const [addressList, setAddressList] = useState<AddressItem[]>([]);
-  const [brushCommissionBoostEnabled, setBrushCommissionBoostEnabled] = useState(false);
+  const [expandedAddressId, setExpandedAddressId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -45,21 +42,11 @@ export default function ProfilePage() {
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [codeCooldown, setCodeCooldown] = useState(0);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "invalid" | "error">("idle");
-  const [expandedAddressId, setExpandedAddressId] = useState<string | null>(null);
   const initializedRef = useRef(false);
   const lastSavedSnapshotRef = useRef("");
+  const brushCommissionBoostEnabled = false;
 
-  const buildProfileSnapshot = (
-    nextName: string,
-    nextAddressList: AddressItem[],
-    nextBrushCommissionBoostEnabled: boolean,
-    nextCanUseBrushSimulation: boolean
-  ) =>
-    JSON.stringify({
-      name: nextName,
-      shippingAddresses: nextAddressList,
-      ...(nextCanUseBrushSimulation ? { brushCommissionBoostEnabled: nextBrushCommissionBoostEnabled } : {}),
-    });
+  const buildProfileSnapshot = (nextName: string) => JSON.stringify({ name: nextName });
 
   useEffect(() => {
     if (!typedUser) {
@@ -68,74 +55,21 @@ export default function ProfilePage() {
 
     const nextName = typedUser.name || "";
     setName(nextName);
-
-    let nextAddressList: AddressItem[] = [];
-    const addresses = typedUser?.shippingAddresses;
-    if (Array.isArray(addresses)) {
-      nextAddressList = addresses.map((item) => ({
-        ...item,
-        address: item.detailAddress || item.address || "",
-        detailAddress: item.detailAddress || item.address || "",
-        contactName: "",
-        contactPhone: "",
-      }));
-    } else if (typeof typedUser?.shippingAddress === "string" && typedUser.shippingAddress) {
-      nextAddressList = [
-        {
-          id: "legacy",
-          label: "常用地址",
-          address: typedUser.shippingAddress,
-          detailAddress: typedUser.shippingAddress,
-          contactName: "",
-          contactPhone: "",
-          isDefault: true,
-        },
-      ];
-    }
-    setAddressList(nextAddressList);
-    const nextBrushCommissionBoostEnabled = canUseBrushSimulation && Boolean(typedUser.brushCommissionBoostEnabled);
-    setBrushCommissionBoostEnabled(nextBrushCommissionBoostEnabled);
-    setExpandedAddressId((current) => current && nextAddressList.some((item) => item.id === current) ? current : null);
-    lastSavedSnapshotRef.current = buildProfileSnapshot(nextName, nextAddressList, nextBrushCommissionBoostEnabled, canUseBrushSimulation);
+    lastSavedSnapshotRef.current = buildProfileSnapshot(nextName);
     initializedRef.current = true;
     setSaveState("idle");
-  }, [typedUser?.name, typedUser?.shippingAddress, typedUser?.shippingAddresses, typedUser?.brushCommissionBoostEnabled]);
+  }, [typedUser?.name]);
 
-  const saveProfile = async (nextName: string, nextAddressList: AddressItem[], nextBrushCommissionBoostEnabled: boolean, silent = true) => {
-    const snapshot = buildProfileSnapshot(nextName, nextAddressList, nextBrushCommissionBoostEnabled, canUseBrushSimulation);
+  const saveProfile = async (nextName: string, ...args: unknown[]) => {
+    const silent = typeof args[0] === "boolean" ? args[0] : true;
+    const snapshot = buildProfileSnapshot(nextName);
     if (snapshot === lastSavedSnapshotRef.current) {
       setSaveState("saved");
       return true;
     }
 
-    const lastSaved = JSON.parse(lastSavedSnapshotRef.current || "{}") as {
-      name?: string;
-      shippingAddresses?: AddressItem[];
-      brushCommissionBoostEnabled?: boolean;
-    };
+    const lastSaved = JSON.parse(lastSavedSnapshotRef.current || "{}") as { name?: string };
     const hasNameChanged = nextName !== (lastSaved.name || "");
-    const hasAddressesChanged = JSON.stringify(nextAddressList) !== JSON.stringify(lastSaved.shippingAddresses || []);
-    const hasBrushSimulationChanged = nextBrushCommissionBoostEnabled !== Boolean(lastSaved.brushCommissionBoostEnabled);
-
-    if (hasAddressesChanged) {
-      const missingLabel = nextAddressList.find((item) => !String(item.label || "").trim());
-      if (missingLabel) {
-        setSaveState("invalid");
-        if (!silent) {
-          showToast("有门店缺少门店简称", "error");
-        }
-        return false;
-      }
-
-      const missingAddress = nextAddressList.find((item) => !String(item.detailAddress || "").trim());
-      if (missingAddress) {
-        setSaveState("invalid");
-        if (!silent) {
-          showToast("有门店缺少详细地址", "error");
-        }
-        return false;
-      }
-    }
 
     setSaveState("saving");
     setIsSaving(true);
@@ -143,12 +77,6 @@ export default function ProfilePage() {
       const payload: Record<string, unknown> = {};
       if (hasNameChanged) {
         payload.name = nextName;
-      }
-      if (hasAddressesChanged) {
-        payload.shippingAddresses = nextAddressList;
-      }
-      if (canUseBrushSimulation && hasBrushSimulationChanged) {
-        payload.brushCommissionBoostEnabled = nextBrushCommissionBoostEnabled;
       }
 
       const res = await fetch("/api/user/profile", {
@@ -181,9 +109,9 @@ export default function ProfilePage() {
       return;
     }
 
-    const snapshot = buildProfileSnapshot(name, addressList, brushCommissionBoostEnabled, canUseBrushSimulation);
+    const snapshot = buildProfileSnapshot(name);
     setSaveState(snapshot === lastSavedSnapshotRef.current ? "saved" : "idle");
-  }, [name, addressList, brushCommissionBoostEnabled, canUseBrushSimulation]);
+  }, [name]);
 
   useEffect(() => {
     if (codeCooldown <= 0) {
@@ -365,7 +293,7 @@ export default function ProfilePage() {
                         {identityLabel}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">集中管理你的基本资料、账号安全和常用收货地址。</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">集中管理你的基本资料、账号安全和头像设置。</p>
                 </div>
               </div>
 
@@ -373,7 +301,6 @@ export default function ProfilePage() {
                 <div className="flex flex-wrap gap-2 xl:justify-end">
                   <a href="#profile-core" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">基本资料</a>
                   <a href="#security-center" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">账号安全</a>
-                  <a href="#address-library" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">地址库</a>
                   <a
                     href="https://cravatar.cn/"
                     target="_blank"
@@ -429,26 +356,18 @@ export default function ProfilePage() {
                     className="h-12 w-full cursor-not-allowed rounded-2xl border border-border/60 bg-muted/25 px-4 text-sm text-muted-foreground dark:bg-white/5"
                   />
                   <p className="text-[11px] text-muted-foreground/65">邮箱是账号唯一标识，不支持在这里手动修改。</p>
+                  <button
+                    type="button"
+                    onClick={() => void saveProfile(name, false)}
+                    disabled={isSaving || saveState === "saving" || saveState === "saved"}
+                    className="inline-flex h-11 items-center justify-center gap-2 self-start rounded-2xl border border-primary/20 bg-primary/8 px-4 text-sm font-black text-primary transition-all hover:bg-primary/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {isSaving ? <Loader2 size={15} className="animate-spin" /> : null}
+                    保存资料
+                  </button>
                 </div>
               </div>
             </div>
-
-            {canUseBrushSimulation ? (
-              <div className="rounded-[22px] border border-border/60 bg-white/78 px-4 py-3.5 shadow-sm dark:bg-white/[0.05] sm:px-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-black text-foreground">刷单模拟显示</div>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/70">只影响刷单页看到的模拟金额，不会改动订单原始金额。</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className={`text-xs font-bold ${brushCommissionBoostEnabled ? "text-emerald-500" : "text-muted-foreground"}`}>
-                      {brushCommissionBoostEnabled ? "已开启" : "已关闭"}
-                    </span>
-                    <Switch checked={brushCommissionBoostEnabled} onChange={setBrushCommissionBoostEnabled} />
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
         </motion.section>
 
@@ -576,6 +495,7 @@ export default function ProfilePage() {
             </div>
         </motion.section>
 
+        {false ? (
         <motion.section id="address-library" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
           <div className="flex flex-col gap-3 border-b border-border/60 px-3.5 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-4">
             <div>
@@ -719,6 +639,7 @@ export default function ProfilePage() {
             )}
           </div>
         </motion.section>
+        ) : null}
       </div>
     </div>
   );

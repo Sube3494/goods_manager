@@ -114,7 +114,6 @@ export const PERMISSION_TREE = [
     label: "刷单中心",
     children: [
       { key: "brush:manage", label: "刷单中心管理" },
-      { key: "brush:simulate", label: "刷单模拟显示" },
     ]
   },
   {
