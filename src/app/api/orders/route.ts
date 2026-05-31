@@ -110,8 +110,10 @@ type MatchedCatalogProduct = {
   id: string;
   name: string;
   sku?: string | null;
+  jdSkuId?: string | null;
   image?: string | null;
   sourceType: "product" | "shopProduct";
+  shopId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
 };
@@ -127,8 +129,14 @@ type AutoPickSystemMeta = {
   };
 };
 
-function toNormalizedText(value: string | null | undefined) {
+function toAutoPickBaseProductName(value: string | null | undefined) {
   return String(value || "")
+    .split(/[|｜]/, 1)[0]
+    .trim();
+}
+
+function toNormalizedText(value: string | null | undefined) {
+  return toAutoPickBaseProductName(value)
     .trim()
     .replace(/[（(].*?[)）]/g, " ")
     .replace(/\s+/g, "")
@@ -136,14 +144,17 @@ function toNormalizedText(value: string | null | undefined) {
 }
 
 function normalizeSkuDigits(value: string | null | undefined) {
-  const compact = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
-  if (!compact) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) {
     return "";
   }
+
+  const compact = raw.replace(/\s+/g, "");
   const digitsOnly = compact.replace(/\D+/g, "");
   if (digitsOnly) {
     return digitsOnly;
   }
+
   return compact.replace(/[^A-Z0-9]+/g, "");
 }
 
@@ -175,12 +186,10 @@ function splitCompositeSkuSegments(value: string | null | undefined) {
     return [];
   }
 
-  const segments = rawValue
+  return rawValue
     .split(/[+＋]/)
-    .map((segment) => segment.trim())
+    .map((segment) => normalizeSkuDigits(segment))
     .filter(Boolean);
-
-  return segments.length > 0 ? segments : [rawValue];
 }
 
 function readExpectedIncomeFromRawPayload(rawPayload: unknown) {
@@ -253,7 +262,18 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
 }
 
 function isJDPlatform(platform: string | null | undefined) {
-  return String(platform || "").includes("京东");
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized === "jd" || normalized.includes("jingdong") || normalized.includes("jddj") || normalized.includes("京东");
+}
+
+function normalizeShopProductSkuForPlatformMatch(
+  platform: string | null | undefined,
+  item: { sku?: string | null; jdSkuId?: string | null }
+) {
+  if (isJDPlatform(platform)) {
+    return normalizeSkuDigits(item.jdSkuId || item.sku);
+  }
+  return normalizeSkuDigits(item.sku || item.jdSkuId);
 }
 
 function findMappedShopNameFromIntegrationConfig(
@@ -849,15 +869,18 @@ export async function GET(request: NextRequest) {
               OR: [
                 ...(productNames.length > 0 ? [{ productName: { in: productNames } }] : []),
                 ...(productSkuCandidates.length > 0 ? [{ sku: { in: productSkuCandidates } }] : []),
+                ...(productSkuCandidates.length > 0 ? [{ jdSkuId: { in: productSkuCandidates } }] : []),
               ],
             },
             select: {
               id: true,
               sku: true,
+              jdSkuId: true,
               productName: true,
               productImage: true,
               shop: {
                 select: {
+                  id: true,
                   name: true,
                 },
               },
@@ -866,32 +889,16 @@ export async function GET(request: NextRequest) {
       : [];
     perf.lap("shop-product-lookup");
 
-    const shopProductMap = new Map<string, MatchedCatalogProduct[]>();
-    const shopProductSkuMap = new Map<string, MatchedCatalogProduct[]>();
-    for (const item of shopProducts) {
-      const normalizedName = toNormalizedText(item.productName);
-      const mappedProduct = {
-        id: item.id,
-        name: item.productName || "未命名商品",
-        sku: item.sku,
-        image: item.productImage ? storage.resolveUrl(item.productImage) : null,
-        sourceType: "shopProduct",
-        shopName: item.shop?.name || null,
-      } satisfies MatchedCatalogProduct;
-
-      if (normalizedName) {
-        const current = shopProductMap.get(normalizedName) || [];
-        current.push(mappedProduct);
-        shopProductMap.set(normalizedName, current);
-      }
-
-      const normalizedSku = normalizeSkuDigits(item.sku);
-      if (normalizedSku) {
-        const current = shopProductSkuMap.get(normalizedSku) || [];
-        current.push(mappedProduct);
-        shopProductSkuMap.set(normalizedSku, current);
-      }
-    }
+    const mappedShopProducts = shopProducts.map((item) => ({
+      id: item.id,
+      name: item.productName || "未命名商品",
+      sku: item.sku,
+      jdSkuId: item.jdSkuId,
+      image: item.productImage ? storage.resolveUrl(item.productImage) : null,
+      sourceType: "shopProduct" as const,
+      shopId: item.shop?.id || null,
+      shopName: item.shop?.name || null,
+    }));
 
     const enrichedOrders = orders.map((order) => {
       const expectedIncome = typeof order.expectedIncome === "number"
@@ -935,12 +942,13 @@ export async function GET(request: NextRequest) {
         order.rawShopAddress,
         userProfile?.permissions
       );
+      const matchedShopId = lockedResolvedShop?.id || null;
       const matchedShopName = String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName;
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
 
       return {
         ...order,
-        matchedShopId: lockedResolvedShop?.id || null,
+        matchedShopId,
         matchedShopName,
         autoOutboundStatus: autoOutboundMeta.status,
         autoOutboundError: autoOutboundMeta.error,
@@ -948,46 +956,54 @@ export async function GET(request: NextRequest) {
         autoOutboundResolvedAt: autoOutboundMeta.resolvedAt,
         items: order.items.map((item) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
-          const normalizedProductName = toNormalizedText(item.productName);
-          const normalizedSkuCandidates = buildSkuMatchCandidates(item.productNo)
-            .map((candidate) => normalizeSkuDigits(candidate))
-            .filter(Boolean);
           const skuSegments = splitCompositeSkuSegments(item.productNo);
-          const matchedShopProducts = normalizedProductName
-            ? (shopProductMap.get(normalizedProductName) || [])
-            : [];
-          const matchedSkuProducts = Array.from(new Map(
-            normalizedSkuCandidates.flatMap((candidate) => shopProductSkuMap.get(candidate) || [])
-              .map((product) => [product.id, product])
-          ).values());
-          const exactShopProduct = matchedShopProducts.find(
-            (product) => isShopNameMatch(product.shopName, matchedShopName)
-          );
-          const exactSkuProduct = matchedSkuProducts.find(
-            (product) => isShopNameMatch(product.shopName, matchedShopName)
-          );
-          const matchedProduct = manualMatchedProduct || (!normalizedProductName
-            ? (exactSkuProduct || matchedSkuProducts[0] || null)
-            : (exactSkuProduct || exactShopProduct || matchedSkuProducts[0] || matchedShopProducts[0] || null));
+          const normalizedSkuCandidates = skuSegments.length > 0
+            ? skuSegments
+            : [normalizeSkuDigits(item.productNo)].filter(Boolean);
+          const candidatesInMatchedShop = mappedShopProducts.filter((product) => (
+            matchedShopId
+              ? product.shopId === matchedShopId
+              : isShopNameMatch(product.shopName, matchedShopName)
+          ));
+          const resolveStrictSkuMatch = (normalizedSku: string) => {
+            if (!normalizedSku) {
+              return null;
+            }
+
+            const strictCandidates = candidatesInMatchedShop.filter((product) =>
+              normalizeShopProductSkuForPlatformMatch(order.platform, product) === normalizedSku
+            );
+
+            const uniqueCandidateShopIds = Array.from(new Set(
+              strictCandidates
+                .map((product) => String(product.shopId || "").trim())
+                .filter(Boolean)
+            ));
+
+            if (!matchedShopId && uniqueCandidateShopIds.length > 1) {
+              return null;
+            }
+
+            return strictCandidates[0] || null;
+          };
+          const strictMatches = normalizedSkuCandidates
+            .map((candidate) => resolveStrictSkuMatch(candidate))
+            .filter((product): product is typeof mappedShopProducts[number] => Boolean(product));
+          const hasStrictMatchForAllSegments = normalizedSkuCandidates.length > 0
+            && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
+          const matchedProduct = manualMatchedProduct || (hasStrictMatchForAllSegments ? (strictMatches[0] || null) : null);
           const displayItems = manualMatchedProduct
             ? undefined
-            : skuSegments.length > 1
-            ? skuSegments.map((segment) => {
-                const normalizedSegmentSku = normalizeSkuDigits(segment);
-                const segmentCandidates = normalizedSegmentSku
-                  ? Array.from(new Map(
-                      (shopProductSkuMap.get(normalizedSegmentSku) || [])
-                        .map((product) => [product.id, product])
-                    ).values())
-                  : [];
-                const exactSegmentProduct = segmentCandidates.find(
-                  (product) => isShopNameMatch(product.shopName, matchedShopName)
-                );
-                const segmentMatchedProduct = exactSegmentProduct || segmentCandidates[0] || null;
-
+            : normalizedSkuCandidates.length > 1 && hasStrictMatchForAllSegments
+            ? normalizedSkuCandidates.map((candidate) => {
+                const segmentMatchedProduct = resolveStrictSkuMatch(candidate);
                 return {
                   name: segmentMatchedProduct?.name || item.productName || "未命名商品",
-                  sku: segmentMatchedProduct?.sku || segment,
+                  sku: (
+                    isJDPlatform(order.platform)
+                      ? (segmentMatchedProduct?.jdSkuId || segmentMatchedProduct?.sku)
+                      : (segmentMatchedProduct?.sku || segmentMatchedProduct?.jdSkuId)
+                  ) || candidate,
                   image: segmentMatchedProduct?.image || item.thumb || null,
                   quantity: item.quantity,
                 };

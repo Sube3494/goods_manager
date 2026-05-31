@@ -11,7 +11,7 @@ function normalizeText(value: unknown) {
   return value.trim();
 }
 
-export async function resolveOrCreateOwnedCategory(
+export async function resolveOwnedCategory(
   tx: Prisma.TransactionClient,
   ownerUserId: string,
   categoryId: string | null | undefined,
@@ -37,31 +37,7 @@ export async function resolveOrCreateOwnedCategory(
   }
 
   if (!normalizedCategoryName) {
-    const fallbackName = "未分类";
-    const existingFallback = await tx.category.findFirst({
-      where: {
-        userId: ownerUserId,
-        name: fallbackName,
-      },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-    if (existingFallback) {
-      return existingFallback;
-    }
-
-    return await tx.category.create({
-      data: {
-        userId: ownerUserId,
-        name: fallbackName,
-      },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
+    return null;
   }
 
   const existingByName = await tx.category.findFirst({
@@ -78,16 +54,7 @@ export async function resolveOrCreateOwnedCategory(
     return existingByName;
   }
 
-  return await tx.category.create({
-    data: {
-      userId: ownerUserId,
-      name: normalizedCategoryName,
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
+  return null;
 }
 
 export async function syncStandaloneShopProductToCatalog(
@@ -104,14 +71,34 @@ export async function syncStandaloneShopProductToCatalog(
     remark?: string | null;
   }
 ) {
-  const category = await resolveOrCreateOwnedCategory(
+  const normalizedLinkedProductId = normalizeText(input.linkedProductId);
+  const existingLinked = normalizedLinkedProductId
+    ? await tx.product.findFirst({
+        where: {
+          id: normalizedLinkedProductId,
+          userId: input.ownerUserId,
+          isShopOnly: true,
+        },
+        select: {
+          id: true,
+          categoryId: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+    : null;
+  const category = await resolveOwnedCategory(
     tx,
     input.ownerUserId,
     input.categoryId,
     input.categoryName
-  );
-  if (!category) {
-    throw new Error("Failed to resolve category for standalone shop product sync");
+  ) || existingLinked?.category || null;
+  if (!category?.id) {
+    throw new Error(`店铺商品 "${input.name}" 缺少可用分类，已停止自动同步主库`);
   }
 
   const productPayload = {
@@ -125,19 +112,7 @@ export async function syncStandaloneShopProductToCatalog(
     remark: input.remark ?? null,
   };
 
-  const normalizedLinkedProductId = normalizeText(input.linkedProductId);
   if (normalizedLinkedProductId) {
-    const existingLinked = await tx.product.findFirst({
-      where: {
-        id: normalizedLinkedProductId,
-        userId: input.ownerUserId,
-        isShopOnly: true,
-      },
-      select: {
-        id: true,
-      },
-    });
-
     if (existingLinked) {
       const updated = await tx.product.update({
         where: { id: existingLinked.id },

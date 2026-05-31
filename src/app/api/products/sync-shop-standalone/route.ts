@@ -64,43 +64,53 @@ export async function POST() {
     }
 
     let synced = 0;
+    let skipped = 0;
+    const skipReasons: string[] = [];
     for (const item of candidates) {
       const ownerUserId = shopOwnerMap.get(item.shopId);
       const name = String(item.productName || "").trim();
       if (!ownerUserId || !name) {
+        skipped += 1;
         continue;
       }
 
-      await prisma.$transaction(async (tx) => {
-        const masterProduct = await syncStandaloneShopProductToCatalog(tx, {
-          ownerUserId,
-          name,
-          jdSkuId: item.jdSkuId || null,
-          categoryId: item.categoryId || null,
-          categoryName: item.categoryName || null,
-          supplierId: item.supplierId || null,
-          image: item.productImage || null,
-          remark: item.remark || null,
-        });
+      try {
+        await prisma.$transaction(async (tx) => {
+          const masterProduct = await syncStandaloneShopProductToCatalog(tx, {
+            ownerUserId,
+            name,
+            jdSkuId: item.jdSkuId || null,
+            categoryId: item.categoryId || null,
+            categoryName: item.categoryName || null,
+            supplierId: item.supplierId || null,
+            image: item.productImage || null,
+            remark: item.remark || null,
+          });
 
-        await tx.shopProduct.update({
-          where: { id: item.id },
-          data: {
-            productId: masterProduct.productId,
-            sourceProductId: masterProduct.productId,
-            categoryId: masterProduct.categoryId || item.categoryId || null,
-            categoryName: masterProduct.categoryName || item.categoryName || "未分类",
-          },
+          await tx.shopProduct.update({
+            where: { id: item.id },
+            data: {
+              productId: masterProduct.productId,
+              sourceProductId: masterProduct.productId,
+              categoryId: masterProduct.categoryId || item.categoryId || null,
+              categoryName: masterProduct.categoryName || item.categoryName || "未分类",
+            },
+          });
         });
-      });
-
-      synced += 1;
+        synced += 1;
+      } catch (error) {
+        skipped += 1;
+        const message = error instanceof Error ? error.message : "同步失败";
+        skipReasons.push(`${name}: ${message}`);
+      }
     }
 
     return NextResponse.json({
       success: true,
       scanned: candidates.length,
       synced,
+      skipped,
+      skipReasons: skipReasons.slice(0, 50),
       shops: shopOwnerMap.size,
     });
   } catch (error) {

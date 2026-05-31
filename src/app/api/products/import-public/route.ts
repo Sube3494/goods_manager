@@ -3,23 +3,15 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { ProductService } from "@/services/productService";
 
-async function ensureCategory(userId: string, sourceCategoryName?: string | null) {
-  const name = sourceCategoryName?.trim() || "其他分类";
-
-  let category = await prisma.category.findFirst({
-    where: { userId, name },
-  });
-
-  if (!category) {
-    category = await prisma.category.create({
-      data: {
-        userId,
-        name,
-      },
-    });
+async function resolveExistingCategory(userId: string, sourceCategoryName?: string | null) {
+  const name = sourceCategoryName?.trim();
+  if (!name) {
+    return null;
   }
 
-  return category;
+  return prisma.category.findFirst({
+    where: { userId, name },
+  });
 }
 
 async function ensureSupplier(userId: string, sourceSupplierName?: string | null) {
@@ -144,10 +136,16 @@ export async function POST(request: Request) {
     }
 
     const [category, supplier, sku] = await Promise.all([
-      ensureCategory(user.id, sourceProduct.category?.name),
+      resolveExistingCategory(user.id, sourceProduct.category?.name),
       ensureSupplier(user.id, sourceProduct.supplier?.name),
       generateAvailableSku(sourceProduct.sku),
     ]);
+
+    if (!category?.id) {
+      return NextResponse.json({
+        error: `导入失败：当前账号下不存在分类「${String(sourceProduct.category?.name || "").trim() || "未提供分类"}」`,
+      }, { status: 409 });
+    }
 
     const product = await prisma.product.create({
       data: {

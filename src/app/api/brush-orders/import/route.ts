@@ -104,23 +104,15 @@ function inferPlatform(platform: unknown) {
   return rawPlatform || "帮我取货";
 }
 
-async function ensureCategory(userId: string, sourceCategoryName?: string | null) {
-  const name = sourceCategoryName?.trim() || "其他分类";
-
-  let category = await prisma.category.findFirst({
-    where: { userId, name },
-  });
-
-  if (!category) {
-    category = await prisma.category.create({
-      data: {
-        userId,
-        name,
-      },
-    });
+async function resolveExistingCategory(userId: string, sourceCategoryName?: string | null) {
+  const name = sourceCategoryName?.trim();
+  if (!name) {
+    return null;
   }
 
-  return category;
+  return prisma.category.findFirst({
+    where: { userId, name },
+  });
 }
 
 async function ensureSupplier(userId: string, sourceSupplierName?: string | null) {
@@ -221,10 +213,14 @@ async function importPublicProductForUser(userId: string, sourceProductId: strin
   }
 
   const [category, supplier, sku] = await Promise.all([
-    ensureCategory(userId, sourceProduct.category?.name),
+    resolveExistingCategory(userId, sourceProduct.category?.name),
     ensureSupplier(userId, sourceProduct.supplier?.name),
     generateAvailableSku(sourceProduct.sku),
   ]);
+
+  if (!category?.id) {
+    throw new Error(`公开商品「${sourceProduct.name}」缺少可用分类「${String(sourceProduct.category?.name || "").trim() || "未提供分类"}」`);
+  }
 
   const product = await prisma.product.create({
     data: {
@@ -582,10 +578,17 @@ export async function POST(req: NextRequest) {
           if (!product && canImportMatchedPublicProduct) {
             const publicProduct = OrderParser.findBestMatchProduct(item.rawName, publicProducts);
             if (publicProduct) {
-              const importedProduct = await importPublicProductForUser(userId, publicProduct.id);
-              if (importedProduct) {
-                allProducts.push(importedProduct);
-                product = importedProduct;
+              try {
+                const importedProduct = await importPublicProductForUser(userId, publicProduct.id);
+                if (importedProduct) {
+                  allProducts.push(importedProduct);
+                  product = importedProduct;
+                }
+              } catch (error) {
+                results.failed++;
+                results.errors.push(`第 ${rowNumber} 行: ${error instanceof Error ? error.message : "导入公开商品失败"}`);
+                matchFailed = true;
+                break;
               }
             }
           }
