@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 import { FinanceMath } from "@/lib/math";
+import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 
 function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
@@ -86,6 +87,10 @@ export async function PUT(
         }
       }
 
+      const sanitizedItems = items
+        ? await sanitizePurchaseOrderItemSuppliers(tx, Array.isArray(items) ? items : [])
+        : null;
+
       const p = await tx.purchaseOrder.update({
         where: { id },
         data: {
@@ -100,10 +105,10 @@ export async function PUT(
           shippingAddress: shippingAddress !== undefined ? shippingAddress : undefined,
           shopName: shopName !== undefined ? shopName : undefined,
           date: date ? new Date(date) : undefined,
-          ...(items && {
+          ...(sanitizedItems && {
             items: {
               deleteMany: {},
-              create: items.map((item: PurchaseOrderItemType) => ({
+              create: sanitizedItems.map((item: PurchaseOrderItemType) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 supplierId: item.supplierId,

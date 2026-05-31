@@ -7,6 +7,7 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
+import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 
 async function resolvePurchaseOrderResponse<T extends {
@@ -208,6 +209,8 @@ export async function POST(request: Request) {
     const normalizedStatus = status === "Draft" ? "Confirmed" : (status || "Confirmed");
 
     const purchase = await prisma.$transaction(async (tx) => {
+      const sanitizedItems = await sanitizePurchaseOrderItemSuppliers(tx, Array.isArray(items) ? items : []);
+
       const p = await tx.purchaseOrder.create({
         data: {
           id: orderId,
@@ -225,7 +228,7 @@ export async function POST(request: Request) {
           shopName: shopName || "",
           userId: session.id,
           items: {
-            create: items.map((item: PurchaseOrderItem) => ({
+            create: sanitizedItems.map((item: PurchaseOrderItem) => ({
               productId: item.productId || null,
               shopProductId: item.shopProductId || null,
               supplierId: item.supplierId,
@@ -248,7 +251,7 @@ export async function POST(request: Request) {
 
       // 如果状态是 Received，更新店铺商品成本价，并调用同步物理库存 (原子事务)
       if (normalizedStatus === "Received") {
-        for (const item of items) {
+        for (const item of sanitizedItems) {
           if (item.shopProductId) {
             const incomingCost = FinanceMath.add(Number(item.costPrice) || 0, 0);
             if (incomingCost > 0) {
