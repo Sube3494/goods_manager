@@ -56,6 +56,19 @@ function getCleanShortId(id: string): string {
   return id.slice(-6).toUpperCase().replace(/^[-\s]+/, '');
 }
 
+function getInboundDisplayAmount(order: PurchaseOrder): number {
+  const storedTotal = Number(order.totalAmount) || 0;
+  if (storedTotal > 0) {
+    return storedTotal;
+  }
+
+  return order.items.reduce((sum, item) => {
+    const quantity = Number(item.quantity) || 0;
+    const costPrice = Number(item.costPrice) || 0;
+    return sum + (costPrice * quantity);
+  }, 0);
+}
+
 function InboundContent() {
   const { showToast } = useToast();
   // Data States
@@ -321,6 +334,7 @@ function InboundContent() {
                   const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
                   const cleanId = getCleanShortId(po.id);
                   const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${cleanId}`;
+                  const displayAmount = getInboundDisplayAmount(po);
 
                   return (
                    <tr 
@@ -382,7 +396,7 @@ function InboundContent() {
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center font-bold text-sm text-foreground">
                         <span className="mr-0.5 opacity-60">￥</span>
-                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -435,6 +449,7 @@ function InboundContent() {
                 const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
                 const cleanId = getCleanShortId(po.id);
                 const shortIdText = serialMatch && serialMatch[1] !== '无' ? `#${serialMatch[1]}` : `#${cleanId}`;
+                const displayAmount = getInboundDisplayAmount(po);
 
                 return (
                 <div
@@ -498,12 +513,12 @@ function InboundContent() {
                         <Calendar size={12} />
                         <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
                     </div>
-                    <div className="font-bold text-foreground text-sm flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground font-normal">金额:</span>
-                        <span className="text-[10px] text-muted-foreground">￥</span>
-                        {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                  </div>
+                     <div className="font-bold text-foreground text-sm flex items-center gap-1">
+                         <span className="text-[10px] text-muted-foreground font-normal">金额:</span>
+                         <span className="text-[10px] text-muted-foreground">￥</span>
+                         {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                     </div>
+                   </div>
                 </div>
                 );
               })

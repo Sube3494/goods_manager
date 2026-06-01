@@ -4070,6 +4070,50 @@ type ResolvedAutoPickOutboundItem = {
   price: number;
 };
 
+async function resolveAutoInboundCompensationCostPrice(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  item: Pick<ResolvedAutoPickOutboundItem, "productId" | "shopProductId">
+) {
+  if (item.shopProductId) {
+    const shopProduct = await tx.shopProduct.findFirst({
+      where: {
+        id: item.shopProductId,
+        shop: { userId },
+      },
+      select: {
+        costPrice: true,
+        product: {
+          select: {
+            costPrice: true,
+          },
+        },
+      },
+    });
+
+    return FinanceMath.add(
+      Number(shopProduct?.costPrice) || Number(shopProduct?.product?.costPrice) || 0,
+      0
+    );
+  }
+
+  if (item.productId) {
+    const product = await tx.product.findFirst({
+      where: {
+        id: item.productId,
+        userId,
+      },
+      select: {
+        costPrice: true,
+      },
+    });
+
+    return FinanceMath.add(Number(product?.costPrice) || 0, 0);
+  }
+
+  return 0;
+}
+
 async function resolveOutboundItemsForAutoPickOrder(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -4404,12 +4448,13 @@ export async function createOutboundFromAutoPickOrder(
           // 批次余量不足，需要补齐批次以确保 FIFO 出库不会抛错
           const batchGap = item.quantity - currentBatchStock;
           const compensateOrderId = `PO-AUTO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+          const costPrice = await resolveAutoInboundCompensationCostPrice(tx, userId, item);
           await tx.purchaseOrder.create({
             data: {
               id: compensateOrderId,
               type: AUTO_INBOUND_TYPE,
               status: "Received",
-              totalAmount: 0,
+              totalAmount: FinanceMath.multiply(costPrice, batchGap),
               date: new Date(),
               note: `[自动推单] 平台单号:${order.orderNo} 店铺商品批次库存不足，系统自动补齐 ${batchGap} 件`,
               shopName: resolved.mappedShopName,
@@ -4420,7 +4465,7 @@ export async function createOutboundFromAutoPickOrder(
                   shopProductId: item.shopProductId,
                   quantity: batchGap,
                   remainingQuantity: batchGap,
-                  costPrice: 0,
+                  costPrice,
                 }],
               },
             },
@@ -4446,12 +4491,13 @@ export async function createOutboundFromAutoPickOrder(
           // 批次余量不足，需要补齐批次以确保 FIFO 出库不会抛错
           const batchGap = item.quantity - currentBatchStock;
           const compensateOrderId = `PO-AUTO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+          const costPrice = await resolveAutoInboundCompensationCostPrice(tx, userId, item);
           await tx.purchaseOrder.create({
             data: {
               id: compensateOrderId,
               type: AUTO_INBOUND_TYPE,
               status: "Received",
-              totalAmount: 0,
+              totalAmount: FinanceMath.multiply(costPrice, batchGap),
               date: new Date(),
               note: `[自动推单] 平台单号:${order.orderNo} 商品批次库存不足，系统自动补齐 ${batchGap} 件`,
               shopName: resolved.mappedShopName,
@@ -4461,7 +4507,7 @@ export async function createOutboundFromAutoPickOrder(
                   productId: item.productId,
                   quantity: batchGap,
                   remainingQuantity: batchGap,
-                  costPrice: 0,
+                  costPrice,
                 }],
               },
             },

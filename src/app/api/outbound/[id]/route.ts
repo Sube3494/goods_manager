@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { InventoryService } from "@/services/inventoryService";
+import { FinanceMath } from "@/lib/math";
 
 /**
  * 实现“退货入库”逻辑 (对冲出库)
@@ -47,9 +48,19 @@ export async function POST(
         throw new Error("Order already returned");
       }
 
+      const inboundItems: Array<{
+        productId: string | null;
+        shopProductId: string | null;
+        quantity: number;
+        remainingQuantity: number;
+        costPrice: number;
+      }> = [];
+      let inboundTotalAmount = 0;
+
       // 1. Reverse stock for each item
       for (const item of order.items) {
         let amountToRestore = item.quantity;
+        let restoredAmount = 0;
 
         // Find batches (PurchaseOrderItems) that need restoring
         // We restore to the latest available space first (LIFO restore for FIFO deduction)
@@ -96,9 +107,32 @@ export async function POST(
               }
             });
 
+            restoredAmount = FinanceMath.add(
+              restoredAmount,
+              FinanceMath.multiply(Number(batch.costPrice) || 0, restoreToThisBatch)
+            );
             amountToRestore -= restoreToThisBatch;
           }
         }
+
+        const fallbackCostPrice = Number(item.shopProduct?.costPrice) || 0;
+        const missingQuantity = Math.max(0, amountToRestore);
+        const itemTotalAmount = FinanceMath.add(
+          restoredAmount,
+          FinanceMath.multiply(fallbackCostPrice, missingQuantity)
+        );
+        const itemCostPrice = item.quantity > 0
+          ? FinanceMath.divide(itemTotalAmount, item.quantity)
+          : fallbackCostPrice;
+
+        inboundTotalAmount = FinanceMath.add(inboundTotalAmount, itemTotalAmount);
+        inboundItems.push({
+          productId: item.productId || null,
+          shopProductId: item.shopProductId || null,
+          quantity: item.quantity,
+          remainingQuantity: item.quantity,
+          costPrice: itemCostPrice,
+        });
       }
 
       // 2. Create a corresponding Inbound record (PurchaseOrder)
@@ -111,17 +145,11 @@ export async function POST(
           type: inboundType,
           status: "Received",
           date: new Date(),
-          totalAmount: 0, // Returns don't necessarily have a transaction amount in this context
+          totalAmount: inboundTotalAmount,
           userId: session.id,
           note: `单据由出库退回自动产生。关联出库单: ${order.id}`,
           items: {
-            create: order.items.map(item => ({
-              productId: item.productId || null,
-              shopProductId: item.shopProductId || null,
-              quantity: item.quantity,
-              remainingQuantity: item.quantity,
-              costPrice: 0 // Financial logic might need refinement here
-            }))
+            create: inboundItems,
           }
         }
       });

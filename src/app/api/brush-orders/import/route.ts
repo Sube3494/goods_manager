@@ -9,6 +9,7 @@ import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { ProductService } from "@/services/productService";
 import { AddressItem, BrushShopItem } from "@/lib/types";
 import { Prisma } from "../../../../../prisma/generated-client";
+import { FinanceMath } from "@/lib/math";
 
 interface UserImportProfile {
   shippingAddresses?: AddressItem[] | null;
@@ -24,6 +25,50 @@ type MatchableProduct = {
   sourceProductId?: string | null;
   shopName?: string | null;
 };
+
+async function resolveAutoInboundCompensationCostPrice(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  item: { productId: string | null; shopProductId: string | null }
+) {
+  if (item.shopProductId) {
+    const shopProduct = await tx.shopProduct.findFirst({
+      where: {
+        id: item.shopProductId,
+        shop: { userId },
+      },
+      select: {
+        costPrice: true,
+        product: {
+          select: {
+            costPrice: true,
+          },
+        },
+      },
+    });
+
+    return FinanceMath.add(
+      Number(shopProduct?.costPrice) || Number(shopProduct?.product?.costPrice) || 0,
+      0
+    );
+  }
+
+  if (item.productId) {
+    const product = await tx.product.findFirst({
+      where: {
+        id: item.productId,
+        userId,
+      },
+      select: {
+        costPrice: true,
+      },
+    });
+
+    return FinanceMath.add(Number(product?.costPrice) || 0, 0);
+  }
+
+  return 0;
+}
 
 function normalizeText(value: unknown) {
   return String(value || "").trim();
@@ -734,13 +779,17 @@ export async function POST(req: NextRequest) {
                 // 批次库存不足以发货！系统自动生成虚拟入库单，补齐批次差额
                 const batchGap = item.quantity - currentBatchStock;
                 const compensateOrderId = `PO-AUTO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+                const costPrice = await resolveAutoInboundCompensationCostPrice(tx, userId, {
+                  productId: item.productId,
+                  shopProductId: item.shopProductId,
+                });
                 
                 await tx.purchaseOrder.create({
                   data: {
                     id: compensateOrderId,
                     type: AUTO_INBOUND_TYPE,
                     status: "Received", // 直接完成
-                    totalAmount: 0,
+                    totalAmount: FinanceMath.multiply(costPrice, batchGap),
                     date: new Date(),
                     note: `[${platform}导入] [流水号:${dailySerial || '无'}] 导入订单(单号:${platformOrderId})时批次库存不足，系统自动补齐 ${batchGap} 件`,
                     shopName: shopName ? String(shopName) : null, // 传递清洗后的智能店名
@@ -751,7 +800,7 @@ export async function POST(req: NextRequest) {
                         shopProductId: item.shopProductId,
                         quantity: batchGap,
                         remainingQuantity: batchGap,
-                        costPrice: 0
+                        costPrice
                       }]
                     }
                   }
