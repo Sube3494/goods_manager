@@ -3,6 +3,7 @@ export async function register() {
     const { BackupService } = await import('@/lib/backup-service');
     const { startAutoCompleteScheduler } = await import('@/lib/autoPickAutoComplete');
     const { disableInactiveUsers } = await import('@/lib/inactiveUserCleanup');
+    const { runLegacyInboundCostBackfillOnce } = await import('@/lib/legacyInboundCostBackfill');
     
     console.log('--- Initializing Backup Service Watcher ---');
     
@@ -30,6 +31,11 @@ export async function register() {
         console.error('Scheduled inactive user cleanup failed:', err);
       });
     }, 3600000);
+
+    console.log('--- Running Legacy Inbound Cost Backfill ---');
+    runLegacyInboundCostBackfillOnce({ write: true }).catch(err => {
+      console.error('Legacy inbound cost backfill failed:', err);
+    });
 
     console.log('--- Initializing Auto Pick Auto Complete Scheduler ---');
     await startAutoCompleteScheduler();
