@@ -540,6 +540,19 @@ function formatCompactDateTime(value: string | null | undefined) {
   return match?.[1] || text;
 }
 
+function getFilterDateValue(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const date = new Date(text);
+  if (!Number.isNaN(date.getTime())) {
+    return formatLocalDate(date);
+  }
+
+  const match = text.match(/\d{4}-\d{2}-\d{2}/);
+  return match?.[0] || "";
+}
+
 function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange">) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
@@ -1789,28 +1802,78 @@ function IntegrationModal({
   );
 }
 
-function BrushSyncPickerModal({ orders, selectedIds, isSubmitting, modalRef, onClose, onToggle, onSetSelected, onConfirm, integrationConfig, }: { orders: AutoPickOrder[]; selectedIds: string[]; isSubmitting: boolean; modalRef: React.RefObject<HTMLDivElement | null>; onClose: () => void; onToggle: (id: string) => void; onSetSelected: (ids: string[]) => void; onConfirm: (commission: number) => void; integrationConfig: AutoPickIntegrationConfig; }) {
+function BrushSyncPickerModal({
+  orders,
+  selectedIds,
+  isSubmitting,
+  modalRef,
+  onClose,
+  onToggle,
+  onSetSelected,
+  onConfirm,
+  integrationConfig,
+  scope,
+  todayDate,
+}: {
+  orders: AutoPickOrder[];
+  selectedIds: string[];
+  isSubmitting: boolean;
+  modalRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  onToggle: (id: string) => void;
+  onSetSelected: (ids: string[]) => void;
+  onConfirm: (commission: number) => void;
+  integrationConfig: AutoPickIntegrationConfig;
+  scope: OrdersTab;
+  todayDate: string;
+}) {
 
   const [commission, setCommission] = useState<string>(
     String(integrationConfig.defaultBrushCommission > 0 ? integrationConfig.defaultBrushCommission : 0)
   );
   const [query, setQuery] = useState("");
+  const [selectedPlatform, setSelectedPlatform] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const platformOptions = useMemo(
+    () => [
+      { value: "all", label: "全部平台" },
+      ...Array.from(new Set(orders.map((order) => String(order.platform || "").trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b, "zh-CN"))
+        .map((item) => ({ value: item, label: item })),
+    ],
+    [orders]
+  );
   const filteredOrders = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    if (!keyword) {
-      return orders;
-    }
     return orders.filter((order) => {
+      if (selectedPlatform !== "all" && String(order.platform || "").trim() !== selectedPlatform) {
+        return false;
+      }
+
+      const orderDate = getFilterDateValue(order.orderTime);
+      if (startDate && (!orderDate || orderDate < startDate)) {
+        return false;
+      }
+      if (endDate && (!orderDate || orderDate > endDate)) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
       const haystacks = [
         String(order.dailyPlatformSequence || ""),
         order.orderNo,
+        order.platform || "",
         order.matchedShopName || "",
         order.userAddress || "",
         ...order.items.map((item) => `${item.productName} ${item.productNo || ""}`),
       ];
       return haystacks.some((item) => item.toLowerCase().includes(keyword));
     });
-  }, [orders, query]);
+  }, [endDate, orders, query, selectedPlatform, startDate]);
   const selectedCount = selectedIds.length;
   const visibleIds = filteredOrders.map((order) => order.id);
   const allVisibleSelected = filteredOrders.length > 0 && filteredOrders.every((order) => selectedIds.includes(order.id));
@@ -1876,9 +1939,38 @@ function BrushSyncPickerModal({ orders, selectedIds, isSubmitting, modalRef, onC
             </button>
           </div>
 
+          {scope === "all" ? (
+            <div className="mt-2.5 grid gap-2.5 sm:grid-cols-3 sm:gap-3">
+              <CustomSelect
+                value={selectedPlatform}
+                onChange={setSelectedPlatform}
+                options={platformOptions}
+                className="h-11"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              />
+              <DatePicker
+                value={startDate}
+                onChange={setStartDate}
+                placeholder="开始日期"
+                maxDate={endDate || todayDate}
+                className="h-11 w-full"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              />
+              <DatePicker
+                value={endDate}
+                onChange={setEndDate}
+                placeholder="结束日期"
+                minDate={startDate || undefined}
+                maxDate={todayDate}
+                className="h-11 w-full"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              />
+            </div>
+          ) : null}
+
           <div className="mt-3 rounded-2xl border border-black/8 bg-black/2 px-3.5 py-3 text-sm dark:border-white/10 dark:bg-white/3 sm:px-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-muted-foreground">当前可选 {orders.length} 单</span>
+              <span className="text-muted-foreground">当前可选 {filteredOrders.length} 单</span>
               <span className="font-semibold text-foreground">已选 {selectedCount} 单</span>
             </div>
             <div className="mt-1 text-[11px] leading-5 text-muted-foreground">只显示已完成且符合刷单同步条件的订单</div>
@@ -1887,6 +1979,8 @@ function BrushSyncPickerModal({ orders, selectedIds, isSubmitting, modalRef, onC
           <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-2">
             {filteredOrders.length > 0 ? filteredOrders.map((order) => {
               const selected = selectedIds.includes(order.id);
+              const platformMeta = getPlatformBadgeMeta(order.platform);
+              const platformLabel = String(order.platform || "").trim() || platformMeta.iconAlt;
               return (
                 <button
                   key={order.id}
@@ -1911,6 +2005,17 @@ function BrushSyncPickerModal({ orders, selectedIds, isSubmitting, modalRef, onC
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       <span className="inline-flex h-6 items-center rounded-full border border-black/8 bg-black/3 px-2 text-[12px] font-black text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-sm">
                         流水 #{order.dailyPlatformSequence || 0}
+                      </span>
+                      <span className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-semibold text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-xs">
+                        <Image
+                          src={platformMeta.iconSrc}
+                          alt={platformMeta.iconAlt}
+                          width={16}
+                          height={16}
+                          className="h-4 w-4 shrink-0 object-cover"
+                          unoptimized
+                        />
+                        <span className="truncate">{platformLabel}</span>
                       </span>
                       {order.matchedShopName ? (
                         <span className="inline-flex h-6 max-w-full items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 dark:text-sky-400 sm:h-7 sm:px-2.5 sm:text-xs">
@@ -3344,6 +3449,8 @@ export default function OrdersPage() {
               onToggle={toggleBrushSyncSelection}
               onSetSelected={setSelectedBrushOrderIds}
               integrationConfig={integrationConfig}
+              scope={activeTab}
+              todayDate={todayDate}
               onConfirm={(commission) => void syncBrushOrders(selectedBrushOrderIds, commission)}
             />,
             document.body
