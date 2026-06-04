@@ -3014,58 +3014,70 @@ export default function FactoryShipmentsPage() {
                               {parsed.compensationStatus}
                             </span>
                           )}
-                          {parsed.compensationTrackingNumber && (
-                            <span 
-                              className="text-[10px] text-muted-foreground bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded font-mono select-all hover:text-foreground transition-colors cursor-pointer mt-0.5"
-                              title="点击复制补偿单号"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(parsed.compensationTrackingNumber).then((success) => {
-                                  if (success) showToast("已复制补偿单号", "success");
-                                });
-                              }}
-                            >
-                              {parsed.compensationLogisticsName ? `${parsed.compensationLogisticsName}:` : ""}{parsed.compensationTrackingNumber}
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="px-4 py-4 text-center text-sm">
                         <div className="mx-auto flex max-w-[220px] flex-wrap justify-center gap-1.5">
-                          {order.items.slice(0, 2).map((item: OutboundOrderItem) => {
-                            const isItemShipped = isShipmentItemMarkedShipped(item, parsed, derivedStatus);
+                          {(() => {
+                            const isCompensation = parsed.compensationStatus === "待补偿" || parsed.compensationStatus === "已补偿";
+                            const listItems = isCompensation
+                              ? (parsed.compensationItems || []).map((cItem) => {
+                                  const matched = order.items.find(
+                                    (oItem) =>
+                                      (oItem.shopProductId || oItem.shopProduct?.id || oItem.productId || oItem.shopProduct?.productId || oItem.product?.id || "") === cItem.itemKey
+                                  );
+                                  return {
+                                    id: cItem.itemKey,
+                                    name: matched?.shopProduct?.name || matched?.product?.name || "未知商品",
+                                    image: matched?.shopProduct?.image || matched?.product?.image || "",
+                                    quantity: cItem.quantity,
+                                    isShipped: parsed.compensationStatus === "已补偿",
+                                  };
+                                })
+                              : order.items.map((item) => ({
+                                  id: item.id,
+                                  name: item.shopProduct?.name || item.product?.name || "未知商品",
+                                  image: item.shopProduct?.image || item.product?.image || "",
+                                  quantity: item.quantity,
+                                  isShipped: isShipmentItemMarkedShipped(item, parsed, derivedStatus),
+                                }));
+
                             return (
-                              <div
-                                key={item.id}
-                                className={cn(
-                                  "flex min-w-0 max-w-[170px] items-center gap-1.5 rounded-full border p-0.5 pr-2 shadow-sm transition-all hover:border-primary/30",
-                                  isItemShipped
-                                    ? "border-emerald-500/55 bg-emerald-500/6 dark:bg-emerald-500/10"
-                                    : "border-border/50 bg-secondary/30 dark:bg-white/5"
-                                )}
-                                title={`${item.shopProduct?.name || item.product?.name || "未知商品"}${isItemShipped ? " - 已发" : ""}`}
-                              >
-                                <div className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
-                                  {(item.shopProduct?.image || item.product?.image) ? (
-                                    <Image src={item.shopProduct?.image || item.product?.image || ""} alt="" fill className="object-cover" sizes="24px" />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center">
-                                      <Package size={12} className="text-muted-foreground/50" />
+                              <>
+                                {listItems.slice(0, 2).map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className={cn(
+                                      "flex min-w-0 max-w-[170px] items-center gap-1.5 rounded-full border p-0.5 pr-2 shadow-sm transition-all hover:border-primary/30",
+                                      item.isShipped
+                                        ? "border-emerald-500/55 bg-emerald-500/6 dark:bg-emerald-500/10"
+                                        : "border-border/50 bg-secondary/30 dark:bg-white/5"
+                                    )}
+                                    title={`${item.name}${item.isShipped ? " - 已发" : ""}`}
+                                  >
+                                    <div className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                      {item.image ? (
+                                        <Image src={item.image} alt="" fill className="object-cover" sizes="24px" />
+                                      ) : (
+                                        <div className="flex h-full w-full items-center justify-center">
+                                          <Package size={12} className="text-muted-foreground/50" />
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                                <span className="truncate text-[10px] font-medium leading-none text-foreground/80">
-                                  {item.shopProduct?.name || item.product?.name || "未知商品"}
-                                </span>
-                                <span className="shrink-0 text-[10px] font-black leading-none text-primary">x{item.quantity}</span>
-                              </div>
+                                    <span className="truncate text-[10px] font-medium leading-none text-foreground/80">
+                                      {item.name}
+                                    </span>
+                                    <span className="shrink-0 text-[10px] font-black leading-none text-primary">x{item.quantity}</span>
+                                  </div>
+                                ))}
+                                {listItems.length > 2 && (
+                                  <div className="flex h-7 items-center justify-center rounded-full border border-border/50 bg-muted/50 px-3 text-[10px] font-bold text-muted-foreground">
+                                    +{listItems.length - 2}
+                                  </div>
+                                )}
+                              </>
                             );
-                          })}
-                          {order.items.length > 2 ? (
-                            <div className="flex h-7 items-center justify-center rounded-full border border-border/50 bg-muted/50 px-3 text-[10px] font-bold text-muted-foreground">
-                              +{order.items.length - 2}
-                            </div>
-                          ) : null}
+                          })()}
                         </div>
                       </td>
                       <td className="px-4 py-4 text-center">
@@ -3170,22 +3182,6 @@ export default function FactoryShipmentsPage() {
                         )}
                       </div>
                     </div>
-                    {parsed.compensationTrackingNumber && (
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <Truck size={11} className="text-amber-500" />
-                        <span 
-                          className="font-mono bg-amber-500/5 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400 select-all cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyToClipboard(parsed.compensationTrackingNumber).then((success) => {
-                              if (success) showToast("已复制补偿单号", "success");
-                            });
-                          }}
-                        >
-                          {parsed.compensationLogisticsName ? `${parsed.compensationLogisticsName}:` : ""}{parsed.compensationTrackingNumber}
-                        </span>
-                      </div>
-                    )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <span className={cn(
@@ -3199,39 +3195,64 @@ export default function FactoryShipmentsPage() {
                 <div className="mt-3 rounded-[18px] border border-border/40 bg-muted/25 p-2.5 dark:border-white/6 dark:bg-white/4">
                   <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">货品概览</div>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {order.items.slice(0, 4).map((item) => {
-                      const isItemShipped = isShipmentItemMarkedShipped(item, parsed, derivedStatus);
-                      const itemName = item.shopProduct?.name || item.product?.name || "未知商品";
+                    {(() => {
+                      const isCompensation = parsed.compensationStatus === "待补偿" || parsed.compensationStatus === "已补偿";
+                      const listItems = isCompensation
+                        ? (parsed.compensationItems || []).map((cItem) => {
+                            const matched = order.items.find(
+                              (oItem) =>
+                                (oItem.shopProductId || oItem.shopProduct?.id || oItem.productId || oItem.shopProduct?.productId || oItem.product?.id || "") === cItem.itemKey
+                            );
+                            return {
+                              id: cItem.itemKey,
+                              name: matched?.shopProduct?.name || matched?.product?.name || "未知商品",
+                              image: matched?.shopProduct?.image || matched?.product?.image || "",
+                              quantity: cItem.quantity,
+                              isShipped: parsed.compensationStatus === "已补偿",
+                            };
+                          })
+                        : order.items.map((item) => ({
+                            id: item.id,
+                            name: item.shopProduct?.name || item.product?.name || "未知商品",
+                            image: item.shopProduct?.image || item.product?.image || "",
+                            quantity: item.quantity,
+                            isShipped: isShipmentItemMarkedShipped(item, parsed, derivedStatus),
+                          }));
+
                       return (
-                        <span
-                          key={item.id}
-                          className={cn(
-                            "inline-flex min-w-0 items-center gap-1.5 rounded-full border p-0.5 pr-2 text-[10px] font-medium text-foreground",
-                            isItemShipped
-                              ? "border-emerald-500/55 bg-emerald-500/6 dark:bg-emerald-500/10"
-                              : "border-border/50 bg-white/70 dark:border-white/8 dark:bg-white/6"
+                        <>
+                          {listItems.slice(0, 4).map((item) => (
+                            <span
+                              key={item.id}
+                              className={cn(
+                                "inline-flex min-w-0 items-center gap-1.5 rounded-full border p-0.5 pr-2 text-[10px] font-medium text-foreground",
+                                item.isShipped
+                                  ? "border-emerald-500/55 bg-emerald-500/6 dark:bg-emerald-500/10"
+                                  : "border-border/50 bg-white/70 dark:border-white/8 dark:bg-white/6"
+                              )}
+                              title={item.isShipped ? `${item.name} 已发` : item.name}
+                            >
+                              <div className="relative flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                {item.image ? (
+                                  <Image src={item.image} alt="" fill sizes="20px" className="object-cover" />
+                                ) : (
+                                  <Package size={10} className="text-muted-foreground/50" />
+                                )}
+                              </div>
+                              <span className="min-w-0 flex-1 truncate">
+                                {item.name}
+                              </span>
+                              <span className="shrink-0 font-black text-primary">x{item.quantity}</span>
+                            </span>
+                          ))}
+                          {listItems.length > 4 && (
+                            <span className="inline-flex items-center justify-center rounded-full border border-border/50 bg-muted/50 px-2 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/8">
+                              另有 {listItems.length - 4} 项
+                            </span>
                           )}
-                          title={isItemShipped ? `${itemName} 已发` : itemName}
-                        >
-                          <div className="relative flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
-                            {item.shopProduct?.image || item.product?.image ? (
-                              <Image src={item.shopProduct?.image || item.product?.image || ""} alt="" fill sizes="20px" className="object-cover" />
-                            ) : (
-                              <Package size={10} className="text-muted-foreground/50" />
-                            )}
-                          </div>
-                          <span className="min-w-0 flex-1 truncate">
-                            {itemName}
-                          </span>
-                          <span className="shrink-0 font-black text-primary">x{item.quantity}</span>
-                        </span>
+                        </>
                       );
-                    })}
-                    {order.items.length > 4 ? (
-                      <span className="inline-flex items-center justify-center rounded-full border border-border/50 bg-muted/50 px-2 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/8">
-                        另有 {order.items.length - 4} 项
-                      </span>
-                    ) : null}
+                    })()}
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-[96px_minmax(84px,1fr)_44px_40px] items-center gap-1.5 border-t border-border/30 pt-2 dark:border-white/6 min-[390px]:grid-cols-[116px_minmax(92px,1fr)_44px_40px]">
