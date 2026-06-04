@@ -200,7 +200,7 @@ export function CustomSelect({
                         handleOpenChange(false);
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-xl bg-white px-3 py-2.5 pr-7 text-xs font-medium text-foreground outline-none transition-colors hover:bg-slate-100 dark:bg-white/[0.035] dark:hover:bg-white/[0.07] cursor-pointer",
+                        "relative flex w-full select-none items-center rounded-xl px-3 py-2.5 pr-7 text-xs font-medium text-foreground outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer",
                         option.value === value && "bg-primary/10 text-primary font-bold dark:bg-primary/20 dark:text-primary"
                       )}
                     >

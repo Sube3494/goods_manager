@@ -1731,8 +1731,12 @@ function GalleryContent() {
                             />
 
                             <motion.div 
-                                animate={{ opacity: 1, y: 0 }}
-                                style={{ pointerEvents: "auto" }}
+                                animate={{ 
+                                    opacity: isUIVisible ? 1 : 0, 
+                                    y: isUIVisible ? 0 : -20 
+                                }}
+                                transition={{ duration: 0.3 }}
+                                style={{ pointerEvents: isUIVisible ? "auto" : "none" }}
                                 className="absolute top-0 left-0 right-0 p-4 md:p-6 flex items-start justify-between z-55"
                             >
                                 <div className="flex items-center gap-2 pointer-events-auto">
@@ -1975,9 +1979,13 @@ function GalleryContent() {
                         {relatedImages.length > 0 && (
                          <div className="absolute bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none px-4">
                             <motion.div 
-                                className="bg-zinc-900/40 backdrop-blur-3xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 max-w-full overflow-hidden transition-all duration-700 ring-1 ring-white/5 opacity-100 translate-y-0"
+                                className="bg-zinc-900/40 backdrop-blur-3xl px-2 py-3 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-2 max-w-full overflow-hidden ring-1 ring-white/5"
+                                animate={{
+                                    opacity: isUIVisible ? 1 : 0,
+                                    y: isUIVisible ? 0 : 20
+                                }}
                                 style={{ 
-                                    pointerEvents: "auto"
+                                    pointerEvents: isUIVisible ? "auto" : "none"
                                 }}
                             >
                                 {relatedImages.length > 1 && (

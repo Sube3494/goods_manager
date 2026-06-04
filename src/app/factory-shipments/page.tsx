@@ -254,7 +254,7 @@ const ShipmentItemRow = memo(({
   const shippingFee = Number(item.shippingFee) || 0;
   const totalPrice = qty * price + shippingFee;
   const valueGridClass = "grid w-full grid-cols-[minmax(0,1fr)_72px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_76px_92px_86px] md:grid-cols-[minmax(180px,1fr)_78px_minmax(120px,0.8fr)_minmax(112px,0.75fr)_108px_24px] md:grid-rows-[auto_36px] md:gap-x-2.5 md:gap-y-1 lg:grid-cols-[minmax(220px,1fr)_88px_156px_136px_112px_28px] lg:gap-x-3";
-  const trackingValueGridClass = "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_76px_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_92px_86px_112px_64px] md:items-end";
+  const trackingValueGridClass = "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_76px_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_92px_112px_80px] md:items-end";
 
   return (
     <div
@@ -1685,11 +1685,11 @@ function FactoryShipmentDetailModal({
                             <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-500">一键快速添加补偿：</div>
                             <div className="grid gap-2 sm:grid-cols-2">
                               {editItems.map((item) => (
-                                <div key={item.shopProductId || item.productId || ""} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-white/40 p-2.5 dark:bg-white/3">
+                                <div key={item.shopProductId || item.productId || ""} className="flex flex-col gap-2 rounded-xl border border-border bg-white/40 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 dark:bg-white/3">
                                   <div className="min-w-0 flex-1">
                                     <div className="truncate text-xs font-semibold text-foreground">{item.name}</div>
                                   </div>
-                                  <div className="flex gap-1.5 shrink-0">
+                                  <div className="flex gap-1.5 shrink-0 justify-end">
                                     <button
                                       type="button"
                                       onClick={() => handleAddCompensationBox(item)}
