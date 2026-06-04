@@ -112,7 +112,6 @@ function PurchasesContent() {
   const [detailReadOnly, setDetailReadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<PurchaseStatusFilter>("Confirmed");
-  const [shopFilter, setShopFilter] = useState<string>("All");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
@@ -128,12 +127,11 @@ function PurchasesContent() {
     onConfirm: () => {},
     message: "",
   });
-  const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "Confirmed" || shopFilter !== "All";
+  const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "Confirmed";
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     setStatusFilter("Confirmed");
-    setShopFilter("All");
     setCurrentPage(1);
     
     const params = new URLSearchParams(searchParams);
@@ -316,7 +314,6 @@ function PurchasesContent() {
         if (!isEdit) {
           setSearchQuery("");
           setStatusFilter("Confirmed");
-          setShopFilter("All");
           setCurrentPage(1);
 
           const params = new URLSearchParams(searchParams);
@@ -1028,7 +1025,7 @@ function PurchasesContent() {
                </div>
                <h3 className="text-xl font-bold text-foreground">暂无采购记录</h3>
                <p className="text-muted-foreground text-sm mt-2 max-w-70 leading-relaxed">
-                 {searchQuery || statusFilter !== 'Confirmed' || shopFilter !== 'All' ? '当前筛选条件下没有找到记录，尝试调整筛选或搜索关键词。' : '还没有采购记录，点击右上角“新建采购单”开始。'}
+                {searchQuery || statusFilter !== 'Confirmed' ? '当前筛选条件下没有找到记录，尝试调整筛选或搜索关键词。' : '还没有采购记录，点击右上角“新建采购单”开始。'}
                </p>
             </div>
           )}
@@ -1167,7 +1164,7 @@ function PurchasesContent() {
                </div>
                <h3 className="text-lg font-bold text-foreground">暂无采购记录</h3>
                <p className="text-muted-foreground text-xs mt-1 max-w-60">
-                 {searchQuery || statusFilter !== 'Confirmed' || shopFilter !== 'All' ? '未找到匹配结果，尝试更改筛选条件或搜索关键词。' : '您目前还没有任何采购订单，立即创建一个吧。'}
+                 {searchQuery || statusFilter !== 'Confirmed' ? '未找到匹配结果，尝试更改筛选条件或搜索关键词。' : '您目前还没有任何采购订单，立即创建一个吧。'}
                </p>
               </div>
            )}

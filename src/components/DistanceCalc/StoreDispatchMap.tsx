@@ -429,7 +429,8 @@ function extractRegionParts(shop: Pick<Shop, "address" | "name" | "province" | "
       "广东", "山东", "河南", "四川", "江苏", "河北", "湖南", "安徽", "湖北", "浙江", "广西", "云南", "江西", "辽宁", "福建", "陕西", "黑龙江", "山西", "贵州", "吉林", "甘肃", "海南", "青海", "台湾", "西藏", "宁夏", "新疆", "内蒙"
     ];
     for (const sp of shortProvinces) {
-      if (text.startsWith(sp)) {
+      const shortProvinceIndex = text.indexOf(sp);
+      if (shortProvinceIndex >= 0) {
         province = sp.includes("内蒙") ? "内蒙古自治区" : (sp.length === 2 ? sp + (sp === "西藏" ? "" : "省") : sp);
         if (sp === "广东") province = "广东省";
         if (sp === "山东") province = "山东省";
@@ -454,7 +455,7 @@ function extractRegionParts(shop: Pick<Shop, "address" | "name" | "province" | "
         if (sp === "宁夏") province = "宁夏回族自治区";
         if (sp === "新疆") province = "新疆维吾尔自治区";
 
-        textAfterProvince = text.slice(sp.length);
+        textAfterProvince = text.slice(shortProvinceIndex + sp.length);
         break;
       }
     }
@@ -463,12 +464,13 @@ function extractRegionParts(shop: Pick<Shop, "address" | "name" | "province" | "
   }
 
   const cityMatch = textAfterProvince.match(/([\u4e00-\u9fa5]{2,6}?(?:市|州|地区|盟|特别行政区))/);
-  let city = cityMatch?.[1] || UNKNOWN_CITY;
+  const cityMatchFromFullText = text.match(/([\u4e00-\u9fa5]{2,6}?(?:市|州|地区|盟|特别行政区))/);
+  let city = cityMatch?.[1] || cityMatchFromFullText?.[1] || UNKNOWN_CITY;
 
   if (!cityMatch && province !== UNKNOWN_PROVINCE) {
     const commonCities = ["广州", "深圳", "成都", "杭州", "武汉", "西安", "南京", "长沙", "郑州", "福州", "济南", "沈阳", "昆明", "南宁", "南昌", "合肥", "筑", "贵阳", "海口", "石家庄", "太原", "哈尔滨", "长春", "兰州", "西宁", "银川", "拉萨", "呼和浩特", "乌鲁木齐"];
     for (const sc of commonCities) {
-      if (textAfterProvince.startsWith(sc)) {
+      if (textAfterProvince.includes(sc) || text.includes(sc)) {
         city = sc + (sc.length === 2 ? "市" : "");
         break;
       }

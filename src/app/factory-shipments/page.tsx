@@ -253,6 +253,7 @@ const ShipmentItemRow = memo(({
   const price = Number(item.price) || 0;
   const shippingFee = Number(item.shippingFee) || 0;
   const totalPrice = qty * price + shippingFee;
+  const isLogisticsSelected = hasSelectedLogisticsName(item.logisticsName);
   const valueGridClass = "grid w-full grid-cols-[minmax(0,1fr)_72px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_76px_92px_86px] md:grid-cols-[minmax(180px,1fr)_78px_minmax(120px,0.8fr)_minmax(112px,0.75fr)_108px_24px] md:grid-rows-[auto_36px] md:gap-x-2.5 md:gap-y-1 lg:grid-cols-[minmax(220px,1fr)_88px_156px_136px_112px_28px] lg:gap-x-3";
   const trackingValueGridClass = "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_76px_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_92px_112px_80px] md:items-end";
 
@@ -320,10 +321,10 @@ const ShipmentItemRow = memo(({
                 <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">快递单号</span>
                 <input
                   type="text"
-                  disabled={disabled}
+                  disabled={disabled || !isLogisticsSelected}
                   value={item.trackingNumber || ""}
                   onChange={(e) => onUpdateTrackingNumber?.(itemKey, e.target.value)}
-                  placeholder="多个单号用逗号分隔"
+                  placeholder={isLogisticsSelected ? "多个单号用逗号分隔" : "请先选择物流公司"}
                   className="h-9 w-full rounded-xl border border-border bg-white px-3 py-1.5 text-xs text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-[#2b313d] disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
@@ -585,11 +586,38 @@ function createInitialForm(): ShipmentFormState {
   };
 }
 
+const recipientPhoneRegex = /1[3-9]\d{9}/;
+const addressKeywordRegex = /(省|自治区|特别行政区|市|区|县|镇|乡|街道|大道|路|街|巷|弄|号|栋|幢|单元|室|楼|层|园|苑|大厦|广场|公寓|小区|花园|村|宿舍|仓|收货|收件)/;
+
+function isLikelyRecipientName(value: string) {
+  const text = value.trim();
+  if (!text || text.length > 12) return false;
+  if (recipientPhoneRegex.test(text) || /\d/.test(text)) return false;
+  if (addressKeywordRegex.test(text)) return false;
+  return /^[\u4e00-\u9fa5·]{2,12}$/.test(text);
+}
+
+function isLikelyRecipientAddress(value: string) {
+  const text = value.trim();
+  if (!text) return false;
+  if (addressKeywordRegex.test(text)) return true;
+  return /[\d一二三四五六七八九十]/.test(text) && text.length >= 6;
+}
+
+function hasSelectedLogisticsName(logisticsName?: string | null) {
+  const value = String(logisticsName || "").trim();
+  return Boolean(value) && value !== "选择物流公司";
+}
+
 function parseQuickAddressInput(input: string) {
   const normalized = input
     .replace(/[（【]/g, "(")
     .replace(/[）】]/g, ")")
-    .replace(/\s+/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
     .trim();
 
   if (!normalized) {
@@ -601,10 +629,18 @@ function parseQuickAddressInput(input: string) {
     };
   }
 
-  const core = normalized;
-  const remark = "";
+  const remarkParts = Array.from(normalized.matchAll(/\(([^()]{2,100})\)/g))
+    .map((match) => match[1].trim())
+    .filter(Boolean);
+  const remark = remarkParts.join("；");
+  const core = normalized
+    .replace(/\(([^()]*)\)/g, " ")
+    .replace(/[|｜]/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
 
-  const phoneMatch = core.match(/1[3-9]\d{9}/);
+  const phoneMatch = core.match(recipientPhoneRegex);
   if (!phoneMatch) {
     return {
       recipientName: "",
@@ -615,13 +651,61 @@ function parseQuickAddressInput(input: string) {
   }
 
   const recipientPhone = phoneMatch[0];
-  const beforePhone = core.slice(0, phoneMatch.index).trim();
-  const afterPhone = core.slice((phoneMatch.index || 0) + recipientPhone.length).trim();
+  const residual = core
+    .slice(0, phoneMatch.index)
+    .concat(" ", core.slice((phoneMatch.index || 0) + recipientPhone.length))
+    .replace(/[，,;；]+/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+
+  const segments = residual
+    .split(/\n+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  let recipientName = "";
+  let recipientAddress = "";
+
+  const addressSegments = segments.filter((segment) => isLikelyRecipientAddress(segment));
+  const nameSegments = segments.filter((segment) => !addressSegments.includes(segment) && isLikelyRecipientName(segment));
+
+  if (addressSegments.length > 0) {
+    recipientAddress = addressSegments.join(" ");
+  }
+  if (nameSegments.length > 0) {
+    recipientName = nameSegments[0];
+  }
+
+  if (segments.length === 1) {
+    const singleLine = segments[0];
+    const leadingNameMatch = singleLine.match(/^([\u4e00-\u9fa5·]{2,12})\s+(.+)$/);
+    if (leadingNameMatch && isLikelyRecipientName(leadingNameMatch[1]) && isLikelyRecipientAddress(leadingNameMatch[2])) {
+      recipientName = recipientName || leadingNameMatch[1].trim();
+      recipientAddress = recipientAddress || leadingNameMatch[2].trim();
+    }
+
+    const trailingNameMatch = singleLine.match(/^(.+?)\s+([\u4e00-\u9fa5·]{2,12})$/);
+    if (trailingNameMatch && isLikelyRecipientAddress(trailingNameMatch[1]) && isLikelyRecipientName(trailingNameMatch[2])) {
+      recipientAddress = recipientAddress || trailingNameMatch[1].trim();
+      recipientName = recipientName || trailingNameMatch[2].trim();
+    }
+  }
+
+  if (!recipientAddress) {
+    const nonNameSegments = segments.filter((segment) => segment !== recipientName);
+    recipientAddress = nonNameSegments.join(" ").trim() || residual;
+  }
+
+  if (!recipientName) {
+    const fallbackName = segments.find((segment) => isLikelyRecipientName(segment));
+    recipientName = fallbackName || "";
+  }
 
   return {
-    recipientName: beforePhone,
+    recipientName,
     recipientPhone,
-    recipientAddress: afterPhone,
+    recipientAddress,
     remark,
   };
 }
@@ -1160,7 +1244,9 @@ function FactoryShipmentDetailModal({
     setEditItems((prev) =>
       prev.map((item) =>
         (getItemKey(item) || getStableShipmentActionKey(item)) === itemKey
-          ? { ...item, trackingNumber }
+          ? hasSelectedLogisticsName(item.logisticsName)
+            ? { ...item, trackingNumber }
+            : { ...item, trackingNumber: "" }
           : item
       )
     );
@@ -1170,7 +1256,9 @@ function FactoryShipmentDetailModal({
     setEditItems((prev) =>
       prev.map((item) =>
         (getItemKey(item) || getStableShipmentActionKey(item)) === itemKey
-          ? { ...item, logisticsName: value }
+          ? hasSelectedLogisticsName(value)
+            ? { ...item, logisticsName: value }
+            : { ...item, logisticsName: value, trackingNumber: "" }
           : item
       )
     );
@@ -1300,6 +1388,11 @@ function FactoryShipmentDetailModal({
     }
     if (editItems.some((item) => item.quantity <= 0)) {
       showToast("请填写所有商品数量，数量至少为 1", "error");
+      return;
+    }
+    const invalidTrackingItem = editItems.find((item) => item.trackingNumber?.trim() && !hasSelectedLogisticsName(item.logisticsName));
+    if (invalidTrackingItem) {
+      showToast(`填写 ${invalidTrackingItem.name} 的快递单号前，请先选择物流公司`, "error");
       return;
     }
 
@@ -1997,6 +2090,31 @@ function FactoryShipmentCreateModal({
     );
   };
 
+  const updateTrackingNumber = (itemKey: string, value: string) => {
+    const trackingNumber = value.replace(/，/g, ",");
+    setSelectedItems((prev) =>
+      prev.map((item) =>
+        getItemKey(item) === itemKey
+          ? hasSelectedLogisticsName(item.logisticsName)
+            ? { ...item, trackingNumber }
+            : { ...item, trackingNumber: "" }
+          : item
+      )
+    );
+  };
+
+  const updateLogisticsName = (itemKey: string, value: string) => {
+    setSelectedItems((prev) =>
+      prev.map((item) =>
+        getItemKey(item) === itemKey
+          ? hasSelectedLogisticsName(value)
+            ? { ...item, logisticsName: value }
+            : { ...item, logisticsName: value, trackingNumber: "" }
+          : item
+      )
+    );
+  };
+
   const removeItem = (itemKey: string) => {
     setSelectedItems((prev) => prev.filter((item) => getItemKey(item) !== itemKey));
   };
@@ -2032,6 +2150,11 @@ function FactoryShipmentCreateModal({
     }
     if (selectedItems.some((item) => item.quantity <= 0)) {
       showToast("请填写所有商品数量，数量至少为 1", "error");
+      return;
+    }
+    const invalidTrackingItem = selectedItems.find((item) => item.trackingNumber?.trim() && !hasSelectedLogisticsName(item.logisticsName));
+    if (invalidTrackingItem) {
+      showToast(`填写 ${invalidTrackingItem.name} 的快递单号前，请先选择物流公司`, "error");
       return;
     }
 
@@ -2277,8 +2400,13 @@ function FactoryShipmentCreateModal({
                         onUpdateManualQuantity={updateManualQuantity}
                         onUpdatePrice={updatePrice}
                         onUpdateShippingFee={updateShippingFee}
+                        showTrackingInput
+                        onUpdateTrackingNumber={updateTrackingNumber}
+                        onUpdateLogisticsName={updateLogisticsName}
                         getItemKey={getItemKey}
                         disabled={false}
+                        logisticsOptions={logisticsOptions}
+                        onAddNewLogistics={() => setIsAddLogisticsOpen(true)}
                       />
                     ))}
                   </div>
@@ -3187,11 +3315,30 @@ export default function FactoryShipmentsPage() {
               <div
                 key={order.id}
                 onClick={() => setDetailOrder(order)}
-                className="w-full cursor-pointer rounded-[22px] border border-border bg-white/80 p-3.5 text-left shadow-sm transition-all active:scale-[0.99] dark:border-white/10 dark:bg-white/4"
+                className={cn(
+                  "w-full cursor-pointer rounded-[22px] border border-border bg-white/80 p-3.5 text-left shadow-sm transition-all active:scale-[0.99] dark:border-white/10 dark:bg-white/4",
+                  selectedOrderIds.includes(order.id) && "border-foreground/25 bg-foreground/[0.03] dark:border-white/20 dark:bg-white/[0.07]"
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleOrderSelection(order.id);
+                        }}
+                        className={cn(
+                          "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300",
+                          selectedOrderIds.includes(order.id)
+                            ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
+                            : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
+                        )}
+                        title={selectedOrderIds.includes(order.id) ? "取消选择" : "选择此发货单"}
+                      >
+                        {selectedOrderIds.includes(order.id) ? <Check size={12} strokeWidth={4} /> : null}
+                      </button>
                       <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-black text-foreground dark:bg-white/8 dark:text-white">
                         {(currentPage - 1) * pageSize + index + 1}
                       </span>
@@ -3381,6 +3528,7 @@ export default function FactoryShipmentsPage() {
         onClear={() => setSelectedOrderIds([])}
         label="张发货单"
         onDelete={handleBatchReturnOrders}
+        onEdit={() => setIsBatchEditOpen(true)}
       />
 
       <ConfirmModal
