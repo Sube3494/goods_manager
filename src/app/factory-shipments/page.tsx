@@ -1101,14 +1101,17 @@ function FactoryShipmentDetailModal({
     );
 
     const compItems = (parsed.compensationItems || []).map((cItem: FactoryShipmentCompensationItem) => {
+      const isBox = cItem.itemKey.endsWith("-box");
+      const realKey = isBox ? cItem.itemKey.replace("-box", "") : cItem.itemKey;
       const matched = order.items.find(
         (oItem) =>
-          (oItem.shopProductId || oItem.shopProduct?.id || oItem.productId || oItem.shopProduct?.productId || oItem.product?.id || "") === cItem.itemKey
+          (oItem.shopProductId || oItem.shopProduct?.id || oItem.productId || oItem.shopProduct?.productId || oItem.product?.id || "") === realKey
       );
+      const baseName = matched?.shopProduct?.name || matched?.product?.name;
       return {
         itemKey: cItem.itemKey,
-        name: matched?.shopProduct?.name || matched?.product?.name || cItem.itemName || "未知商品",
-        sku: matched?.shopProduct?.sku || matched?.product?.sku || "",
+        name: baseName ? (isBox ? `${baseName} (彩盒)` : baseName) : (isBox ? "未知商品 (彩盒)" : "未知商品"),
+        sku: matched?.shopProduct?.sku || matched?.product?.sku || (isBox && matched?.shopProduct?.sku ? `${matched.shopProduct.sku}-box` : ""),
         image: matched?.shopProduct?.image || matched?.product?.image || "",
         quantity: cItem.quantity,
       };
