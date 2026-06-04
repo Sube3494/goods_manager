@@ -250,11 +250,11 @@ export default function OverviewPage() {
     <div className="min-w-0 space-y-5 overflow-x-hidden animate-in fade-in zoom-in-95 duration-500 sm:space-y-6">
       <section className="overflow-hidden rounded-[30px] border border-border/70 bg-linear-to-br from-white/92 via-white/72 to-sky-500/8 p-4 shadow-xl shadow-black/5 dark:border-white/10 dark:from-white/[0.08] dark:via-white/[0.045] dark:to-cyan-500/10 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-2xl">
             <div className="text-[11px] font-black uppercase tracking-[0.22em] text-cyan-500">业务概述</div>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">今天先看这些</h1>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">运营概览</h1>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
-              这里按当前的货品、采购、发货、客户和物流流程汇总，只保留真正会影响今天处理顺序的指标。
+              汇总当前采购、发货、回款与补偿等关键环节，帮助快速识别当日需要优先处理的业务事项。
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[520px]">
