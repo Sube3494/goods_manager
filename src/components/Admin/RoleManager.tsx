@@ -13,6 +13,7 @@ import {
   ListChecks,
   Loader2,
   Package,
+  PanelTop,
   Plus,
   Search,
   Settings,
@@ -24,6 +25,7 @@ import {
   Truck,
   Warehouse,
   X,
+  ReceiptText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
@@ -46,9 +48,11 @@ interface RoleProfile {
 }
 
 const GROUP_ICONS = {
+  dashboard: PanelTop,
   products: Package,
   categories: LayoutGrid,
   suppliers: Truck,
+  orders: ListChecks,
   purchases: ShoppingBag,
   setup_purchases: Store,
   inbound: Warehouse,
@@ -56,7 +60,10 @@ const GROUP_ICONS = {
   brush_center: Layers,
   gallery: ImageIcon,
   gallery_audit: ClipboardCheck,
+  settlement: ReceiptText,
   logistics: Truck,
+  shelf_life: BadgeCheck,
+  admin_system: Settings,
   system: Settings,
 } as const;
 
@@ -251,9 +258,9 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-lg font-black tracking-tight text-foreground">{role.name}</h3>
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black tracking-[0.12em] uppercase",
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium tracking-[0.12em] uppercase",
                             role.isSystem ? "bg-amber-500/10 text-amber-600" : "bg-sky-500/10 text-sky-600"
                           )}
                         >
@@ -288,14 +295,14 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
 
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-black/3 dark:bg-white/5 px-4 py-3">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">成员覆盖</div>
+                    <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">成员覆盖</div>
                     <div className="mt-1 flex items-end gap-2">
                       <span className="text-2xl font-black text-foreground">{role._count?.users || 0}</span>
                       <span className="pb-1 text-xs text-muted-foreground">位成员</span>
                     </div>
                   </div>
                   <div className="rounded-2xl bg-primary/5 px-4 py-3 ring-1 ring-primary/10">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/60">权限规模</div>
+                    <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-primary/60">权限规模</div>
                     <div className="mt-1 flex items-end gap-2">
                       <span className="text-2xl font-black text-foreground">{Object.values(role.permissions || {}).filter(Boolean).length}</span>
                       <span className="pb-1 text-xs text-muted-foreground">项已启用</span>
@@ -304,7 +311,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                  <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
                     <Sparkles size={12} />
                     角色画像
                   </div>
@@ -312,7 +319,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                     {groups.slice(0, 4).map((group) => {
                       const GroupIcon = getGroupIcon(group.key);
                       return (
-                        <div key={group.key} className="inline-flex items-center gap-2 rounded-full bg-muted/60 dark:bg-white/8 px-3 py-2 text-xs font-bold text-foreground/80">
+                        <div key={group.key} className="inline-flex items-center gap-2 rounded-full bg-muted/60 dark:bg-white/8 px-3 py-2 text-xs font-normal text-foreground/80">
                           <GroupIcon size={12} />
                           {group.label}
                           <span className="text-muted-foreground">{group.selected}/{group.total}</span>
@@ -388,7 +395,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                   <div className="p-4 pb-24 space-y-4">
                     <div className="space-y-3 rounded-3xl border border-border/60 bg-background/70 p-4">
                       <div className="space-y-1.5">
-                        <label className="text-sm font-black text-foreground ml-1 flex items-center gap-1">
+                        <label className="text-sm font-medium text-foreground ml-1 flex items-center gap-1">
                           角色名称 <span className="text-red-500">*</span>
                         </label>
                         <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-4 py-3">
@@ -398,13 +405,13 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                             onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
                             placeholder="输入角色名称..."
                             disabled={editingRole.isSystem}
-                            className="flex-1 bg-transparent outline-none font-black text-sm text-foreground placeholder:text-foreground/40 disabled:opacity-50"
+                            className="flex-1 bg-transparent outline-none font-medium text-sm text-foreground placeholder:text-foreground/40 disabled:opacity-50"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-sm font-black text-foreground ml-1">职能定位描述</label>
+                        <label className="text-sm font-medium text-foreground ml-1">职能定位描述</label>
                         <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-4 py-3">
                           <input
                             type="text"
@@ -412,14 +419,14 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                             onChange={(e) => setEditingRole({ ...editingRole, description: e.target.value })}
                             placeholder="输入职能定位描述..."
                             disabled={editingRole.isSystem}
-                            className="flex-1 bg-transparent outline-none font-bold text-sm text-foreground/80 placeholder:text-foreground/40 disabled:opacity-50"
+                            className="flex-1 bg-transparent outline-none font-normal text-sm text-foreground/80 placeholder:text-foreground/40 disabled:opacity-50"
                           />
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-3 rounded-3xl border border-border/60 bg-background/70 p-4">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
+                      <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/60">
                         <ListChecks size={12} />
                         权限分组
                       </div>
@@ -443,8 +450,8 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                     <GroupIcon size={16} />
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="text-sm font-black text-foreground truncate">{group.label}</div>
-                                    <div className="text-[11px] text-muted-foreground">{selectedCount} / {group.children.length}</div>
+                                     <div className="text-sm font-medium text-foreground truncate">{group.label}</div>
+                                     <div className="text-[11px] font-normal text-muted-foreground">{selectedCount} / {group.children.length}</div>
                                   </div>
                                 </div>
                               </button>
@@ -474,7 +481,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                         {!editingRole.isSystem && (
                           <button
                             onClick={() => toggleGroup(currentKeys, currentSelected !== currentKeys.length)}
-                            className="w-full h-11 px-4 rounded-2xl border border-border bg-background hover:bg-muted text-sm font-black"
+                            className="w-full h-11 px-4 rounded-2xl border border-border bg-background hover:bg-muted text-sm font-medium"
                           >
                             当前分组全选/撤销
                           </button>
@@ -483,11 +490,11 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">启用权限</div>
+                          <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/60">启用权限</div>
                           <div className="mt-1 text-xl font-black text-foreground">{selectedPermissions}</div>
                         </div>
                         <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">覆盖模块</div>
+                          <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/60">覆盖模块</div>
                           <div className="mt-1 text-xl font-black text-foreground">{enabledGroups.length}</div>
                         </div>
                       </div>
@@ -511,8 +518,8 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                               )}
                             >
                               <div className="min-w-0 space-y-1">
-                                <div className="text-base font-black text-foreground leading-none">{child.label}</div>
-                                <div className={cn("text-xs font-bold", isChecked ? "text-primary/80" : "text-muted-foreground")}>
+                                <div className="text-base font-medium text-foreground leading-none">{child.label}</div>
+                                <div className={cn("text-xs font-normal", isChecked ? "text-primary/80" : "text-muted-foreground")}>
                                   {isChecked ? "已启用" : "未启用"}
                                 </div>
                               </div>
@@ -542,7 +549,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                       <div className="p-4 md:p-5 space-y-4 shrink-0 border-b border-border/40">
                         <div className="space-y-3">
                         <div className="space-y-1.5">
-                          <label className="text-sm font-black text-foreground ml-1 flex items-center gap-1">
+                          <label className="text-sm font-medium text-foreground ml-1 flex items-center gap-1">
                             角色名称 <span className="text-red-500">*</span>
                           </label>
                           <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-5 py-3">
@@ -552,13 +559,13 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                               onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
                               placeholder="输入角色名称..."
                               disabled={editingRole.isSystem}
-                              className="flex-1 bg-transparent outline-none font-black text-sm text-foreground placeholder:text-foreground/40 disabled:opacity-50"
+                              className="flex-1 bg-transparent outline-none font-medium text-sm text-foreground placeholder:text-foreground/40 disabled:opacity-50"
                             />
                           </div>
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-sm font-black text-foreground ml-1">职能定位描述</label>
+                          <label className="text-sm font-medium text-foreground ml-1">职能定位描述</label>
                           <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-5 py-3">
                             <input
                               type="text"
@@ -566,14 +573,14 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                               onChange={(e) => setEditingRole({ ...editingRole, description: e.target.value })}
                               placeholder="输入职能定位描述..."
                               disabled={editingRole.isSystem}
-                              className="flex-1 bg-transparent outline-none font-bold text-sm text-foreground/80 placeholder:text-foreground/40 disabled:opacity-50"
+                              className="flex-1 bg-transparent outline-none font-normal text-sm text-foreground/80 placeholder:text-foreground/40 disabled:opacity-50"
                             />
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
+                        <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/60">
                           <ListChecks size={12} />
                           权限分组
                         </div>
@@ -601,11 +608,11 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                       <GroupIcon size={16} />
                                     </div>
                                     <div className="min-w-0">
-                                      <div className="text-sm font-black text-foreground truncate">{group.label}</div>
-                                      <div className="text-[11px] text-muted-foreground">{selectedCount} / {group.children.length} 已启用</div>
+                                      <div className="text-sm font-medium text-foreground truncate">{group.label}</div>
+                                      <div className="text-[11px] font-normal text-muted-foreground">{selectedCount} / {group.children.length} 已启用</div>
                                     </div>
                                   </div>
-                                  <div className="text-xs font-black text-muted-foreground">{selectedCount}</div>
+                                  <div className="text-xs font-medium text-muted-foreground">{selectedCount}</div>
                                 </div>
                               </button>
                             );
@@ -635,7 +642,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                             {!editingRole.isSystem && (
                               <button
                                 onClick={() => toggleGroup(currentKeys, currentSelected !== currentKeys.length)}
-                                className="h-11 px-4 rounded-2xl border border-border bg-background hover:bg-muted text-sm font-black"
+                                className="h-11 px-4 rounded-2xl border border-border bg-background hover:bg-muted text-sm font-medium"
                               >
                                 当前分组全选/撤销
                               </button>
@@ -646,7 +653,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                         <div className="rounded-3xl border border-border bg-white/50 dark:bg-white/5 p-5">
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
-                              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">分组概览</div>
+                              <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">分组概览</div>
                               <div className="mt-2 text-sm text-muted-foreground">
                                 当前已启用 <span className="font-black text-foreground">{currentSelected}</span> / {currentGroup.children.length} 项能力
                               </div>
@@ -655,7 +662,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                               <div className="h-2 w-40 rounded-full bg-muted overflow-hidden">
                                 <div className="h-full bg-primary rounded-full" style={{ width: `${(currentSelected / currentGroup.children.length) * 100}%` }} />
                               </div>
-                              <div className={cn("text-xs font-black", currentSelected === currentGroup.children.length ? "text-primary" : "text-muted-foreground")}>
+                              <div className={cn("text-xs font-medium", currentSelected === currentGroup.children.length ? "text-primary" : "text-muted-foreground")}>
                                 {currentSelected === currentGroup.children.length ? "已全开" : "未全开"}
                               </div>
                             </div>
@@ -664,22 +671,22 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
 
                         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,180px)_minmax(0,180px)_minmax(0,1fr)] gap-3">
                           <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">启用权限</div>
+                            <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/60">启用权限</div>
                             <div className="mt-1 text-2xl font-black text-foreground">{selectedPermissions}</div>
                           </div>
                           <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">覆盖模块</div>
+                            <div className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/60">覆盖模块</div>
                             <div className="mt-1 text-2xl font-black text-foreground">{enabledGroups.length}</div>
                           </div>
                           <div className="rounded-2xl border border-border bg-background p-4 space-y-3">
-                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
+                            <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground/60">
                               <BadgeCheck size={12} />
                               已覆盖模块
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {enabledGroups.length > 0 ? (
                                 enabledGroups.map((group) => (
-                                  <div key={group.key} className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-xs font-bold text-foreground/80">
+                                  <div key={group.key} className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-xs font-normal text-foreground/80">
                                     {group.label}
                                     <span className="text-muted-foreground">{group.selected}/{group.total}</span>
                                   </div>
@@ -713,10 +720,10 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                     )}
                                   >
                                     <div className="min-w-0">
-                                      <div className="text-sm font-black text-foreground">{child.label}</div>
+                                      <div className="text-sm font-medium text-foreground">{child.label}</div>
                                     </div>
                                     <div className="flex items-center justify-between gap-3">
-                                      <div className="min-w-0 text-[11px] md:text-xs text-muted-foreground font-mono break-all">{child.key}</div>
+                                      <div className="min-w-0 text-[11px] md:text-xs text-muted-foreground font-normal break-all">{child.key}</div>
                                       <div className="flex items-center gap-2 md:gap-3 shrink-0">
                                         {isChecked && <Check size={14} className="text-primary" />}
                                         <input
@@ -750,12 +757,12 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
 
                 <div className="px-6 md:px-8 py-4 flex flex-row items-center justify-between gap-4 shrink-0 bg-background border-t border-border">
                   <div className="hidden lg:flex items-center gap-3 rounded-2xl border border-border bg-white/40 dark:bg-white/5 px-4 py-2">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.16em]">当前配置</span>
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.16em]">当前配置</span>
                     <span className="text-lg font-black text-foreground">{selectedPermissions}</span>
-                    <span className="text-xs font-bold text-muted-foreground">项权限已启用</span>
+                    <span className="text-xs font-normal text-muted-foreground">项权限已启用</span>
                   </div>
                   <div className="flex items-center gap-3 w-full sm:w-auto ml-auto">
-                    <button onClick={() => setEditingRole(null)} className="flex-1 sm:flex-none px-4 md:px-6 h-10 rounded-xl md:rounded-2xl font-black hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm opacity-70">
+                    <button onClick={() => setEditingRole(null)} className="flex-1 sm:flex-none px-4 md:px-6 h-10 rounded-xl md:rounded-2xl font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm opacity-70">
                       {editingRole.isSystem ? "关闭" : "放弃"}
                     </button>
                     {!editingRole.isSystem && (

@@ -1969,10 +1969,14 @@ function FactoryShipmentCreateModal({
   isOpen,
   onClose,
   onCreated,
+  logisticsOptions,
+  onAddNewLogistics,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onCreated: () => Promise<void>;
+  logisticsOptions: { value: string; label: string }[];
+  onAddNewLogistics: () => void;
 }) {
   const { showToast } = useToast();
   const [form, setForm] = useState<ShipmentFormState>(createInitialForm);
@@ -2406,7 +2410,7 @@ function FactoryShipmentCreateModal({
                         getItemKey={getItemKey}
                         disabled={false}
                         logisticsOptions={logisticsOptions}
-                        onAddNewLogistics={() => setIsAddLogisticsOpen(true)}
+                        onAddNewLogistics={onAddNewLogistics}
                       />
                     ))}
                   </div>
@@ -3504,6 +3508,8 @@ export default function FactoryShipmentsPage() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreated={fetchOrders}
+        logisticsOptions={logisticsOptions}
+        onAddNewLogistics={() => setIsQuickLogisticsOpen(true)}
       />
       <FactoryShipmentDetailModal
         order={detailOrder}

@@ -75,24 +75,10 @@ export const PERMISSION_TREE = [
     ]
   },
   {
-    key: "orders",
-    label: "订单管理",
-    children: [
-      { key: "order:manage", label: "订单管理" },
-    ]
-  },
-  {
     key: "purchases",
-    label: "日常采购",
+    label: "采购管理",
     children: [
-      { key: "purchase:manage", label: "日常采购管理" },
-    ]
-  },
-  {
-    key: "setup_purchases",
-    label: "开店进货",
-    children: [
-      { key: "setup_purchase:manage", label: "开店进货管理" },
+      { key: "purchase:manage", label: "采购管理" },
     ]
   },
   {
@@ -104,16 +90,9 @@ export const PERMISSION_TREE = [
   },
   {
     key: "outbound",
-    label: "出库管理",
+    label: "出库与发货",
     children: [
-      { key: "outbound:manage", label: "出库管理" },
-    ]
-  },
-  {
-    key: "brush_center",
-    label: "刷单中心",
-    children: [
-      { key: "brush:manage", label: "刷单中心管理" },
+      { key: "outbound:manage", label: "出库管理 / 发货记录 / 客户管理" },
     ]
   },
   {
@@ -127,25 +106,10 @@ export const PERMISSION_TREE = [
     ]
   },
   {
-    key: "settlement",
-    label: "财务结算",
-    children: [
-      { key: "settlement:manage", label: "结算管理" },
-    ]
-  },
-  {
     key: "logistics",
-    label: "物流配送",
+    label: "物流管理",
     children: [
-      { key: "logistics:manage", label: "调货与网点管理" },
-    ]
-  },
-  {
-    key: "shelf_life",
-    label: "保质期管理",
-    children: [
-      { key: "shelf_life:read", label: "查看保质期台账" },
-      { key: "shelf_life:manage", label: "调整/核销库存" },
+      { key: "logistics:manage", label: "物流管理" },
     ]
   },
   {

@@ -1,4 +1,4 @@
-import { Camera, Download, LayoutDashboard, Layers, Package, Settings, ShoppingBag, Truck, Upload, Users, Briefcase, Contact, LucideIcon } from "lucide-react";
+import { Camera, Download, LayoutDashboard, Layers, Package, Settings, ShoppingBag, Shield, Truck, Upload, Users, Briefcase, Contact, LucideIcon } from "lucide-react";
 import { AdminCapability, Permission, hasAdminAccess } from "./permissions";
 
 export interface NavItem {
@@ -26,6 +26,7 @@ export const navItems: NavItem[] = [
   { name: "物流管理", href: "/logistics", icon: Briefcase, permission: "logistics:manage", description: "维护可用快递与物流公司", section: "workspace" },
   { name: "实物相册", href: "/gallery", icon: Camera, permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"], description: "商品实拍与公共素材", section: "workspace" },
   { name: "成员管理", href: "/admin/members", icon: Users, adminCapability: ["members:manage", "members:status", "whitelist:manage"], description: "管理成员账号与访问范围", section: "management" },
+  { name: "角色管理", href: "/admin/roles", icon: Shield, adminCapability: "roles:manage", description: "配置角色模板与模块权限矩阵", section: "management" },
   { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true, permission: ["settings:manage", "backup:manage", "data:transfer", "system:manage"], description: "配置上传、存储与相册系统参数", section: "management" },
 ];
 
