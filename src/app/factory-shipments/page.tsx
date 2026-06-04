@@ -3019,7 +3019,7 @@ export default function FactoryShipmentsPage() {
                       <td className="px-4 py-4 text-center text-sm">
                         <div className="mx-auto flex max-w-[220px] flex-wrap justify-center gap-1.5">
                           {(() => {
-                            const isCompensation = parsed.compensationStatus === "待补偿" || parsed.compensationStatus === "已补偿";
+                            const isCompensation = false;
                             const listItems = isCompensation
                               ? (parsed.compensationItems || []).map((cItem) => {
                                   const matched = order.items.find(
@@ -3196,7 +3196,7 @@ export default function FactoryShipmentsPage() {
                   <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">货品概览</div>
                   <div className="grid grid-cols-2 gap-1.5">
                     {(() => {
-                      const isCompensation = parsed.compensationStatus === "待补偿" || parsed.compensationStatus === "已补偿";
+                      const isCompensation = false;
                       const listItems = isCompensation
                         ? (parsed.compensationItems || []).map((cItem) => {
                             const matched = order.items.find(
