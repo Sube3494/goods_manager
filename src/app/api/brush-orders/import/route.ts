@@ -9,6 +9,7 @@ import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { ProductService } from "@/services/productService";
 import { AddressItem, BrushShopItem } from "@/lib/types";
 import { Prisma } from "../../../../../prisma/generated-client";
+import { generateOutboundId } from "@/lib/utils";
 
 interface UserImportProfile {
   shippingAddresses?: AddressItem[] | null;
@@ -792,8 +793,11 @@ export async function POST(req: NextRequest) {
                 ? `[店铺:${shopName}] [流水号:${dailySerial || '无'}] [${platform}导入] 平台单号: ${platformOrderId} ${note ? ' | 备注: ' + note : ''}`
                 : `[流水号:${dailySerial || '无'}] [${platform}导入] 平台单号: ${platformOrderId} ${note ? ' | 备注: ' + note : ''}`;
 
+            const orderId = generateOutboundId("Sale");
+
             await tx.outboundOrder.create({
               data: {
+                id: orderId,
                 type: "Sale",
                 date: parseAsShanghaiTime(dateStr),
                 status: "Normal",

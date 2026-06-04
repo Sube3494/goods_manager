@@ -10,6 +10,7 @@ import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
+import { generateOutboundId } from "@/lib/utils";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -4473,8 +4474,11 @@ export async function createOutboundFromAutoPickOrder(
       }
     }
 
+    const outboundOrderId = generateOutboundId("Sale");
+
     const outboundOrder = await tx.outboundOrder.create({
       data: {
+        id: outboundOrderId,
         type: "Sale",
         status: "Normal",
         date: parseAsShanghaiTime(order.orderTime),

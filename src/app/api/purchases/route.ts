@@ -246,17 +246,10 @@ export async function POST(request: Request) {
         }
       });
 
-      // 如果状态是 Received，更新店铺商品成本价，并调用同步物理库存 (原子事务)
+      // 如果状态是 Received，调用同步物理库存 (原子事务)
       if (normalizedStatus === "Received") {
         for (const item of items) {
           if (item.shopProductId) {
-            const incomingCost = FinanceMath.add(Number(item.costPrice) || 0, 0);
-            if (incomingCost > 0) {
-              await tx.shopProduct.update({
-                where: { id: item.shopProductId },
-                data: { costPrice: incomingCost }
-              });
-            }
             await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
           } else if (item.productId) {
             await InventoryService.syncStockFromBatches(tx, item.productId, null);

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, Package, Minus, Plus, Search } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { Product, OutboundOrder, Shop } from "@/lib/types";
+import { Product, OutboundOrder } from "@/lib/types";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -30,8 +30,6 @@ interface OutboundModalProps {
 
 export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [selectedShopId, setSelectedShopId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 500);
   const [selectedItems, setSelectedItems] = useState<SelectedOutboundItem[]>([]);
@@ -69,7 +67,6 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         pageSize: "20",
         search: debouncedSearch,
         sortBy: "stock-desc",
-        ...(selectedShopId ? { shopId: selectedShopId } : {}),
       });
 
       const res = await fetch(`/api/purchase-products?${queryParams.toString()}`);
@@ -96,15 +93,13 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       setIsSearching(false);
       setIsNextPageLoading(false);
     }
-  }, [debouncedSearch, selectedShopId]);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     if (isOpen) {
       fetchProducts('initial');
     } else {
       setSelectedItems([]);
-      setShops([]);
-      setSelectedShopId("");
       setSearchQuery("");
       setNote("");
       setType("Sale");
@@ -113,38 +108,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   }, [isOpen, fetchProducts]);
 
   useEffect(() => {
-    if (!isOpen) return;
-
-    const fetchShops = async () => {
-      try {
-        const res = await fetch("/api/shops?source=shipping-addresses");
-        if (!res.ok) return;
-        const data = await res.json();
-        const items = Array.isArray(data?.shops) ? data.shops : [];
-        setShops(items);
-        setSelectedShopId((prev) => {
-          if (prev && items.some((shop: Shop) => shop.id === prev)) {
-            return prev;
-          }
-          return items[0]?.id || "";
-        });
-      } catch (error) {
-        console.error("Failed to fetch shops:", error);
-      }
-    };
-
-    fetchShops();
-  }, [isOpen]);
-
-  useEffect(() => {
     if (!isOpen || isLoadingProducts) return;
     fetchProducts('search');
   }, [debouncedSearch, isOpen, isLoadingProducts, fetchProducts]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setSelectedItems([]);
-  }, [selectedShopId, isOpen]);
 
   useEffect(() => {
     if (!isOpen || !hasMore || isLoadingProducts || isSearching || isNextPageLoading) return;
@@ -228,11 +194,6 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       return;
     }
 
-    if (shops.length > 0 && !selectedShopId) {
-      showToast("请先选择出库门店", "error");
-      return;
-    }
-    
     if (mobileView === "selection" && window.innerWidth < 768) {
         setMobileView("review");
         return;
@@ -246,7 +207,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
     onSubmit({
       type,
-      note: `${selectedShopId ? `[店铺:${shops.find((shop) => shop.id === selectedShopId)?.name || ""}] ` : ""}${note}`.trim(),
+      note: note.trim(),
       items: selectedItems.map(item => ({
         productId: item.productId,
         shopProductId: item.shopProductId,
@@ -399,22 +360,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                 <div className="flex flex-col h-full overflow-hidden">
 
                     <div className="p-4 sm:p-5 grid grid-cols-2 gap-4 shrink-0">
-
-
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">出库门店</label>
-                        <CustomSelect
-                            value={selectedShopId}
-                            onChange={setSelectedShopId}
-                            options={shops.map((shop) => ({
-                              value: shop.id,
-                              label: shop.name,
-                            }))}
-                            placeholder="选择门店"
-                            triggerClassName="bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
-                        />
-                    </div>
-                    <div className="space-y-1.5">
+                      <div className="space-y-1.5 col-span-2">
                         <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">出库业务类型</label>
                         <CustomSelect 
                             value={type}
@@ -456,9 +402,6 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                             <p className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">
                                                 {item.sku}
                                             </p>
-                                            {item.shopName && (
-                                                <p className="text-[10px] text-blue-500/80 mt-0.5">{item.shopName}</p>
-                                            )}
                                         </div>
                                          <div className="flex items-center bg-muted/30 rounded-lg border border-white/5 p-0.5 ml-auto">
                                              <button 

@@ -16,7 +16,7 @@ interface BatchEditModalProps {
     supplierId?: string; 
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
-    costPrice?: number;
+    salePrice?: number;
     stock?: number;
   }) => void;
   categories: Category[];
@@ -39,7 +39,7 @@ const BatchEditForm = ({
   const [categoryId, setCategoryId] = useState<string>("keep");
   const [supplierId, setSupplierId] = useState<string>("keep");
   const [productionStatus, setProductionStatus] = useState<string>("keep");
-  const [costPrice, setCostPrice] = useState<string>("");
+  const [salePrice, setSalePrice] = useState<string>("");
   const [stock, setStock] = useState<string>("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -49,14 +49,14 @@ const BatchEditForm = ({
       supplierId?: string; 
       isPublic?: boolean; 
       isDiscontinued?: boolean; 
-      costPrice?: number;
+      salePrice?: number;
       stock?: number;
     } = {};
     
     if (categoryId !== "keep") data.categoryId = categoryId;
     if (supplierId !== "keep") data.supplierId = supplierId;
     if (!hideProductionStatus && productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
-    if (costPrice.trim() !== "") data.costPrice = parseFloat(costPrice);
+    if (salePrice.trim() !== "") data.salePrice = parseFloat(salePrice);
     if (stock.trim() !== "") data.stock = parseInt(stock, 10);
 
     onConfirm(data);
@@ -158,16 +158,16 @@ const BatchEditForm = ({
             {/* Cost Price Input */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground/80 flex items-center gap-1.5 px-1 uppercase tracking-wider">
-                <Tag size={13} className="rotate-90 text-amber-500" /> 进货单价
+                <Tag size={13} className="rotate-90 text-amber-500" /> 售价
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-bold font-number pointer-events-none">¥</span>
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="保持原单价"
-                  value={costPrice}
-                  onChange={(e) => setCostPrice(e.target.value)}
+                  placeholder="保持原售价"
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
                   className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 h-11 pl-8 pr-4 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 focus:border-primary/20 focus:shadow-[0_0_14px_rgba(var(--primary-rgb),0.12)] transition-all font-bold font-number text-xs"
                 />
               </div>
@@ -205,7 +205,7 @@ const BatchEditForm = ({
               categoryId === "keep" &&
               supplierId === "keep" &&
               (hideProductionStatus || productionStatus === "keep") &&
-              costPrice.trim() === "" &&
+              salePrice.trim() === "" &&
               stock.trim() === ""
             }
             className="flex-2 rounded-full bg-primary text-primary-foreground py-3 text-xs font-bold shadow-[0_8px_20px_-4px_rgba(var(--primary-rgb),0.3)] hover:bg-primary/90 hover:shadow-[0_12px_24px_-4px_rgba(var(--primary-rgb),0.45)] hover:-translate-y-0.5 disabled:translate-y-0 active:scale-[0.95] active:translate-y-0 disabled:opacity-50 disabled:shadow-none transition-all duration-200 flex items-center justify-center gap-1.5"

@@ -81,6 +81,7 @@ interface ProductSelectionModalProps {
   externalLoading?: boolean;
   loadAllOnOpen?: boolean;
   respectPublicVisibility?: boolean;
+  inStockOnly?: boolean;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -120,6 +121,7 @@ export function ProductSelectionModal({
   externalLoading = false,
   loadAllOnOpen = false,
   respectPublicVisibility = true,
+  inStockOnly = false,
 }: ProductSelectionModalProps) {
   const queryRef = useRef(query);
   queryRef.current = query;
@@ -350,12 +352,31 @@ export function ProductSelectionModal({
       const searchableText = [p.name, p.sku, p.jdSkuId].filter(Boolean).join(" ").toLowerCase();
       const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
       const matchesShop = !scopedShopName || isShopNameMatch(p.shopName, scopedShopName);
+      const matchesStock = !inStockOnly || (Number(p.stock) || 0) > 0;
 
-      return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop;
+      return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop && matchesStock;
     });
-  }, [debouncedSearch, getSelectionKey, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
+  }, [debouncedSearch, getSelectionKey, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly, inStockOnly]);
 
   const displayCategoryName = selectedCategoryName;
+
+  const dynamicCategories = useMemo(() => {
+    if (!inStockOnly) return categories;
+
+    const categoriesWithStock = new Set<string>();
+    (Array.isArray(products) ? products : []).forEach((p) => {
+      const stock = Number(p.stock) || 0;
+      const isVisible = (respectPublicVisibility ? (p.isPublic ?? true) : true) && !(p.isDiscontinued ?? false);
+      if (stock > 0 && isVisible) {
+        const catName = p.category?.name || (p as Product & { categoryName?: string | null }).categoryName;
+        if (catName) {
+          categoriesWithStock.add(catName);
+        }
+      }
+    });
+
+    return categories.filter((c) => categoriesWithStock.has(c.name));
+  }, [categories, products, inStockOnly, respectPublicVisibility]);
 
   const filteredProducts = useMemo(() => {
     return filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
@@ -524,7 +545,7 @@ export function ProductSelectionModal({
                     <CustomSelect
                       options={[
                         { value: "all", label: "所有分类" },
-                        ...categories.map(category => ({ value: category.name, label: category.name }))
+                        ...dynamicCategories.map(category => ({ value: category.name, label: category.name }))
                       ]}
                       value={selectedCategoryName}
                       onChange={setSelectedCategoryName}
@@ -551,20 +572,20 @@ export function ProductSelectionModal({
                       const productCode = getProductCode(product);
                       return (
                          <button
-                          key={product.id}
-                          type="button"
-                         onClick={() => toggleProduct(product)}
-                            disabled={isAlreadySelected}
-                            className={cn(
-                             imageOnly
+                           key={product.id}
+                           type="button"
+                          onClick={() => toggleProduct(product)}
+                             disabled={isAlreadySelected}
+                             className={cn(
+                              imageOnly
                                ? "group relative aspect-square overflow-hidden rounded-2xl border transition-all cursor-pointer"
                                : "group relative flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer min-h-[64px]",
-                             isSelected 
+                              isSelected 
                                ? "bg-white dark:bg-white/5 border-primary shadow-md" 
                                : isAlreadySelected
                                ? "bg-white/70 dark:bg-white/5 border-emerald-500/20 shadow-sm opacity-70 cursor-not-allowed"
                                : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
-                           )}
+                            )}
                         >
                           <div className={cn(
                             imageOnly
@@ -619,6 +640,16 @@ export function ProductSelectionModal({
                                     {product.category.name}
                                   </span>
                                 )}
+                                {inStockOnly && product.stock !== undefined && product.stock !== null && (
+                                  <span className={cn(
+                                    "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black border",
+                                    Number(product.stock) > 0
+                                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400"
+                                      : "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-400"
+                                  )}>
+                                    库存：{product.stock}
+                                  </span>
+                                )}
                                 {!minimalView && product.remark && (
                                     <span className="flex min-w-0 items-center gap-1 truncate rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-500">
                                         <span className="shrink-0 font-bold opacity-70">注:</span>
@@ -627,7 +658,7 @@ export function ProductSelectionModal({
                                 )}
                                 {showPrice && !minimalView && (
                                   <span className="ml-auto shrink-0 text-sm font-semibold text-foreground">
-                                      ￥{product.costPrice}
+                                      进价 ￥{product.costPrice}
                                   </span>
                                 )}
                              </div>
@@ -663,7 +694,7 @@ export function ProductSelectionModal({
                     
                      {filteredProducts.length === 0 && !showInitialSkeleton && !isLoading && !isSearching && !isNextPageLoading && (
                         <div className="py-12 text-center text-muted-foreground">
-                            {emptyStateText}
+                            {emptyStateText === "未找到相关商品" && inStockOnly ? "未找到有库存的相关商品" : emptyStateText}
                         </div>
                      )}
                     

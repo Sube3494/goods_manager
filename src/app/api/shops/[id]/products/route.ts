@@ -250,6 +250,7 @@ export async function GET(
         categoryName: item.categoryName || item.product?.category?.name || "未分类",
         supplierId: item.supplierId || item.product?.supplierId || null,
         costPrice: item.costPrice ?? 0,
+        salePrice: item.salePrice ?? item.costPrice ?? 0,
         stock: item.stock ?? 0,
         isPublic: item.isPublic ?? true,
         isDiscontinued: item.isDiscontinued ?? false,
@@ -335,6 +336,7 @@ export async function GET(
       categoryName: item.categoryName || item.product?.category?.name || "未分类",
       supplierId: item.supplierId || item.product?.supplierId || null,
       costPrice: item.costPrice ?? 0,
+      salePrice: item.salePrice ?? item.costPrice ?? 0,
       stock: item.stock ?? 0,
       isPublic: item.isPublic ?? true,
       isDiscontinued: item.isDiscontinued ?? false,
@@ -422,6 +424,7 @@ export async function PUT(
     const productImage = typeof body?.image === "string" ? body.image.trim() : "";
     const supplierId = typeof body?.supplierId === "string" ? body.supplierId.trim() : "";
     const costPrice = Number(body?.costPrice ?? 0);
+    const salePrice = body?.salePrice !== undefined ? Number(body.salePrice) : costPrice;
     const isPublic = Boolean(body?.isPublic ?? true);
     const isDiscontinued = Boolean(body?.isDiscontinued ?? false);
     const remark = typeof body?.remark === "string" ? body.remark.trim() : "";
@@ -466,6 +469,7 @@ export async function PUT(
         productImage: normalizedProductImage,
         supplierId: supplierId || null,
         costPrice: Number.isFinite(costPrice) ? costPrice : 0,
+        salePrice: Number.isFinite(salePrice) ? salePrice : 0,
         isPublic,
         isDiscontinued,
         remark: remark || null,
@@ -485,6 +489,7 @@ export async function PUT(
         categoryName: true,
         supplierId: true,
         costPrice: true,
+        salePrice: true,
         stock: true,
         isPublic: true,
         isDiscontinued: true,
@@ -509,6 +514,7 @@ export async function PUT(
       categoryName: updated.categoryName || "未分类",
       supplierId: updated.supplierId || null,
       costPrice: updated.costPrice ?? 0,
+      salePrice: updated.salePrice ?? updated.costPrice ?? 0,
       stock: updated.stock ?? 0,
       isPublic: updated.isPublic ?? true,
       isDiscontinued: updated.isDiscontinued ?? false,
@@ -564,6 +570,7 @@ export async function POST(
         categoryId: true,
         supplierId: true,
         costPrice: true,
+        salePrice: true,
         stock: true,
         isPublic: true,
         isDiscontinued: true,
@@ -672,7 +679,8 @@ export async function POST(
         categoryId: categoryMap.get(product.category?.name || "") || null,
         categoryName: product.category?.name || null,
         supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name) || null) : null,
-        costPrice: 0,
+        costPrice: product.costPrice ?? 0,
+        salePrice: product.salePrice ?? product.costPrice ?? 0,
         stock: 0,
         isPublic: product.isPublic,
         isDiscontinued: product.isDiscontinued,
@@ -737,9 +745,9 @@ export async function PATCH(
       updateData.supplierId = body.supplierId.trim() || null;
     }
 
-    if (body?.costPrice !== undefined) {
-      const costPrice = Number(body.costPrice);
-      updateData.costPrice = Number.isFinite(costPrice) ? costPrice : 0;
+    if (body?.salePrice !== undefined) {
+      const salePrice = Number(body.salePrice);
+      updateData.salePrice = Number.isFinite(salePrice) ? salePrice : 0;
     }
 
     // stock 字段禁止通过此接口手动修改，库存只能通过采购入库生成批次

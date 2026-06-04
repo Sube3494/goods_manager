@@ -23,6 +23,7 @@ interface CustomSelectProps {
   addNewLabel?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  disabled?: boolean;
 }
 
 export function CustomSelect({
@@ -37,6 +38,7 @@ export function CustomSelect({
   addNewLabel,
   searchable = false,
   searchPlaceholder = "搜索...",
+  disabled = false,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,6 +52,13 @@ export function CustomSelect({
   const containerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
+
+  const handleOpenChange = useCallback((open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setSearchQuery("");
+    }
+  }, []);
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label || placeholder;
   const filteredOptions = searchable
@@ -71,24 +80,18 @@ export function CustomSelect({
   }, [isOpen, searchable]);
 
   useEffect(() => {
-    if (!isOpen && searchQuery) {
-      setSearchQuery("");
-    }
-  }, [isOpen, searchQuery]);
-
-  useEffect(() => {
     onOpenChange?.(isOpen);
   }, [isOpen, onOpenChange]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.parentElement?.contains(event.target as Node)) {
-        setIsOpen(false);
+        handleOpenChange(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [handleOpenChange]);
 
   const updatePosition = useCallback(() => {
     if (isOpen && containerRef.current) {
@@ -127,11 +130,13 @@ export function CustomSelect({
       <button
         ref={containerRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        onClick={() => !disabled && handleOpenChange(!isOpen)}
         className={cn(
           "flex w-full h-full items-center justify-between bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background",
           !triggerClassName?.includes("rounded-") && "rounded-lg",
           isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/5 dark:hover:bg-white/10",
+          disabled && "opacity-60 cursor-not-allowed pointer-events-none bg-muted/10 dark:bg-white/5",
           triggerClassName
         )}
       >
@@ -142,13 +147,13 @@ export function CustomSelect({
             value={isOpen ? searchQuery : selectedLabel}
             onChange={(e) => {
               if (!isOpen) {
-                setIsOpen(true);
+                handleOpenChange(true);
               }
               setSearchQuery(e.target.value);
             }}
-            onFocus={() => setIsOpen(true)}
+            onFocus={() => handleOpenChange(true)}
             onClick={(e) => e.stopPropagation()}
-            placeholder={placeholder}
+            placeholder={isOpen ? searchPlaceholder : placeholder}
             className={cn(
               "w-full bg-transparent outline-none text-xs font-normal",
               !value && !searchQuery && "text-muted-foreground"
@@ -182,9 +187,9 @@ export function CustomSelect({
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
+              className="rounded-2xl border border-black/8 bg-white/98 shadow-2xl backdrop-blur-2xl focus:outline-none dark:border-white/10 dark:bg-[#202733]/98 dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col"
             >
-              <div className="max-h-60 overflow-auto p-1.5 py-2">
+              <div className="max-h-52 overflow-auto p-1.5 py-2">
                 {filteredOptions.length > 0 ? (
                   filteredOptions.map((option, index) => (
                     <button
@@ -192,11 +197,10 @@ export function CustomSelect({
                       type="button"
                       onClick={() => {
                         onChange(option.value);
-                        setIsOpen(false);
-                        setSearchQuery("");
+                        handleOpenChange(false);
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-xl py-2.5 pl-3 pr-7 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
+                        "relative flex w-full select-none items-center rounded-xl bg-white px-3 py-2.5 pr-7 text-xs font-medium text-foreground outline-none transition-colors hover:bg-slate-100 dark:bg-white/[0.035] dark:hover:bg-white/[0.07] cursor-pointer",
                         option.value === value && "bg-primary/10 text-primary font-bold dark:bg-primary/20 dark:text-primary"
                       )}
                     >
@@ -209,25 +213,28 @@ export function CustomSelect({
                     </button>
                   ))
                 ) : (
-                  <div className="py-6 text-center space-y-3">
+                  <div className="py-6 text-center">
                     <p className="text-xs text-muted-foreground">{searchable && searchQuery ? "暂无匹配结果" : "暂无选项"}</p>
-                    {onAddNew && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAddNew();
-                          setIsOpen(false);
-                        }}
-                        className="mx-auto flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-[11px] font-bold rounded-lg hover:bg-primary/90 transition-all active:scale-95 shadow-sm"
-                      >
-                        <Plus size={12} strokeWidth={3} />
-                        {addNewLabel || "去新增"}
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
+
+              {onAddNew && (
+                <div className="shrink-0 border-t border-black/8 bg-slate-50/70 p-1.5 dark:border-white/10 dark:bg-white/[0.035]">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddNew();
+                      handleOpenChange(false);
+                    }}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl py-2 px-3 text-xs font-semibold text-primary hover:bg-primary/10 dark:hover:bg-primary/20 transition-colors cursor-pointer"
+                  >
+                    <Plus size={12} strokeWidth={2.5} />
+                    <span>{addNewLabel || "新增项"}</span>
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>,

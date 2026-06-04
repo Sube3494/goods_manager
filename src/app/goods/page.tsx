@@ -314,7 +314,7 @@ export default function GoodsPage() {
     supplierId?: string; 
     isPublic?: boolean; 
     isDiscontinued?: boolean; 
-    costPrice?: number;
+    salePrice?: number;
   }) => {
     const count = selectedIds.length;
     try {
@@ -489,8 +489,9 @@ export default function GoodsPage() {
           "商品名称": g.name,
           "SKU/编号": g.sku || "",
           "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
-          "进货单价": g.costPrice,
-          "媒体数量": Array.isArray(g.gallery) ? g.gallery.length : 0,
+          "售价": g.salePrice ?? g.costPrice,
+          "进价": g.costPrice,
+          "库存数量": g.stock ?? 0,
           "供应商": g.supplier?.name || "未知供应商",
           "商品图片": g.image || "暂无图片",
           "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
@@ -536,7 +537,7 @@ export default function GoodsPage() {
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `商品模板库导出_${formatLocalDate(new Date())}.xlsx`);
+      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `商品库导出_${formatLocalDate(new Date())}.xlsx`);
       showToast(`已导出 ${allGoods.length} 条商品数据`, "success");
     } catch (error) {
       console.error("Export failed:", error);
@@ -592,7 +593,7 @@ export default function GoodsPage() {
       {/* Header section with unified style */}
       <div className="flex items-center justify-between mb-6 sm:mb-8 transition-all relative z-10 gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品模板库</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">商品库</h1>
           <p className="hidden md:block text-muted-foreground mt-1 sm:mt-2 text-xs sm:text-lg truncate">
             {isLoading ? "正在从数据库加载资料..." : "统一管理商品资料、SKU 与相册默认信息"}
           </p>
@@ -759,7 +760,7 @@ export default function GoodsPage() {
           {filteredGoods.map((product, index) => (
             <GoodsCard 
               key={product.id} 
-              product={{ ...product, stock: Array.isArray(product.gallery) ? product.gallery.length : (product.image ? 1 : 0) }} 
+              product={product}
               onEdit={canUpdate ? handleEdit : undefined} 
               onDelete={canDelete ? handleDelete : undefined} 
               lowStockThreshold={0}
@@ -767,9 +768,8 @@ export default function GoodsPage() {
               anySelected={selectedIds.length > 0}
               onToggleSelect={toggleSelectProduct}
               priority={index < 4}
-              stockTitle="媒体数量"
-              stockUnit="项"
-              disableLowStockTone={true}
+              stockTitle="库存数量"
+              stockUnit="件"
             />
           ))}
         </div>
@@ -817,7 +817,8 @@ export default function GoodsPage() {
           {
             "*商品名称": "示例商品1",
             "*分类": "默认分类",
-            "*进货单价": 99.00,
+            "*售价": 99.00,
+            "进货单价": 59.00,
             "SKU": "EXAMPLE-001",
             "供应商": "默认供应商",
             "商品图片": "https://example.com/main.jpg",
@@ -835,7 +836,6 @@ export default function GoodsPage() {
         onClose={() => setIsNewProductOpen(false)}
         onSubmit={handleSaveItem}
         initialData={editingProduct}
-        disableHistorySection={true}
         hideStockField={true}
         hideShelfLifeSection={true}
       />

@@ -5,6 +5,8 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { InventoryService } from "@/services/inventoryService";
 import { FinanceMath } from "@/lib/math";
 import { getStorageStrategy } from "@/lib/storage";
+import { parseFactoryShipmentNote, generateOutboundId } from "@/lib/utils";
+import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
  
 interface OutboundItem {
   productId: string;
@@ -84,6 +86,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { type, date, note, items } = body;
+    const requestedStatus = typeof body?.status === "string" ? body.status.trim() : "";
+    const finalStatus = requestedStatus || (type === "FactoryShipment" ? "待发货" : "");
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Invalid items" }, { status: 400 });
@@ -116,12 +120,16 @@ export async function POST(request: Request) {
       };
     });
 
+    const orderId = generateOutboundId(type);
+
     // 使用事务确保数据原子性，业务逻辑委托给 InventoryService
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. 创建出库单记录
       const order = await tx.outboundOrder.create({
         data: {
+          id: orderId,
           type: type || "Sale",
+          ...(finalStatus ? { status: finalStatus } : {}),
           date: date ? new Date(date) : new Date(),
           note: note || "",
           userId: user.id,
@@ -138,6 +146,16 @@ export async function POST(request: Request) {
 
       // 2. 委托 Service 处理 FIFO 扣减及库存更新
       await InventoryService.processOutboundFIFO(tx, user.id, normalizedItems);
+
+      // 3. 自动将厂家发货单的新收件信息沉淀到客户管理
+      try {
+        const parsed = parseFactoryShipmentNote(note);
+        if (parsed.isFactoryShipment) {
+          await collectFactoryShipmentCustomer(tx, user.id, parsed);
+        }
+      } catch (err) {
+        console.error("Failed to auto-collect customer during outbound creation:", err);
+      }
 
       return order;
     });

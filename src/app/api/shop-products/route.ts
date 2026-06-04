@@ -139,6 +139,7 @@ export async function GET(request: NextRequest) {
               ? { id: item.product.supplier.id, name: item.product.supplier.name }
               : null,
             costPrice: item.costPrice ?? 0,
+            salePrice: item.salePrice ?? item.costPrice ?? 0,
             stock: item.stock ?? 0,
             shopId: item.shopId,
             shopName: item.shop?.name || "",
@@ -205,6 +206,7 @@ export async function GET(request: NextRequest) {
             ? { id: item.product.supplier.id, name: item.product.supplier.name }
             : null,
           costPrice: item.costPrice ?? 0,
+          salePrice: item.salePrice ?? item.costPrice ?? 0,
           stock: item.stock ?? 0,
           shopId: item.shopId,
           shopName: item.shop?.name || "",
@@ -284,6 +286,7 @@ export async function GET(request: NextRequest) {
           ? { id: item.product.supplier.id, name: item.product.supplier.name }
           : null,
         costPrice: item.costPrice ?? 0,
+        salePrice: item.salePrice ?? item.costPrice ?? 0,
         stock: item.stock ?? 0,
         shopId: item.shopId,
         shopName: item.shop?.name || "",
@@ -368,6 +371,7 @@ export async function GET(request: NextRequest) {
         ? { id: item.product.supplier.id, name: item.product.supplier.name }
         : null,
       costPrice: item.costPrice ?? 0,
+      salePrice: item.salePrice ?? item.costPrice ?? 0,
       stock: item.stock ?? 0,
       shopId: item.shopId,
       shopName: item.shop?.name || "",

@@ -200,7 +200,7 @@ export function DataOverview({
   const cancelledLikeGap = Math.max(0, totalOrders - trueOrders - brushOrders);
   const trueShare = totalOrders > 0 ? (trueOrders / totalOrders) * 100 : 0;
   const brushShare = totalOrders > 0 ? (brushOrders / totalOrders) * 100 : 0;
-  const contextLabel = selectedShopName ? `${selectedShopName} · ${int(rangeDays)} 天` : `全部店铺 · ${int(rangeDays)} 天`;
+  const contextLabel = selectedShopName ? `${selectedShopName} · ${int(rangeDays)} 天` : `总库视角 · ${int(rangeDays)} 天`;
 
   return (
     <div className="space-y-5 sm:space-y-8">
@@ -324,7 +324,7 @@ export function DataOverview({
           <CompactMetric label="平台扣费" value={money(data?.platformCommission)} hint="平台佣金与扣点" />
           <CompactMetric label="配送支出" value={money(data?.deliveryExpense)} hint="配送相关成本" />
           <CompactMetric label="推广支出" value={money(data?.promotionExpense)} hint="活动与推广消耗" />
-          <CompactMetric label="活跃店铺" value={int(data?.activeShopCount)} hint="当前范围有动销的店铺" />
+          <CompactMetric label="总库存件数" value={int(data?.totalStock)} hint="当前范围的总库库存" />
         </div>
       </section>
 

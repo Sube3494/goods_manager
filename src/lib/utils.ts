@@ -171,7 +171,7 @@ export interface PlatformBadgeMeta {
 
 export function getPlatformMeta(platform: string | undefined | null): PlatformBadgeMeta | null {
   if (!platform) return null;
-  let name = platform.trim();
+  const name = platform.trim();
 
   if (name.includes("线下") || name.includes("线下交易")) {
     return {
@@ -217,4 +217,205 @@ export function getPlatformMeta(platform: string | undefined | null): PlatformBa
   };
 }
 
+export interface FactoryShipmentNotePayload {
+  recipientName: string;
+  recipientPhone?: string | null;
+  paymentStatus: string;
+  compensationStatus?: string | null;
+  recipientAddress: string;
+  trackingEntries?: FactoryShipmentTrackingEntry[];
+  remark?: string | null;
 
+  // 独立补偿物流
+  compensationLogisticsName?: string | null;
+  compensationTrackingNumber?: string | null;
+  compensationItems?: FactoryShipmentCompensationItem[];
+}
+
+export interface FactoryShipmentTrackingEntry {
+  itemKey: string;
+  itemName?: string;
+  trackingNumber: string;
+  logisticsName?: string;
+  shippingFee?: number;
+}
+
+export interface FactoryShipmentCompensationItem {
+  itemKey: string;
+  itemName?: string;
+  quantity: number;
+}
+
+export interface ParsedFactoryShipmentNote {
+  isFactoryShipment: boolean;
+  recipientName: string;
+  recipientPhone: string;
+  recipientAddress: string;
+  paymentStatus: string;
+  compensationStatus: string;
+  trackingEntries: FactoryShipmentTrackingEntry[];
+  remark: string;
+  rawNote: string;
+
+  // 独立补偿物流
+  compensationLogisticsName: string;
+  compensationTrackingNumber: string;
+  compensationItems: FactoryShipmentCompensationItem[];
+}
+
+export function buildFactoryShipmentNote(payload: FactoryShipmentNotePayload): string {
+  const trackingSegment = (payload.trackingEntries || [])
+    .filter((entry) => entry.itemKey?.trim() && (entry.trackingNumber?.trim() || entry.logisticsName?.trim() || entry.shippingFee))
+    .map((entry) => {
+      const logisticsPart = entry.logisticsName?.trim() ? `${entry.logisticsName.trim()}:` : "";
+      const trackingPart = entry.trackingNumber?.trim() || "";
+      const feePart = entry.shippingFee && entry.shippingFee > 0 ? `:${entry.shippingFee}` : "";
+      return `${entry.itemKey.trim()}=${logisticsPart}${trackingPart}${feePart}`;
+    })
+    .join(" ; ");
+
+  const compensationTrackingSegment = payload.compensationTrackingNumber?.trim()
+    ? `${payload.compensationLogisticsName?.trim() ? payload.compensationLogisticsName.trim() + ":" : ""}${payload.compensationTrackingNumber.trim()}`
+    : "";
+
+  const compensationItemsSegment = (payload.compensationItems || [])
+    .filter((item) => item.itemKey?.trim() && item.quantity > 0)
+    .map((item) => `${item.itemKey.trim()}=${item.quantity}`)
+    .join(" ; ");
+
+  const parts = [
+    "[销售]",
+    `[收件人:${payload.recipientName.trim()}]`,
+    payload.recipientPhone?.trim() ? `[电话:${payload.recipientPhone.trim()}]` : "",
+    `[货款:${payload.paymentStatus.trim()}]`,
+    payload.compensationStatus?.trim() ? `[补偿:${payload.compensationStatus.trim()}]` : "",
+    compensationTrackingSegment ? `[补偿单号:${compensationTrackingSegment}]` : "",
+    compensationItemsSegment ? `[补偿货品:${compensationItemsSegment}]` : "",
+    `地址: ${payload.recipientAddress.trim()}`,
+    trackingSegment ? `| 单号: ${trackingSegment}` : "",
+    payload.remark?.trim() ? `| 备注: ${payload.remark.trim()}` : "",
+  ].filter(Boolean);
+
+  return parts.join(" ").trim();
+}
+
+export function parseFactoryShipmentNote(note: string | undefined | null): ParsedFactoryShipmentNote {
+  const rawNote = note || "";
+  const result: ParsedFactoryShipmentNote = {
+    isFactoryShipment: rawNote.includes("[厂家发货]") || rawNote.includes("[销售]"),
+    recipientName: "",
+    recipientPhone: "",
+    recipientAddress: "",
+    paymentStatus: "未支付",
+    compensationStatus: "",
+    trackingEntries: [],
+    remark: "",
+    rawNote,
+    compensationLogisticsName: "",
+    compensationTrackingNumber: "",
+    compensationItems: [],
+  };
+
+  if (!rawNote) {
+    return result;
+  }
+
+  const recipientMatch = rawNote.match(/\[收件人:(.*?)\]/);
+  const phoneMatch = rawNote.match(/\[电话:(.*?)\]/);
+  const paymentMatch = rawNote.match(/\[货款:(.*?)\]/);
+  const compensationMatch = rawNote.match(/\[补偿:(.*?)\]/);
+  const compensationLogisticsMatch = rawNote.match(/\[补偿单号:(.*?)\]/);
+  const compensationItemsMatch = rawNote.match(/\[补偿货品:(.*?)\]/);
+  const addressMatch = rawNote.match(/地址:\s*([^|]+)/);
+  const trackingMatch = rawNote.match(/单号:\s*(.*?)(?:\s*\|\s*备注:|$)/);
+  const remarkMatch = rawNote.match(/备注:\s*(.*)$/);
+
+  result.recipientName = recipientMatch?.[1]?.trim() || "";
+  result.recipientPhone = phoneMatch?.[1]?.trim() || "";
+  result.paymentStatus = paymentMatch?.[1]?.trim() || result.paymentStatus;
+  const compensationStatus = compensationMatch?.[1]?.trim() || result.compensationStatus;
+  result.compensationStatus = compensationStatus === "无需补偿" ? "" : compensationStatus;
+
+  if (compensationLogisticsMatch?.[1]) {
+    const fullVal = compensationLogisticsMatch[1].trim();
+    const colonIndex = fullVal.indexOf(":");
+    if (colonIndex > -1) {
+      result.compensationLogisticsName = fullVal.substring(0, colonIndex).trim();
+      result.compensationTrackingNumber = fullVal.substring(colonIndex + 1).trim();
+    } else {
+      result.compensationLogisticsName = "";
+      result.compensationTrackingNumber = fullVal;
+    }
+  }
+
+  if (compensationItemsMatch?.[1]) {
+    result.compensationItems = compensationItemsMatch[1]
+      .split(/\s*;\s*/)
+      .map((segment) => segment.trim())
+      .filter(Boolean)
+      .map((segment) => {
+        const [itemKey, qtyStr] = segment.split("=");
+        return {
+          itemKey: itemKey?.trim() || "",
+          quantity: parseInt(qtyStr, 10) || 1,
+        };
+      })
+      .filter((item) => item.itemKey && item.quantity > 0);
+  }
+
+  result.recipientAddress = addressMatch?.[1]?.trim() || "";
+  result.trackingEntries = trackingMatch?.[1]
+    ? trackingMatch[1]
+        .split(/\s*;\s*/)
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .map((segment) => {
+          const [itemKey, ...rest] = segment.split("=");
+          const fullVal = rest.join("=").trim();
+          let logisticsName = "";
+          let trackingNumber = "";
+          let shippingFee = 0;
+
+          const colonParts = fullVal.split(":");
+          if (colonParts.length >= 3) {
+            logisticsName = colonParts[0].trim();
+            trackingNumber = colonParts[1].trim();
+            shippingFee = Number(colonParts[2].trim()) || 0;
+          } else if (colonParts.length === 2) {
+            const leftPart = colonParts[0].trim();
+            const rightPart = colonParts[1].trim();
+
+            // 兼容旧数据里“仅填写运费”被序列化为 `:20` 的情况，避免把运费误解析成快递单号。
+            if (!leftPart && rightPart) {
+              logisticsName = "";
+              trackingNumber = "";
+              shippingFee = Number(rightPart) || 0;
+            } else {
+              logisticsName = leftPart;
+              trackingNumber = rightPart;
+            }
+          } else {
+            logisticsName = "";
+            trackingNumber = fullVal.trim();
+          }
+
+          return {
+            itemKey: itemKey?.trim() || "",
+            logisticsName,
+            trackingNumber,
+            shippingFee,
+          };
+        })
+        .filter((entry) => entry.itemKey && (entry.trackingNumber || entry.logisticsName || entry.shippingFee))
+    : [];
+  result.remark = remarkMatch?.[1]?.trim() || "";
+
+  return result;
+}
+
+export function generateOutboundId(type?: string): string {
+  const prefix = type === "FactoryShipment" ? "FH" : "CK";
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${prefix}-${date}-${random}`;
+}

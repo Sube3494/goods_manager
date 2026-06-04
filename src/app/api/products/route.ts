@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
+    const { name, sku, jdSkuId, jdSkuIds, costPrice, salePrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
     const isShelfLife = Boolean(body?.isShelfLife ?? false);
     const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     const normalizedSku = normalizeSku(sku);
@@ -140,6 +140,8 @@ export async function POST(request: Request) {
 
     // 格式化价格和库存 (强制库存初始值为 0，只能通过采购生成批次入库)
     const stockNum = 0;
+    const normalizedCostPrice = Math.max(0, Number(costPrice) || 0);
+    const normalizedSalePrice = salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : normalizedCostPrice;
 
     let resolvedShopId: string | null = null;
     let resolvedShopName = "";
@@ -198,7 +200,8 @@ export async function POST(request: Request) {
           categoryId: categoryId || null,
           categoryName: category?.name || null,
           supplierId: supplierId || null,
-          costPrice: Number(costPrice) || 0,
+          costPrice: normalizedCostPrice,
+          salePrice: normalizedSalePrice,
           stock: stockNum,
           isPublic: isPublic ?? true,
           isDiscontinued: isDiscontinued ?? false,
@@ -221,6 +224,7 @@ export async function POST(request: Request) {
         jdSkuId: created.jdSkuId,
         categoryId: created.categoryId,
         costPrice: created.costPrice,
+        salePrice: created.salePrice,
         stock: created.stock,
         image: created.productImage ? storage.resolveUrl(created.productImage) : null,
         supplierId: created.supplierId,
@@ -278,7 +282,8 @@ export async function POST(request: Request) {
           name,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
-          costPrice: Number(costPrice) || 0,
+          costPrice: normalizedCostPrice,
+          salePrice: normalizedSalePrice,
           stock: 0,
           categoryId: categoryId || undefined,
           supplierId: supplierId || null,
@@ -305,7 +310,8 @@ export async function POST(request: Request) {
                 categoryId: categoryId || null,
                 categoryName: category?.name || null,
                 supplierId: supplierId || null,
-                costPrice: Number(costPrice) || 0,
+                costPrice: normalizedCostPrice,
+                salePrice: normalizedSalePrice,
                 stock: stockNum,
                 isPublic: isPublic ?? true,
                 isDiscontinued: isDiscontinued ?? false,
@@ -358,7 +364,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { id, name, sku, jdSkuId, jdSkuIds, costPrice, salePrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
     const isShelfLife = body?.isShelfLife !== undefined ? Boolean(body.isShelfLife) : undefined;
     const shelfLifeDays = body?.shelfLifeDays !== undefined ? (body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null) : undefined;
     const normalizedSku = normalizeSku(sku);
@@ -405,6 +411,7 @@ export async function PUT(request: Request) {
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
           costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
+          salePrice: salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : undefined,
           categoryId: categoryId || undefined,
           supplierId: supplierId || null,
           image: image !== undefined ? storage.stripUrl(image) : undefined,

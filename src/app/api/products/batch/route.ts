@@ -167,7 +167,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { ids, categoryId, supplierId, isPublic, isDiscontinued, costPrice, isShelfLife, shelfLifeDays } = await request.json();
+    const { ids, categoryId, supplierId, isPublic, isDiscontinued, salePrice, isShelfLife, shelfLifeDays } = await request.json();
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
@@ -181,7 +181,7 @@ export async function PATCH(request: NextRequest) {
     if (supplierId) updateData.supplierId = supplierId;
     if (isPublic !== undefined) updateData.isPublic = isPublic;
     if (isDiscontinued !== undefined) updateData.isDiscontinued = isDiscontinued;
-    if (costPrice !== undefined) updateData.costPrice = costPrice;
+    if (salePrice !== undefined) updateData.salePrice = salePrice;
     if (isShelfLife !== undefined) {
       updateData.isShelfLife = Boolean(isShelfLife);
       if (isShelfLife === false) {

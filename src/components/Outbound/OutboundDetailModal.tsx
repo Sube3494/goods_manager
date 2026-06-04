@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { X, Copy, Check, Store, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle, ArrowLeftRight } from "lucide-react";
+import { X, Copy, Check, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle, ArrowLeftRight } from "lucide-react";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
-import { parseOutboundNote, copyToClipboard, getPlatformMeta, cn } from "@/lib/utils";
+import { parseOutboundNote, copyToClipboard, cn, parseFactoryShipmentNote } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
@@ -20,12 +20,15 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
   if (!isOpen || !order) return null;
 
   const parsed = parseOutboundNote(order.note);
-  const platformMeta = getPlatformMeta(parsed.platform);
   const isReturned = order.status === "Returned";
   
   // 提取对冲理由
   const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
   const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
+
+  const displayUserNote = order.type === "FactoryShipment"
+    ? parseFactoryShipmentNote(order.note).remark
+    : parsed.userNote;
 
   const handleCopy = async (text: string, field: string) => {
     const success = await copyToClipboard(text);
@@ -79,45 +82,10 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
             </h3>
             
             <div className="grid grid-cols-2 gap-3">
-              {/* 流水号与平台渠道集成卡片 (完美复刻订单列表的平台+流水号集成Badge形式) */}
-              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3.5 rounded-xl transition-all duration-300 shadow-sm dark:shadow-none flex items-center justify-between group">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
-                    <FileText size={12} className="text-blue-500 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-                    <span>流水号与平台</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    {platformMeta ? (
-                      <span className={cn("inline-flex h-7 items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black border shadow-xs whitespace-nowrap", platformMeta.className)}>
-                        <span className="inline-flex h-3.5 w-3.5 items-center justify-center shrink-0">
-                          <Image
-                            src={platformMeta.iconSrc}
-                            alt={platformMeta.name}
-                            width={14}
-                            height={14}
-                            className="h-3.5 w-3.5 object-cover"
-                            unoptimized
-                          />
-                        </span>
-                        <span>
-                          {parsed.serialNum 
-                            ? `${platformMeta.name} #${parsed.serialNum}` 
-                            : `${platformMeta.name} #${order.id.slice(-6).toUpperCase()}`}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
-                        {parsed.serialNum ? `#${parsed.serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
               {/* 出库类型 (col-span-1 平行) */}
               {(() => {
                 const typeConfig = {
+                  FactoryShipment: { label: '销售', color: 'from-sky-500/10 to-cyan-500/5 text-sky-600 dark:text-sky-300 border-sky-200 dark:border-sky-500/30' },
                   Sale: { label: '销售出库', color: 'from-blue-500/10 to-cyan-500/5 text-blue-600 dark:text-cyan-400 border-blue-200 dark:border-cyan-500/30' },
                   Sample: { label: '领用出库', color: 'from-purple-500/10 to-pink-500/5 text-purple-600 dark:text-pink-400 border-purple-200 dark:border-pink-500/30' },
                   Return: { label: '退货出库', color: 'from-amber-500/10 to-orange-500/5 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30' },
@@ -139,19 +107,8 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                 );
               })()}
 
-              {/* 出库门店 (col-span-1 平行) */}
+              {/* 出库时间 (col-span-1 平行) */}
               <div className="col-span-1 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                  <Store size={12} className="text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
-                  <span>出库门店</span>
-                </div>
-                <div className="font-bold text-xs text-slate-900 dark:text-white truncate mt-0.5" title={parsed.shopName || order.shopName || "未知门店"}>
-                  {parsed.shopName || order.shopName || "未知门店"}
-                </div>
-              </div>
-
-              {/* 出库时间 (col-span-2) */}
-              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
                   <Clock size={12} className="text-emerald-500 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
                   <span>出库时间</span>
@@ -159,28 +116,6 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                 <div className="font-mono text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
                   {format(new Date(order.date), 'yyyy-MM-dd HH:mm:ss', { locale: zhCN })}
                 </div>
-              </div>
-
-              {/* 平台订单号 (col-span-2 独立一行全宽平铺，右置复制) */}
-              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group flex items-center justify-between gap-4 shadow-sm dark:shadow-none">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                    <FileText size={12} className="text-cyan-500 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
-                    <span>平台订单号</span>
-                  </div>
-                  <div className="font-mono text-xs text-slate-900 dark:text-white truncate font-bold mt-0.5 select-all" title={parsed.platformId || "-"}>
-                    {parsed.platformId || "-"}
-                  </div>
-                </div>
-                {parsed.platformId && (
-                  <button
-                    onClick={() => handleCopy(parsed.platformId!, "platformId")}
-                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-all shrink-0 self-end mb-0.5"
-                    title="复制平台订单号"
-                  >
-                    {copiedField === "platformId" ? <Check size={12} className="text-emerald-500 dark:text-emerald-400 animate-bounce" /> : <Copy size={12} />}
-                  </button>
-                )}
               </div>
 
               {/* 配送地址 (去除累赘嵌套黑框，右置一键复制，与上面的平台订单号完美对称) */}
@@ -208,9 +143,9 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
           </div>
 
           {/* User Custom Note & Return Status */}
-          {(parsed.userNote || isReturned) && (
+          {(displayUserNote || isReturned) && (
             <div className="space-y-4">
-              {parsed.userNote && (
+              {displayUserNote && (
                 <div className="p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.03)] flex gap-3">
                   <div className="p-2 h-fit rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 shrink-0">
                     <FileText size={14} />
@@ -218,7 +153,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                   <div className="flex-1 min-w-0">
                     <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">用户备注</h4>
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed break-words">
-                      {parsed.userNote}
+                      {displayUserNote}
                     </p>
                   </div>
                 </div>
@@ -281,11 +216,6 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                           {name}
                         </p>
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {item.shopProduct?.shopName && (
-                            <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                              {item.shopProduct.shopName}
-                            </span>
-                          )}
                           <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 bg-slate-200/50 dark:bg-white/5 px-2 py-0.5 rounded border border-black/[0.04] dark:border-white/5">
                             SKU: {sku}
                           </span>

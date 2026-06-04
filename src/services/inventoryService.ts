@@ -4,6 +4,49 @@ import { Prisma } from "../../prisma/generated-client";
  * 库存核心服务
  */
 export class InventoryService {
+  private static async getOutboundItemLabel(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    item: { productId?: string | null; shopProductId?: string | null }
+  ) {
+    if (item.shopProductId) {
+      const shopProduct = await tx.shopProduct.findFirst({
+        where: {
+          id: item.shopProductId,
+          shop: { userId },
+        },
+        select: {
+          productName: true,
+          sku: true,
+          product: {
+            select: {
+              name: true,
+              sku: true,
+            },
+          },
+        },
+      });
+
+      const name = shopProduct?.productName || shopProduct?.product?.name;
+      const sku = shopProduct?.sku || shopProduct?.product?.sku;
+      return [name, sku ? `(${sku})` : ""].filter(Boolean).join(" ") || "该商品";
+    }
+
+    if (item.productId) {
+      const product = await tx.product.findUnique({
+        where: { id: item.productId },
+        select: {
+          name: true,
+          sku: true,
+        },
+      });
+
+      return [product?.name, product?.sku ? `(${product.sku})` : ""].filter(Boolean).join(" ") || "该商品";
+    }
+
+    return "该商品";
+  }
+
   /**
    * 处理出库的 FIFO (先进先出) 扣减逻辑
    * @param tx Prisma 事务客户端
@@ -64,7 +107,8 @@ export class InventoryService {
         });
 
         if (updateResult.count === 0) {
-          throw new Error(`并发冲突：商品 ID ${item.shopProductId || item.productId} 在该批次库存不足。请重试。`);
+          const itemLabel = await this.getOutboundItemLabel(tx, userId, item);
+          throw new Error(`并发冲突：${itemLabel} 在该批次库存不足，请重试。`);
         }
 
         // 同时更新关联的保质期批次库存 ProductBatch（如果有的话）
@@ -84,7 +128,8 @@ export class InventoryService {
 
       // 3. 校验库存是否足够 (虽然前端通常有校验，但后端逻辑必须闭环)
       if (remainingToDeduct > 0) {
-        throw new Error(`商品 ID ${item.shopProductId || item.productId} 库存不足，缺口: ${remainingToDeduct}`);
+        const itemLabel = await this.getOutboundItemLabel(tx, userId, item);
+        throw new Error(`${itemLabel} 库存不足，缺口 ${remainingToDeduct} 件`);
       }
 
       // 4. 根据实际扣减完的批次，统一同步该商品及其关联的主库商品物理库存

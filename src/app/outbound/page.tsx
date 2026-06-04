@@ -30,8 +30,6 @@ export default function OutboundPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [platformFilter, setPlatformFilter] = useState("全部平台");
-  const [selectedShop, setSelectedShop] = useState("全部门店");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
@@ -50,6 +48,13 @@ export default function OutboundPage() {
   const { showToast } = useToast();
   const { user } = useUser();
   const canCreate = hasPermission(user as SessionUser | null, "outbound:manage");
+
+  const formatOrderId = (id: string) => {
+    if (id.startsWith("CK-") || id.startsWith("FH-") || id.startsWith("FS-") || id.includes("-")) {
+      return id;
+    }
+    return `#${id.slice(-6).toUpperCase()}`;
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -116,36 +121,7 @@ export default function OutboundPage() {
     });
   };
 
-  // 从 note 中提取店铺名的辅助函数
-  const extractShopName = (note: string | undefined | null): string | null => {
-    return parseOutboundNote(note).shopName;
-  };
 
-  const resolveOrderShopName = (order: OutboundOrder): string | null => {
-    const noteShopName = extractShopName(order.note);
-    if (noteShopName) return noteShopName;
-
-    const itemShopName = order.items.find((item) => item.shopProduct?.shopName)?.shopProduct?.shopName;
-    if (itemShopName) return itemShopName;
-
-    return order.shopName || null;
-  };
-
-  // 从 note 中提取平台的辅助函数 (归一化为 美团、京东、淘宝等)
-  const extractPlatform = (note: string | undefined | null): string | null => {
-    const rawPlatform = parseOutboundNote(note).platform;
-    return getPlatformMeta(rawPlatform)?.name || null;
-  };
-
-  const allShopNames = useMemo(() => {
-    const names = orders.map((order) => resolveOrderShopName(order)).filter(Boolean) as string[];
-    return Array.from(new Set(names)).sort();
-  }, [orders]);
-
-  const allPlatforms = useMemo(() => {
-    const platforms = orders.map(o => extractPlatform(o.note)).filter(Boolean) as string[];
-    return Array.from(new Set(platforms)).sort();
-  }, [orders]);
 
   const filteredOrders = orders.filter(order => {
     const parsedNote = parseOutboundNote(order.note);
@@ -155,25 +131,16 @@ export default function OutboundPage() {
       return displayName.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
-    // Search query filter: supports serial number, platform, address, user note and items
+    // Search query filter: supports serial number, address, user note and items
     const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       parsedNote.rawNote.toLowerCase().includes(searchQuery.toLowerCase()) ||
       parsedNote.userNote?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parsedNote.platform?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       parsedNote.platformId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       parsedNote.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       matchesItemSearch;
     
     // Type filter
     const matchesType = typeFilter === "all" || order.type === typeFilter;
-
-    // Platform filter
-    const orderPlatform = extractPlatform(order.note);
-    const matchesPlatform = platformFilter === "全部平台" || orderPlatform === platformFilter;
-
-    // Shop filter
-    const orderShop = resolveOrderShopName(order);
-    const matchesShop = selectedShop === "全部门店" || orderShop === selectedShop;
     
     // Date filter
     let matchesDate = true;
@@ -184,7 +151,7 @@ export default function OutboundPage() {
       matchesDate = isWithinInterval(orderDate, { start, end });
     }
     
-    return matchesSearch && matchesType && matchesPlatform && matchesShop && matchesDate;
+    return matchesSearch && matchesType && matchesDate;
   });
 
   const totalItems = filteredOrders.length;
@@ -198,13 +165,11 @@ export default function OutboundPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, startDate, endDate, typeFilter, platformFilter, selectedShop, pageSize]);
+  }, [searchQuery, startDate, endDate, typeFilter, pageSize]);
   
   const activeFiltersCount = useMemo(() => {
-    return (typeFilter !== "all" ? 1 : 0) + 
-           (platformFilter !== "全部平台" ? 1 : 0) + 
-           (selectedShop !== "全部门店" ? 1 : 0);
-  }, [typeFilter, platformFilter, selectedShop]);
+    return (typeFilter !== "all" ? 1 : 0);
+  }, [typeFilter]);
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
@@ -250,8 +215,6 @@ export default function OutboundPage() {
                         setStartDate("");
                         setEndDate("");
                         setTypeFilter("all");
-                        setPlatformFilter("全部平台");
-                        setSelectedShop("全部门店");
                         setCurrentPage(1);
                     }}
                     className="h-10 sm:h-11 px-3 sm:px-4 flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
@@ -315,6 +278,7 @@ export default function OutboundPage() {
                     onChange={setTypeFilter}
                     options={[
                         { value: "all", label: "所有类型" },
+                        { value: "FactoryShipment", label: "销售" },
                         { value: "Sale", label: "销售出库" },
                         { value: "Sample", label: "样板领用" },
                         { value: "Loss", label: "损耗出库" },
@@ -324,40 +288,6 @@ export default function OutboundPage() {
                     triggerClassName={cn(
                         "h-full rounded-full border shadow-sm text-[10px] sm:text-sm font-normal transition-all px-3 sm:px-4",
                         typeFilter !== "all" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
-                    )}
-                />
-            </div>
-            
-            <div className="w-full sm:w-36 h-10 sm:h-11 shrink-0">
-                <CustomSelect
-                    value={platformFilter}
-                    onChange={setPlatformFilter}
-                    options={[
-                      { value: "全部平台", label: "全部平台" },
-                      ...allPlatforms.map(name => ({ value: name, label: name }))
-                    ]}
-                    placeholder="全部平台"
-                    className="h-full"
-                    triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm text-[10px] sm:text-sm font-normal transition-all px-3 sm:px-4",
-                        platformFilter !== "全部平台" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
-                    )}
-                />
-            </div>
-            
-            <div className="w-full sm:w-36 h-10 sm:h-11 shrink-0">
-                <CustomSelect
-                    value={selectedShop}
-                    onChange={setSelectedShop}
-                    options={[
-                      { value: "全部门店", label: "全部门店" },
-                      ...allShopNames.map(name => ({ value: name, label: name }))
-                    ]}
-                    placeholder="全部门店"
-                    className="h-full"
-                    triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm text-[10px] sm:text-sm font-normal transition-all px-3 sm:px-4",
-                        selectedShop !== "全部门店" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
                     )}
                 />
             </div>
@@ -380,7 +310,6 @@ export default function OutboundPage() {
                 <tr className="border-b border-border bg-muted/30">
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">单据编号</th>
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">类型</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">平台</th>
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">出库时间</th>
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">商品概览</th>
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">操作</th>
@@ -391,11 +320,6 @@ export default function OutboundPage() {
                     const isReturned = order.status === 'Returned';
                     const parsed = parseOutboundNote(order.note);
                     
-                    const shopName = parsed.shopName || resolveOrderShopName(order);
-                    const platformName = extractPlatform(order.note);
-                    const platformMeta = getPlatformMeta(platformName);
-                    const serialNum = parsed.serialNum;
-
                     return (
                       <tr 
                         key={order.id}
@@ -405,56 +329,25 @@ export default function OutboundPage() {
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-center text-[11px] font-mono text-muted-foreground">
                           <div className="flex flex-col items-center gap-1.5">
-                            <div className="flex flex-wrap items-center justify-center gap-1">
-                              {shopName && (
-                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                  <Store size={8} />
-                                  {shopName}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-semibold text-muted-foreground/40 text-[10px]">
-                              {serialNum ? `流水单号 #${serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
+                            <span className="font-semibold text-muted-foreground/45 text-[10px]">
+                              {formatOrderId(order.id)}
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                              order.type === 'FactoryShipment' ? 'bg-sky-500/10 text-sky-600 border-sky-500/20' :
                               order.type === 'Sale' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
                               order.type === 'Sample' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
                               'bg-orange-500/10 text-orange-600 border-orange-500/20'
                             }`}>
-                              {order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
+                              {order.type === 'FactoryShipment' ? '销售' : order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
                             </span>
                             {isReturned && (
                               <span className="flex items-center gap-1 text-[10px] font-bold text-destructive bg-destructive/5 px-2 py-0.5 rounded-md border border-destructive/10">
                                 <RotateCcw size={10} />
                                 已对冲
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="flex items-center justify-center">
-                            {platformMeta ? (
-                              <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] shadow-xs", platformMeta.className)}>
-                                <span className="inline-flex h-4.5 w-4.5 items-center justify-center shrink-0">
-                                  <Image
-                                    src={platformMeta.iconSrc}
-                                    alt={platformMeta.name}
-                                    width={18}
-                                    height={18}
-                                    className="h-4.5 w-4.5 object-cover"
-                                    unoptimized
-                                  />
-                                </span>
-                                <span>{platformMeta.name}</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 dark:bg-slate-500/20 dark:border-slate-500/30 shadow-xs whitespace-nowrap">
-                                <Pencil size={11} className="shrink-0" />
-                                <span>手动登记</span>
                               </span>
                             )}
                           </div>
@@ -552,11 +445,6 @@ export default function OutboundPage() {
                 const isReturned = order.status === 'Returned';
                 const parsed = parseOutboundNote(order.note);
                 
-                const shopName = parsed.shopName || resolveOrderShopName(order);
-                const platformName = extractPlatform(order.note);
-                const platformMeta = getPlatformMeta(platformName);
-                const serialNum = parsed.serialNum;
-
                 const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
                 const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
 
@@ -571,48 +459,18 @@ export default function OutboundPage() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
                         
-                        {/* 1. 平台与流水单号集成 Badge */}
-                        {platformMeta ? (
-                          <span className={cn("inline-flex h-7 items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border shadow-xs whitespace-nowrap", platformMeta.className)}>
-                            <span className="inline-flex h-3.5 w-3.5 items-center justify-center shrink-0">
-                              <Image
-                                src={platformMeta.iconSrc}
-                                alt={platformMeta.name}
-                                width={14}
-                                height={14}
-                                className="h-3.5 w-3.5 object-cover"
-                                unoptimized
-                              />
-                            </span>
-                            <span>{serialNum ? `#${serialNum}` : `#${order.id.slice(-4).toUpperCase()}`}</span>
-                          </span>
-                        ) : (
-                          <>
-                            <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
-                              {serialNum ? `#${serialNum}` : `#${order.id.slice(-4).toUpperCase()}`}
-                            </span>
-                            <span className="inline-flex h-7 items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 dark:bg-slate-500/20 dark:border-slate-500/30 shadow-xs whitespace-nowrap">
-                              <Pencil size={11} className="shrink-0" />
-                              <span>手动登记</span>
-                            </span>
-                          </>
-                        )}
-
-                        {/* 2. 出库门店 Badge */}
-                        {shopName && (
-                          <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 text-[9px] font-bold text-blue-500 whitespace-nowrap">
-                            <Store size={8} className="mr-1 text-blue-500" />
-                            {shopName}
-                          </span>
-                        )}
+                        <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
+                          {formatOrderId(order.id)}
+                        </span>
 
                         {/* 3. 出库类型 Badge */}
                         <span className={`inline-flex h-7 items-center px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase whitespace-nowrap ${
+                          order.type === 'FactoryShipment' ? 'bg-sky-500/10 text-sky-600 border-sky-500/20' :
                           order.type === 'Sale' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
                           order.type === 'Sample' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' :
                           'bg-orange-500/10 text-orange-600 border-orange-500/20'
                         }`}>
-                          {order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
+                          {order.type === 'FactoryShipment' ? '销售' : order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
                         </span>
 
                         {/* 4. 已对冲 Badge */}

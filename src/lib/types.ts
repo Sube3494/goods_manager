@@ -63,6 +63,7 @@ export interface Product {
   categoryId: string;
   category?: Category;
   costPrice: number;
+  salePrice?: number;
   stock: number;
   image?: string;
   isPublic?: boolean;
@@ -113,6 +114,7 @@ export interface ShopCatalogItem {
   supplierId?: string | null;
   supplier?: SupplierSummary | null;
   costPrice?: number | null;
+  salePrice?: number | null;
   stock?: number | null;
   shopId?: string | null;
   shopName?: string | null;

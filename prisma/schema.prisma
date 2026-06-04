@@ -29,6 +29,7 @@ model Product {
   jdSkuId         String?
   name            String
   costPrice       Float               @default(0)
+  salePrice       Float               @default(0)
   stock           Int                 @default(0)
   image           String?
   categoryId      String
@@ -248,6 +249,7 @@ model User {
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
   batches            ProductBatch[]
   dailyPromotionExpenses DailyPromotionExpense[]
+  logisticsCompanies LogisticsCompany[]
 }
 
 model UserDeviceSession {
@@ -596,6 +598,7 @@ model ShopProduct {
   categoryName    String?
   supplierId      String?
   costPrice       Float    @default(0)
+  salePrice       Float    @default(0)
   stock           Int      @default(0)
   isPublic        Boolean  @default(true)
   isDiscontinued  Boolean  @default(false)
@@ -764,4 +767,19 @@ model DailyPromotionExpense {
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+model LogisticsCompany {
+  id        String   @id @default(cuid())
+  name      String   // 物流公司名称 (如：顺丰速运, 邮政EMS, 圆通速递)
+  code      String?  // 物流公司编码 (如：SF, EMS, YTO 等，可选)
+  isActive  Boolean  @default(true) // 是否启用
+  sortOrder Int      @default(0) // 排序号
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String?  // 多用户隔离
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@unique([name, userId])
+  @@index([userId])
 }

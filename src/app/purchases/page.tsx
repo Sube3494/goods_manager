@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Package, Wallet, Archive, ReceiptText, Check, ArrowUp } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -41,8 +41,8 @@ function formatPurchaseItemsSummary(purchase: PurchaseOrder) {
   return {
     items: visibleItems.map((item) => ({
       key: item.id || item.shopProductId || item.productId || `${item.quantity}-${item.costPrice}`,
-      name: item.shopProduct?.productName || item.shopProduct?.name || "未知商品",
-      image: item.shopProduct?.image || "",
+      name: item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || "未知商品",
+      image: item.shopProduct?.image || item.product?.image || "",
       quantity: item.quantity,
     })),
     hasMore: purchase.items.length > visibleItems.length,
@@ -345,16 +345,16 @@ function PurchasesContent() {
   };
 
   const filteredPurchases = useMemo(() => {
-    return filterPurchases(purchases, { searchQuery, statusFilter, shopFilter });
-  }, [purchases, searchQuery, statusFilter, shopFilter]);
+    return filterPurchases(purchases, { searchQuery, statusFilter, shopFilter: "All" });
+  }, [purchases, searchQuery, statusFilter]);
 
   const statsPurchases = useMemo(() => {
     return filterPurchases(purchases, {
       searchQuery,
       statusFilter: "All",
-      shopFilter,
+      shopFilter: "All",
     });
-  }, [purchases, searchQuery, shopFilter]);
+  }, [purchases, searchQuery]);
 
   const purchaseStats = useMemo(() => {
     const totalAmount = statsPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
@@ -362,7 +362,7 @@ function PurchasesContent() {
     const pendingPurchases = statsPurchases.filter((purchase) => purchase.status !== "Received");
     const receivedAmount = receivedPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
     const pendingAmount = pendingPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
-    const shopCount = new Set(statsPurchases.map((purchase) => purchase.shopName).filter(Boolean)).size;
+    const shopCount = 0;
 
     return {
       totalCount: statsPurchases.length,
@@ -385,7 +385,7 @@ function PurchasesContent() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, shopFilter, pageSize]);
+  }, [searchQuery, statusFilter, pageSize]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -597,7 +597,7 @@ function PurchasesContent() {
         const sortedItems = sortPurchaseItems(
             po.items,
             item => item.shopProduct?.sku || item.product?.sku,
-            item => item.shopProduct?.name || item.product?.name
+            item => item.shopProduct?.productName || item.shopProduct?.name || item.product?.name
         );
         for (const item of sortedItems) {
           const qty = item.quantity || 0;
@@ -663,7 +663,7 @@ function PurchasesContent() {
           const row = worksheet.addRow([
             globalIndex++,
             "", // Placeholder for image
-            item.shopProduct?.name || item.product?.name || "未知商品",
+            item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || "未知商品",
             item.shopProduct?.sku || item.product?.sku || "",
             price,
             qty,
@@ -836,11 +836,9 @@ function PurchasesContent() {
         purchases={purchases}
         searchQuery={searchQuery}
         statusFilter={statusFilter}
-        shopFilter={shopFilter}
         hasActiveFilters={hasActiveFilters}
         onSearchChange={setSearchQuery}
         onStatusChange={handleStatusFilterChange}
-        onShopChange={setShopFilter}
         onReset={resetFilters}
       />
 
@@ -854,16 +852,15 @@ function PurchasesContent() {
                <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
             </div>
           ) : paginatedPurchases.length > 0 ? (
-          <table className="w-full min-w-[1120px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[960px] table-fixed border-collapse text-left">
             <colgroup>
               <col className="w-[44px]" />
               <col className="w-[58px]" />
-              <col className="w-[130px]" />
-              <col className="w-[330px]" />
-              <col className="w-[135px]" />
+              <col className="w-[320px]" />
               <col className="w-[120px]" />
-              <col className="w-[190px]" />
-              <col className="w-[113px]" />
+              <col className="w-[110px]" />
+              <col className="w-[170px]" />
+              <col className="w-[104px]" />
             </colgroup>
             <thead>
               <tr className="border-b border-border bg-muted/30">
@@ -893,7 +890,6 @@ function PurchasesContent() {
                 <th className="w-[52px] px-1 py-3 text-xs font-bold text-foreground text-center whitespace-nowrap align-middle lg:w-[64px] lg:px-0">
                   <div className="flex justify-center">序号</div>
                 </th>
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">归属店铺</th>
                 <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">商品与数量</th>
                 <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">交易金额</th>
                 <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">状态</th>
@@ -939,14 +935,6 @@ function PurchasesContent() {
                           {(currentPage - 1) * pageSize + index + 1}
                         </span>
                       </div>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      {po.shopName ? (
-                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1 text-[10px] font-bold text-primary">
-                              <Store size={10} />
-                              <span className="truncate">{po.shopName}</span>
-                          </span>
-                      ) : <span className="text-[10px] text-muted-foreground/30 italic">未归属</span>}
                     </td>
                     <td className="px-5 py-4 text-center text-sm">
                       {(() => {
@@ -1090,10 +1078,6 @@ function PurchasesContent() {
                         <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-black text-foreground dark:bg-white/8 dark:text-white">
                           {(currentPage - 1) * pageSize + index + 1}
                         </span>
-                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-1 text-[11px] font-bold text-primary dark:bg-white/6 dark:text-white">
-                          <Store size={12} />
-                          <span className="max-w-[180px] truncate">{po.shopName || "未指定店铺"}</span>
-                        </div>
                         <div className="inline-flex items-center gap-1.5 text-[10px] font-mono text-foreground/60">
                           <Calendar size={11} className="shrink-0" />
                           <span>{formatLocalDateTime(po.date)}</span>

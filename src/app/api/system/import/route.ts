@@ -132,7 +132,8 @@ export async function POST(request: Request) {
                 name,
                 categoryId,
                 supplierId,
-                costPrice: Number(p["成本价"] || 0)
+                costPrice: Number(p["成本价"] || p["进货单价"] || 0),
+                salePrice: Number(p["售价"] || p["销售价"] || p["成本价"] || p["进货单价"] || 0)
               },
               create: {
                 sku,
@@ -140,7 +141,8 @@ export async function POST(request: Request) {
                 categoryId,
                 supplierId,
                 stock: 0, // 新建时库存初始为 0，需通过采购入库
-                costPrice: Number(p["成本价"] || 0),
+                costPrice: Number(p["成本价"] || p["进货单价"] || 0),
+                salePrice: Number(p["售价"] || p["销售价"] || p["成本价"] || p["进货单价"] || 0),
                 userId
               }
             });

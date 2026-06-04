@@ -154,6 +154,7 @@ export async function POST(request: Request) {
         name: sourceProduct.name,
         sku,
         costPrice: sourceProduct.costPrice,
+        salePrice: (sourceProduct as { salePrice?: number | null }).salePrice ?? sourceProduct.costPrice,
         stock: 0,
         image: sourceProduct.image,
         categoryId: category.id,

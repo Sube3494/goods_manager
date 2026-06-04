@@ -1,0 +1,5 @@
+ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "salePrice" DOUBLE PRECISION NOT NULL DEFAULT 0;
+UPDATE "Product" SET "salePrice" = COALESCE("salePrice", 0) + CASE WHEN "salePrice" = 0 THEN COALESCE("costPrice", 0) ELSE 0 END;
+
+ALTER TABLE "ShopProduct" ADD COLUMN IF NOT EXISTS "salePrice" DOUBLE PRECISION NOT NULL DEFAULT 0;
+UPDATE "ShopProduct" SET "salePrice" = COALESCE("salePrice", 0) + CASE WHEN "salePrice" = 0 THEN COALESCE("costPrice", 0) ELSE 0 END;

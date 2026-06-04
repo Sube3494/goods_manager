@@ -17,6 +17,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const sessionUser = (user as unknown as SessionUser | null) ?? null;
   const isAlbumOnlyPath =
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/profile" ||
     pathname === "/goods" ||
@@ -32,7 +33,19 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     pathname === "/settings" ||
     pathname.startsWith("/settings/") ||
     pathname === "/media" ||
-    pathname.startsWith("/media/");
+    pathname.startsWith("/media/") ||
+    pathname === "/purchases" ||
+    pathname.startsWith("/purchases/") ||
+    pathname === "/factory-shipments" ||
+    pathname.startsWith("/factory-shipments/") ||
+    pathname === "/customers" ||
+    pathname.startsWith("/customers/") ||
+    pathname === "/inbound" ||
+    pathname.startsWith("/inbound/") ||
+    pathname === "/outbound" ||
+    pathname.startsWith("/outbound/") ||
+    pathname === "/logistics" ||
+    pathname.startsWith("/logistics/");
 
   const isAuthorized = useMemo(() => {
     // 1. Instant allow for public entry points to prevent flickering while loading user session

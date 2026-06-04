@@ -97,7 +97,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, remark, isShelfLife, shelfLifeDays } = body;
+    const { name, sku, jdSkuId, jdSkuIds, costPrice, salePrice, categoryId, supplierId, image, isPublic, remark, isShelfLife, shelfLifeDays } = body;
     const normalizedSku = normalizeSku(sku);
     const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
     const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
@@ -134,7 +134,8 @@ export async function PUT(
           name,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
-          costPrice: Number(costPrice || body.price),
+          costPrice: Number(costPrice ?? body.costPrice ?? 0),
+          salePrice: salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : undefined,
           categoryId,
           supplierId,
           image,

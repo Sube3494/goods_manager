@@ -205,11 +205,11 @@ export const GoodsCard = memo(function GoodsCard({
             </p>
           </div>
           <div className="text-right">
-             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">进货单价</p>
+             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">售价</p>
              <p className="font-bold text-foreground">
-                <span className="text-base sm:text-lg font-number">¥{Number(product.costPrice || 0).toLocaleString()}</span>
+                <span className="text-base sm:text-lg font-number">¥{Number(product.salePrice ?? product.costPrice ?? 0).toLocaleString()}</span>
              </p>
-          </div>
+           </div>
         </div>
 
         {/* Mobile Actions Bar */}
@@ -288,6 +288,7 @@ export const GoodsCard = memo(function GoodsCard({
     prev.product.name === next.product.name &&
     prev.product.stock === next.product.stock &&
     prev.product.costPrice === next.product.costPrice &&
+    prev.product.salePrice === next.product.salePrice &&
     prev.product.image === next.product.image &&
     prev.product.sku === next.product.sku &&
     prev.product.supplierId === next.product.supplierId &&

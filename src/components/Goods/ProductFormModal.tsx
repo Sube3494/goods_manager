@@ -119,6 +119,7 @@ export function ProductFormModal({
     name: initialData?.name || "",
     categoryId: initialData?.categoryId || "",
     costPrice: initialData?.costPrice?.toString() || "",
+    salePrice: initialData?.salePrice?.toString() || "",
     stock: initialData?.stock?.toString() || "",
     image: initialData?.image || "",
     supplierId: initialData?.supplierId || "",
@@ -324,6 +325,7 @@ export function ProductFormModal({
           jdSkuId: formatInitialJdSkuValue(initialData),
           name: initialData.name,
           costPrice: String(initialData.costPrice || ""),
+          salePrice: String(initialData.salePrice ?? ""),
           stock: String(initialData.stock || ""),
           categoryId: initialData.categoryId || "",
           supplierId: initialData.supplierId || "",
@@ -347,6 +349,7 @@ export function ProductFormModal({
           jdSkuId: "",
           name: "",
           costPrice: "",
+          salePrice: "",
           stock: "",
           categoryId: "",
           supplierId: "",
@@ -807,6 +810,7 @@ export function ProductFormModal({
     await onSubmit({
       ...formData,
       costPrice: Number(formData.costPrice),
+      salePrice: Number(formData.salePrice || formData.costPrice || 0),
       stock: hideStockField ? 0 : Number(formData.stock),
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
       isShelfLife: formData.isShelfLife,
@@ -1116,9 +1120,9 @@ export function ProductFormModal({
 
                         {!hideSupplierField && (
                           <div className="space-y-2">
-                                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                      <Truck size={16} className="text-amber-500" /> 供应商
-                                  </label>
+                              <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                  <Truck size={16} className="text-amber-500" /> 供应商
+                              </label>
                               <CustomSelect 
                                   value={formData.supplierId || ""}
                                   onChange={(value) => setFormData({...formData, supplierId: value})}
@@ -1414,11 +1418,11 @@ export function ProductFormModal({
 
                     {!hidePricingFields && (
                     <div className="space-y-4">
-                        <div className={cn("grid gap-4", hideStockField ? "grid-cols-1" : "grid-cols-2")}>
+                        <div className={cn("grid gap-4", hideStockField ? "grid-cols-2" : "grid-cols-3")}>
                             {/* Cost Price */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                    <Tag size={16} className="rotate-90 text-amber-500" /> 进货单价 (￥)
+                                    <Tag size={16} className="rotate-90 text-sky-500" /> 进价 (￥)
                                 </label>
                                 <input 
                                     type="number" 
@@ -1426,6 +1430,21 @@ export function ProductFormModal({
                                     min="0"
                                     value={formData.costPrice}
                                     onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
+                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
+                                    placeholder="0.00"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                    <Tag size={16} className="rotate-90 text-amber-500" /> 售价 (￥)
+                                </label>
+                                <input 
+                                    type="number" 
+                                    step="0.01"
+                                    min="0"
+                                    value={formData.salePrice}
+                                    onChange={(e) => setFormData({...formData, salePrice: e.target.value})}
                                     className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
                                     placeholder="0.00"
                                 />

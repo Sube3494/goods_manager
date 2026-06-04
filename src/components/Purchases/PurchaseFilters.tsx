@@ -3,41 +3,30 @@
 import { RotateCcw, Search, X } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn } from "@/lib/utils";
-import { getUniquePurchaseShops, PURCHASE_STATUS_OPTIONS, PurchaseStatusFilter } from "@/lib/purchases";
+import { PURCHASE_STATUS_OPTIONS, PurchaseStatusFilter } from "@/lib/purchases";
 import { PurchaseOrder } from "@/lib/types";
 
 interface PurchaseFiltersProps {
   purchases: PurchaseOrder[];
   searchQuery: string;
   statusFilter: PurchaseStatusFilter;
-  shopFilter: string;
   hasActiveFilters: boolean;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: PurchaseStatusFilter) => void;
-  onShopChange: (value: string) => void;
   onReset: () => void;
 }
 
 export function PurchaseFilters({
-  purchases,
   searchQuery,
   statusFilter,
-  shopFilter,
   hasActiveFilters,
   onSearchChange,
   onStatusChange,
-  onShopChange,
   onReset,
 }: PurchaseFiltersProps) {
-  const uniqueShops = getUniquePurchaseShops(purchases);
-  const shopOptions = [
-    { value: "All", label: "全部店铺" },
-    ...uniqueShops.map((shop) => ({ value: shop, label: shop })),
-  ];
-
   return (
-    <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 md:mb-8 text-foreground">
-      <div className="flex items-center gap-2 w-full">
+    <div className="mb-6 grid grid-cols-[minmax(0,1fr)_116px_auto] items-center gap-2 text-foreground sm:grid-cols-[minmax(0,1fr)_128px_auto] md:mb-8">
+      <div className="min-w-0">
         <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0 relative">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
@@ -58,8 +47,8 @@ export function PurchaseFilters({
         </div>
       </div>
 
-      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-row sm:items-center sm:gap-3 sm:h-11 sm:w-auto">
-        <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
+      <div className="contents">
+        <div className="h-10 min-w-0 sm:h-11">
           <CustomSelect
             value={statusFilter}
             onChange={(value) => onStatusChange(value as PurchaseStatusFilter)}
@@ -75,30 +64,13 @@ export function PurchaseFilters({
           />
         </div>
 
-        <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
-          <CustomSelect
-            value={shopFilter}
-            onChange={onShopChange}
-            options={shopOptions}
-            placeholder="全部店铺"
-            className="h-full"
-            triggerClassName={cn(
-              "h-full rounded-full border shadow-sm transition-all text-[13px] sm:text-sm",
-              shopFilter !== "All"
-                ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium"
-                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
-            )}
-          />
-        </div>
-
         {hasActiveFilters && (
           <button
             onClick={onReset}
-            className="h-10 sm:h-11 px-3 sm:px-4 flex items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/5 text-primary shadow-sm transition-all hover:bg-primary/10 active:scale-95 sm:h-11 sm:w-auto sm:gap-2 sm:px-4"
           >
             <RotateCcw size={14} />
-            <span className="hidden sm:inline">重置</span>
-            <span className="sm:hidden text-[10px]">重置</span>
+            <span className="hidden text-xs font-bold sm:inline">重置</span>
           </button>
         )}
       </div>

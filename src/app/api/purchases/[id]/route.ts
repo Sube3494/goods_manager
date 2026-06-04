@@ -4,19 +4,6 @@ import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 import { FinanceMath } from "@/lib/math";
 import { InventoryService } from "@/services/inventoryService";
 
-function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
-  const nextStock = currentStock - revertQty;
-  if (nextStock <= 0) {
-    return 0;
-  }
-
-  const currentTotalValue = FinanceMath.multiply(currentStock, currentCost || 0);
-  const revertTotalValue = FinanceMath.multiply(revertQty, revertCost || 0);
-  const nextTotalValue = FinanceMath.add(currentTotalValue, -revertTotalValue);
-
-  return Math.max(0, FinanceMath.divide(nextTotalValue, nextStock));
-}
-
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -133,54 +120,6 @@ export async function PUT(
 
         for (const item of orderItems) {
           const incomingQty = item.quantity;
-          const incomingCost = item.costPrice || 0;
-
-          if (item.shopProductId) {
-            const shopProduct = await tx.shopProduct.findUnique({
-              where: { id: item.shopProductId }
-            });
-
-            if (shopProduct) {
-              const currentCost = shopProduct.costPrice || 0;
-              const newCostPrice = incomingCost > 0 ? incomingCost : currentCost;
-
-              await tx.shopProduct.update({
-                where: { id: item.shopProductId },
-                data: {
-                  costPrice: newCostPrice
-                }
-              });
-            }
-          } else if (item.productId) {
-            const product = await tx.product.findUnique({
-              where: { id: item.productId }
-            });
-
-            if (product) {
-              const currentStock = product.stock;
-              const currentCost = product.costPrice || 0;
-              let newCostPrice = currentCost;
-
-              if (incomingCost > 0) {
-                if (currentStock <= 0) {
-                  newCostPrice = incomingCost;
-                } else {
-                  const currentTotalValue = FinanceMath.multiply(currentStock, currentCost);
-                  const incomingTotalValue = FinanceMath.multiply(incomingQty, incomingCost);
-                  const totalValue = FinanceMath.add(currentTotalValue, incomingTotalValue);
-                  const totalQty = currentStock + incomingQty;
-                  newCostPrice = FinanceMath.divide(totalValue, totalQty);
-                }
-              }
-
-              await tx.product.update({
-                where: { id: item.productId },
-                data: {
-                  costPrice: newCostPrice
-                }
-              });
-            }
-          }
 
           // FIFO 支持：如果该项还没有设置余量
           if (item.remainingQuantity === null) {
@@ -194,49 +133,6 @@ export async function PUT(
           await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
         }
       } else if (isRevokingReceived) {
-        for (const item of existingPurchase.items) {
-          const revertQty = Number(item.quantity || 0);
-          const revertCost = Number(item.costPrice || 0);
-
-          if (item.shopProductId) {
-            const shopProduct = await tx.shopProduct.findUnique({
-              where: { id: item.shopProductId }
-            });
-
-            if (shopProduct) {
-              await tx.shopProduct.update({
-                where: { id: item.shopProductId },
-                data: {
-                  costPrice: calculateRevertedCostPrice(
-                    Number(shopProduct.stock || 0),
-                    Number(shopProduct.costPrice || 0),
-                    revertQty,
-                    revertCost
-                  ),
-                }
-              });
-            }
-          } else if (item.productId) {
-            const product = await tx.product.findUnique({
-              where: { id: item.productId }
-            });
-
-            if (product) {
-              await tx.product.update({
-                where: { id: item.productId },
-                data: {
-                  costPrice: calculateRevertedCostPrice(
-                    Number(product.stock || 0),
-                    Number(product.costPrice || 0),
-                    revertQty,
-                    revertCost
-                  ),
-                }
-              });
-            }
-          }
-        }
-
         await tx.purchaseOrderItem.updateMany({
           where: { purchaseOrderId: id },
           data: { remainingQuantity: null },
@@ -294,18 +190,6 @@ export async function DELETE(
             if (!shopProduct || Number(shopProduct.stock || 0) < originalQuantity) {
               throw new Error("店铺商品当前库存不足，无法删除这张已入库采购单");
             }
-
-            await tx.shopProduct.update({
-              where: { id: item.shopProductId },
-              data: {
-                costPrice: calculateRevertedCostPrice(
-                  Number(shopProduct.stock || 0),
-                  Number(shopProduct.costPrice || 0),
-                  originalQuantity,
-                  Number(item.costPrice || 0)
-                ),
-              },
-            });
           } else if (item.productId) {
             const product = await tx.product.findUnique({
               where: { id: item.productId },
@@ -314,18 +198,6 @@ export async function DELETE(
             if (!product || Number(product.stock || 0) < originalQuantity) {
               throw new Error("主商品当前库存不足，无法删除这张已入库采购单");
             }
-
-            await tx.product.update({
-              where: { id: item.productId },
-              data: {
-                costPrice: calculateRevertedCostPrice(
-                  Number(product.stock || 0),
-                  Number(product.costPrice || 0),
-                  originalQuantity,
-                  Number(item.costPrice || 0)
-                ),
-              },
-            });
           }
         }
       }

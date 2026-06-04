@@ -50,7 +50,8 @@ export async function POST(request: Request) {
         try {
             // Map keys for SKU and Quantity (Supporting both internal formats and exported headers)
             const sku = String(item.sku || item['SKU/店内码'] || item['SKU'] || item['编码'] || item['*SKU'] || "");
-            const costPrice = Number(item['进货单价'] || item['*进货单价'] || item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
+            const salePrice = Number(item['售价'] || item['*售价'] || item.salePrice || item['Sale Price'] || item['销售价'] || 0);
+            const costPrice = Number(item['进货单价'] || item['*进货单价'] || item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || salePrice || 0);
             // 1. 基础数据解析
             const name = String(item['商品名称'] || item.name || "");
             const image = String(item['商品图片'] || item.image || item['图片'] || "");
@@ -118,9 +119,11 @@ export async function POST(request: Request) {
 
                 // UPDATE: Replenishment & metadata update
                 const currentCost = product.costPrice || 0;
+                const currentSalePrice = (product as { salePrice?: number | null }).salePrice || 0;
 
                 const updateData: Record<string, unknown> = {
                     costPrice: costPrice > 0 ? costPrice : currentCost,
+                    salePrice: salePrice > 0 ? salePrice : currentSalePrice || (costPrice > 0 ? costPrice : currentCost),
                     pinyin: name ? generatePinyinSearchText(name) : undefined,
                     isPublic,
                     isDiscontinued,
@@ -287,6 +290,7 @@ export async function POST(request: Request) {
                         categoryId: finalCategoryId as string,
                         supplierId: finalSupplierId,
                         costPrice: costPrice > 0 ? costPrice : 0,
+                        salePrice: salePrice > 0 ? salePrice : (costPrice > 0 ? costPrice : 0),
                         stock: 0,
                         image: finalMainImage,
                         pinyin: generatePinyinSearchText(name),

@@ -363,6 +363,7 @@ export default function ShopGoodsPage() {
           supplierId: formData.supplierId || "",
           image: formData.image?.trim() || "",
           costPrice: formData.costPrice ?? 0,
+          salePrice: formData.salePrice ?? formData.costPrice ?? 0,
           stock: formData.stock ?? 0,
           isPublic: formData.isPublic ?? true,
           isDiscontinued: formData.isDiscontinued ?? false,
@@ -456,6 +457,7 @@ export default function ShopGoodsPage() {
       name: item.name,
       categoryId: item.categoryId || "",
       costPrice: item.costPrice || 0,
+      salePrice: item.salePrice ?? item.costPrice ?? 0,
       stock: item.stock || 0,
       image: item.image || "",
       supplierId: item.supplierId || "",
@@ -543,6 +545,7 @@ export default function ShopGoodsPage() {
           image: formData.image?.trim() || "",
           supplierId: formData.supplierId || "",
           costPrice: formData.costPrice ?? 0,
+          salePrice: formData.salePrice ?? formData.costPrice ?? 0,
           stock: formData.stock ?? 0,
           isPublic: formData.isPublic ?? true,
           isDiscontinued: formData.isDiscontinued ?? false,
@@ -577,7 +580,7 @@ export default function ShopGoodsPage() {
     supplierId?: string;
     isPublic?: boolean;
     isDiscontinued?: boolean;
-    costPrice?: number;
+    salePrice?: number;
     stock?: number;
     isShelfLife?: boolean;
     shelfLifeDays?: number;
@@ -609,7 +612,7 @@ export default function ShopGoodsPage() {
           ...item,
           ...(updateData.categoryId ? { categoryId: updateData.categoryId, categoryName } : {}),
           ...(updateData.supplierId !== undefined ? { supplierId: updateData.supplierId || null } : {}),
-          ...(updateData.costPrice !== undefined ? { costPrice: updateData.costPrice } : {}),
+          ...(updateData.salePrice !== undefined ? { salePrice: updateData.salePrice } : {}),
           ...(updateData.stock !== undefined ? { stock: updateData.stock } : {}),
           ...(updateData.isPublic !== undefined ? { isPublic: updateData.isPublic } : {}),
           ...(updateData.isShelfLife !== undefined ? { isShelfLife: updateData.isShelfLife } : {}),
@@ -645,7 +648,8 @@ export default function ShopGoodsPage() {
         "SKU/店内码": item.sku || "",
         分类: item.categoryName || "未分类",
         供应商: suppliers.find((supplier) => supplier.id === item.supplierId)?.name || "",
-        进货单价: item.costPrice ?? 0,
+        售价: item.salePrice ?? item.costPrice ?? 0,
+        进价: item.costPrice ?? 0,
         库存: item.stock ?? 0,
         主图: item.image || "",
         备注: item.remark || "",
@@ -757,7 +761,7 @@ export default function ShopGoodsPage() {
         <>
           <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 transition-opacity duration-300">
             {displayedItems.map((product, index) => (
-              <GoodsCard key={product.displayId} product={{ id: product.displayId, sku: product.sku || undefined, name: product.name, categoryId: product.categoryId || "", category: product.categoryName ? { id: product.categoryId || "", name: product.categoryName, count: 0 } : undefined, costPrice: product.costPrice || 0, stock: product.stock || 0, image: product.image || undefined, isPublic: product.isPublic ?? true, isDiscontinued: product.isDiscontinued ?? false, remark: product.remark || undefined, specs: product.specs || undefined, supplierId: product.supplierId || undefined, supplier: product.supplier || undefined }} onEdit={() => {
+              <GoodsCard key={product.displayId} product={{ id: product.displayId, sku: product.sku || undefined, name: product.name, categoryId: product.categoryId || "", category: product.categoryName ? { id: product.categoryId || "", name: product.categoryName, count: 0 } : undefined, costPrice: product.costPrice || 0, salePrice: product.salePrice ?? product.costPrice ?? 0, stock: product.stock || 0, image: product.image || undefined, isPublic: product.isPublic ?? true, isDiscontinued: product.isDiscontinued ?? false, remark: product.remark || undefined, specs: product.specs || undefined, supplierId: product.supplierId || undefined, supplier: product.supplier || undefined }} onEdit={() => {
                 const rawTarget = items.find((item) => item.id === product.linkedIds[0]);
                 if (rawTarget) openEditModal(rawTarget);
               }} isSelected={selectedIds.includes(product.displayId)} anySelected={selectedIds.length > 0} onToggleSelect={handleToggleSelect} priority={index < 4} hideDiscontinuedState={true} />
@@ -770,7 +774,7 @@ export default function ShopGoodsPage() {
 
       <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: "删除商品", icon: <Trash2 size={16} />, onClick: handleRemoveSelected, variant: "danger" }]} />
       <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" loadAllOnOpen={true} respectPublicVisibility={false} />
-      <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
+      <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ 商品名称: "示例商品", "SKU/店内码": "SHOP-001", 分类: "默认分类", 供应商: "默认供应商", 售价: 19.9, 进货单价: 12.8, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
       <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
       <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />

@@ -112,7 +112,8 @@ export async function POST(
       const categoryName = normalizeText(extractRowValue(row, ["分类", "categoryName", "类目"])) || "未分类";
       const supplierName = normalizeText(extractRowValue(row, ["供应商", "supplierName"]));
       const image = normalizeText(extractRowValue(row, ["主图", "商品主图", "商品图片", "image"]));
-      const costPrice = Number(extractRowValue(row, ["进货单价", "costPrice", "成本价"]) || 0);
+      const salePrice = Number(extractRowValue(row, ["售价", "*售价", "salePrice", "销售价"]) || 0);
+      const costPrice = Number(extractRowValue(row, ["进货单价", "costPrice", "成本价"]) || salePrice || 0);
       // stock 字段禁止通过导入覆盖，库存只能通过采购入库批次生成
       const remark = normalizeText(extractRowValue(row, ["备注", "remark"]));
 
@@ -149,6 +150,7 @@ export async function POST(
             supplierId: supplier?.id || null,
             productImage: normalizedImage,
             costPrice: Number.isFinite(costPrice) ? costPrice : 0,
+            salePrice: Number.isFinite(salePrice) ? salePrice : (Number.isFinite(costPrice) ? costPrice : 0),
             // stock 不在此处更新，库存只能通过采购入库
             remark: remark || null,
           },
@@ -193,6 +195,7 @@ export async function POST(
           categoryName: category?.name || "未分类",
           supplierId: supplier?.id || null,
           costPrice: Number.isFinite(costPrice) ? costPrice : 0,
+          salePrice: Number.isFinite(salePrice) ? salePrice : (Number.isFinite(costPrice) ? costPrice : 0),
           stock: 0, // 新建店铺商品库存初始为 0，需通过采购入库批次
           isPublic: sourceProduct.isPublic,
           isDiscontinued: sourceProduct.isDiscontinued,

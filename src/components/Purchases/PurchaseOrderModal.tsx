@@ -3,18 +3,15 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search } from "lucide-react";
-import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier, Shop } from "@/lib/types";
+import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, ShoppingBag, Download, AlertCircle, BarChart3, Search } from "lucide-react";
+import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, Supplier } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
 import { uploadFileWithChunking } from "@/lib/uploadWithChunking";
 import { ImageGallery } from "@/components/ui/ImageGallery";
 import { useToast } from "@/components/ui/Toast";
 import { sortPurchaseItems } from "@/lib/pinyin";
-import { useUser } from "@/hooks/useUser";
-import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 
@@ -208,7 +205,7 @@ const PurchaseItemRow = memo(({
 
                 {/* Price Column */}
                 <div className="flex flex-col sm:block items-center justify-center">
-                    <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">单价</label>
+                    <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">进价</label>
                     {readOnly ? (
                         <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono text-foreground">
                             <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
@@ -338,9 +335,6 @@ export function PurchaseOrderModal({
   defaultType = "Purchase",
 }: PurchaseOrderModalProps) {
   const { showToast } = useToast();
-  const { user } = useUser();
-  const router = useRouter();
-  const typedUser = user as unknown as UserType;
   
   const [formData, setFormData] = useState<PurchaseOrder>(() => {
     if (initialData) return initialData;
@@ -355,17 +349,13 @@ export function PurchaseOrderModal({
       extraFees: 0,
       totalAmount: 0,
       discountAmount: 0,
-      shippingAddress: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.address || (user as unknown as UserType)?.shippingAddresses?.[0]?.address || "",
-      shopName: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.label || (user as unknown as UserType)?.shippingAddresses?.[0]?.label || ""
+      shippingAddress: "",
+      shopName: ""
     };
   });
   
   // Data fetch status to avoid redundant calls
   const [hasFetchedData, setHasFetchedData] = useState(false);
-
-  const addressList = useMemo(() => {
-    return typedUser?.shippingAddresses || [];
-  }, [typedUser]);
 
 
   // Only 'Received' status or system-generated records are truly read-only for core product/price info
@@ -391,12 +381,11 @@ export function PurchaseOrderModal({
   const [mounted, setMounted] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [shops, setShops] = useState<Shop[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
   const [batchConfirming, setBatchConfirming] = useState(false);
-  const purchaseCatalogFetchPath = "/api/purchase-products";
+  const purchaseCatalogFetchPath = "/api/products";
   
   // Shelf Life Modal State
   const [shelfLifeModalOpen, setShelfLifeModalOpen] = useState(false);
@@ -459,21 +448,10 @@ export function PurchaseOrderModal({
       setIsSavingShelfLife(false);
     }
   };
-  const selectedPurchaseShopId = useMemo(
-    () => shops.find((shop) => shop.name === formData.shopName)?.id || "",
-    [shops, formData.shopName]
-  );
   const purchaseCatalogQuery = useMemo<Record<string, string> | undefined>(() => {
-    if (selectedPurchaseShopId) {
-      const nextQuery: Record<string, string> = { shopId: selectedPurchaseShopId };
-      return nextQuery;
-    }
-    if (formData.shopName) {
-      const nextQuery: Record<string, string> = { shopName: formData.shopName };
-      return nextQuery;
-    }
-    return undefined;
-  }, [selectedPurchaseShopId, formData.shopName]);
+    const nextQuery: Record<string, string> = { all: "true" };
+    return nextQuery;
+  }, []);
   const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductId || item.productId || "", []);
 
   const filteredItems = useMemo(() => {
@@ -561,11 +539,6 @@ export function PurchaseOrderModal({
           setSuppliers(sData);
         }
 
-        const shopRes = await fetch("/api/shops");
-        if (shopRes.ok) {
-          const shopData = await shopRes.json();
-          setShops(Array.isArray(shopData?.shops) ? shopData.shops : []);
-        }
         setHasFetchedData(true);
       } catch (error) {
         console.error("Failed to fetch data:", error);
@@ -595,8 +568,6 @@ export function PurchaseOrderModal({
         } else {
             const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
             
-            const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address || "";
-
             setFormData(() => ({
                 id: newId,
                 status: "Confirmed",
@@ -608,8 +579,8 @@ export function PurchaseOrderModal({
                 totalAmount: 0,
                 trackingData: undefined,
                 paymentVouchers: [],
-                shippingAddress: defaultAddr,
-                shopName: (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.label || ""
+                shippingAddress: "",
+                shopName: ""
             }));
             setShippingFeeInput("0");
             setExtraFeeInput("0");
@@ -617,31 +588,7 @@ export function PurchaseOrderModal({
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [defaultType, isOpen, initialData, user, typedUser?.shippingAddresses]);
-
-  // Auto-select default address if empty and list is available
-  useEffect(() => {
-    if (formData.type === "Purchase" && !formData.shippingAddress && addressList.length > 0) {
-      const defaultAddr = addressList.find(a => a.isDefault)?.address || addressList[0].address;
-      if (defaultAddr && defaultAddr !== formData.shippingAddress) {
-        // Using a microtask or next tick to avoid cascading render warning in some React versions/environments
-        const handle = requestAnimationFrame(() => {
-          setFormData(prev => prev.shippingAddress ? prev : { ...prev, shippingAddress: defaultAddr });
-        });
-        return () => cancelAnimationFrame(handle);
-      }
-    }
-  }, [formData.type, formData.shippingAddress, addressList]);
-
-  // Auto-sync shopName if address changes and matches a known label
-  useEffect(() => {
-    if (formData.shippingAddress && addressList.length > 0 && !formData.shopName) {
-        const matched = addressList.find(a => a.address === formData.shippingAddress);
-        if (matched) {
-            setFormData(prev => ({ ...prev, shopName: matched.label }));
-        }
-    }
-  }, [formData.shippingAddress, addressList, formData.shopName]);
+  }, [defaultType, isOpen, initialData]);
 
 
   const calculateTotal = useCallback(() => {
@@ -1022,39 +969,6 @@ export function PurchaseOrderModal({
                                     </div>
                                 </div>
 
-                                <div className="rounded-2xl border border-border/50 bg-white/70 p-4 shadow-sm dark:bg-white/5">
-                                    <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                        <MapPin size={13} /> 收货地址
-                                    </div>
-                                    {effectiveReadOnly ? (
-                                        <div className="flex min-h-[42px] items-center text-sm font-semibold text-foreground">
-                                            {formData.shippingAddress || "未设置地址"}
-                                        </div>
-                                    ) : (
-                                        <CustomSelect 
-                                            value={formData.shippingAddress || ""}
-                                            onChange={(val) => {
-                                                const matched = addressList.find(a => a.address === val);
-                                                setFormData({
-                                                    ...formData,
-                                                    shippingAddress: val,
-                                                    shopName: matched?.label || formData.shopName || ""
-                                                });
-                                            }}
-                                            options={addressList
-                                                .filter((item) => !!item.address)
-                                                .map((item) => ({
-                                                    value: item.address || "",
-                                                    label: item.label || item.address || "未命名地址"
-                                                }))}
-                                            placeholder="选择个人资料里的收货地址..."
-                                            className="h-[42px]"
-                                            triggerClassName="h-[42px] rounded-xl"
-                                            onAddNew={() => router.push("/profile#address-library")}
-                                            addNewLabel="管理地址"
-                                        />
-                                    )}
-                                </div>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6">
@@ -1195,7 +1109,7 @@ export function PurchaseOrderModal({
                                     {batchMode && <div />}
                                     <div className="text-left pl-2">商品信息 <span className="text-red-500">*</span></div>
                                     <div className="text-center">数量 <span className="text-red-500">*</span></div>
-                                    <div className="text-center">单价 <span className="text-red-500">*</span></div>
+                                    <div className="text-center">进价 <span className="text-red-500">*</span></div>
                                     <div className="text-right pr-4">小计</div>
                                     {!effectiveReadOnly && <div></div>}
                                 </div>

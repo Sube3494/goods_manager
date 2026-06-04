@@ -25,7 +25,7 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
   const { user } = useUser();
   const sessionUser = user as SessionUser | null;
   const isSuperAdmin = sessionUser?.role === "SUPER_ADMIN";
-  const inventoryHref = "/shop-goods";
+  const inventoryHref = "/goods";
 
   const stats: StatItem[] = isSuperAdmin
     ? [
@@ -33,7 +33,7 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
           title: "库存总货值",
           value: data ? `¥${data.totalValue.toLocaleString()}` : "¥0",
           icon: Archive,
-          sub: data ? `合计 ${data.productCount} 门店商品` : "计算中...",
+          sub: data ? `合计 ${data.productCount} 个商品 SKU` : "计算中...",
           trend: "资产总计",
           trendUp: true,
           warning: false,
@@ -42,10 +42,10 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
           iconColor: "text-blue-500",
         },
         {
-          title: "门店商品",
+          title: "总库存件数",
           value: data ? data.totalStock.toLocaleString() : "0",
           icon: Package,
-          sub: "经营库存总量",
+          sub: "当前总库在库数量",
           trend: "库存水位",
           trendUp: true,
           warning: false,
@@ -83,23 +83,22 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
       ]
     : [
         {
-          title: "经营店铺",
-          value: data ? `${data.shopCount ?? 0}` : "0",
+          title: "库存总货值",
+          value: data ? `¥${data.totalValue.toLocaleString()}` : "¥0",
           icon: Archive,
-          sub: "当前已接入门店",
-          trend: "经营规模",
+          sub: data ? `合计 ${data.productCount} 个商品 SKU` : "计算中...",
+          trend: "资产总计",
           trendUp: true,
           warning: false,
           color: "from-blue-500/10 to-cyan-500/10",
           glowColor: "group-hover:shadow-blue-500/20",
           iconColor: "text-blue-500",
-          href: "/shop-goods",
         },
         {
-          title: "店铺商品",
+          title: "商品数量",
           value: data ? data.productCount.toLocaleString() : "0",
           icon: Package,
-          sub: "合计经营 SKU",
+          sub: "当前总库商品池",
           trend: "商品池",
           trendUp: true,
           warning: false,
@@ -109,10 +108,10 @@ export function StatsGrid({ data }: { data: StatsData | null }) {
           href: inventoryHref,
         },
         {
-          title: "库存件数",
+          title: "总库存件数",
           value: data ? data.totalStock.toLocaleString() : "0",
           icon: ArrowDownRight,
-          sub: "店铺总库存",
+          sub: "当前总库在库数量",
           trend: "库存水位",
           trendUp: true,
           warning: false,
