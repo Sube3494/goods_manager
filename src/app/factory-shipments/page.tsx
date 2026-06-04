@@ -1416,7 +1416,7 @@ function FactoryShipmentDetailModal({
                       <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">单据编号</div>
                       <div className="mt-1 truncate font-mono text-sm font-semibold text-foreground/85">{order.id}</div>
                     </div>
-                    <span className={cn("inline-flex h-8 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-black", getShippingTone(editForm.status))}>
+                    <span className={cn("inline-flex h-8 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-normal", getShippingTone(editForm.status))}>
                       {editForm.status}
                     </span>
                   </div>
@@ -1525,7 +1525,7 @@ function FactoryShipmentDetailModal({
                           className="h-11 w-full rounded-2xl border border-border/70 bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-[#2b313d]"
                         />
                       ) : (
-                        <div className="mt-3 rounded-2xl border border-border/50 bg-white/80 px-4 py-3.5 text-sm font-semibold leading-relaxed text-foreground dark:border-white/10 dark:bg-white/4">
+                        <div className="mt-3 rounded-2xl border border-border/50 bg-white/80 px-4 py-3.5 text-sm font-normal leading-relaxed text-foreground dark:border-white/10 dark:bg-white/4">
                           {[parsed.recipientName, parsed.recipientPhone, parsed.recipientAddress].filter(Boolean).join(" ") || "-"}
                         </div>
                       )}
@@ -3070,7 +3070,7 @@ export default function FactoryShipmentsPage() {
                       </td>
                       <td className="px-4 py-4 text-center">
                         <span className={cn(
-                          "inline-flex h-8.5 min-w-24 items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold shadow-xs",
+                          "inline-flex h-8.5 min-w-24 items-center justify-center rounded-full border px-2.5 py-1 text-xs font-normal shadow-xs",
                           getShippingTone(derivedStatus)
                         )}>
                           {derivedStatus}
@@ -3160,7 +3160,7 @@ export default function FactoryShipmentsPage() {
                         <span>{format(new Date(order.date), "HH:mm")}</span>
                       </span>
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-foreground" title={[parsed.recipientName, parsed.recipientAddress].filter(Boolean).join(" ")}>
+                        <div className="truncate text-sm font-normal text-foreground" title={[parsed.recipientName, parsed.recipientAddress].filter(Boolean).join(" ")}>
                           {formatRecipientWithRegion(parsed.recipientName, parsed.recipientAddress)}
                         </div>
                         {parsed.compensationStatus && (
@@ -3189,7 +3189,7 @@ export default function FactoryShipmentsPage() {
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <span className={cn(
-                      "inline-flex h-7 min-w-20 items-center justify-center rounded-full border px-2.5 text-[11px] font-black shadow-xs",
+                      "inline-flex h-7 min-w-20 items-center justify-center rounded-full border px-2.5 text-[11px] font-normal shadow-xs",
                       getShippingTone(derivedStatus)
                     )}>
                       {derivedStatus}

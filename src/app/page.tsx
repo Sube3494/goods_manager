@@ -124,15 +124,17 @@ function Panel({
   title,
   subtitle,
   href,
+  className,
   children,
 }: {
   title: string;
   subtitle: string;
   href?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-[26px] border border-border/70 bg-white/78 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.045] sm:p-5">
+    <section className={cn("flex flex-col h-full min-w-0 overflow-hidden rounded-[26px] border border-border/70 bg-white/78 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.045] sm:p-5", className)}>
       <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-black tracking-tight text-foreground sm:text-lg">{title}</h2>
@@ -152,7 +154,7 @@ function Panel({
 
 function StatusPill({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-bold", className)}>
+    <span className={cn("inline-flex h-6 items-center rounded-full border px-2 text-[11px] font-normal", className)}>
       {children}
     </span>
   );
@@ -319,7 +321,7 @@ export default function OverviewPage() {
               <div key={item.id} className="overflow-hidden rounded-2xl border border-border/50 bg-white/60 px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.035]">
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-bold text-foreground">{item.recipientName} · {item.firstItemName}</div>
+                    <div className="truncate text-sm font-normal text-foreground">{item.recipientName} · {item.firstItemName}</div>
                     <div className="mt-1 text-[11px] text-muted-foreground">{formatDate(item.date)} · {numberText(item.quantity)} 件</div>
                   </div>
                   <div className="flex shrink-0 items-center justify-between gap-2 sm:flex-col sm:items-end sm:gap-1">
@@ -372,7 +374,7 @@ export default function OverviewPage() {
 
       <section className="grid gap-4 xl:grid-cols-3">
         <Panel title="采购进度" subtitle="关注已下单但还没入库的采购单。" href="/purchases">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="mt-auto grid grid-cols-2 gap-2">
             <div className="rounded-2xl border border-border/60 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
               <div className="text-[10px] font-bold text-muted-foreground">已下单</div>
               <div className="mt-1.5 text-[30px] font-black leading-none text-blue-500">{numberText(data.purchases.pendingCount)}</div>
@@ -385,32 +387,34 @@ export default function OverviewPage() {
         </Panel>
 
         <Panel title="客户沉淀" subtitle="发货单收件人会自动沉淀到客户管理。" href="/customers">
-          <div className="flex items-end justify-between gap-3 rounded-2xl border border-border/60 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
-            <div>
-              <div className="text-[11px] font-bold text-muted-foreground">客户数量</div>
-              <div className="mt-2 text-3xl font-black text-foreground">{numberText(data.customers.count)}</div>
+          <div className="mt-auto flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold text-muted-foreground">客户数量</div>
+              <div className="mt-1.5 text-[30px] font-black leading-none text-foreground">{numberText(data.customers.count)}</div>
             </div>
-            <Users className="text-cyan-500" size={30} />
+            <Users className="text-cyan-500 shrink-0" size={26} />
           </div>
         </Panel>
 
         <Panel title="基础资料" subtitle="物流公司与基础资料是否已准备好。" href="/logistics">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border border-border/60 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
-              <div className="text-[10px] font-bold text-muted-foreground">物流公司</div>
-              <div className="mt-1.5 text-[30px] font-black leading-none text-foreground sm:mt-2 sm:text-2xl">{numberText(data.logistics.count)}</div>
+          <div className="mt-auto flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-2xl border border-border/60 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
+                <div className="text-[10px] font-bold text-muted-foreground">物流公司</div>
+                <div className="mt-1.5 text-[30px] font-black leading-none text-foreground">{numberText(data.logistics.count)}</div>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
+                <div className="text-[10px] font-bold text-muted-foreground">零库存</div>
+                <div className="mt-1.5 text-[30px] font-black leading-none text-rose-500">{numberText(data.inventory.zeroStockCount)}</div>
+              </div>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-white/70 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.04]">
-              <div className="text-[10px] font-bold text-muted-foreground">零库存</div>
-              <div className="mt-1.5 text-[30px] font-black leading-none text-rose-500 sm:mt-2 sm:text-2xl">{numberText(data.inventory.zeroStockCount)}</div>
-            </div>
+            {data.logistics.count === 0 ? (
+              <div className="mt-1 flex items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs font-bold text-amber-500">
+                <AlertTriangle size={14} />
+                还没有物流公司，发货单下拉会为空。
+              </div>
+            ) : null}
           </div>
-          {data.logistics.count === 0 ? (
-            <div className="mt-3 flex items-center gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs font-bold text-amber-500">
-              <AlertTriangle size={14} />
-              还没有物流公司，发货单下拉会为空。
-            </div>
-          ) : null}
         </Panel>
       </section>
 
@@ -434,18 +438,20 @@ export default function OverviewPage() {
         </div>
         <div className="grid gap-2.5 md:grid-cols-2">
           {filteredRecentActivity.length > 0 ? filteredRecentActivity.map((item) => (
-            <div key={item.id} className="overflow-hidden rounded-2xl border border-border/50 bg-white/60 px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.035]">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusPill className={item.type === "采购" ? "border-blue-500/20 bg-blue-500/10 text-blue-500" : "border-sky-500/20 bg-sky-500/10 text-sky-500"}>
-                    {item.type}
-                  </StatusPill>
-                  <span className="text-[11px] text-muted-foreground">{formatDate(item.date)}</span>
+            <div key={item.id} className="flex flex-col justify-between overflow-hidden rounded-2xl border border-border/50 bg-white/60 px-3 py-2.5 dark:border-white/8 dark:bg-white/[0.035]">
+              <div className="flex flex-col flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <StatusPill className={item.type === "采购" ? "border-blue-500/20 bg-blue-500/10 text-blue-500" : "border-sky-500/20 bg-sky-500/10 text-sky-500"}>
+                      {item.type}
+                    </StatusPill>
+                    {item.type === "发货" && item.title ? (
+                      <span className="truncate text-xs font-normal text-foreground">{item.title}</span>
+                    ) : null}
+                  </div>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">{formatDate(item.date)}</span>
                 </div>
-                {item.type === "发货" ? (
-                  <div className="mt-1 truncate text-sm font-bold text-foreground">{item.title}</div>
-                ) : null}
-                <div className="mt-2 flex min-w-0 items-center gap-2 overflow-hidden">
+                <div className="mt-2.5 flex min-w-0 items-center gap-2 overflow-hidden">
                   <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-white/75 px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.05]">
                     <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full border border-border/60 bg-white/80 dark:border-white/10 dark:bg-white/[0.05]">
                       {item.image ? (
@@ -462,7 +468,7 @@ export default function OverviewPage() {
                     <div className="shrink-0 pl-1 text-[13px] font-black text-foreground">x{numberText(item.quantity)}</div>
                   </div>
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="mt-auto pt-2.5 flex items-center justify-between gap-3">
                   <div className="text-xs font-bold text-muted-foreground">{item.subtitle}</div>
                   <div className="shrink-0 text-sm font-black text-foreground">{moneyText(item.amount)}</div>
                 </div>
