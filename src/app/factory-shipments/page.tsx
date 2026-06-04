@@ -1303,6 +1303,17 @@ function FactoryShipmentDetailModal({
       return;
     }
 
+    const compLogName = (editForm.compensationLogisticsName || "").trim();
+    const isCompensationLogisticsSelected = compLogName && compLogName !== "选择物流公司";
+    if (
+      (editForm.compensationStatus === "待补偿" || editForm.compensationStatus === "已补偿") &&
+      editForm.compensationTrackingNumber.trim() &&
+      !isCompensationLogisticsSelected
+    ) {
+      showToast("填写补偿单号前，请先选择补偿物流公司", "error");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`/api/outbound/${order.id}`, {
@@ -1570,7 +1581,15 @@ function FactoryShipmentDetailModal({
                         <CustomSelect
                           options={compensationLogisticsOptions}
                           value={editForm.compensationLogisticsName}
-                          onChange={(val) => setEditForm((prev) => ({ ...prev, compensationLogisticsName: val }))}
+                          onChange={(val) => setEditForm((prev) => {
+                            const nextLogistics = (val || "").trim();
+                            const isNone = !nextLogistics || nextLogistics === "选择物流公司";
+                            return {
+                              ...prev,
+                              compensationLogisticsName: isNone ? "" : nextLogistics,
+                              ...(isNone ? { compensationTrackingNumber: "" } : {}),
+                            };
+                          })}
                           placeholder="选择物流公司"
                           disabled={!isEditing}
                           searchable
@@ -1583,14 +1602,20 @@ function FactoryShipmentDetailModal({
 
                       <div className="rounded-2xl border border-border bg-white/70 px-3.5 py-2.5 shadow-sm dark:bg-white/5">
                         <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-500">补偿快递单号</div>
-                        <input
-                          type="text"
-                          disabled={!isEditing}
-                          value={editForm.compensationTrackingNumber}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, compensationTrackingNumber: e.target.value }))}
-                          placeholder="单独发出的快递单号"
-                          className="mt-1 h-9 w-full rounded-xl border border-border bg-white px-3 text-xs text-foreground outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-white/10 dark:bg-[#2b313d]"
-                        />
+                        {(() => {
+                          const compLogName = (editForm.compensationLogisticsName || "").trim();
+                          const isLogisticsSelected = compLogName && compLogName !== "选择物流公司";
+                          return (
+                            <input
+                              type="text"
+                              disabled={!isEditing || !isLogisticsSelected}
+                              value={editForm.compensationTrackingNumber}
+                              onChange={(e) => setEditForm((prev) => ({ ...prev, compensationTrackingNumber: e.target.value }))}
+                              placeholder={isLogisticsSelected ? "单独发出的快递单号" : "请先选择物流公司"}
+                              className="mt-1 h-9 w-full rounded-xl border border-border bg-white px-3 text-xs text-foreground outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-white/10 dark:bg-[#2b313d] disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                          );
+                        })()}
                       </div>
                     </div>
 
