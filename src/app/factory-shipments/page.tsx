@@ -437,7 +437,7 @@ const ShipmentItemRow = memo(({
             onClick={(e) => e.stopPropagation()}
           >
             {/* 上面一行：商品、数量、单价、操作 */}
-            <div className="grid w-full grid-cols-[minmax(160px,1.8fr)_minmax(70px,0.7fr)_minmax(90px,1.1fr)_60px] items-center gap-2.5">
+            <div className="grid w-full grid-cols-[minmax(150px,1.8fr)_minmax(70px,0.7fr)_minmax(90px,1.1fr)_80px] items-center gap-2.5">
               {/* 商品信息 */}
               <div className="flex min-w-0 items-start gap-2.5">
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm">
