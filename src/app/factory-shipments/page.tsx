@@ -3464,11 +3464,6 @@ export default function FactoryShipmentsPage() {
                         <div className="truncate text-sm font-normal text-foreground" title={[parsed.recipientName, parsed.recipientAddress].filter(Boolean).join(" ")}>
                           {formatRecipientWithRegion(parsed.recipientName, parsed.recipientAddress)}
                         </div>
-                        {parsed.compensationStatus && (
-                          <span className={cn("mt-1 inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[9px] font-bold leading-none", getCompensationTone(parsed.compensationStatus))}>
-                            {parsed.compensationStatus}
-                          </span>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -3482,7 +3477,14 @@ export default function FactoryShipmentsPage() {
                   </div>
                 </div>
                 <div className="mt-3 rounded-[18px] border border-border/40 bg-muted/25 p-2.5 dark:border-white/6 dark:bg-white/4">
-                  <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">货品概览</div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">货品概览</span>
+                    {parsed.compensationStatus && (
+                      <span className={cn("inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[9px] font-bold leading-none", getCompensationTone(parsed.compensationStatus))}>
+                        {parsed.compensationStatus}
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-1.5">
                     {(() => {
                       const isCompensation = false;
@@ -3545,7 +3547,12 @@ export default function FactoryShipmentsPage() {
                     })()}
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-[96px_minmax(84px,1fr)_44px_40px] items-center gap-1.5 border-t border-border/30 pt-2 dark:border-white/6 min-[390px]:grid-cols-[116px_minmax(92px,1fr)_44px_40px]">
+                <div className={cn(
+                  "mt-3 grid items-center gap-1.5 border-t border-border/30 pt-2 dark:border-white/6",
+                  isReturned
+                    ? "grid-cols-[96px_minmax(84px,1fr)_44px] min-[390px]:grid-cols-[116px_minmax(92px,1fr)_44px]"
+                    : "grid-cols-[96px_minmax(84px,1fr)_44px_40px] min-[390px]:grid-cols-[116px_minmax(92px,1fr)_44px_40px]"
+                )}>
                   <div className="flex h-11 min-w-0 items-center rounded-2xl border border-border/40 bg-muted/25 px-2.5 dark:border-white/6 dark:bg-white/4">
                     <div className="min-w-0">
                       <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">合计</div>
