@@ -81,12 +81,14 @@ function formatCustomerAddressLine(customer: CustomerAddressOption) {
 function CustomerAddressCombobox({
   value,
   onChange,
+  onSelectCustomer,
   placeholder,
   className,
   wrapperClassName,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onSelectCustomer?: (customer: CustomerAddressOption | null) => void;
   placeholder: string;
   className?: string;
   wrapperClassName?: string;
@@ -154,6 +156,7 @@ function CustomerAddressCombobox({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               onChange("");
+              onSelectCustomer?.(null);
               setSearchQuery("");
               setIsOpen(false);
             }}
@@ -185,6 +188,7 @@ function CustomerAddressCombobox({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 onChange(formatCustomerAddressLine(customer));
+                onSelectCustomer?.(customer);
                 setSearchQuery("");
                 setIsOpen(false);
               }}
@@ -869,7 +873,7 @@ function isLikelyRecipientName(value: string) {
   if (!text || text.length > 12) return false;
   if (recipientPhoneRegex.test(text) || /\d/.test(text)) return false;
   if (addressKeywordRegex.test(text)) return false;
-  return /^[\u4e00-\u9fa5·]{2,12}$/.test(text);
+  return /^[\u4e00-\u9fa5·]{1,12}$/.test(text);
 }
 
 function isLikelyRecipientAddress(value: string) {
@@ -954,13 +958,13 @@ function parseQuickAddressInput(input: string) {
 
   if (segments.length === 1) {
     const singleLine = segments[0];
-    const leadingNameMatch = singleLine.match(/^([\u4e00-\u9fa5·]{2,12})\s+(.+)$/);
+    const leadingNameMatch = singleLine.match(/^([\u4e00-\u9fa5·]{1,12})\s+(.+)$/);
     if (leadingNameMatch && isLikelyRecipientName(leadingNameMatch[1]) && isLikelyRecipientAddress(leadingNameMatch[2])) {
       recipientName = recipientName || leadingNameMatch[1].trim();
       recipientAddress = leadingNameMatch[2].trim();
     }
 
-    const trailingNameMatch = singleLine.match(/^(.+?)\s+([\u4e00-\u9fa5·]{2,12})$/);
+    const trailingNameMatch = singleLine.match(/^(.+?)\s+([\u4e00-\u9fa5·]{1,12})$/);
     if (trailingNameMatch && isLikelyRecipientAddress(trailingNameMatch[1]) && isLikelyRecipientName(trailingNameMatch[2])) {
       recipientAddress = trailingNameMatch[1].trim();
       recipientName = recipientName || trailingNameMatch[2].trim();
@@ -2362,6 +2366,18 @@ function FactoryShipmentCreateModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleQuickAddressChange = useCallback((nextValue: string, selectedCustomer?: CustomerAddressOption | null) => {
+    setQuickAddressInput(nextValue);
+    const parsed = parseQuickAddressInput(nextValue);
+
+    setForm((prev) => ({
+      ...prev,
+      recipientName: (selectedCustomer?.contactName || parsed.recipientName || "").trim(),
+      recipientPhone: (selectedCustomer?.contactPhone || parsed.recipientPhone || "").trim(),
+      recipientAddress: (selectedCustomer?.address || parsed.recipientAddress || "").trim(),
+    }));
+  }, []);
+
   const shipmentDraftId = `FS-${form.date.replace(/-/g, "")}-${Math.max(selectedItems.length, 1)
     .toString()
     .padStart(3, "0")}`;
@@ -2463,9 +2479,9 @@ function FactoryShipmentCreateModal({
     const parsedAddress = parseQuickAddressInput(quickAddressInput);
     const finalForm = {
       ...form,
-      recipientName: parsedAddress.recipientName.trim(),
-      recipientPhone: parsedAddress.recipientPhone.trim(),
-      recipientAddress: parsedAddress.recipientAddress.trim(),
+      recipientName: (parsedAddress.recipientName.trim() || form.recipientName.trim()),
+      recipientPhone: (parsedAddress.recipientPhone.trim() || form.recipientPhone.trim()),
+      recipientAddress: (parsedAddress.recipientAddress.trim() || form.recipientAddress.trim()),
       remark: [parsedAddress.remark.trim(), form.remark.trim()].filter(Boolean).join(" / "),
       trackingEntries: selectedItems.map((item) => ({
         itemKey: getItemKey(item),
@@ -2618,7 +2634,8 @@ function FactoryShipmentCreateModal({
                     <div className="mt-2">
                       <CustomerAddressCombobox
                         value={quickAddressInput}
-                        onChange={setQuickAddressInput}
+                        onChange={(value) => handleQuickAddressChange(value, null)}
+                        onSelectCustomer={(customer) => handleQuickAddressChange(customer ? formatCustomerAddressLine(customer) : "", customer)}
                         placeholder="直接粘贴客户整串地址，系统会在后台自动拆解"
                         className="w-full h-10 rounded-xl border border-border bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-white/5"
                       />
