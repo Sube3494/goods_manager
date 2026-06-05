@@ -54,6 +54,8 @@ export async function POST(
       // 1. Reverse stock for each item
       const itemsToCreate = [];
       let totalAmount = 0;
+      const isFactoryShipment = order.type === "FactoryShipment";
+      const wasDeducted = !isFactoryShipment || order.status === "已发货" || order.status === "部分发货";
 
       for (const item of order.items) {
         let amountToRestore = item.quantity;
@@ -128,35 +130,37 @@ export async function POST(
 
         totalAmount += item.quantity * costPrice;
 
-        for (const batch of batches) {
-          if (amountToRestore <= 0) break;
+        if (wasDeducted) {
+          for (const batch of batches) {
+            if (amountToRestore <= 0) break;
 
-          const currentRemaining = batch.remainingQuantity || 0;
-          const originalQty = batch.quantity;
-          const spaceInBatch = originalQty - currentRemaining;
-          const restoreToThisBatch = Math.min(spaceInBatch, amountToRestore);
+            const currentRemaining = batch.remainingQuantity || 0;
+            const originalQty = batch.quantity;
+            const spaceInBatch = originalQty - currentRemaining;
+            const restoreToThisBatch = Math.min(spaceInBatch, amountToRestore);
 
-          if (restoreToThisBatch > 0) {
-            await tx.purchaseOrderItem.update({
-              where: { id: batch.id },
-              data: {
-                remainingQuantity: {
-                  increment: restoreToThisBatch
+            if (restoreToThisBatch > 0) {
+              await tx.purchaseOrderItem.update({
+                where: { id: batch.id },
+                data: {
+                  remainingQuantity: {
+                    increment: restoreToThisBatch
+                  }
                 }
-              }
-            });
+              });
 
-            // 同样增加关联的保质期批次库存 ProductBatch 的 remainingStock
-            await tx.productBatch.updateMany({
-              where: { purchaseOrderItemId: batch.id },
-              data: {
-                remainingStock: {
-                  increment: restoreToThisBatch
+              // 同样增加关联的保质期批次库存 ProductBatch 的 remainingStock
+              await tx.productBatch.updateMany({
+                where: { purchaseOrderItemId: batch.id },
+                data: {
+                  remainingStock: {
+                    increment: restoreToThisBatch
+                  }
                 }
-              }
-            });
+              });
 
-            amountToRestore -= restoreToThisBatch;
+              amountToRestore -= restoreToThisBatch;
+            }
           }
         }
       }
@@ -183,14 +187,16 @@ export async function POST(
       });
 
       // 3. 统一同步物理库存
-      for (const item of order.items) {
-        await OutboundInventoryService.syncStockFromBatches(
-          tx,
-          item.productId || null,
-          item.shopProductId || null,
-          item.productVariantId || null,
-          item.shopProductVariantId || null
-        );
+      if (wasDeducted) {
+        for (const item of order.items) {
+          await OutboundInventoryService.syncStockFromBatches(
+            tx,
+            item.productId || null,
+            item.shopProductId || null,
+            item.productVariantId || null,
+            item.shopProductVariantId || null
+          );
+        }
       }
 
       // 4. Update the order as "Returned" instead of deleting
@@ -334,56 +340,62 @@ export async function PUT(
       }
 
       if (normalizedItems) {
-        for (const item of existingOrder.items) {
-          let amountToRestore = item.quantity;
-          const batches = await tx.purchaseOrderItem.findMany({
-            where: {
-              ...(item.shopProductVariantId
-                ? { shopProductVariantId: item.shopProductVariantId }
-                : item.productVariantId
-                  ? { productVariantId: item.productVariantId }
-                  : item.shopProductId
-                    ? { shopProductId: item.shopProductId }
-                    : { productId: item.productId }),
-              purchaseOrder: {
-                userId: session.id,
-                status: "Received",
-              },
-            },
-            orderBy: {
-              purchaseOrder: {
-                date: "desc",
-              },
-            },
-          });
+        const isFactoryShipment = existingOrder.type === "FactoryShipment";
+        const wasDeducted = !isFactoryShipment || existingOrder.status === "已发货" || existingOrder.status === "部分发货";
+        const willBeDeducted = !isFactoryShipment || finalStatus === "已发货" || finalStatus === "部分发货";
 
-          for (const batch of batches) {
-            if (amountToRestore <= 0) break;
-            const currentRemaining = batch.remainingQuantity || 0;
-            const originalQty = batch.quantity;
-            const spaceInBatch = originalQty - currentRemaining;
-            const restoreToThisBatch = Math.min(spaceInBatch, amountToRestore);
-
-            if (restoreToThisBatch > 0) {
-              await tx.purchaseOrderItem.update({
-                where: { id: batch.id },
-                data: {
-                  remainingQuantity: {
-                    increment: restoreToThisBatch,
-                  },
+        if (wasDeducted) {
+          for (const item of existingOrder.items) {
+            let amountToRestore = item.quantity;
+            const batches = await tx.purchaseOrderItem.findMany({
+              where: {
+                ...(item.shopProductVariantId
+                  ? { shopProductVariantId: item.shopProductVariantId }
+                  : item.productVariantId
+                    ? { productVariantId: item.productVariantId }
+                    : item.shopProductId
+                      ? { shopProductId: item.shopProductId }
+                      : { productId: item.productId }),
+                purchaseOrder: {
+                  userId: session.id,
+                  status: "Received",
                 },
-              });
-
-              await tx.productBatch.updateMany({
-                where: { purchaseOrderItemId: batch.id },
-                data: {
-                  remainingStock: {
-                    increment: restoreToThisBatch,
-                  },
+              },
+              orderBy: {
+                purchaseOrder: {
+                  date: "desc",
                 },
-              });
+              },
+            });
 
-              amountToRestore -= restoreToThisBatch;
+            for (const batch of batches) {
+              if (amountToRestore <= 0) break;
+              const currentRemaining = batch.remainingQuantity || 0;
+              const originalQty = batch.quantity;
+              const spaceInBatch = originalQty - currentRemaining;
+              const restoreToThisBatch = Math.min(spaceInBatch, amountToRestore);
+
+              if (restoreToThisBatch > 0) {
+                await tx.purchaseOrderItem.update({
+                  where: { id: batch.id },
+                  data: {
+                    remainingQuantity: {
+                      increment: restoreToThisBatch,
+                    },
+                  },
+                });
+
+                await tx.productBatch.updateMany({
+                  where: { purchaseOrderItemId: batch.id },
+                  data: {
+                    remainingStock: {
+                      increment: restoreToThisBatch,
+                    },
+                  },
+                });
+
+                amountToRestore -= restoreToThisBatch;
+              }
             }
           }
         }
@@ -406,17 +418,19 @@ export async function PUT(
           })),
         });
 
-        await OutboundInventoryService.processOutboundFIFO(
-          tx,
-          session.id,
-          normalizedItems.map((item) => ({
-            productId: item.productId,
-            productVariantId: item.productVariantId,
-            shopProductId: item.shopProductId,
-            shopProductVariantId: item.shopProductVariantId,
-            quantity: item.quantity,
-          }))
-        );
+        if (willBeDeducted) {
+          await OutboundInventoryService.processOutboundFIFO(
+            tx,
+            session.id,
+            normalizedItems.map((item) => ({
+              productId: item.productId,
+              productVariantId: item.productVariantId,
+              shopProductId: item.shopProductId,
+              shopProductVariantId: item.shopProductVariantId,
+              quantity: item.quantity,
+            }))
+          );
+        }
 
         const touchedItems = [
           ...existingOrder.items.map((item) => ({

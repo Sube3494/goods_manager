@@ -264,7 +264,7 @@ const ShipmentItemRow = memo(({
     <div
       onClick={isBatchMode ? () => onToggle(itemKey) : undefined}
       className={cn(
-        "group relative flex flex-col gap-3 rounded-3xl border border-border/70 bg-linear-to-br from-white to-slate-50/70 p-3.5 shadow-sm transition-all cursor-pointer dark:border-white/8 dark:from-white/10 dark:to-white/[0.06]",
+        "group relative flex flex-col gap-2.5 md:gap-2 rounded-2xl border border-border/70 bg-linear-to-br from-white to-slate-50/70 p-3 md:p-2.5 shadow-sm transition-all cursor-pointer dark:border-white/8 dark:from-white/10 dark:to-white/[0.06]",
         isBatchMode && isChecked
           ? "bg-rose-500/5 border-rose-500/30 dark:bg-rose-500/10 dark:border-rose-500/20"
           : "hover:border-primary/20 hover:shadow-[0_16px_40px_-28px_rgba(59,130,246,0.45)]"
@@ -272,45 +272,41 @@ const ShipmentItemRow = memo(({
     >
       {showTrackingInput ? (
         <>
+          {/* 移动端排版 (仅在 md 以下可见) */}
           <div
-            className="flex w-full flex-col gap-2"
+            className="flex w-full flex-col gap-2 md:hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">商品</div>
-              <div className="flex min-w-0 items-start gap-2.5">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm">
-                  {item.image ? (
-                    <Image src={item.image} alt={item.name} width={48} height={48} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Package size={16} className="text-muted-foreground/50" />
+            <div className="grid w-full grid-cols-2 gap-2.5">
+              <div className="col-span-2 flex min-w-0 flex-col gap-1">
+                <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">商品</div>
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm">
+                    {item.image ? (
+                      <Image src={item.image} alt={item.name} width={48} height={48} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Package size={16} className="text-muted-foreground/50" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div title={item.name} className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground">{baseName}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {variantLabel ? (
+                        <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-bold text-primary">
+                          {variantLabel}
+                        </span>
+                      ) : null}
+                      <span className="inline-flex h-5 items-center rounded-full border border-cyan-400/25 bg-cyan-400/12 px-2 text-[10px] font-black text-cyan-700 shadow-[0_0_18px_rgba(34,211,238,0.12)] dark:text-cyan-200">
+                        库存 {item.stock}
+                      </span>
                     </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <div title={item.name} className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground">{baseName}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-1">
-                    {variantLabel ? (
-                      <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-bold text-primary">
-                        {variantLabel}
-                      </span>
-                    ) : null}
-                    {item.sku ? (
-                      <span className="inline-flex h-5 items-center rounded-full border border-border/50 bg-white/70 px-2 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.06]">
-                        {item.sku}
-                      </span>
-                    ) : null}
-                    <span className="inline-flex h-5 items-center rounded-full border border-cyan-400/25 bg-cyan-400/12 px-2 text-[10px] font-black text-cyan-700 shadow-[0_0_18px_rgba(34,211,238,0.12)] dark:text-cyan-200">
-                      库存 {item.stock}
-                    </span>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid w-full grid-cols-[minmax(104px,0.9fr)_minmax(0,1fr)] gap-2">
-              <div className="flex min-w-0 flex-col gap-1">
+              <div className="col-span-1 flex min-w-0 flex-col gap-1">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">物流公司</span>
                 <CustomSelect
                   options={logisticsOptions}
@@ -325,7 +321,7 @@ const ShipmentItemRow = memo(({
                 />
               </div>
 
-              <div className="flex min-w-0 flex-col gap-1">
+              <div className="col-span-1 flex min-w-0 flex-col gap-1">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">快递单号</span>
                 <input
                   type="text"
@@ -347,7 +343,7 @@ const ShipmentItemRow = memo(({
                   disabled={disabled}
                   value={item.quantity || ""}
                   onChange={(e) => onUpdateManualQuantity(itemKey, e.target.value)}
-                  className="h-9 w-full rounded-xl border border-border bg-white px-2 py-1 text-center font-mono text-sm font-bold text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="h-9 w-full rounded-xl border border-border bg-white px-2 py-1 text-center font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
 
@@ -362,7 +358,7 @@ const ShipmentItemRow = memo(({
                     disabled={disabled}
                     value={item.price ?? ""}
                     onChange={(e) => onUpdatePrice?.(itemKey, e.target.value)}
-                    className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="0.00"
                   />
                 </div>
@@ -379,7 +375,7 @@ const ShipmentItemRow = memo(({
                     disabled={disabled}
                     value={item.shippingFee ?? ""}
                     onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
-                    className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="0.00"
                   />
                 </div>
@@ -387,8 +383,8 @@ const ShipmentItemRow = memo(({
 
               <div className="col-span-2 flex flex-col gap-1 min-[430px]:col-span-1">
                 <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">小计</span>
-                <div className="flex h-9 min-w-0 items-center justify-end rounded-xl border border-border/50 bg-background/70 px-2.5 text-right dark:border-white/8 dark:bg-white/[0.04]">
-                  <div className="whitespace-nowrap font-mono text-[15px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
+                <div className="flex h-9 min-w-0 items-center justify-end rounded-xl border border-border/50 bg-background/70 px-2.5 text-right dark:border-white/8 dark:bg-white/4">
+                  <div className="overflow-x-auto scrollbar-none whitespace-nowrap font-mono text-[15px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
                 </div>
               </div>
 
@@ -431,6 +427,159 @@ const ShipmentItemRow = memo(({
                     ) : null}
                   </>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* PC 端排版 (仅在 md 及以上可见) */}
+          <div
+            className="hidden w-full flex-col gap-2 md:flex"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 上面一行：商品、数量、单价、操作 */}
+            <div className="grid w-full grid-cols-[minmax(160px,1.8fr)_minmax(70px,0.7fr)_minmax(90px,1.1fr)_60px] items-center gap-2.5">
+              {/* 商品信息 */}
+              <div className="flex min-w-0 items-start gap-2.5">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm">
+                  {item.image ? (
+                    <Image src={item.image} alt={item.name} width={48} height={48} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Package size={16} className="text-muted-foreground/50" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div title={item.name} className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground">{baseName}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {variantLabel ? (
+                      <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-bold text-primary">
+                        {variantLabel}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex h-5 items-center rounded-full border border-cyan-400/25 bg-cyan-400/12 px-2 text-[10px] font-black text-cyan-700 shadow-[0_0_18px_rgba(34,211,238,0.12)] dark:text-cyan-200">
+                      库存 {item.stock}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 数量 */}
+              <div className="relative">
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">数量</span>
+                <input
+                  type="number"
+                  min="1"
+                  disabled={disabled}
+                  value={item.quantity || ""}
+                  onChange={(e) => onUpdateManualQuantity(itemKey, e.target.value)}
+                  placeholder="0"
+                  className="h-9 w-full rounded-xl border border-border bg-white pl-9 pr-1.5 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+
+              {/* 单价 */}
+              <div className="relative">
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">单价 ￥</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={disabled}
+                  value={item.price ?? ""}
+                  onChange={(e) => onUpdatePrice?.(itemKey, e.target.value)}
+                  className="h-9 w-full rounded-xl border border-border bg-white pl-10 pr-2 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="0.00"
+                />
+              </div>
+
+              {/* 操作 */}
+              <div className="relative flex h-9 items-center justify-end gap-1">
+                {isBatchMode ? (
+                  <div
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
+                      isChecked ? "bg-rose-500 border-rose-500 text-white" : "border-border dark:border-white/20"
+                    )}
+                  >
+                    {isChecked && <Check size={11} strokeWidth={3} />}
+                  </div>
+                ) : (
+                  <>
+                    {onCopyItem ? (
+                      <button
+                        type="button"
+                        onClick={() => onCopyItem(item)}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary active:scale-95"
+                        title="复制此货品"
+                      >
+                        <Copy size={15} className="shrink-0" />
+                      </button>
+                    ) : null}
+                    {!disabled ? (
+                      <button
+                        type="button"
+                        onClick={handleDeleteClick}
+                        className={cn(
+                          "inline-flex h-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 flex-nowrap",
+                          confirmingDelete
+                            ? "w-14 bg-rose-500 px-2 text-white shadow-sm"
+                            : "w-9 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
+                        )}
+                        title="移除项目"
+                      >
+                        {confirmingDelete ? <span className="text-[10px] font-bold whitespace-nowrap">确认</span> : <X size={16} className="shrink-0" />}
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* 下面一行：物流、快递单号、运费、小计 */}
+            <div className="grid w-full grid-cols-[130px_minmax(150px,1.8fr)_minmax(85px,0.9fr)_minmax(105px,1.1fr)] items-center gap-2.5">
+              {/* 物流公司 */}
+              <CustomSelect
+                options={logisticsOptions}
+                value={item.logisticsName || ""}
+                onChange={(val) => onUpdateLogisticsName?.(itemKey, val)}
+                placeholder="物流公司"
+                disabled={disabled}
+                searchable
+                triggerClassName="h-9 w-full rounded-xl border border-border bg-white text-xs dark:border-white/10 dark:bg-[#2b313d]"
+                onAddNew={onAddNewLogistics}
+                addNewLabel="去新增"
+              />
+
+              {/* 快递单号 */}
+              <input
+                type="text"
+                disabled={disabled || !isLogisticsSelected}
+                value={item.trackingNumber || ""}
+                onChange={(e) => onUpdateTrackingNumber?.(itemKey, e.target.value)}
+                placeholder={isLogisticsSelected ? "多个单号用逗号分隔" : "请先选择物流公司"}
+                className="h-9 w-full rounded-xl border border-border bg-white px-3 py-1.5 text-xs text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-[#2b313d] disabled:cursor-not-allowed disabled:opacity-50"
+              />
+
+              {/* 运费 */}
+              <div className="relative">
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">运费 ￥</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={disabled}
+                  value={item.shippingFee ?? ""}
+                  onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
+                  className="h-9 w-full rounded-xl border border-border bg-white pl-10 pr-2 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="0.00"
+                />
+              </div>
+
+              {/* 小计 */}
+              <div className="flex h-9 min-w-0 items-center justify-between rounded-xl border border-border/50 bg-background/70 px-2.5 dark:border-white/8 dark:bg-white/4">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1">小计</span>
+                <div className="overflow-x-auto scrollbar-none whitespace-nowrap font-mono text-[13px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -480,7 +629,7 @@ const ShipmentItemRow = memo(({
               disabled={disabled}
               value={item.quantity || ""}
               onChange={(e) => onUpdateManualQuantity(itemKey, e.target.value)}
-              className="h-9 w-full rounded-xl border border-border bg-white px-2 py-1 text-center font-mono text-sm font-bold text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-9 w-full rounded-xl border border-border bg-white px-2 py-1 text-center font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -495,7 +644,7 @@ const ShipmentItemRow = memo(({
                 disabled={disabled}
                 value={item.price ?? ""}
                 onChange={(e) => onUpdatePrice?.(itemKey, e.target.value)}
-                className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="0.00"
               />
             </div>
@@ -512,7 +661,7 @@ const ShipmentItemRow = memo(({
                 disabled={disabled}
                 value={item.shippingFee ?? ""}
                 onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
-                className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="0.00"
               />
             </div>
@@ -696,12 +845,12 @@ function parseQuickAddressInput(input: string) {
     const leadingNameMatch = singleLine.match(/^([\u4e00-\u9fa5·]{2,12})\s+(.+)$/);
     if (leadingNameMatch && isLikelyRecipientName(leadingNameMatch[1]) && isLikelyRecipientAddress(leadingNameMatch[2])) {
       recipientName = recipientName || leadingNameMatch[1].trim();
-      recipientAddress = recipientAddress || leadingNameMatch[2].trim();
+      recipientAddress = leadingNameMatch[2].trim();
     }
 
     const trailingNameMatch = singleLine.match(/^(.+?)\s+([\u4e00-\u9fa5·]{2,12})$/);
     if (trailingNameMatch && isLikelyRecipientAddress(trailingNameMatch[1]) && isLikelyRecipientName(trailingNameMatch[2])) {
-      recipientAddress = recipientAddress || trailingNameMatch[1].trim();
+      recipientAddress = trailingNameMatch[1].trim();
       recipientName = recipientName || trailingNameMatch[2].trim();
     }
   }
@@ -714,6 +863,13 @@ function parseQuickAddressInput(input: string) {
   if (!recipientName) {
     const fallbackName = segments.find((segment) => isLikelyRecipientName(segment));
     recipientName = fallbackName || "";
+  }
+
+  // 兜底去除地址前面可能因解析或导入污染而重复出现的“姓名”前缀
+  if (recipientName && recipientAddress) {
+    const escapedName = recipientName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const namePrefixRegex = new RegExp(`^(?:${escapedName}\\s*)+`, 'g');
+    recipientAddress = recipientAddress.replace(namePrefixRegex, '').trim();
   }
 
   return {
@@ -1271,15 +1427,23 @@ function FactoryShipmentDetailModal({
       return;
     }
 
-    const quantity = Number.parseInt(value, 10) || 1;
-    setEditItems((prev) =>
-      prev.map((item) =>
+    const nextQty = Number.parseInt(value, 10) || 1;
+    setEditItems((prev) => {
+      const originalItem = order?.items.find(
+        (oItem) =>
+          (oItem.shopProductVariantId || oItem.productVariantId || oItem.shopProductId || oItem.productId || "") === itemKey
+      );
+      const originalQty = originalItem?.quantity || 0;
+      const currentItem = prev.find((i) => (getItemKey(i) || getStableShipmentActionKey(i)) === itemKey);
+      const maxAllowed = originalQty + (currentItem?.stock || 0);
+
+      return prev.map((item) =>
         (getItemKey(item) || getStableShipmentActionKey(item)) === itemKey
-          ? { ...item, quantity: Math.max(1, Math.min(Math.max(item.stock, quantity), quantity)) }
+          ? { ...item, quantity: Math.max(1, Math.min(maxAllowed, nextQty)) }
           : item
-      )
-    );
-  }, []);
+      );
+    });
+  }, [order]);
 
   const removeEditItem = useCallback((itemKey: string) => {
     setEditItems((prev) => prev.filter((item) => (getItemKey(item) || getStableShipmentActionKey(item)) !== itemKey));
@@ -2155,7 +2319,7 @@ function FactoryShipmentCreateModal({
     setSelectedItems((prev) =>
       prev.map((item) =>
         getItemKey(item) === itemKey
-          ? { ...item, quantity: Math.max(1, Math.min(item.stock, quantity)) }
+          ? { ...item, quantity: Math.max(0, Math.min(item.stock, quantity)) }
           : item
       )
     );
@@ -2175,31 +2339,6 @@ function FactoryShipmentCreateModal({
     setSelectedItems((prev) =>
       prev.map((item) =>
         getItemKey(item) === itemKey ? { ...item, shippingFee } : item
-      )
-    );
-  };
-
-  const updateTrackingNumber = (itemKey: string, value: string) => {
-    const trackingNumber = value.replace(/，/g, ",");
-    setSelectedItems((prev) =>
-      prev.map((item) =>
-        getItemKey(item) === itemKey
-          ? hasSelectedLogisticsName(item.logisticsName)
-            ? { ...item, trackingNumber }
-            : { ...item, trackingNumber: "" }
-          : item
-      )
-    );
-  };
-
-  const updateLogisticsName = (itemKey: string, value: string) => {
-    setSelectedItems((prev) =>
-      prev.map((item) =>
-        getItemKey(item) === itemKey
-          ? hasSelectedLogisticsName(value)
-            ? { ...item, logisticsName: value }
-            : { ...item, logisticsName: value, trackingNumber: "" }
-          : item
       )
     );
   };
@@ -2491,9 +2630,6 @@ function FactoryShipmentCreateModal({
                         onUpdateManualQuantity={updateManualQuantity}
                         onUpdatePrice={updatePrice}
                         onUpdateShippingFee={updateShippingFee}
-                        showTrackingInput
-                        onUpdateTrackingNumber={updateTrackingNumber}
-                        onUpdateLogisticsName={updateLogisticsName}
                         getItemKey={getItemKey}
                         disabled={false}
                         logisticsOptions={logisticsOptions}

@@ -191,8 +191,13 @@ export async function POST(request: Request) {
         }
       });
 
-      // 2. 委托 Service 处理 FIFO 扣减及库存更新
-      await InventoryService.processOutboundFIFO(tx, user.id, normalizedItems);
+      // 2. 对于厂家发货单，只有在已发货/部分发货状态下才真正执行 FIFO 扣减；普通出库则直接执行。
+      const isFactoryShipment = type === "FactoryShipment";
+      const shouldDeductStock = !isFactoryShipment || finalStatus === "已发货" || finalStatus === "部分发货";
+
+      if (shouldDeductStock) {
+        await InventoryService.processOutboundFIFO(tx, user.id, normalizedItems);
+      }
 
       // 3. 自动将厂家发货单的新收件信息沉淀到客户管理
       try {
