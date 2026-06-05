@@ -19,15 +19,38 @@ interface OutboundItem {
   price?: number;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getAuthorizedUser("outbound:manage");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const scope = searchParams.get("scope");
+    const excludeReturned = searchParams.get("excludeReturned") === "1";
+
+    const where: Prisma.OutboundOrderWhereInput = {
+      userId: user.id,
+    };
+
+    if (excludeReturned) {
+      where.status = { notIn: ["Returned", "已退回"] };
+    }
+
+    if (scope === "factory-shipments") {
+      where.AND = [
+        {
+          OR: [
+            { note: { contains: "[厂家发货]" } },
+            { note: { contains: "[销售]" } },
+          ],
+        },
+      ];
+    }
+
     const orders = await prisma.outboundOrder.findMany({
-      where: { userId: user.id },
+      where,
       include: {
         items: {
           include: {

@@ -585,122 +585,235 @@ const ShipmentItemRow = memo(({
           </div>
         </>
       ) : (
-        <div
-          className={valueGridClass}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">商品</span>
-          <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">数量</span>
-          <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">单价 (￥)</span>
-          <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">运费 (￥)</span>
-          <span className="hidden justify-end text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">小计</span>
-          <div className="hidden md:block" />
-
-          <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm lg:h-11 lg:w-11">
-              {item.image ? (
-                <Image src={item.image} alt={item.name} width={48} height={48} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <Package size={16} className="text-muted-foreground/50" />
+        <>
+          <div
+            className="flex w-full flex-col gap-3 md:hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm">
+                  {item.image ? (
+                    <Image src={item.image} alt={item.name} width={48} height={48} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Package size={16} className="text-muted-foreground/50" />
+                    </div>
+                  )}
                 </div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div title={item.name} className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground">{baseName}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {variantLabel ? (
+                      <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-black text-primary">
+                        {variantLabel}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex h-5 items-center rounded-full border border-cyan-400/25 bg-cyan-400/12 px-2 text-[10px] font-black text-cyan-700 shadow-[0_0_18px_rgba(34,211,238,0.12)] dark:text-cyan-200">
+                      库存 {item.stock}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center justify-end">
+                {isBatchMode ? (
+                  <div
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
+                      isChecked ? "bg-rose-500 border-rose-500 text-white" : "border-border dark:border-white/20"
+                    )}
+                  >
+                    {isChecked && <Check size={11} strokeWidth={3} />}
+                  </div>
+                ) : (
+                  <>
+                    {onCopyItem ? (
+                      <button
+                        type="button"
+                        onClick={() => onCopyItem(item)}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary active:scale-95"
+                        title="复制此货品"
+                      >
+                        <Copy size={15} className="shrink-0" />
+                      </button>
+                    ) : null}
+                    {!disabled ? (
+                      <button
+                        type="button"
+                        onClick={handleDeleteClick}
+                        className={cn(
+                          "inline-flex h-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 flex-nowrap",
+                          confirmingDelete
+                            ? "w-14 bg-rose-500 px-2 text-white shadow-sm"
+                            : "w-9 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
+                        )}
+                        title="移除项目"
+                      >
+                        {confirmingDelete ? <span className="text-[10px] font-bold whitespace-nowrap">确认</span> : <X size={16} className="shrink-0" />}
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">数量</span>
+                <input
+                  type="number"
+                  min="1"
+                  disabled={disabled}
+                  value={item.quantity || ""}
+                  onChange={(e) => onUpdateManualQuantity(itemKey, e.target.value)}
+                  className="h-9 w-full rounded-xl border border-border bg-white px-2 py-1 text-center font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">单价 (￥)</span>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    disabled={disabled}
+                    value={item.price ?? ""}
+                    onChange={(e) => onUpdatePrice?.(itemKey, e.target.value)}
+                    className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">小计</span>
+                <div className="flex h-9 min-w-0 items-center justify-end rounded-xl border border-border/50 bg-background/70 px-2.5 text-right dark:border-white/8 dark:bg-white/[0.04]">
+                  <div className="truncate text-[14px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={cn(valueGridClass, "hidden md:grid")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">商品</span>
+            <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">数量</span>
+            <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">单价 (￥)</span>
+            <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">运费 (￥)</span>
+            <span className="hidden justify-end text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">小计</span>
+            <div className="hidden md:block" />
+
+            <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm lg:h-11 lg:w-11">
+                {item.image ? (
+                  <Image src={item.image} alt={item.name} width={48} height={48} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Package size={16} className="text-muted-foreground/50" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground lg:text-[14px]">{baseName}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1">
+                  {variantLabel ? (
+                    <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-black text-primary">
+                      {variantLabel}
+                    </span>
+                  ) : null}
+                  <span className="inline-flex h-5 items-center rounded-full border border-cyan-400/25 bg-cyan-400/12 px-2 text-[10px] font-black text-cyan-700 shadow-[0_0_18px_rgba(34,211,238,0.12)] dark:text-cyan-200">
+                    库存 {item.stock}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1 md:gap-0">
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">数量</span>
+              <input
+                type="number"
+                min="1"
+                disabled={disabled}
+                value={item.quantity || ""}
+                onChange={(e) => onUpdateManualQuantity(itemKey, e.target.value)}
+                className="h-9 w-full rounded-xl border border-border bg-white px-2 py-1 text-center font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1 md:gap-0">
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">单价 (￥)</span>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={disabled}
+                  value={item.price ?? ""}
+                  onChange={(e) => onUpdatePrice?.(itemKey, e.target.value)}
+                  className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1 md:gap-0">
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">运费 (￥)</span>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={disabled}
+                  value={item.shippingFee ?? ""}
+                  onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
+                  className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div className="flex h-9 min-w-0 items-center justify-end rounded-xl border border-border/50 bg-background/70 px-3 text-right dark:border-white/8 dark:bg-white/[0.04]">
+              <div className="truncate text-[16px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
+            </div>
+
+            <div className="flex h-9 items-center justify-center">
+              {isBatchMode ? (
+                <div
+                  className={cn(
+                    "flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
+                    isChecked ? "bg-rose-500 border-rose-500 text-white" : "border-border dark:border-white/20"
+                  )}
+                >
+                  {isChecked && <Check size={11} strokeWidth={3} />}
+                </div>
+              ) : (
+                !disabled ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className={cn(
+                      "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-xl px-2 transition-all active:scale-95 flex-nowrap",
+                      confirmingDelete
+                        ? "bg-rose-500 text-white shadow-sm min-w-[52px]"
+                        : "text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 min-w-[32px] sm:opacity-0 group-hover:opacity-100"
+                    )}
+                    title="移除项目"
+                  >
+                    <X size={16} className="shrink-0" />
+                    {confirmingDelete && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
+                  </button>
+                ) : null
               )}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground lg:text-[14px]">{baseName}</div>
-              <div className="mt-1 flex flex-wrap items-center gap-1">
-                {variantLabel ? (
-                  <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-black text-primary">
-                    {variantLabel}
-                  </span>
-                ) : null}
-                <span className="inline-flex h-5 items-center rounded-full border border-cyan-400/25 bg-cyan-400/12 px-2 text-[10px] font-black text-cyan-700 shadow-[0_0_18px_rgba(34,211,238,0.12)] dark:text-cyan-200">
-                  库存 {item.stock}
-                </span>
-              </div>
-            </div>
           </div>
-
-          <div className="flex flex-col gap-1 md:gap-0">
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">数量</span>
-            <input
-              type="number"
-              min="1"
-              disabled={disabled}
-              value={item.quantity || ""}
-              onChange={(e) => onUpdateManualQuantity(itemKey, e.target.value)}
-              className="h-9 w-full rounded-xl border border-border bg-white px-2 py-1 text-center font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1 md:gap-0">
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">单价 (￥)</span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                disabled={disabled}
-                value={item.price ?? ""}
-                onChange={(e) => onUpdatePrice?.(itemKey, e.target.value)}
-                className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1 md:gap-0">
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">运费 (￥)</span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                disabled={disabled}
-                value={item.shippingFee ?? ""}
-                onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
-                className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          <div className="flex h-9 min-w-0 items-center justify-end rounded-xl border border-border/50 bg-background/70 px-3 text-right dark:border-white/8 dark:bg-white/[0.04]">
-            <div className="truncate text-[16px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
-          </div>
-
-          <div className="flex h-9 items-center justify-center">
-            {isBatchMode ? (
-              <div
-                className={cn(
-                  "flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
-                  isChecked ? "bg-rose-500 border-rose-500 text-white" : "border-border dark:border-white/20"
-                )}
-              >
-                {isChecked && <Check size={11} strokeWidth={3} />}
-              </div>
-            ) : (
-              !disabled ? (
-                <button
-                  type="button"
-                  onClick={handleDeleteClick}
-                  className={cn(
-                    "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-xl px-2 transition-all active:scale-95 flex-nowrap",
-                    confirmingDelete
-                      ? "bg-rose-500 text-white shadow-sm min-w-[52px]"
-                      : "text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 min-w-[32px] sm:opacity-0 group-hover:opacity-100"
-                  )}
-                  title="移除项目"
-                >
-                  <X size={16} className="shrink-0" />
-                  {confirmingDelete && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
-                </button>
-              ) : null
-            )}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -722,7 +835,6 @@ const shippingStatusOptions = [
   { value: "待发货", label: "待发货" },
   { value: "部分发货", label: "部分发货" },
   { value: "已发货", label: "已发货" },
-  { value: "已退回", label: "已退回" },
 ];
 
 const paymentStatusOptions = [
@@ -2878,14 +2990,10 @@ export default function FactoryShipmentsPage() {
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/outbound");
+      const res = await fetch("/api/outbound?scope=factory-shipments&excludeReturned=1");
       if (!res.ok) throw new Error("加载发货记录失败");
       const data = await res.json();
-      const factoryOrders = (data || []).filter((order: OutboundOrder) => {
-        const parsed = parseFactoryShipmentNote(order.note);
-        return parsed.isFactoryShipment;
-      });
-      setShipmentOrders(factoryOrders);
+      setShipmentOrders(data || []);
     } catch (error) {
       console.error("Failed to fetch factory shipments:", error);
       showToast("加载发货记录失败", "error");
