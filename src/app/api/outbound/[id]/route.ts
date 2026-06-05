@@ -126,11 +126,14 @@ export async function POST(
           : fallbackCostPrice;
 
         inboundTotalAmount = FinanceMath.add(inboundTotalAmount, itemTotalAmount);
+
+        // 退回优先回补历史采购批次；只有历史批次无法完整容纳时，
+        // 才把缺口写成新的可用入库余量，避免重复累计库存。
         inboundItems.push({
           productId: item.productId || null,
           shopProductId: item.shopProductId || null,
           quantity: item.quantity,
-          remainingQuantity: item.quantity,
+          remainingQuantity: missingQuantity,
           costPrice: itemCostPrice,
         });
       }
