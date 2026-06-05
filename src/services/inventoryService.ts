@@ -4,11 +4,94 @@ import { Prisma } from "../../prisma/generated-client";
  * 库存核心服务
  */
 export class InventoryService {
+  private static buildInventoryScope(item: {
+    productId?: string | null;
+    productVariantId?: string | null;
+    shopProductId?: string | null;
+    shopProductVariantId?: string | null;
+  }) {
+    if (item.shopProductVariantId) {
+      return { shopProductVariantId: item.shopProductVariantId };
+    }
+
+    if (item.productVariantId) {
+      return { productVariantId: item.productVariantId };
+    }
+
+    if (item.shopProductId) {
+      return { shopProductId: item.shopProductId };
+    }
+
+    if (item.productId) {
+      return { productId: item.productId };
+    }
+
+    return null;
+  }
+
   private static async getOutboundItemLabel(
     tx: Prisma.TransactionClient,
     userId: string,
-    item: { productId?: string | null; shopProductId?: string | null }
+    item: {
+      productId?: string | null;
+      productVariantId?: string | null;
+      shopProductId?: string | null;
+      shopProductVariantId?: string | null;
+    }
   ) {
+    if (item.shopProductVariantId) {
+      const shopVariant = await tx.shopProductVariant.findFirst({
+        where: {
+          id: item.shopProductVariantId,
+          shopProduct: {
+            shop: { userId },
+          },
+        },
+        select: {
+          variantName: true,
+          optionSummary: true,
+          sku: true,
+          shopProduct: {
+            select: {
+              productName: true,
+              product: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const baseName = shopVariant?.shopProduct?.productName || shopVariant?.shopProduct?.product?.name;
+      const variantLabel = shopVariant?.variantName || shopVariant?.optionSummary;
+      const sku = shopVariant?.sku;
+      return [baseName, variantLabel, sku ? `(${sku})` : ""].filter(Boolean).join(" ") || "该规格商品";
+    }
+
+    if (item.productVariantId) {
+      const productVariant = await tx.productVariant.findUnique({
+        where: { id: item.productVariantId },
+        select: {
+          variantName: true,
+          optionSummary: true,
+          sku: true,
+          product: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      return [
+        productVariant?.product?.name,
+        productVariant?.variantName || productVariant?.optionSummary,
+        productVariant?.sku ? `(${productVariant.sku})` : "",
+      ].filter(Boolean).join(" ") || "该规格商品";
+    }
+
     if (item.shopProductId) {
       const shopProduct = await tx.shopProduct.findFirst({
         where: {
@@ -56,12 +139,19 @@ export class InventoryService {
   static async processOutboundFIFO(
     tx: Prisma.TransactionClient,
     userId: string,
-    items: { productId?: string | null; shopProductId?: string | null; quantity: number }[]
+    items: {
+      productId?: string | null;
+      productVariantId?: string | null;
+      shopProductId?: string | null;
+      shopProductVariantId?: string | null;
+      quantity: number;
+    }[]
   ) {
     for (const item of items) {
       let remainingToDeduct = item.quantity;
+      const inventoryScope = this.buildInventoryScope(item);
 
-      if (!item.shopProductId && !item.productId) {
+      if (!inventoryScope) {
         throw new Error("出库商品缺少关联标识，无法扣减库存");
       }
 
@@ -69,7 +159,7 @@ export class InventoryService {
       // 增加 userId 校验以确保数据隔离安全性
       const batches = await tx.purchaseOrderItem.findMany({
         where: {
-          ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId! }),
+          ...inventoryScope,
           remainingQuantity: {
             gt: 0
           },
@@ -133,7 +223,13 @@ export class InventoryService {
       }
 
       // 4. 根据实际扣减完的批次，统一同步该商品及其关联的主库商品物理库存
-      await this.syncStockFromBatches(tx, item.productId || null, item.shopProductId || null);
+      await this.syncStockFromBatches(
+        tx,
+        item.productId || null,
+        item.shopProductId || null,
+        item.productVariantId || null,
+        item.shopProductVariantId || null
+      );
     }
   }
 
@@ -146,9 +242,67 @@ export class InventoryService {
   static async syncStockFromBatches(
     tx: Prisma.TransactionClient,
     productId: string | null,
-    shopProductId: string | null
+    shopProductId: string | null,
+    productVariantId: string | null = null,
+    shopProductVariantId: string | null = null
   ) {
-    if (shopProductId) {
+    if (shopProductVariantId) {
+      const aggregateResult = await tx.purchaseOrderItem.aggregate({
+        where: {
+          shopProductVariantId,
+          remainingQuantity: { gt: 0 },
+          purchaseOrder: { status: "Received" }
+        },
+        _sum: {
+          remainingQuantity: true
+        }
+      });
+      const sum = aggregateResult._sum.remainingQuantity || 0;
+
+      await tx.shopProductVariant.update({
+        where: { id: shopProductVariantId },
+        data: { stock: sum }
+      });
+
+      const shopVariant = await tx.shopProductVariant.findUnique({
+        where: { id: shopProductVariantId },
+        select: { shopProductId: true, productVariantId: true }
+      });
+
+      if (shopVariant?.shopProductId) {
+        await this.syncStockFromBatches(tx, null, shopVariant.shopProductId, null, null);
+      }
+
+      if (shopVariant?.productVariantId) {
+        await this.syncStockFromBatches(tx, null, null, shopVariant.productVariantId, null);
+      }
+    } else if (productVariantId) {
+      const aggregateResult = await tx.purchaseOrderItem.aggregate({
+        where: {
+          productVariantId,
+          remainingQuantity: { gt: 0 },
+          purchaseOrder: { status: "Received" }
+        },
+        _sum: {
+          remainingQuantity: true
+        }
+      });
+      const sum = aggregateResult._sum.remainingQuantity || 0;
+
+      await tx.productVariant.update({
+        where: { id: productVariantId },
+        data: { stock: sum }
+      });
+
+      const variant = await tx.productVariant.findUnique({
+        where: { id: productVariantId },
+        select: { productId: true }
+      });
+
+      if (variant?.productId) {
+        await this.syncStockFromBatches(tx, variant.productId, null, null, null);
+      }
+    } else if (shopProductId) {
       // 聚合所有有效的店铺采购批次
       const aggregateResult = await tx.purchaseOrderItem.aggregate({
         where: {

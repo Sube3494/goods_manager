@@ -47,14 +47,18 @@ const PurchaseItemRow = memo(({
     onToggle?: (productId: string) => void;
     onManageShelfLife?: (item: PurchaseOrderItem) => void;
 }) => {
-    const itemKey = item.shopProductId || item.productId || "";
+    const itemKey = item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "";
     const productData = useMemo(() => {
-        const p = products.find(g => g.id === itemKey);
+        const p = products.find(g =>
+            (g.shopProductVariantId || g.productVariantId || g.shopProductId || g.id) === itemKey
+        );
         const supplierId = item.shopProduct?.supplierId || item.supplierId;
+        const baseName = item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || p?.name || "加载中...";
+        const variantLabel = item.variantName || item.shopProductVariant?.variantName || item.productVariant?.variantName || "";
         return {
             imageUrl: item.shopProduct?.image || item.image || item.product?.image || p?.image,
-            productName: item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || p?.name || "加载中...",
-            productSku: item.shopProduct?.sku || item.product?.sku || p?.sku,
+            productName: [baseName, variantLabel].filter(Boolean).join(" / "),
+            productSku: item.variantSku || item.shopProductVariant?.sku || item.productVariant?.sku || item.shopProduct?.sku || item.product?.sku || p?.sku,
             supplierName: suppliers.find(s => s.id === supplierId)?.name,
             remark: item.shopProduct?.remark || item.product?.remark || p?.remark
         };
@@ -452,7 +456,7 @@ export function PurchaseOrderModal({
     const nextQuery: Record<string, string> = { all: "true" };
     return nextQuery;
   }, []);
-  const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductId || item.productId || "", []);
+  const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "", []);
 
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return formData.items;
@@ -553,41 +557,36 @@ export function PurchaseOrderModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Use setTimeout to avoid the "cascading renders" lint error while 
-    // keeping initialization out of the render path (fixing the Math.random error)
-    const timeoutId = setTimeout(() => {
-        if (initialData) {
-            const sortedItems = sortPurchaseItems(
-                initialData.items,
-                (item) => item.product?.sku,
-                (item) => item.product?.name
-            );
-            setFormData({ ...initialData, items: sortedItems });
-            setShippingFeeInput(initialData.shippingFees?.toString() || "0");
-            setExtraFeeInput(initialData.extraFees?.toString() || "0");
-        } else {
-            const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
-            
-            setFormData(() => ({
-                id: newId,
-                status: "Confirmed",
-                date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
-                items: [],
-                type: defaultType,
-                shippingFees: 0,
-                extraFees: 0,
-                totalAmount: 0,
-                trackingData: undefined,
-                paymentVouchers: [],
-                shippingAddress: "",
-                shopName: ""
-            }));
-            setShippingFeeInput("0");
-            setExtraFeeInput("0");
-        }
-    }, 0);
+    if (initialData) {
+        const sortedItems = sortPurchaseItems(
+            initialData.items,
+            (item) => item.product?.sku,
+            (item) => item.product?.name
+        );
+        setFormData({ ...initialData, items: sortedItems });
+        setShippingFeeInput(initialData.shippingFees?.toString() || "0");
+        setExtraFeeInput(initialData.extraFees?.toString() || "0");
+        return;
+    }
 
-    return () => clearTimeout(timeoutId);
+    const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
+
+    setFormData(() => ({
+        id: newId,
+        status: "Confirmed",
+        date: new Date().toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
+        items: [],
+        type: defaultType,
+        shippingFees: 0,
+        extraFees: 0,
+        totalAmount: 0,
+        trackingData: undefined,
+        paymentVouchers: [],
+        shippingAddress: "",
+        shopName: ""
+    }));
+    setShippingFeeInput("0");
+    setExtraFeeInput("0");
   }, [defaultType, isOpen, initialData]);
 
 
@@ -606,16 +605,18 @@ export function PurchaseOrderModal({
       let newItems = [...prev.items];
       
       selectedProducts.forEach(product => {
-        const itemKey = product.shopProductId || product.id;
+        const itemKey = product.shopProductVariantId || product.productVariantId || product.shopProductId || product.id;
         const resolvedProductId = product.sourceType === "shopProduct"
           ? (product.sourceProductId || product.productId || null)
-          : product.id;
+          : (product.productId || product.id);
 
         // Check against the growing newItems list to prevent duplicates within the same batch
-        if (!newItems.some(item => (item.shopProductId || item.productId) === itemKey)) {
+        if (!newItems.some(item => getPurchaseItemKey(item) === itemKey)) {
           newItems.push({
             productId: resolvedProductId,
+            productVariantId: product.productVariantId || null,
             shopProductId: product.shopProductId,
+            shopProductVariantId: product.shopProductVariantId || null,
             product: product, // Store snapshot for stable name display
             image: product.image,
             supplierId: product.supplierId,
@@ -1287,7 +1288,7 @@ export function PurchaseOrderModal({
             isOpen={isSelectionModalOpen}
             onClose={() => setIsSelectionModalOpen(false)}
             onSelect={handleBatchAdd}
-            showPrice={true}
+            showPrice={false}
             selectedIds={selectedProductIds}
             selectedBadgeLabel="已在采购单中"
             unselectedOnlyLabel="显示未添加"

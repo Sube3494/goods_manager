@@ -53,7 +53,9 @@ import { pinyinMatch } from "@/lib/pinyin";
 
 interface SelectedShipmentItem {
   productId?: string | null;
+  productVariantId?: string | null;
   shopProductId?: string;
+  shopProductVariantId?: string | null;
   name: string;
   sku: string;
   quantity: number;
@@ -237,6 +239,7 @@ const ShipmentItemRow = memo(({
   onAddNewLogistics?: () => void;
 }) => {
   const itemKey = getItemKey(item) || getStableShipmentActionKey(item);
+  const { baseName, variantLabel } = splitShipmentDisplayName(item.name);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
@@ -286,8 +289,13 @@ const ShipmentItemRow = memo(({
                   )}
                 </div>
                 <div className="min-w-0 flex-1 pt-0.5">
-                  <div title={item.name} className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground">{item.name}</div>
+                  <div title={item.name} className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground">{baseName}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {variantLabel ? (
+                      <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-bold text-primary">
+                        {variantLabel}
+                      </span>
+                    ) : null}
                     {item.sku ? (
                       <span className="inline-flex h-5 items-center rounded-full border border-border/50 bg-white/70 px-2 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.06]">
                         {item.sku}
@@ -406,21 +414,21 @@ const ShipmentItemRow = memo(({
                         <Copy size={15} className="shrink-0" />
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={handleDeleteClick}
-                      className={cn(
-                        "inline-flex h-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 flex-nowrap",
-                        disabled && "pointer-events-none opacity-0",
-                        confirmingDelete
-                          ? "w-14 bg-rose-500 px-2 text-white shadow-sm"
-                          : "w-9 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
-                      )}
-                      title="移除项目"
-                    >
-                      {confirmingDelete ? <span className="text-[10px] font-bold whitespace-nowrap">确认</span> : <X size={16} className="shrink-0" />}
-                    </button>
+                    {!disabled ? (
+                      <button
+                        type="button"
+                        onClick={handleDeleteClick}
+                        className={cn(
+                          "inline-flex h-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 flex-nowrap",
+                          confirmingDelete
+                            ? "w-14 bg-rose-500 px-2 text-white shadow-sm"
+                            : "w-9 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
+                        )}
+                        title="移除项目"
+                      >
+                        {confirmingDelete ? <span className="text-[10px] font-bold whitespace-nowrap">确认</span> : <X size={16} className="shrink-0" />}
+                      </button>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -450,8 +458,13 @@ const ShipmentItemRow = memo(({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground lg:text-[14px]">{item.name}</div>
+              <div className="line-clamp-1 text-[13px] font-bold leading-tight text-foreground lg:text-[14px]">{baseName}</div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
+                {variantLabel ? (
+                  <span className="inline-flex h-5 items-center rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-black text-primary">
+                    {variantLabel}
+                  </span>
+                ) : null}
                 <span className="inline-flex h-5 items-center rounded-full border border-cyan-400/25 bg-cyan-400/12 px-2 text-[10px] font-black text-cyan-700 shadow-[0_0_18px_rgba(34,211,238,0.12)] dark:text-cyan-200">
                   库存 {item.stock}
                 </span>
@@ -520,22 +533,22 @@ const ShipmentItemRow = memo(({
                 {isChecked && <Check size={11} strokeWidth={3} />}
               </div>
             ) : (
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={handleDeleteClick}
-                className={cn(
-                  "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-xl px-2 transition-all active:scale-95 flex-nowrap",
-                  disabled && "pointer-events-none opacity-0",
-                  confirmingDelete
-                    ? "bg-rose-500 text-white shadow-sm min-w-[52px]"
-                    : "text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 min-w-[32px] sm:opacity-0 group-hover:opacity-100"
-                )}
-                title="移除项目"
-              >
-                <X size={16} className="shrink-0" />
-                {confirmingDelete && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
-              </button>
+              !disabled ? (
+                <button
+                  type="button"
+                  onClick={handleDeleteClick}
+                  className={cn(
+                    "inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-xl px-2 transition-all active:scale-95 flex-nowrap",
+                    confirmingDelete
+                      ? "bg-rose-500 text-white shadow-sm min-w-[52px]"
+                      : "text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500 min-w-[32px] sm:opacity-0 group-hover:opacity-100"
+                  )}
+                  title="移除项目"
+                >
+                  <X size={16} className="shrink-0" />
+                  {confirmingDelete && <span className="text-[10px] font-bold whitespace-nowrap">确认</span>}
+                </button>
+              ) : null
             )}
           </div>
         </div>
@@ -560,6 +573,7 @@ const shippingStatusOptions = [
   { value: "待发货", label: "待发货" },
   { value: "部分发货", label: "部分发货" },
   { value: "已发货", label: "已发货" },
+  { value: "已退回", label: "已退回" },
 ];
 
 const paymentStatusOptions = [
@@ -727,12 +741,34 @@ function formatRecipientWithRegion(name?: string, address?: string) {
   return city ? `${recipientName}-${city}` : recipientName;
 }
 
-function getItemKey(item: { productId?: string | null; shopProductId?: string | null }) {
-  return item.shopProductId || item.productId || "";
+function splitShipmentDisplayName(name?: string) {
+  const raw = String(name || "").trim();
+  if (!raw) {
+    return { baseName: "未知商品", variantLabel: "" };
+  }
+
+  const parts = raw.split(" / ").map((part) => part.trim()).filter(Boolean);
+  if (parts.length <= 1) {
+    return { baseName: raw, variantLabel: "" };
+  }
+
+  return {
+    baseName: parts[0] || raw,
+    variantLabel: parts.slice(1).join(" / "),
+  };
+}
+
+function getItemKey(item: {
+  productId?: string | null;
+  productVariantId?: string | null;
+  shopProductId?: string | null;
+  shopProductVariantId?: string | null;
+}) {
+  return item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "";
 }
 
 function isShipmentItemMarkedShipped(
-  item: { productId?: string | null; shopProductId?: string | null },
+  item: { productId?: string | null; productVariantId?: string | null; shopProductId?: string | null; shopProductVariantId?: string | null },
   parsed: { trackingEntries?: FactoryShipmentTrackingEntry[] },
   status?: string | null
 ) {
@@ -752,7 +788,7 @@ function hasShipmentItemDeliveryInfo(item: Pick<SelectedShipmentItem, "trackingN
 }
 
 function hasParsedShipmentItemDeliveryInfo(
-  item: { productId?: string | null; shopProductId?: string | null },
+  item: { productId?: string | null; productVariantId?: string | null; shopProductId?: string | null; shopProductVariantId?: string | null },
   parsed: { trackingEntries?: FactoryShipmentTrackingEntry[] }
 ) {
   const itemKey = getItemKey(item);
@@ -782,9 +818,13 @@ function deriveFactoryShipmentStatusFromOrder(order: OutboundOrder, parsed = par
   return shippedCount === order.items.length ? "已发货" : "部分发货";
 }
 
+function isReturnedShipmentOrder(order: Pick<OutboundOrder, "status">) {
+  return order.status === "Returned" || order.status === "已退回";
+}
+
 // 供 key 属性使用的稳定键生成器
 function getStableShipmentItemKey(
-  item: { productId?: string | null; shopProductId?: string | null; name?: string; sku?: string },
+  item: { productId?: string | null; productVariantId?: string | null; shopProductId?: string | null; shopProductVariantId?: string | null; name?: string; sku?: string },
   index: number
 ) {
   return getItemKey(item) || `${item.sku || item.name || "shipment-item"}-${index}`;
@@ -792,7 +832,7 @@ function getStableShipmentItemKey(
 
 // 供事件和表单处理使用的稳定键生成器
 function getStableShipmentActionKey(
-  item: { productId?: string | null; shopProductId?: string | null; name?: string; sku?: string; quantity?: number }
+  item: { productId?: string | null; productVariantId?: string | null; shopProductId?: string | null; shopProductVariantId?: string | null; name?: string; sku?: string; quantity?: number }
 ) {
   return getItemKey(item) || `${item.sku || item.name || "shipment-item"}-${item.quantity || 0}`;
 }
@@ -1170,15 +1210,21 @@ function FactoryShipmentDetailModal({
         );
         return {
           productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
+          productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
           shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
-          name: item.shopProduct?.name || item.product?.name || "未知商品",
-          sku: item.shopProduct?.sku || item.product?.sku || "",
+          shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
+          name: item.shopProductVariant?.variantName
+            ? `${item.shopProduct?.name || item.product?.name || "未知商品"} / ${item.shopProductVariant.variantName}`
+            : item.productVariant?.variantName
+              ? `${item.product?.name || "未知商品"} / ${item.productVariant.variantName}`
+              : item.shopProduct?.name || item.product?.name || "未知商品",
+          sku: item.shopProductVariant?.sku || item.productVariant?.sku || item.shopProduct?.sku || item.product?.sku || "",
           quantity: item.quantity,
-          image: item.shopProduct?.image || item.product?.image || "",
-          stock: Number(item.shopProduct?.stock ?? item.product?.stock ?? item.quantity ?? 0),
+          image: item.shopProductVariant?.image || item.productVariant?.image || item.shopProduct?.image || item.product?.image || "",
+          stock: Number(item.shopProductVariant?.stock ?? item.productVariant?.stock ?? item.shopProduct?.stock ?? item.product?.stock ?? item.quantity ?? 0),
           trackingNumber: trackingEntry?.trackingNumber || "",
           logisticsName: trackingEntry?.logisticsName || "",
-          price: item.price || item.shopProduct?.costPrice || item.product?.costPrice || 0,
+          price: item.price || item.shopProductVariant?.salePrice || item.productVariant?.salePrice || item.shopProduct?.costPrice || item.product?.costPrice || 0,
           shippingFee: trackingEntry?.shippingFee || 0,
         };
       })
@@ -1291,15 +1337,17 @@ function FactoryShipmentDetailModal({
       const next = [...prev];
 
       for (const product of pickedProducts) {
-        const itemKey = product.shopProductId || product.id;
+        const itemKey = product.shopProductVariantId || product.productVariantId || product.shopProductId || product.id;
         if (next.some((item) => getItemKey(item) === itemKey)) continue;
 
         next.push({
           productId:
-            product.sourceProductId ||
             product.productId ||
+            product.sourceProductId ||
             (product.sourceType === "shopProduct" ? null : product.id),
+          productVariantId: product.productVariantId || null,
           shopProductId: product.shopProductId || undefined,
+          shopProductVariantId: product.shopProductVariantId || null,
           name: product.name,
           sku: product.sku || "",
           image: product.image || "",
@@ -1441,7 +1489,9 @@ function FactoryShipmentDetailModal({
           },
           items: editItems.map((item) => ({
             productId: item.productId || undefined,
+            productVariantId: item.productVariantId || undefined,
             shopProductId: item.shopProductId || undefined,
+            shopProductVariantId: item.shopProductVariantId || undefined,
             quantity: item.quantity,
             price: Number(item.price) || 0,
           })),
@@ -1512,23 +1562,39 @@ function FactoryShipmentDetailModal({
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-                <div className="rounded-[20px] border border-border/50 bg-linear-to-br from-zinc-50 to-white p-4 shadow-sm dark:border-white/10 dark:from-white/6 dark:to-white/3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">发货安排</div>
-                    <span className="text-[11px] font-bold text-muted-foreground">共 {editItems.length || order.items.length} 项货品</span>
-                  </div>
-                  <div className="mt-2.5 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-white/70 px-3.5 py-2.5 dark:border-white/10 dark:bg-white/5">
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                <div className="rounded-[22px] border border-border/50 bg-linear-to-br from-zinc-50 via-white to-zinc-50/70 p-4 shadow-sm dark:border-white/10 dark:from-white/7 dark:via-white/4 dark:to-white/2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">单据编号</div>
-                      <div className="mt-1 truncate font-mono text-sm font-semibold text-foreground/85">{order.id}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">发货安排</div>
+                      <div className="mt-1 text-xs text-muted-foreground">单据与发货时间</div>
                     </div>
-                    <span className={cn("inline-flex h-8 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-normal", getShippingTone(editForm.status))}>
-                      {editForm.status}
+                    <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-border/60 bg-white/80 px-3 text-[11px] text-muted-foreground shadow-xs dark:border-white/10 dark:bg-white/6">
+                      {editItems.length || order.items.length} 项货品
                     </span>
                   </div>
+                  <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2.5">
+                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
+                      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        <FileText size={12} className="shrink-0" />
+                        <span>单据编号</span>
+                      </div>
+                      <div className="mt-2 truncate font-mono text-[15px] font-semibold tracking-tight text-foreground/90">{order.id}</div>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
+                      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        <Calendar size={12} className="shrink-0" />
+                        <span>发货状态</span>
+                      </div>
+                      <div className="mt-2">
+                        <span className={cn("inline-flex h-8 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-normal", getShippingTone(editForm.status))}>
+                          {editForm.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                   {isEditing ? (
-                    <div className="mt-2.5 flex items-center gap-2">
+                    <div className="mt-3 flex items-center gap-2">
                       <DatePicker
                         value={editForm.date ? editForm.date.slice(0, 10) : ""}
                         onChange={(val) => {
@@ -1544,16 +1610,22 @@ function FactoryShipmentDetailModal({
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-3 text-base font-semibold text-foreground">{format(new Date(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}</div>
+                    <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
+                      <div className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
+                        {format(new Date(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className="rounded-[20px] border border-border/50 bg-linear-to-br from-zinc-50 to-white p-4 shadow-sm dark:border-white/10 dark:from-white/6 dark:to-white/3">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="rounded-[22px] border border-border/50 bg-linear-to-br from-zinc-50 via-white to-zinc-50/70 p-4 shadow-sm dark:border-white/10 dark:from-white/7 dark:via-white/4 dark:to-white/2">
+                  <div className="min-w-0">
                     <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">状态设置</div>
+                    <div className="mt-1 text-xs text-muted-foreground">货款与补偿状态</div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
-                    <div>
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">货款状态</div>
+                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
+                      <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">货款状态</div>
                       {isEditing ? (
                         <CustomSelect
                           value={editForm.paymentStatus}
@@ -1566,13 +1638,13 @@ function FactoryShipmentDetailModal({
                           triggerClassName="h-10 w-full rounded-2xl border border-border/70 bg-white px-3 text-sm dark:border-white/10 dark:bg-[#2b313d]"
                         />
                       ) : (
-                        <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-bold", getPaymentTone(parsed.paymentStatus))}>
+                        <span className={cn("inline-flex h-8 items-center rounded-full border px-3 text-xs font-normal", getPaymentTone(parsed.paymentStatus))}>
                           {parsed.paymentStatus}
                         </span>
                       )}
                     </div>
-                    <div>
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">补偿状态</div>
+                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
+                      <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">补偿状态</div>
                       {isEditing ? (
                         <CustomSelect
                           value={editForm.compensationStatus}
@@ -1600,7 +1672,7 @@ function FactoryShipmentDetailModal({
                           triggerClassName="h-10 w-full rounded-2xl border border-border/70 bg-white px-3 text-sm dark:border-white/10 dark:bg-[#2b313d] disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       ) : (
-                        <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-bold", getCompensationTone(parsed.compensationStatus || ""))}>
+                        <span className={cn("inline-flex h-8 items-center rounded-full border px-3 text-xs font-normal", getCompensationTone(parsed.compensationStatus || ""))}>
                           {parsed.compensationStatus || "无需补偿"}
                         </span>
                       )}
@@ -1611,8 +1683,8 @@ function FactoryShipmentDetailModal({
 
               <div className="space-y-3">
                 <div className="rounded-[20px] border border-border/50 bg-linear-to-br from-zinc-50 to-white p-4 shadow-sm dark:border-white/10 dark:from-white/6 dark:to-white/3">
-                  <div className="grid gap-3">
-                    <div>
+                  <div className="grid min-w-0 gap-3">
+                    <div className="min-w-0">
                       <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">收件信息</div>
                       {isEditing ? (
                         <CustomerAddressCombobox
@@ -1632,12 +1704,15 @@ function FactoryShipmentDetailModal({
                           className="h-11 w-full rounded-2xl border border-border/70 bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-[#2b313d]"
                         />
                       ) : (
-                        <div className="mt-3 rounded-2xl border border-border/50 bg-white/80 px-4 py-3.5 text-sm font-normal leading-relaxed text-foreground dark:border-white/10 dark:bg-white/4">
+                        <div
+                          className="mt-3 w-full min-w-0 overflow-hidden text-ellipsis rounded-2xl border border-border/50 bg-white/80 px-4 py-3.5 text-sm font-normal whitespace-nowrap text-foreground dark:border-white/10 dark:bg-white/4"
+                          title={[parsed.recipientName, parsed.recipientPhone, parsed.recipientAddress].filter(Boolean).join(" ") || "-"}
+                        >
                           {[parsed.recipientName, parsed.recipientPhone, parsed.recipientAddress].filter(Boolean).join(" ") || "-"}
                         </div>
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">备注</div>
                       {isEditing ? (
                         <input
@@ -1648,7 +1723,7 @@ function FactoryShipmentDetailModal({
                           className="mt-2.5 h-11 w-full rounded-2xl border border-border/70 bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-[#2b313d]"
                         />
                       ) : (
-                        <div className="mt-3 rounded-2xl border border-border/50 bg-white/80 px-4 py-3.5 text-sm leading-relaxed text-muted-foreground dark:border-white/10 dark:bg-white/4">
+                        <div className="mt-3 w-full min-w-0 rounded-2xl border border-border/50 bg-white/80 px-4 py-3.5 text-sm leading-relaxed text-muted-foreground dark:border-white/10 dark:bg-white/4">
                           {parsed.remark || "无备注"}
                         </div>
                       )}
@@ -1739,7 +1814,10 @@ function FactoryShipmentDetailModal({
                                     )}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <div className="truncate text-xs font-semibold text-foreground">{item.name}</div>
+                                    <div className="truncate text-xs font-semibold text-foreground">{splitShipmentDisplayName(item.name).baseName}</div>
+                                    {splitShipmentDisplayName(item.name).variantLabel ? (
+                                      <div className="mt-0.5 text-[10px] font-medium text-primary">{splitShipmentDisplayName(item.name).variantLabel}</div>
+                                    ) : null}
                                     {item.sku && (
                                       <div className="mt-0.5 text-[10px] text-muted-foreground font-mono">{item.sku}</div>
                                     )}
@@ -1806,9 +1884,12 @@ function FactoryShipmentDetailModal({
                             <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-500">一键快速添加补偿：</div>
                             <div className="grid gap-2 sm:grid-cols-2">
                               {editItems.map((item) => (
-                                <div key={item.shopProductId || item.productId || ""} className="flex flex-col gap-2 rounded-xl border border-border bg-white/40 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 dark:bg-white/3">
+                                <div key={getItemKey(item) || ""} className="flex flex-col gap-2 rounded-xl border border-border bg-white/40 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 dark:bg-white/3">
                                   <div className="min-w-0 flex-1">
-                                    <div className="truncate text-xs font-semibold text-foreground">{item.name}</div>
+                                    <div className="truncate text-xs font-semibold text-foreground">{splitShipmentDisplayName(item.name).baseName}</div>
+                                    {splitShipmentDisplayName(item.name).variantLabel ? (
+                                      <div className="mt-0.5 text-[10px] font-medium text-primary">{splitShipmentDisplayName(item.name).variantLabel}</div>
+                                    ) : null}
                                   </div>
                                   <div className="flex gap-1.5 shrink-0 justify-end">
                                     <button
@@ -1847,7 +1928,7 @@ function FactoryShipmentDetailModal({
                   <div className="mt-3 flex flex-col gap-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex shrink-0 items-center gap-2 text-sm font-bold text-foreground">
-                        <ListOrdered size={16} className="text-primary" /> 已选货品
+                        <ListOrdered size={16} className="text-primary" /> {isEditing ? "已选货品" : "发货货品"}
                       </div>
                         <div className="flex items-center gap-1.5">
                         {editItems.length > 0 ? (
@@ -1859,17 +1940,19 @@ function FactoryShipmentDetailModal({
                             <Copy size={12} /> 复制全部
                           </button>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={() => setIsSelectionModalOpen(true)}
-                          className="flex h-8 items-center gap-1.5 rounded-xl bg-primary/5 px-2.5 text-[11px] font-bold text-primary transition-all hover:bg-primary/10 active:scale-95"
-                        >
-                          <Plus size={12} /> 添加商品
-                        </button>
+                        {isEditing ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsSelectionModalOpen(true)}
+                            className="flex h-8 items-center gap-1.5 rounded-xl bg-primary/5 px-2.5 text-[11px] font-bold text-primary transition-all hover:bg-primary/10 active:scale-95"
+                          >
+                            <Plus size={12} /> 添加商品
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 
-                    {editItems.length === 0 ? (
+                    {isEditing && editItems.length === 0 ? (
                       <button
                         type="button"
                         onClick={() => setIsSelectionModalOpen(true)}
@@ -2034,12 +2117,14 @@ function FactoryShipmentCreateModal({
       const next = [...prev];
 
       for (const product of pickedProducts) {
-        const itemKey = product.shopProductId || product.id;
+        const itemKey = product.shopProductVariantId || product.productVariantId || product.shopProductId || product.id;
         if (next.some((item) => getItemKey(item) === itemKey)) continue;
 
         next.push({
-          productId: product.id,
+          productId: product.productId || product.id,
+          productVariantId: product.productVariantId || null,
           shopProductId: product.shopProductId || undefined,
+          shopProductVariantId: product.shopProductVariantId || null,
           name: product.name,
           sku: product.sku || "",
           image: product.image || "",
@@ -2175,7 +2260,9 @@ function FactoryShipmentCreateModal({
           note: buildFactoryShipmentNote(finalForm),
           items: selectedItems.map((item) => ({
             productId: item.productId,
+            productVariantId: item.productVariantId,
             shopProductId: item.shopProductId,
+            shopProductVariantId: item.shopProductVariantId,
             quantity: item.quantity,
             price: Number(item.price) || 0,
           })),
@@ -2985,11 +3072,25 @@ export default function FactoryShipmentsPage() {
     searchQuery || shippingFilter !== "all" || paymentFilter !== "all" || compensationFilter !== "all" || startDate || endDate
   );
 
+  const selectableFilteredOrderIds = useMemo(
+    () => filteredOrders.filter((order) => !isReturnedShipmentOrder(order)).map((order) => order.id),
+    [filteredOrders]
+  );
+
   const toggleOrderSelection = useCallback((id: string) => {
+    const targetOrder = shipmentOrders.find((order) => order.id === id);
+    if (!targetOrder || isReturnedShipmentOrder(targetOrder)) return;
     setSelectedOrderIds((prev) => (
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     ));
-  }, []);
+  }, [shipmentOrders]);
+
+  useEffect(() => {
+    setSelectedOrderIds((prev) => prev.filter((id) => {
+      const order = shipmentOrders.find((item) => item.id === id);
+      return order ? !isReturnedShipmentOrder(order) : false;
+    }));
+  }, [shipmentOrders]);
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
@@ -3104,19 +3205,19 @@ export default function FactoryShipmentsPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (selectedOrderIds.length === filteredOrders.length) {
+                          if (selectedOrderIds.length === selectableFilteredOrderIds.length) {
                             setSelectedOrderIds([]);
                           } else {
-                            setSelectedOrderIds(filteredOrders.map((order) => order.id));
+                            setSelectedOrderIds(selectableFilteredOrderIds);
                           }
                         }}
                         className={`relative flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 transition-all duration-300 lg:h-5 lg:w-5 ${
-                          selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0
+                          selectedOrderIds.length === selectableFilteredOrderIds.length && selectableFilteredOrderIds.length > 0
                             ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
                             : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
                         }`}
                       >
-                        {selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0 ? (
+                        {selectedOrderIds.length === selectableFilteredOrderIds.length && selectableFilteredOrderIds.length > 0 ? (
                           <Check size={12} strokeWidth={4} />
                         ) : null}
                       </button>
@@ -3135,6 +3236,7 @@ export default function FactoryShipmentsPage() {
                 {paginatedOrders.map((order, index) => {
                   const parsed = parseFactoryShipmentNote(order.note);
                   const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
+                  const isReturned = isReturnedShipmentOrder(order);
                   return (
                     <tr key={order.id} className="transition-colors hover:bg-muted/20">
                       <td className="w-[44px] px-1 py-3 text-center align-middle">
@@ -3145,11 +3247,15 @@ export default function FactoryShipmentsPage() {
                               e.stopPropagation();
                               toggleOrderSelection(order.id);
                             }}
+                            disabled={isReturned}
                             className={`relative flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 transition-all duration-300 lg:h-5 lg:w-5 ${
                               selectedOrderIds.includes(order.id)
                                 ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
-                                : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
+                                : isReturned
+                                  ? "cursor-not-allowed border-gray-200 bg-muted/50 opacity-45 dark:border-white/10 dark:bg-white/[0.03]"
+                                  : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
                             }`}
+                            title={isReturned ? "已退回单据不可勾选" : (selectedOrderIds.includes(order.id) ? "取消选择" : "选择此发货单")}
                           >
                             {selectedOrderIds.includes(order.id) ? <Check size={12} strokeWidth={4} /> : null}
                           </button>
@@ -3225,7 +3331,8 @@ export default function FactoryShipmentsPage() {
                                       )}
                                     </div>
                                     <span className="truncate text-[10px] font-medium leading-none text-foreground/80">
-                                      {item.name}
+                                      {splitShipmentDisplayName(item.name).baseName}
+                                      {splitShipmentDisplayName(item.name).variantLabel ? ` / ${splitShipmentDisplayName(item.name).variantLabel}` : ""}
                                     </span>
                                     <span className="shrink-0 text-[10px] font-black leading-none text-primary">x{item.quantity}</span>
                                   </div>
@@ -3315,6 +3422,7 @@ export default function FactoryShipmentsPage() {
           paginatedOrders.map((order, index) => {
             const parsed = parseFactoryShipmentNote(order.note);
             const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
+            const isReturned = isReturnedShipmentOrder(order);
             return (
               <div
                 key={order.id}
@@ -3327,22 +3435,24 @@ export default function FactoryShipmentsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleOrderSelection(order.id);
-                        }}
-                        className={cn(
-                          "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300",
-                          selectedOrderIds.includes(order.id)
-                            ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
-                            : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
-                        )}
-                        title={selectedOrderIds.includes(order.id) ? "取消选择" : "选择此发货单"}
-                      >
-                        {selectedOrderIds.includes(order.id) ? <Check size={12} strokeWidth={4} /> : null}
-                      </button>
+                      {!isReturned ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleOrderSelection(order.id);
+                          }}
+                          className={cn(
+                            "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300",
+                            selectedOrderIds.includes(order.id)
+                              ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"
+                              : "border-gray-300 bg-white shadow-sm hover:border-gray-400 dark:border-white/20 dark:bg-white/5 dark:hover:border-foreground/50"
+                          )}
+                          title={selectedOrderIds.includes(order.id) ? "取消选择" : "选择此发货单"}
+                        >
+                          {selectedOrderIds.includes(order.id) ? <Check size={12} strokeWidth={4} /> : null}
+                        </button>
+                      ) : null}
                       <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-black text-foreground dark:bg-white/8 dark:text-white">
                         {(currentPage - 1) * pageSize + index + 1}
                       </span>
@@ -3419,7 +3529,8 @@ export default function FactoryShipmentsPage() {
                                 )}
                               </div>
                               <span className="min-w-0 flex-1 truncate">
-                                {item.name}
+                                {splitShipmentDisplayName(item.name).baseName}
+                                {splitShipmentDisplayName(item.name).variantLabel ? ` / ${splitShipmentDisplayName(item.name).variantLabel}` : ""}
                               </span>
                               <span className="shrink-0 font-black text-primary">x{item.quantity}</span>
                             </span>
@@ -3523,12 +3634,12 @@ export default function FactoryShipmentsPage() {
 
       <ActionBar
         selectedCount={selectedOrderIds.length}
-        totalCount={filteredOrders.length}
+        totalCount={selectableFilteredOrderIds.length}
         onToggleSelectAll={() => {
-          if (selectedOrderIds.length === filteredOrders.length) {
+          if (selectedOrderIds.length === selectableFilteredOrderIds.length) {
             setSelectedOrderIds([]);
           } else {
-            setSelectedOrderIds(filteredOrders.map((order) => order.id));
+            setSelectedOrderIds(selectableFilteredOrderIds);
           }
         }}
         onClear={() => setSelectedOrderIds([])}

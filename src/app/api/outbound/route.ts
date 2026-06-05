@@ -9,8 +9,12 @@ import { parseFactoryShipmentNote, generateOutboundId } from "@/lib/utils";
 import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
  
 interface OutboundItem {
-  productId: string;
+  productId?: string | null;
+  productVariantId?: string | null;
   shopProductId?: string;
+  shopProductVariantId?: string | null;
+  variantName?: string | null;
+  variantSku?: string | null;
   quantity: number;
   price?: number;
 }
@@ -28,11 +32,13 @@ export async function GET() {
         items: {
           include: {
             product: true,
+            productVariant: true,
             shopProduct: {
               include: {
                 shop: { select: { id: true, name: true } }
               }
-            }
+            },
+            shopProductVariant: true,
           }
         }
       },
@@ -68,6 +74,14 @@ export async function GET() {
           createdAt: item.shopProduct.createdAt,
           updatedAt: item.shopProduct.updatedAt,
         } : item.shopProduct,
+        productVariant: item.productVariant ? {
+          ...item.productVariant,
+          image: item.productVariant.image ? storage.resolveUrl(item.productVariant.image) : item.productVariant.image,
+        } : item.productVariant,
+        shopProductVariant: item.shopProductVariant ? {
+          ...item.shopProductVariant,
+          image: item.shopProductVariant.variantImage ? storage.resolveUrl(item.shopProductVariant.variantImage) : null,
+        } : item.shopProductVariant,
       })),
     }));
     return NextResponse.json(normalizedOrders);
@@ -96,6 +110,9 @@ export async function POST(request: Request) {
     const requestedShopProductIds = items
       .map((item: OutboundItem) => item.shopProductId)
       .filter((id: unknown): id is string => typeof id === "string" && id.trim() !== "");
+    const requestedShopProductVariantIds = items
+      .map((item: OutboundItem) => item.shopProductVariantId)
+      .filter((id: unknown): id is string => typeof id === "string" && id.trim() !== "");
 
     const shopProducts = requestedShopProductIds.length > 0
       ? await prisma.shopProduct.findMany({
@@ -109,12 +126,38 @@ export async function POST(request: Request) {
           }
         })
       : [];
+    const shopProductVariants = requestedShopProductVariantIds.length > 0
+      ? await prisma.shopProductVariant.findMany({
+          where: {
+            id: { in: requestedShopProductVariantIds },
+            shopProduct: { shop: { userId: user.id } },
+          },
+          select: {
+            id: true,
+            shopProductId: true,
+            productVariantId: true,
+            sku: true,
+            variantName: true,
+            shopProduct: {
+              select: {
+                productId: true,
+              },
+            },
+          }
+        })
+      : [];
     const shopProductMap = new Map(shopProducts.map((item) => [item.id, item]));
+    const shopProductVariantMap = new Map(shopProductVariants.map((item) => [item.id, item]));
     const normalizedItems = items.map((item: OutboundItem) => {
+      const shopProductVariant = item.shopProductVariantId ? shopProductVariantMap.get(item.shopProductVariantId) : null;
       const shopProduct = item.shopProductId ? shopProductMap.get(item.shopProductId) : null;
       return {
-        productId: shopProduct?.productId || item.productId || null,
-        shopProductId: shopProduct?.id || null,
+        productId: shopProductVariant?.shopProduct.productId || shopProduct?.productId || item.productId || null,
+        productVariantId: shopProductVariant?.productVariantId || item.productVariantId || null,
+        shopProductId: shopProductVariant?.shopProductId || shopProduct?.id || item.shopProductId || null,
+        shopProductVariantId: shopProductVariant?.id || item.shopProductVariantId || null,
+        variantName: shopProductVariant?.variantName || item.variantName || null,
+        variantSku: shopProductVariant?.sku || item.variantSku || null,
         quantity: item.quantity,
         price: item.price,
       };
@@ -136,7 +179,11 @@ export async function POST(request: Request) {
           items: {
             create: normalizedItems.map((item) => ({
               productId: item.productId || null,
+              productVariantId: item.productVariantId || null,
               shopProductId: item.shopProductId || null,
+              shopProductVariantId: item.shopProductVariantId || null,
+              variantName: item.variantName || null,
+              variantSku: item.variantSku || null,
               quantity: item.quantity,
               price: FinanceMath.add(item.price || 0, 0)
             }))

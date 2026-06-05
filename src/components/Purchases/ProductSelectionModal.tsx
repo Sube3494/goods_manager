@@ -57,6 +57,30 @@ function getProductCode(product: Product) {
   return String(product.sku || product.shopProductId || product.sourceProductId || "").trim();
 }
 
+function expandProductVariants(products: Product[]): Product[] {
+  return products.flatMap((product) => {
+    if (!product.hasVariants || !Array.isArray(product.variants) || product.variants.length === 0) {
+      return [product];
+    }
+
+    return product.variants
+      .filter((variant) => variant.isActive !== false)
+      .map((variant, index) => ({
+        ...product,
+        id: variant.id || `${product.id}-variant-${index}`,
+        productId: product.id,
+        sourceProductId: product.sourceProductId || product.id,
+        sku: variant.sku || product.sku,
+        name: [product.name, variant.variantName || variant.optionSummary].filter(Boolean).join(" / "),
+        image: variant.image || product.image,
+        costPrice: variant.costPrice ?? product.costPrice,
+        salePrice: variant.salePrice ?? product.salePrice ?? product.costPrice,
+        stock: Number(variant.stock ?? 0),
+        productVariantId: variant.id,
+      }));
+  });
+}
+
 interface ProductSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -165,7 +189,7 @@ export function ProductSelectionModal({
   });
 
   const getSelectionKey = useCallback((product: Product) => {
-    return String(product.shopProductId || product.id || product.sourceProductId || "").trim();
+    return String(product.shopProductVariantId || product.productVariantId || product.shopProductId || product.id || product.sourceProductId || "").trim();
   }, []);
 
 
@@ -265,7 +289,7 @@ export function ProductSelectionModal({
 
       if (pRes.ok) {
         const pData = await pRes.json();
-        const newItems = Array.isArray(pData.items) ? pData.items : [];
+        const newItems = expandProductVariants(Array.isArray(pData.items) ? pData.items : []);
         setHasLoadedResults(true);
         
         if (mode === 'initial' || mode === 'search') {
@@ -458,7 +482,7 @@ export function ProductSelectionModal({
       if (!res.ok) throw new Error("Failed to fetch all products");
 
       const data = await res.json();
-      const allProducts = filterVisibleProducts(Array.isArray(data.items) ? data.items : [], selectedCategoryName);
+      const allProducts = filterVisibleProducts(expandProductVariants(Array.isArray(data.items) ? data.items : []), selectedCategoryName);
       setProducts(allProducts);
       setHasMore(false);
       setTempSelectedIds(allProducts.map((product: Product) => getSelectionKey(product)));
@@ -656,7 +680,7 @@ export function ProductSelectionModal({
                                         <span className="truncate">{product.remark}</span>
                                     </span>
                                 )}
-                                {showPrice && !minimalView && (
+                                {showPrice && !minimalView && fetchPath !== "/api/products" && (
                                   <span className="ml-auto shrink-0 text-sm font-semibold text-foreground">
                                       进价 ￥{product.costPrice}
                                   </span>

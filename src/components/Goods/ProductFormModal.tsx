@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2, Calendar } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, ChevronDown, Eye, Crown, Activity, RotateCw, Trash2, Calendar } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -92,6 +92,36 @@ import { createPortal } from "react-dom";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
 import { validateUploadFileSize } from "@/lib/uploadValidation";
 
+type VariantDraft = {
+  panelKey: string;
+  id?: string;
+  variantName: string;
+  sku: string;
+  costPrice: string;
+  salePrice: string;
+  stock?: number;
+  image: string;
+  isActive: boolean;
+};
+
+function buildInitialVariants(initialData?: Product | null): VariantDraft[] {
+  if (!initialData?.variants?.length) {
+    return [];
+  }
+
+  return initialData.variants.map((variant, index) => ({
+    panelKey: variant.id || `variant-${index}`,
+    id: variant.id,
+    variantName: variant.variantName || "",
+    sku: variant.sku || "",
+    costPrice: String(variant.costPrice ?? initialData.costPrice ?? ""),
+    salePrice: String(variant.salePrice ?? initialData.salePrice ?? initialData.costPrice ?? ""),
+    stock: Number(variant.stock ?? 0),
+    image: variant.image || "",
+    isActive: variant.isActive ?? true,
+  }));
+}
+
 export function ProductFormModal({
   isOpen,
   onClose,
@@ -127,11 +157,14 @@ export function ProductFormModal({
     jdSkuId: formatInitialJdSkuValue(initialData),
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
+    hasVariants: initialData?.hasVariants ?? Boolean(initialData?.variants?.length),
     specs: (initialData?.specs as Record<string, string>) || {},
     remark: initialData?.remark || "",
     isShelfLife: initialData?.isShelfLife ?? false,
     shelfLifeDays: initialData?.shelfLifeDays !== null && initialData?.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : ""
   });
+  const [variantDrafts, setVariantDrafts] = useState<VariantDraft[]>(() => buildInitialVariants(initialData));
+  const [expandedVariantKeys, setExpandedVariantKeys] = useState<string[]>([]);
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -332,11 +365,14 @@ export function ProductFormModal({
           image: initialData.image || "",
           isDiscontinued: initialData.isDiscontinued ?? false,
           isPublic: initialData.isPublic ?? true,
+          hasVariants: initialData.hasVariants ?? Boolean(initialData.variants?.length),
           specs: initialData.specs as Record<string, string> || {},
           remark: initialData.remark || "",
           isShelfLife: initialData.isShelfLife ?? false,
           shelfLifeDays: initialData.shelfLifeDays !== null && initialData.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : ""
         });
+        setVariantDrafts(buildInitialVariants(initialData));
+        setExpandedVariantKeys([]);
         const _parsed = parseShelfLife(initialData.shelfLifeDays !== null && initialData.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : "");
         setShelfLifeVal(_parsed.value);
         setShelfLifeUnit(_parsed.unit);
@@ -356,11 +392,14 @@ export function ProductFormModal({
           image: "",
           isDiscontinued: false,
           isPublic: true,
+          hasVariants: false,
           specs: {},
           remark: "",
           isShelfLife: false,
           shelfLifeDays: ""
         });
+        setVariantDrafts([]);
+        setExpandedVariantKeys([]);
         setShelfLifeVal("");
         setShelfLifeUnit("天");
       }
@@ -806,6 +845,27 @@ export function ProductFormModal({
     const shelfLifeDaysVal = formData.isShelfLife 
       ? (formData.shelfLifeDays ? parseInt(String(formData.shelfLifeDays), 10) : null) 
       : null;
+    const normalizedVariants = formData.hasVariants
+      ? variantDrafts
+          .map((variant, index) => {
+            if (!variant.variantName.trim() && !variant.sku.trim()) {
+              return null;
+            }
+
+            return {
+              id: variant.id,
+              variantName: variant.variantName.trim() || null,
+              sku: variant.sku.trim() || null,
+              optionSummary: variant.variantName.trim() || null,
+              costPrice: Number(variant.costPrice || formData.costPrice || 0),
+              salePrice: Number(variant.salePrice || variant.costPrice || formData.salePrice || formData.costPrice || 0),
+              image: variant.image.trim() || null,
+              isDefault: index === 0,
+              isActive: variant.isActive,
+            };
+          })
+          .filter((variant): variant is NonNullable<typeof variant> => Boolean(variant))
+      : [];
 
     await onSubmit({
       ...formData,
@@ -815,6 +875,8 @@ export function ProductFormModal({
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
       isShelfLife: formData.isShelfLife,
       shelfLifeDays: shelfLifeDaysVal,
+      hasVariants: formData.hasVariants && normalizedVariants.length > 0,
+      variants: normalizedVariants,
       id: initialData?.id
     }, galleryImages);
   };
@@ -1023,6 +1085,48 @@ export function ProductFormModal({
     });
   };
 
+  const handleAddVariant = () => {
+    const panelKey = `variant-${Date.now()}`;
+    setVariantDrafts((prev) => [
+      ...prev,
+      {
+        panelKey,
+        variantName: "",
+        sku: "",
+        costPrice: "",
+        salePrice: "",
+        stock: 0,
+        image: formData.image || "",
+        isActive: true,
+      },
+    ]);
+    setExpandedVariantKeys((prev) => (prev.includes(panelKey) ? prev : [...prev, panelKey]));
+  };
+
+  const handleUpdateVariant = (index: number, field: keyof VariantDraft, value: string | boolean) => {
+    setVariantDrafts((prev) =>
+      prev.map((variant, variantIndex) =>
+        variantIndex === index ? { ...variant, [field]: value } : variant
+      )
+    );
+  };
+
+  const handleRemoveVariant = (index: number) => {
+    setVariantDrafts((prev) => {
+      const target = prev[index];
+      if (target?.panelKey) {
+        setExpandedVariantKeys((keys) => keys.filter((key) => key !== target.panelKey));
+      }
+      return prev.filter((_, variantIndex) => variantIndex !== index);
+    });
+  };
+
+  const handleToggleVariant = (panelKey: string) => {
+    setExpandedVariantKeys((prev) =>
+      prev.includes(panelKey) ? prev.filter((key) => key !== panelKey) : [...prev, panelKey]
+    );
+  };
+
   return createPortal(
     <>
     <AnimatePresence>
@@ -1050,7 +1154,7 @@ export function ProductFormModal({
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 custom-scrollbar">
-                    {!hideSkuField && (
+                    {!hideSkuField && !formData.hasVariants && (
                       <div className="space-y-2">
                           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                               <FileText size={16} className="text-indigo-500" /> 商品编号 (SKU)
@@ -1065,7 +1169,7 @@ export function ProductFormModal({
                       </div>
                     )}
 
-                    {showJdSkuField && (
+                    {showJdSkuField && !formData.hasVariants && (
                       <div className="space-y-2">
                           <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                               <FileText size={16} className="text-rose-500" /> JD SKU ID
@@ -1099,7 +1203,7 @@ export function ProductFormModal({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className={cn("grid gap-3", hideSupplierField ? "grid-cols-1" : "grid-cols-2")}>
                         {/* Category */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1137,7 +1241,10 @@ export function ProductFormModal({
                     </div>
 
                     {user?.role === "SUPER_ADMIN" && (!hideProductionControl || !hideVisibilityControl) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className={cn(
+                          "grid gap-3",
+                          !hideProductionControl && !hideVisibilityControl ? "grid-cols-2" : "grid-cols-1"
+                        )}>
                             {/* Production Condition Box */}
                             {!hideProductionControl && (
                               <div className="space-y-2">
@@ -1416,7 +1523,7 @@ export function ProductFormModal({
                       </div>
                     )}
 
-                    {!hidePricingFields && (
+                    {!hidePricingFields && !formData.hasVariants && (
                     <div className="space-y-4">
                         <div className={cn("grid gap-4", hideStockField ? "grid-cols-2" : "grid-cols-3")}>
                             {/* Cost Price */}
@@ -1470,6 +1577,31 @@ export function ProductFormModal({
                         </div>
 
 
+                    </div>
+                    )}
+
+                    {!hidePricingFields && formData.hasVariants && !hideStockField && (
+                    <div className="space-y-3">
+                        <div className="rounded-2xl border border-border/60 bg-white/50 p-4 dark:bg-white/5">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                        <Package size={16} className="text-blue-500" /> 总库存
+                                    </label>
+                                    <p className="text-xs text-muted-foreground">
+                                        已启用多规格，统一 SKU、进价、售价已隐藏，实际以各规格设置为准。
+                                    </p>
+                                </div>
+                                <input
+                                    type="number"
+                                    readOnly
+                                    disabled
+                                    value={formData.stock ?? 0}
+                                    placeholder="由采购批次自动计算"
+                                    className="w-32 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-center text-foreground outline-none font-medium no-spinner text-sm opacity-50 cursor-not-allowed"
+                                />
+                            </div>
+                        </div>
                     </div>
                     )}
 
@@ -1527,6 +1659,221 @@ export function ProductFormModal({
                         </div>
                       </div>
                     )}
+
+                    <div className="space-y-3 pt-2">
+                        <div className="rounded-2xl border border-border/60 bg-white/50 p-4 dark:bg-white/5">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                        <Package size={16} className="text-cyan-500" /> 启用多规格
+                                    </label>
+                                    <p className="text-xs text-muted-foreground">
+                                        关闭时按单规格商品处理，打开后可为每个规格分别设置 SKU、进价和售价。
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={formData.hasVariants}
+                                    onChange={(val) => setFormData((prev) => ({ ...prev, hasVariants: val }))}
+                                />
+                            </div>
+                        </div>
+
+                        {formData.hasVariants && (
+                        <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Package size={16} className="text-cyan-500" /> 商品规格
+                            </label>
+                            <button
+                                type="button"
+                                onClick={handleAddVariant}
+                                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary px-3 py-1.5 rounded-full border border-primary/20 transition-all duration-300 active:scale-95 shadow-sm"
+                            >
+                                <Plus size={12} strokeWidth={3} /> 添加规格
+                            </button>
+                        </div>
+                            {variantDrafts.map((variant, index) => (
+                                <div key={variant.panelKey} className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.025))] p-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
+                                    <div className="flex items-center gap-2">
+                                        <div className="group flex min-w-0 flex-1 flex-col gap-3 rounded-[20px] border border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] px-4 py-3 transition-all hover:border-cyan-400/25 hover:bg-[linear-gradient(135deg,rgba(34,211,238,0.09),rgba(255,255,255,0.04))] sm:flex-row sm:items-center sm:gap-3 sm:py-2.5">
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/15 bg-cyan-400/10 text-[11px] font-semibold tracking-[0.12em] text-cyan-300">
+                                                    {String(index + 1).padStart(2, "0")}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="truncate text-[15px] font-medium tracking-tight text-foreground">
+                                                        {variant.variantName.trim() || `规格 ${index + 1}`}
+                                                    </div>
+                                                </div>
+                                                <div className="flex shrink-0 items-center gap-1 sm:hidden">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleVariant(variant.panelKey)}
+                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/6 bg-white/[0.03] text-muted-foreground/80 transition-all hover:border-cyan-400/20 hover:bg-white/8 hover:text-foreground active:scale-95"
+                                                        title={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
+                                                        aria-label={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
+                                                        aria-expanded={expandedVariantKeys.includes(variant.panelKey)}
+                                                    >
+                                                        <ChevronDown
+                                                            size={16}
+                                                            className={cn(
+                                                                "transition-transform duration-200",
+                                                                expandedVariantKeys.includes(variant.panelKey) && "rotate-180"
+                                                            )}
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveVariant(index)}
+                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/6 bg-white/[0.03] text-destructive/45 transition-all hover:border-destructive/15 hover:bg-destructive/10 hover:text-destructive active:scale-95"
+                                                        title="删除此规格"
+                                                        aria-label="删除此规格"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="min-w-0 flex flex-1 flex-wrap items-center gap-2 text-[11px]">
+                                                {variant.sku.trim() ? (
+                                                    <span className="inline-flex items-center rounded-full border border-white/8 bg-white/6 px-2.5 py-1 font-normal text-muted-foreground">
+                                                        SKU {variant.sku.trim()}
+                                                    </span>
+                                                ) : null}
+                                                {variant.costPrice ? (
+                                                    <span className="inline-flex items-center rounded-full border border-emerald-400/12 bg-emerald-400/8 px-2.5 py-1 font-normal text-emerald-300">
+                                                        进价 {variant.costPrice}
+                                                    </span>
+                                                ) : null}
+                                                {variant.salePrice ? (
+                                                    <span className="inline-flex items-center rounded-full border border-sky-400/12 bg-sky-400/8 px-2.5 py-1 font-normal text-sky-300">
+                                                        售价 {variant.salePrice}
+                                                    </span>
+                                                ) : null}
+                                                {Number(variant.stock ?? 0) > 0 ? (
+                                                    <span className="inline-flex items-center rounded-full border border-amber-400/12 bg-amber-400/8 px-2.5 py-1 font-normal text-amber-200">
+                                                        库存 {Number(variant.stock ?? 0)}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                            <div className="hidden shrink-0 items-center gap-1 sm:flex">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleVariant(variant.panelKey)}
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/6 bg-white/[0.03] text-muted-foreground/80 transition-all hover:border-cyan-400/20 hover:bg-white/8 hover:text-foreground active:scale-95"
+                                                    title={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
+                                                    aria-label={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
+                                                    aria-expanded={expandedVariantKeys.includes(variant.panelKey)}
+                                                >
+                                                    <ChevronDown
+                                                        size={16}
+                                                        className={cn(
+                                                            "transition-transform duration-200",
+                                                            expandedVariantKeys.includes(variant.panelKey) && "rotate-180"
+                                                        )}
+                                                    />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveVariant(index)}
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/6 bg-white/[0.03] text-destructive/45 transition-all hover:border-destructive/15 hover:bg-destructive/10 hover:text-destructive active:scale-95"
+                                                    title="删除此规格"
+                                                    aria-label="删除此规格"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <AnimatePresence initial={false}>
+                                        {expandedVariantKeys.includes(variant.panelKey) ? (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: "auto", opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.2, ease: "easeOut" }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="space-y-3 px-2 pt-3">
+                                                    <div className="rounded-[18px] border border-white/6 bg-black/10 p-3">
+                                                        <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+                                                            基础信息
+                                                        </div>
+                                                        <div className="grid gap-3 sm:grid-cols-2">
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[11px] font-medium text-muted-foreground">规格名称</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={variant.variantName}
+                                                                    onChange={(e) => handleUpdateVariant(index, "variantName", e.target.value)}
+                                                                    placeholder="如 大杯 / 红色 / 500ml"
+                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[11px] font-medium text-muted-foreground">规格 SKU</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={variant.sku}
+                                                                    onChange={(e) => handleUpdateVariant(index, "sku", e.target.value)}
+                                                                    placeholder="规格 SKU"
+                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-[18px] border border-white/6 bg-black/10 p-3">
+                                                        <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+                                                            价格与库存
+                                                        </div>
+                                                        <div className="grid gap-3 sm:grid-cols-3">
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[11px] font-medium text-muted-foreground">进价</label>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={variant.costPrice}
+                                                                    onChange={(e) => handleUpdateVariant(index, "costPrice", e.target.value)}
+                                                                    placeholder="进价"
+                                                                    aria-label="规格进价"
+                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[11px] font-medium text-muted-foreground">售价</label>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min="0"
+                                                                    value={variant.salePrice}
+                                                                    onChange={(e) => handleUpdateVariant(index, "salePrice", e.target.value)}
+                                                                    placeholder="售价"
+                                                                    aria-label="规格售价"
+                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[11px] font-medium text-muted-foreground">规格库存</label>
+                                                                <div className="flex h-[42px] items-center rounded-2xl border border-amber-400/10 bg-amber-400/[0.06] px-4 text-xs font-medium text-amber-100">
+                                                                    {Number(variant.stock ?? 0)}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ) : null}
+                                    </AnimatePresence>
+                                </div>
+                            ))}
+                            {variantDrafts.length === 0 && (
+                                <div className="text-center py-4 bg-muted/20 rounded-xl border border-dashed border-border/50">
+                                    <span className="text-xs text-muted-foreground">未配置规格时，系统按单规格商品处理</span>
+                                </div>
+                            )}
+                        </div>
+                        )}
+                    </div>
 
                     {/* Specifications */}
                     {!hideSpecsSection && (

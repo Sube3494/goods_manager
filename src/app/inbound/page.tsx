@@ -17,6 +17,13 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Suspense } from "react";
 import { AUTO_INBOUND_TYPE, isAutoInboundOrderLike } from "@/lib/purchaseOrderTypes";
 
+function getInboundItemDisplayName(item: PurchaseOrder["items"][number]) {
+  return [
+    item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || "未知商品",
+    item.variantName || item.shopProductVariant?.variantName || item.productVariant?.variantName || "",
+  ].filter(Boolean).join(" / ");
+}
+
 const INBOUND_TYPE_ALL = "全部类型";
 const INBOUND_TYPE_OPTIONS = [
   { value: INBOUND_TYPE_ALL, label: INBOUND_TYPE_ALL },
@@ -355,17 +362,17 @@ function InboundContent() {
                           <div 
                             key={idx} 
                             className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default"
-                            title={item.product?.name}
+                            title={getInboundItemDisplayName(item)}
                           >
                             <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
-                              {item.product?.image ? (
-                                <Image src={item.product.image} className="object-cover" alt="" fill sizes="24px" />
+                              {(item.shopProduct?.image || item.product?.image) ? (
+                                <Image src={item.shopProduct?.image || item.product?.image || ""} className="object-cover" alt="" fill sizes="24px" />
                               ) : (
                                 <Package size={12} className="text-muted-foreground/50" />
                               )}
                             </div>
                             <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
-                              {item.product?.name || '未知商品'}
+                              {getInboundItemDisplayName(item)}
                             </span>
                             <span className="text-[10px] font-black text-primary shrink-0 leading-none">
                               x{item.quantity}
@@ -469,17 +476,17 @@ function InboundContent() {
                       <div 
                         key={idx} 
                         className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[160px] shadow-sm"
-                        title={item.product?.name}
+                        title={getInboundItemDisplayName(item)}
                       >
                         <div className="relative w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
-                          {item.product?.image ? (
-                            <Image src={item.product.image} className="object-cover" alt="" fill sizes="20px" />
+                          {(item.shopProduct?.image || item.product?.image) ? (
+                            <Image src={item.shopProduct?.image || item.product?.image || ""} className="object-cover" alt="" fill sizes="20px" />
                           ) : (
                             <Package size={10} className="text-muted-foreground/50" />
                           )}
                         </div>
                         <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
-                          {item.product?.name || '未知商品'}
+                          {getInboundItemDisplayName(item)}
                         </span>
                         <span className="text-[10px] font-black text-primary shrink-0 leading-none">
                           x{item.quantity}

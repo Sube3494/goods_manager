@@ -18,7 +18,13 @@ async function resolvePurchaseOrderResponse<T extends {
       productImage?: string | null;
       productName?: string | null;
     } | null;
+    shopProductVariant?: {
+      variantImage?: string | null;
+    } | null;
     product?: {
+      image?: string | null;
+    } | null;
+    productVariant?: {
       image?: string | null;
     } | null;
   }>;
@@ -51,10 +57,22 @@ async function resolvePurchaseOrderResponse<T extends {
             image: item.shopProduct.productImage ? storage.resolveUrl(item.shopProduct.productImage) : null,
           }
         : null,
+      shopProductVariant: item.shopProductVariant
+        ? {
+            ...item.shopProductVariant,
+            image: item.shopProductVariant.variantImage ? storage.resolveUrl(item.shopProductVariant.variantImage) : null,
+          }
+        : null,
       product: item.product
         ? {
             ...item.product,
             image: item.product.image ? storage.resolveUrl(item.product.image) : null,
+          }
+        : null,
+      productVariant: item.productVariant
+        ? {
+            ...item.productVariant,
+            image: item.productVariant.image ? storage.resolveUrl(item.productVariant.image) : null,
           }
         : null,
     })),
@@ -113,7 +131,9 @@ export async function GET(request: Request) {
           some: {
             OR: [
               { productId },
+              { productVariantId: productId },
               { shopProductId: productId },
+              { shopProductVariantId: productId },
             ],
           }
         },
@@ -131,7 +151,9 @@ export async function GET(request: Request) {
           items: {
             include: {
               product: true,
+              productVariant: true,
               shopProduct: true,
+              shopProductVariant: true,
               supplier: true,
               batches: true
             }
@@ -206,6 +228,52 @@ export async function POST(request: Request) {
     const orderId = generateOrderId();
 
     const normalizedStatus = status === "Draft" ? "Confirmed" : (status || "Confirmed");
+    const requestedShopProductVariantIds = Array.isArray(items)
+      ? items
+          .map((item: PurchaseOrderItem) => item.shopProductVariantId)
+          .filter((id: unknown): id is string => typeof id === "string" && id.trim() !== "")
+      : [];
+
+    const shopProductVariants = requestedShopProductVariantIds.length > 0
+      ? await prisma.shopProductVariant.findMany({
+          where: {
+            id: { in: requestedShopProductVariantIds },
+            shopProduct: {
+              shop: { userId: session.id },
+            },
+          },
+          select: {
+            id: true,
+            shopProductId: true,
+            productVariantId: true,
+            sku: true,
+            variantName: true,
+            shopProduct: {
+              select: {
+                productId: true,
+              },
+            },
+          },
+        })
+      : [];
+    const shopProductVariantMap = new Map(shopProductVariants.map((item) => [item.id, item]));
+    const normalizedItems = Array.isArray(items)
+      ? items.map((item: PurchaseOrderItem) => {
+          const shopProductVariant = item.shopProductVariantId ? shopProductVariantMap.get(item.shopProductVariantId) : null;
+          return {
+            productId: shopProductVariant?.shopProduct.productId || item.productId || null,
+            productVariantId: shopProductVariant?.productVariantId || item.productVariantId || null,
+            shopProductId: shopProductVariant?.shopProductId || item.shopProductId || null,
+            shopProductVariantId: shopProductVariant?.id || item.shopProductVariantId || null,
+            supplierId: item.supplierId,
+            variantName: shopProductVariant?.variantName || item.variantName || null,
+            variantSku: shopProductVariant?.sku || item.variantSku || null,
+            quantity: Number(item.quantity) || 0,
+            remainingQuantity: normalizedStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
+            costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0),
+          };
+        })
+      : [];
 
     const purchase = await prisma.$transaction(async (tx) => {
       const p = await tx.purchaseOrder.create({
@@ -225,13 +293,8 @@ export async function POST(request: Request) {
           shopName: shopName || "",
           userId: session.id,
           items: {
-            create: items.map((item: PurchaseOrderItem) => ({
-              productId: item.productId || null,
-              shopProductId: item.shopProductId || null,
-              supplierId: item.supplierId,
-              quantity: Number(item.quantity) || 0,
-              remainingQuantity: normalizedStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
-              costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
+            create: normalizedItems.map((item) => ({
+              ...item,
             }))
           }
         },
@@ -239,7 +302,9 @@ export async function POST(request: Request) {
           items: {
             include: {
               product: true,
+              productVariant: true,
               shopProduct: true,
+              shopProductVariant: true,
               supplier: true
             }
           }
@@ -248,16 +313,31 @@ export async function POST(request: Request) {
 
       // 如果状态是 Received，调用同步物理库存 (原子事务)
       if (normalizedStatus === "Received") {
-        for (const item of items) {
-          if (item.shopProductId) {
-            await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
-          } else if (item.productId) {
-            await InventoryService.syncStockFromBatches(tx, item.productId, null);
-          }
+        for (const item of normalizedItems) {
+          await InventoryService.syncStockFromBatches(
+            tx,
+            item.productId || null,
+            item.shopProductId || null,
+            item.productVariantId || null,
+            item.shopProductVariantId || null
+          );
         }
       }
       
-      return p;
+      return await tx.purchaseOrder.findUniqueOrThrow({
+        where: { id: p.id },
+        include: {
+          items: {
+            include: {
+              product: true,
+              productVariant: true,
+              shopProduct: true,
+              shopProductVariant: true,
+              supplier: true,
+            },
+          },
+        },
+      });
     });
 
     return NextResponse.json(await resolvePurchaseOrderResponse(purchase));

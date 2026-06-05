@@ -165,7 +165,24 @@ export class ProductService {
             const detailedProducts = pickerView
               ? await prisma.product.findMany({
                   where: { id: { in: pageIds } },
-                  select: { id: true, name: true, image: true, categoryId: true, category: true, sku: true, costPrice: true, salePrice: true, stock: true, remark: true, isPublic: true, isDiscontinued: true },
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true,
+                    categoryId: true,
+                    category: true,
+                    sku: true,
+                    costPrice: true,
+                    salePrice: true,
+                    stock: true,
+                    remark: true,
+                    isPublic: true,
+                    isDiscontinued: true,
+                    hasVariants: true,
+                    variants: {
+                      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+                    },
+                  },
                 })
               : await prisma.product.findMany({
                   where: { id: { in: pageIds } },
@@ -174,6 +191,7 @@ export class ProductService {
                     supplier: true,
                     gallery: { take: 1 },
                     shopProducts: { select: { shopId: true } },
+                    variants: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
                     jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
                   },
                 });
@@ -192,7 +210,24 @@ export class ProductService {
       pickerView
         ? prisma.product.findMany({
             where,
-            select: { id: true, name: true, image: true, categoryId: true, category: true, sku: true, costPrice: true, salePrice: true, stock: true, remark: true, isPublic: true, isDiscontinued: true },
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              categoryId: true,
+              category: true,
+              sku: true,
+              costPrice: true,
+              salePrice: true,
+              stock: true,
+              remark: true,
+              isPublic: true,
+              isDiscontinued: true,
+              hasVariants: true,
+              variants: {
+                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+              },
+            },
             orderBy: standardOrderBy,
             skip,
             take: pageSize,
@@ -204,6 +239,7 @@ export class ProductService {
               supplier: true,
               gallery: { take: 1 },
               shopProducts: { select: { shopId: true } },
+              variants: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
               jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
             },
             orderBy: standardOrderBy,
@@ -222,6 +258,12 @@ export class ProductService {
     const resolved = (products as Record<string, unknown>[]).map(p => ({
       ...p,
       image: p.image ? storage.resolveUrl(p.image as string) : null,
+      variants: Array.isArray(p.variants)
+        ? (p.variants as Array<Record<string, unknown>>).map((variant) => ({
+            ...variant,
+            image: variant.image ? storage.resolveUrl(variant.image as string) : null,
+          }))
+        : [],
       gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || [],
       assignedShopIds: (p.shopProducts as Array<{ shopId: string }> | undefined)?.map((item) => item.shopId) || [],
       jdSkuIds: (p.jdSkuMappings as Array<{ jdSkuId: string }> | undefined)?.map((item) => item.jdSkuId) || (p.jdSkuId ? [p.jdSkuId as string] : []),

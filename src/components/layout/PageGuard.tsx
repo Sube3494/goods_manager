@@ -52,6 +52,7 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
     const isPublicPath =
       pathname === "/login" ||
       pathname === "/gallery" ||
+      pathname.startsWith("/gallery/faq") ||
       pathname === "/media" ||
       pathname.startsWith("/media/") ||
       pathname === "/brush-plans/share" ||

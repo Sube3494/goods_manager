@@ -41,6 +41,8 @@ model Product {
   pinyin          String?
   isDiscontinued  Boolean             @default(false)
   isShopOnly      Boolean             @default(false)
+  hasVariants     Boolean             @default(false)
+  variantDefinitions Json?
   isShelfLife     Boolean             @default(false)
   shelfLifeDays   Int?
   remark          String?
@@ -56,6 +58,7 @@ model Product {
   user            User?               @relation(fields: [userId], references: [id])
   orderItems      PurchaseOrderItem[]
   shopProducts    ShopProduct[]
+  variants        ProductVariant[]
   storeOpeningItems StoreOpeningItem[]
   jdSkuMappings   ProductJdSku[]
   batches         ProductBatch[]
@@ -66,6 +69,36 @@ model Product {
   @@index([userId, pinyin])
   @@index([userId, createdAt])
   @@unique([userId, sourceProductId])
+}
+
+model ProductVariant {
+  id                String              @id @default(cuid())
+  productId         String
+  sku               String?             @unique
+  jdSkuId           String?
+  variantName       String?
+  optionSummary     String?
+  costPrice         Float               @default(0)
+  salePrice         Float               @default(0)
+  stock             Int                 @default(0)
+  image             String?
+  specs             Json?
+  sortOrder         Int                 @default(0)
+  isDefault         Boolean             @default(false)
+  isActive          Boolean             @default(true)
+  sourceVariantId   String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  product           Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shopVariants      ShopProductVariant[]
+  purchaseOrderItems PurchaseOrderItem[]
+  outboundItems     OutboundOrderItem[]
+  batches           ProductBatch[]
+
+  @@index([productId, sortOrder])
+  @@index([productId, optionSummary])
+  @@index([sourceVariantId])
 }
 
 model GalleryFaq {
@@ -146,21 +179,29 @@ model PurchaseOrderItem {
   id                String        @id @default(cuid())
   purchaseOrderId   String
   productId         String?
+  productVariantId  String?
   shopProductId     String?
+  shopProductVariantId String?
   supplierId        String?
+  variantName       String?
+  variantSku        String?
   quantity          Int
   remainingQuantity Int?
   costPrice         Float
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   product           Product?      @relation(fields: [productId], references: [id])
+  productVariant    ProductVariant? @relation(fields: [productVariantId], references: [id])
   shopProduct       ShopProduct?  @relation(fields: [shopProductId], references: [id])
+  shopProductVariant ShopProductVariant? @relation(fields: [shopProductVariantId], references: [id])
   purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   supplier          Supplier?     @relation(fields: [supplierId], references: [id])
   batches           ProductBatch[]
 
   @@index([productId])
+  @@index([productVariantId])
   @@index([shopProductId])
+  @@index([shopProductVariantId])
 }
 
 model OutboundOrder {
@@ -182,15 +223,23 @@ model OutboundOrderItem {
   id              String        @id @default(cuid())
   outboundOrderId String
   productId       String?
+  productVariantId String?
   shopProductId   String?
+  shopProductVariantId String?
+  variantName     String?
+  variantSku      String?
   quantity        Int
   price           Float         @default(0)
   outboundOrder   OutboundOrder @relation(fields: [outboundOrderId], references: [id], onDelete: Cascade)
   product         Product?      @relation(fields: [productId], references: [id])
+  productVariant  ProductVariant? @relation(fields: [productVariantId], references: [id])
   shopProduct     ShopProduct?  @relation(fields: [shopProductId], references: [id])
+  shopProductVariant ShopProductVariant? @relation(fields: [shopProductVariantId], references: [id])
 
   @@index([productId])
+  @@index([productVariantId])
   @@index([shopProductId])
+  @@index([shopProductVariantId])
 }
 
 model GalleryItem {
@@ -605,6 +654,8 @@ model ShopProduct {
   remark          String?
   specs           Json?
   sourceProductId String?
+  hasVariants     Boolean  @default(false)
+  variantDefinitions Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   isShelfLife     Boolean  @default(false)
@@ -614,6 +665,7 @@ model ShopProduct {
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
   product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   brushProducts BrushProduct[]
+  variants   ShopProductVariant[]
   purchaseOrderItems PurchaseOrderItem[]
   outboundOrderItems OutboundOrderItem[]
 
@@ -623,6 +675,38 @@ model ShopProduct {
   @@index([productId])
   @@index([shopId, createdAt])
   @@index([shopId, pinyin])
+}
+
+model ShopProductVariant {
+  id                  String              @id @default(cuid())
+  shopProductId       String
+  productVariantId    String?
+  sourceVariantId     String?
+  sku                 String?
+  jdSkuId             String?
+  variantName         String?
+  optionSummary       String?
+  variantImage        String?
+  costPrice           Float               @default(0)
+  salePrice           Float               @default(0)
+  stock               Int                 @default(0)
+  sortOrder           Int                 @default(0)
+  isDefault           Boolean             @default(false)
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  shopProduct         ShopProduct         @relation(fields: [shopProductId], references: [id], onDelete: Cascade)
+  productVariant      ProductVariant?     @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  purchaseOrderItems  PurchaseOrderItem[]
+  outboundOrderItems  OutboundOrderItem[]
+  batches             ProductBatch[]
+
+  @@unique([shopProductId, productVariantId])
+  @@unique([shopProductId, sku])
+  @@index([shopProductId, sortOrder])
+  @@index([productVariantId])
+  @@index([sourceVariantId])
 }
 
 model AutoPickOrder {
@@ -730,8 +814,12 @@ model AutoPickApiKey {
 model ProductBatch {
   id                  String             @id @default(cuid())
   productId           String
+  productVariantId    String?
   shopProductId       String?
+  shopProductVariantId String?
   batchNo             String?            // 批次号
+  variantName         String?
+  variantSku          String?
   productionDate      DateTime?          // 生产日期
   expirationDate      DateTime           // 过期日期
   quantity            Int                @default(0)  // 该批次初始入库数量
@@ -743,12 +831,16 @@ model ProductBatch {
   userId              String?
   
   product             Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productVariant      ProductVariant?    @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
   shopProduct         ShopProduct?       @relation(fields: [shopProductId], references: [id], onDelete: SetNull)
+  shopProductVariant  ShopProductVariant? @relation(fields: [shopProductVariantId], references: [id], onDelete: SetNull)
   purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
   user                User?              @relation(fields: [userId], references: [id])
 
   @@index([productId])
+  @@index([productVariantId])
   @@index([shopProductId])
+  @@index([shopProductVariantId])
   @@index([expirationDate])
   @@index([purchaseOrderItemId])
   @@index([userId])

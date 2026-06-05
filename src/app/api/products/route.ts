@@ -7,6 +7,20 @@ import { ProductService } from "@/services/productService";
 import { Prisma } from "../../../../prisma/generated-client";
 import { findConflictingProductJdSkuIds, getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 
+type VariantInput = {
+  id?: string;
+  sku?: string | null;
+  jdSkuId?: string | null;
+  variantName?: string | null;
+  optionSummary?: string | null;
+  costPrice?: number | string | null;
+  salePrice?: number | string | null;
+  image?: string | null;
+  specs?: Record<string, string> | null;
+  isDefault?: boolean;
+  isActive?: boolean;
+};
+
 function normalizeSku(sku: unknown) {
   if (typeof sku !== "string") {
     return null;
@@ -14,6 +28,48 @@ function normalizeSku(sku: unknown) {
 
   const trimmed = sku.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeVariants(rawVariants: unknown, defaultCostPrice: number, defaultSalePrice: number) {
+  if (!Array.isArray(rawVariants)) {
+    return [];
+  }
+
+  return rawVariants
+    .map((variant, index) => {
+      const record = typeof variant === "object" && variant !== null ? variant as VariantInput : null;
+      if (!record) return null;
+
+      const normalizedSku = normalizeSku(record.sku);
+      const normalizedVariantName = typeof record.variantName === "string" ? record.variantName.trim() : "";
+      const normalizedOptionSummary = typeof record.optionSummary === "string"
+        ? record.optionSummary.trim()
+        : "";
+
+      if (!normalizedSku && !normalizedVariantName && !normalizedOptionSummary) {
+        return null;
+      }
+
+      return {
+        id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : undefined,
+        sku: normalizedSku,
+        jdSkuId: normalizeSku(record.jdSkuId),
+        variantName: normalizedVariantName || normalizedOptionSummary || null,
+        optionSummary: normalizedOptionSummary || normalizedVariantName || null,
+        costPrice: Math.max(0, Number(record.costPrice) || defaultCostPrice),
+        salePrice: Math.max(0, Number(record.salePrice) || defaultSalePrice),
+        image: typeof record.image === "string" && record.image.trim() ? record.image.trim() : null,
+        specs: record.specs && typeof record.specs === "object" ? record.specs : null,
+        isDefault: Boolean(record.isDefault ?? index === 0),
+        isActive: record.isActive !== undefined ? Boolean(record.isActive) : true,
+        sortOrder: index,
+      };
+    })
+    .filter((variant): variant is NonNullable<typeof variant> => Boolean(variant));
+}
+
+function buildVariantDefinitions(variants: ReturnType<typeof normalizeVariants>) {
+  return variants.length > 0 ? [{ name: "规格", values: variants.map((variant) => variant.variantName || variant.optionSummary || "").filter(Boolean) }] : [];
 }
 
 async function findConflictingProductBySku(sku: string, excludeId?: string) {
@@ -129,7 +185,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, salePrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
+    const { name, sku, jdSkuId, jdSkuIds, costPrice, salePrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly, variants } = body;
     const isShelfLife = Boolean(body?.isShelfLife ?? false);
     const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     const normalizedSku = normalizeSku(sku);
@@ -142,6 +198,9 @@ export async function POST(request: Request) {
     const stockNum = 0;
     const normalizedCostPrice = Math.max(0, Number(costPrice) || 0);
     const normalizedSalePrice = salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : normalizedCostPrice;
+    const normalizedVariants = normalizeVariants(variants, normalizedCostPrice, normalizedSalePrice);
+    const variantDefinitions = buildVariantDefinitions(normalizedVariants);
+    const hasVariants = normalizedVariants.length > 0;
 
     let resolvedShopId: string | null = null;
     let resolvedShopName = "";
@@ -207,8 +266,25 @@ export async function POST(request: Request) {
           isDiscontinued: isDiscontinued ?? false,
           remark: remark || null,
           specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : Prisma.JsonNull) : undefined,
+          hasVariants,
+          variantDefinitions: hasVariants ? variantDefinitions : Prisma.JsonNull,
           isShelfLife,
           shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
+          variants: hasVariants ? {
+            create: normalizedVariants.map((variant) => ({
+              sku: variant.sku,
+              jdSkuId: variant.jdSkuId,
+              variantName: variant.variantName,
+              optionSummary: variant.optionSummary,
+              variantImage: storage.stripUrl(variant.image),
+              costPrice: variant.costPrice,
+              salePrice: variant.salePrice,
+              stock: 0,
+              sortOrder: variant.sortOrder,
+              isDefault: variant.isDefault,
+              isActive: variant.isActive,
+            })),
+          } : undefined,
         },
       });
 
@@ -290,16 +366,36 @@ export async function POST(request: Request) {
           image: storage.stripUrl(image),
           pinyin: ProductService.generatePinyinSearchText(name),
           isPublic: isPublic ?? true,
-          isDiscontinued: isDiscontinued ?? false,
-          isShopOnly: Boolean(isShopOnly && resolvedShopId),
-          specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
-          remark: remark || null,
-          userId: user.id,
-          isShelfLife,
-          shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
-          ...(resolvedShopId ? {
-            shopProducts: {
-              create: [{
+            isDiscontinued: isDiscontinued ?? false,
+            isShopOnly: Boolean(isShopOnly && resolvedShopId),
+            specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+            hasVariants,
+            variantDefinitions: hasVariants ? variantDefinitions : Prisma.JsonNull,
+            remark: remark || null,
+            userId: user.id,
+            isShelfLife,
+            shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
+            ...(hasVariants ? {
+              variants: {
+                create: normalizedVariants.map((variant) => ({
+                  sku: variant.sku,
+                  jdSkuId: variant.jdSkuId,
+                  variantName: variant.variantName,
+                  optionSummary: variant.optionSummary,
+                  image: storage.stripUrl(variant.image),
+                  costPrice: variant.costPrice,
+                  salePrice: variant.salePrice,
+                  stock: 0,
+                  specs: variant.specs ?? Prisma.JsonNull,
+                  sortOrder: variant.sortOrder,
+                  isDefault: variant.isDefault,
+                  isActive: variant.isActive,
+                })),
+              },
+            } : {}),
+            ...(resolvedShopId ? {
+              shopProducts: {
+                create: [{
                 shopId: resolvedShopId,
                 sourceProductId: undefined,
                 sku: normalizedSku,
@@ -317,8 +413,27 @@ export async function POST(request: Request) {
                 isDiscontinued: isDiscontinued ?? false,
                 remark: remark || null,
                 specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+                hasVariants,
+                variantDefinitions: hasVariants ? variantDefinitions : Prisma.JsonNull,
                 isShelfLife,
                 shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
+                ...(hasVariants ? {
+                  variants: {
+                    create: normalizedVariants.map((variant) => ({
+                      sku: variant.sku,
+                      jdSkuId: variant.jdSkuId,
+                      variantName: variant.variantName,
+                      optionSummary: variant.optionSummary,
+                      variantImage: storage.stripUrl(variant.image),
+                      costPrice: variant.costPrice,
+                      salePrice: variant.salePrice,
+                      stock: 0,
+                      sortOrder: variant.sortOrder,
+                      isDefault: variant.isDefault,
+                      isActive: variant.isActive,
+                    })),
+                  },
+                } : {}),
               }],
             },
           } : {}),
@@ -327,6 +442,7 @@ export async function POST(request: Request) {
           category: true,
           supplier: true,
           shopProducts: { select: { shopId: true } },
+          variants: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
         }
       });
@@ -339,6 +455,7 @@ export async function POST(request: Request) {
           category: true,
           supplier: true,
           shopProducts: { select: { shopId: true } },
+          variants: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
         },
       });
@@ -347,6 +464,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ...product,
       image: product.image ? storage.resolveUrl(product.image) : null,
+      variants: product.variants.map((variant) => ({
+        ...variant,
+        image: variant.image ? storage.resolveUrl(variant.image) : null,
+      })),
       assignedShopIds: product.shopProducts.map((item) => item.shopId),
       jdSkuIds: product.jdSkuMappings.map((item) => item.jdSkuId),
     });
@@ -364,7 +485,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, jdSkuId, jdSkuIds, costPrice, salePrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { id, name, sku, jdSkuId, jdSkuIds, costPrice, salePrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, variants } = body;
     const isShelfLife = body?.isShelfLife !== undefined ? Boolean(body.isShelfLife) : undefined;
     const shelfLifeDays = body?.shelfLifeDays !== undefined ? (body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null) : undefined;
     const normalizedSku = normalizeSku(sku);
@@ -384,6 +505,12 @@ export async function PUT(request: Request) {
     if (!existing) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+
+    const normalizedCostPrice = costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : Math.max(0, Number(existing.costPrice) || 0);
+    const normalizedSalePrice = salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : Math.max(0, Number(existing.salePrice) || normalizedCostPrice);
+    const normalizedVariants = normalizeVariants(variants, normalizedCostPrice, normalizedSalePrice);
+    const variantDefinitions = buildVariantDefinitions(normalizedVariants);
+    const hasVariants = normalizedVariants.length > 0;
 
     if (normalizedSku) {
       const existingProduct = await findConflictingProductBySku(normalizedSku, id);
@@ -410,8 +537,8 @@ export async function PUT(request: Request) {
           name,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
-          costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
-          salePrice: salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : undefined,
+          costPrice: costPrice !== undefined ? normalizedCostPrice : undefined,
+          salePrice: salePrice !== undefined ? normalizedSalePrice : undefined,
           categoryId: categoryId || undefined,
           supplierId: supplierId || null,
           image: image !== undefined ? storage.stripUrl(image) : undefined,
@@ -419,11 +546,37 @@ export async function PUT(request: Request) {
           isPublic: isPublic ?? undefined,
           isDiscontinued: isDiscontinued ?? undefined,
           specs: specs !== undefined ? (Object.keys(specs || {}).length > 0 ? specs : null) : undefined,
+          hasVariants,
+          variantDefinitions: hasVariants ? variantDefinitions : Prisma.JsonNull,
           remark: remark !== undefined ? remark : undefined,
           isShelfLife: isShelfLife ?? undefined,
           shelfLifeDays: shelfLifeDays !== undefined ? (Number.isFinite(shelfLifeDays) ? shelfLifeDays : null) : undefined,
         },
       });
+
+      await tx.productVariant.deleteMany({
+        where: { productId: id },
+      });
+
+      if (hasVariants) {
+        await tx.productVariant.createMany({
+          data: normalizedVariants.map((variant) => ({
+            productId: id,
+            sku: variant.sku,
+            jdSkuId: variant.jdSkuId,
+            variantName: variant.variantName,
+            optionSummary: variant.optionSummary,
+            image: storage.stripUrl(variant.image),
+            costPrice: variant.costPrice,
+            salePrice: variant.salePrice,
+            stock: 0,
+            specs: variant.specs ?? Prisma.JsonNull,
+            sortOrder: variant.sortOrder,
+            isDefault: variant.isDefault,
+            isActive: variant.isActive,
+          })),
+        });
+      }
 
       await replaceProductJdSkuMappings(tx, id, user.id, normalizedJdSkuIds);
 
@@ -432,6 +585,7 @@ export async function PUT(request: Request) {
         include: {
           category: true,
           supplier: true,
+          variants: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
           jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
         },
       });
@@ -440,6 +594,10 @@ export async function PUT(request: Request) {
     return NextResponse.json({
       ...updatedProduct,
       image: updatedProduct.image ? storage.resolveUrl(updatedProduct.image) : null,
+      variants: updatedProduct.variants.map((variant) => ({
+        ...variant,
+        image: variant.image ? storage.resolveUrl(variant.image) : null,
+      })),
       jdSkuIds: updatedProduct.jdSkuMappings.map((item) => item.jdSkuId),
     });
   } catch (error: unknown) {

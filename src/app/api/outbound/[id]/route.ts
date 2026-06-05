@@ -5,6 +5,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { InventoryService as OutboundInventoryService } from "@/services/inventoryService";
 import { buildFactoryShipmentNote } from "@/lib/utils";
 import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
+import { Prisma } from "../../../../../prisma/generated-client";
 
 /**
  * 实现“退货入库”逻辑 (对冲出库)
@@ -34,7 +35,8 @@ export async function POST(
         include: {
           items: {
             include: {
-              shopProduct: true
+              shopProduct: true,
+              shopProductVariant: true,
             }
           }
         }
@@ -58,12 +60,18 @@ export async function POST(
 
         // Find batches (PurchaseOrderItems) that need restoring
         // We restore to the latest available space first (LIFO restore for FIFO deduction)
-        const batches = await tx.purchaseOrderItem.findMany({
-          where: {
-            ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId }),
-            purchaseOrder: {
-              userId: session.id,
-              status: "Received"
+          const batches = await tx.purchaseOrderItem.findMany({
+            where: {
+              ...(item.shopProductVariantId
+                ? { shopProductVariantId: item.shopProductVariantId }
+                : item.productVariantId
+                  ? { productVariantId: item.productVariantId }
+                  : item.shopProductId
+                    ? { shopProductId: item.shopProductId }
+                    : { productId: item.productId }),
+              purchaseOrder: {
+                userId: session.id,
+                status: "Received"
             }
           },
           orderBy: {
@@ -80,10 +88,22 @@ export async function POST(
         } else {
           // 若无历史采购记录，回退采用主表上的商品进货成本价
           if (item.shopProductId) {
+            if (item.shopProductVariantId) {
+              const spv = await tx.shopProductVariant.findUnique({
+                where: { id: item.shopProductVariantId }
+              });
+              costPrice = Number(spv?.costPrice) || 0;
+            } else {
             const sp = await tx.shopProduct.findUnique({
               where: { id: item.shopProductId }
             });
             costPrice = Number(sp?.costPrice) || 0;
+            }
+          } else if (item.productVariantId) {
+            const pv = await tx.productVariant.findUnique({
+              where: { id: item.productVariantId }
+            });
+            costPrice = Number(pv?.costPrice) || 0;
           } else if (item.productId) {
             const p = await tx.product.findUnique({
               where: { id: item.productId }
@@ -94,9 +114,15 @@ export async function POST(
 
         itemsToCreate.push({
           productId: item.productId || null,
+          productVariantId: item.productVariantId || null,
           shopProductId: item.shopProductId || null,
+          shopProductVariantId: item.shopProductVariantId || null,
+          variantName: item.variantName || item.shopProductVariant?.variantName || null,
+          variantSku: item.variantSku || item.shopProductVariant?.sku || null,
           quantity: item.quantity,
-          remainingQuantity: item.quantity,
+          // 退回对冲单只保留审计记录，实际库存已经通过恢复原采购批次余量处理过了，
+          // 这里不能再给它可用余量，否则会把库存重复加一次。
+          remainingQuantity: 0,
           costPrice: costPrice
         });
 
@@ -149,14 +175,22 @@ export async function POST(
           userId: session.id,
           note: `单据由出库退回自动产生。关联出库单: ${order.id}`,
           items: {
-            create: itemsToCreate
+            create: itemsToCreate.map((item) => ({
+              ...item,
+            }))
           }
         }
       });
 
       // 3. 统一同步物理库存
       for (const item of order.items) {
-        await OutboundInventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId || null);
+        await OutboundInventoryService.syncStockFromBatches(
+          tx,
+          item.productId || null,
+          item.shopProductId || null,
+          item.productVariantId || null,
+          item.shopProductVariantId || null
+        );
       }
 
       // 4. Update the order as "Returned" instead of deleting
@@ -200,6 +234,11 @@ export async function PUT(
           .map((item: { shopProductId?: string }) => item.shopProductId)
           .filter((shopProductId: unknown): shopProductId is string => typeof shopProductId === "string" && shopProductId.trim() !== "")
       : [];
+    const requestedShopProductVariantIds = Array.isArray(items)
+      ? items
+          .map((item: { shopProductVariantId?: string }) => item.shopProductVariantId)
+          .filter((shopProductVariantId: unknown): shopProductVariantId is string => typeof shopProductVariantId === "string" && shopProductVariantId.trim() !== "")
+      : [];
 
     const shopProducts = requestedShopProductIds.length > 0
       ? await prisma.shopProduct.findMany({
@@ -213,18 +252,44 @@ export async function PUT(
           },
         })
       : [];
+    const shopProductVariants = requestedShopProductVariantIds.length > 0
+      ? await prisma.shopProductVariant.findMany({
+          where: {
+            id: { in: requestedShopProductVariantIds },
+            shopProduct: { shop: { userId: session.id } },
+          },
+          select: {
+            id: true,
+            shopProductId: true,
+            productVariantId: true,
+            sku: true,
+            variantName: true,
+            shopProduct: {
+              select: {
+                productId: true,
+              },
+            },
+          },
+        })
+      : [];
     const shopProductMap = new Map(shopProducts.map((item) => [item.id, item]));
+    const shopProductVariantMap = new Map(shopProductVariants.map((item) => [item.id, item]));
 
     const normalizedItems = Array.isArray(items)
-      ? items.map((item: { productId?: string; shopProductId?: string; quantity: number; price?: number }) => {
+      ? items.map((item: { productId?: string; productVariantId?: string; shopProductId?: string; shopProductVariantId?: string; variantName?: string; variantSku?: string; quantity: number; price?: number }) => {
+          const shopProductVariant = item.shopProductVariantId ? shopProductVariantMap.get(item.shopProductVariantId) : null;
           const shopProduct = item.shopProductId ? shopProductMap.get(item.shopProductId) : null;
           return {
-            productId: shopProduct?.productId || item.productId || null,
-            shopProductId: shopProduct?.id || null,
+            productId: shopProductVariant?.shopProduct.productId || shopProduct?.productId || item.productId || null,
+            productVariantId: shopProductVariant?.productVariantId || item.productVariantId || null,
+            shopProductId: shopProductVariant?.shopProductId || shopProduct?.id || null,
+            shopProductVariantId: shopProductVariant?.id || item.shopProductVariantId || null,
+            variantName: shopProductVariant?.variantName || item.variantName || null,
+            variantSku: shopProductVariant?.sku || item.variantSku || null,
             quantity: Number(item.quantity) || 0,
             price: item.price || 0,
           };
-        }).filter((item) => item.quantity > 0 && (item.productId || item.shopProductId))
+        }).filter((item) => item.quantity > 0 && (item.productId || item.shopProductId || item.productVariantId || item.shopProductVariantId))
       : null;
 
     if (Array.isArray(items) && (!normalizedItems || normalizedItems.length === 0)) {
@@ -273,7 +338,13 @@ export async function PUT(
           let amountToRestore = item.quantity;
           const batches = await tx.purchaseOrderItem.findMany({
             where: {
-              ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId }),
+              ...(item.shopProductVariantId
+                ? { shopProductVariantId: item.shopProductVariantId }
+                : item.productVariantId
+                  ? { productVariantId: item.productVariantId }
+                  : item.shopProductId
+                    ? { shopProductId: item.shopProductId }
+                    : { productId: item.productId }),
               purchaseOrder: {
                 userId: session.id,
                 status: "Received",
@@ -325,7 +396,11 @@ export async function PUT(
           data: normalizedItems.map((item) => ({
             outboundOrderId: id,
             productId: item.productId,
+            productVariantId: item.productVariantId,
             shopProductId: item.shopProductId,
+            shopProductVariantId: item.shopProductVariantId,
+            variantName: item.variantName || null,
+            variantSku: item.variantSku || null,
             quantity: item.quantity,
             price: item.price,
           })),
@@ -336,18 +411,36 @@ export async function PUT(
           session.id,
           normalizedItems.map((item) => ({
             productId: item.productId,
+            productVariantId: item.productVariantId,
             shopProductId: item.shopProductId,
+            shopProductVariantId: item.shopProductVariantId,
             quantity: item.quantity,
           }))
         );
 
         const touchedItems = [
-          ...existingOrder.items.map((item) => ({ productId: item.productId, shopProductId: item.shopProductId })),
-          ...normalizedItems.map((item) => ({ productId: item.productId, shopProductId: item.shopProductId })),
+          ...existingOrder.items.map((item) => ({
+            productId: item.productId,
+            productVariantId: item.productVariantId,
+            shopProductId: item.shopProductId,
+            shopProductVariantId: item.shopProductVariantId,
+          })),
+          ...normalizedItems.map((item) => ({
+            productId: item.productId,
+            productVariantId: item.productVariantId,
+            shopProductId: item.shopProductId,
+            shopProductVariantId: item.shopProductVariantId,
+          })),
         ];
 
         for (const item of touchedItems) {
-          await OutboundInventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId || null);
+          await OutboundInventoryService.syncStockFromBatches(
+            tx,
+            item.productId || null,
+            item.shopProductId || null,
+            item.productVariantId || null,
+            item.shopProductVariantId || null
+          );
         }
       }
 

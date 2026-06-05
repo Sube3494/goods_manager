@@ -59,6 +59,7 @@ export interface Product {
   jdSkuIds?: string[];
   name: string;
   productId?: string | null;
+  productVariantId?: string | null;
   sourceProductId?: string | null;
   categoryId: string;
   category?: Category;
@@ -80,11 +81,38 @@ export interface Product {
   updatedAt?: string;
   sourceType?: "product" | "shopProduct";
   shopProductId?: string;
+  shopProductVariantId?: string | null;
   shopId?: string;
   shopName?: string;
   isStandaloneShopProduct?: boolean;
   isShelfLife?: boolean;
   shelfLifeDays?: number | null;
+  hasVariants?: boolean;
+  variantDefinitions?: Array<{
+    name: string;
+    values: string[];
+  }> | null;
+  variants?: ProductVariant[];
+}
+
+export interface ProductVariant {
+  id?: string;
+  productId?: string;
+  sku?: string | null;
+  jdSkuId?: string | null;
+  variantName?: string | null;
+  optionSummary?: string | null;
+  costPrice: number;
+  salePrice?: number | null;
+  stock?: number;
+  image?: string | null;
+  specs?: Record<string, string> | null;
+  sortOrder?: number;
+  isDefault?: boolean;
+  isActive?: boolean;
+  sourceVariantId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Shop {
@@ -104,10 +132,13 @@ export interface ShopCatalogItem {
   id: string;
   sourceProductId?: string | null;
   productId?: string | null;
+  productVariantId?: string | null;
   sku?: string | null;
   jdSkuId?: string | null;
   name: string;
   productName?: string | null;
+  variantName?: string | null;
+  optionSummary?: string | null;
   image?: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
@@ -124,6 +155,32 @@ export interface ShopCatalogItem {
   specs?: Record<string, string> | null;
   isShelfLife?: boolean;
   shelfLifeDays?: number | null;
+  hasVariants?: boolean;
+  variantDefinitions?: Array<{
+    name: string;
+    values: string[];
+  }> | null;
+  variants?: ShopProductVariant[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ShopProductVariant {
+  id: string;
+  shopProductId: string;
+  productVariantId?: string | null;
+  sourceVariantId?: string | null;
+  sku?: string | null;
+  jdSkuId?: string | null;
+  variantName?: string | null;
+  optionSummary?: string | null;
+  image?: string | null;
+  costPrice?: number | null;
+  salePrice?: number | null;
+  stock?: number | null;
+  sortOrder?: number;
+  isDefault?: boolean;
+  isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -313,7 +370,11 @@ export interface PurchaseOrder {
 export interface ProductBatch {
   id: string;
   productId: string;
+  productVariantId?: string | null;
   shopProductId?: string | null;
+  shopProductVariantId?: string | null;
+  variantName?: string | null;
+  variantSku?: string | null;
   batchNo?: string | null;
   productionDate?: string | Date | null;
   expirationDate: string | Date;
@@ -329,12 +390,18 @@ export interface PurchaseOrderItem {
   id?: string;
   purchaseOrderId?: string;
   productId?: string | null;
+  productVariantId?: string | null;
   shopProductId?: string;
+  shopProductVariantId?: string | null;
   product?: Product;
+  productVariant?: ProductVariant | null;
   shopProduct?: ShopCatalogItem;
+  shopProductVariant?: ShopProductVariant | null;
   image?: string;
   supplierId?: string;
   supplier?: Supplier;
+  variantName?: string | null;
+  variantSku?: string | null;
   quantity: number;
   remainingQuantity?: number;
   costPrice: number;
@@ -524,9 +591,15 @@ export interface OutboundOrderItem {
   id?: string;
   outboundOrderId?: string;
   productId?: string | null;
+  productVariantId?: string | null;
   shopProductId?: string;
+  shopProductVariantId?: string | null;
   product?: Product;
+  productVariant?: ProductVariant | null;
   shopProduct?: ShopCatalogItem;
+  shopProductVariant?: ShopProductVariant | null;
+  variantName?: string | null;
+  variantSku?: string | null;
   quantity: number;
   price: number;
 }

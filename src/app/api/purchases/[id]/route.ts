@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 import { FinanceMath } from "@/lib/math";
 import { InventoryService } from "@/services/inventoryService";
+import { Prisma } from "../../../../../prisma/generated-client";
 
 export async function PUT(
   request: Request,
@@ -54,6 +55,17 @@ export async function PUT(
           }
 
           if (item.shopProductId) {
+            if (item.shopProductVariantId) {
+              const shopProductVariant = await tx.shopProductVariant.findUnique({
+                where: { id: item.shopProductVariantId },
+              });
+
+              if (!shopProductVariant || Number(shopProductVariant.stock || 0) < originalQuantity) {
+                throw new Error("店铺规格当前库存不足，无法撤销这张已入库采购单");
+              }
+              continue;
+            }
+
             const shopProduct = await tx.shopProduct.findUnique({
               where: { id: item.shopProductId },
             });
@@ -73,6 +85,48 @@ export async function PUT(
         }
       }
 
+      const requestedShopProductVariantIds = Array.isArray(items)
+        ? items
+            .map((item: PurchaseOrderItemType) => item.shopProductVariantId)
+            .filter((value: unknown): value is string => typeof value === "string" && value.trim() !== "")
+        : [];
+
+      const shopProductVariants = requestedShopProductVariantIds.length > 0
+        ? await tx.shopProductVariant.findMany({
+            where: { id: { in: requestedShopProductVariantIds } },
+            select: {
+              id: true,
+              shopProductId: true,
+              productVariantId: true,
+              sku: true,
+              variantName: true,
+              shopProduct: {
+                select: {
+                  productId: true,
+                },
+              },
+            },
+          })
+        : [];
+      const shopProductVariantMap = new Map(shopProductVariants.map((item) => [item.id, item]));
+      const normalizedItems = Array.isArray(items)
+        ? items.map((item: PurchaseOrderItemType) => {
+            const shopProductVariant = item.shopProductVariantId ? shopProductVariantMap.get(item.shopProductVariantId) : null;
+            return {
+              productId: shopProductVariant?.shopProduct.productId || item.productId || null,
+              productVariantId: shopProductVariant?.productVariantId || item.productVariantId || null,
+              shopProductId: shopProductVariant?.shopProductId || item.shopProductId || null,
+              shopProductVariantId: shopProductVariant?.id || item.shopProductVariantId || null,
+              supplierId: item.supplierId,
+              variantName: shopProductVariant?.variantName || item.variantName || null,
+              variantSku: shopProductVariant?.sku || item.variantSku || null,
+              quantity: Number(item.quantity) || 0,
+              remainingQuantity: nextStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
+              costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
+            };
+          })
+        : [];
+
       const p = await tx.purchaseOrder.update({
         where: { id },
         data: {
@@ -90,13 +144,8 @@ export async function PUT(
           ...(items && {
             items: {
               deleteMany: {},
-              create: items.map((item: PurchaseOrderItemType) => ({
-                productId: item.productId || null,
-                shopProductId: item.shopProductId || null,
-                supplierId: item.supplierId,
-                quantity: Number(item.quantity) || 0,
-                remainingQuantity: nextStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
-                costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
+              create: normalizedItems.map((item) => ({
+                ...item,
               }))
             }
           })
@@ -105,7 +154,9 @@ export async function PUT(
           items: {
             include: {
               product: true,
+              productVariant: true,
               shopProduct: true,
+              shopProductVariant: true,
               supplier: true,
               batches: true
             }
@@ -130,7 +181,13 @@ export async function PUT(
           }
 
           // 原子同步物理库存
-          await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
+          await InventoryService.syncStockFromBatches(
+            tx,
+            item.productId || null,
+            item.shopProductId || null,
+            item.productVariantId || null,
+            item.shopProductVariantId || null
+          );
         }
       } else if (isRevokingReceived) {
         await tx.purchaseOrderItem.updateMany({
@@ -140,7 +197,13 @@ export async function PUT(
 
         // 撤销入库后，同步物理库存
         for (const item of existingPurchase.items) {
-          await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
+          await InventoryService.syncStockFromBatches(
+            tx,
+            item.productId || null,
+            item.shopProductId || null,
+            item.productVariantId || null,
+            item.shopProductVariantId || null
+          );
         }
       }
       return p;
@@ -183,6 +246,17 @@ export async function DELETE(
           }
 
           if (item.shopProductId) {
+            if (item.shopProductVariantId) {
+              const shopProductVariant = await tx.shopProductVariant.findUnique({
+                where: { id: item.shopProductVariantId },
+              });
+
+              if (!shopProductVariant || Number(shopProductVariant.stock || 0) < originalQuantity) {
+                throw new Error("店铺规格当前库存不足，无法删除这张已入库采购单");
+              }
+              continue;
+            }
+
             const shopProduct = await tx.shopProduct.findUnique({
               where: { id: item.shopProductId },
             });
@@ -210,9 +284,15 @@ export async function DELETE(
         where: { id }
       });
 
-      // 物理删除后，同步物理库存
+        // 物理删除后，同步物理库存
       for (const item of existingPurchase.items) {
-        await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId);
+        await InventoryService.syncStockFromBatches(
+          tx,
+          item.productId || null,
+          item.shopProductId || null,
+          item.productVariantId || null,
+          item.shopProductVariantId || null
+        );
       }
     });
 

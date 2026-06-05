@@ -41,7 +41,10 @@ function formatPurchaseItemsSummary(purchase: PurchaseOrder) {
   return {
     items: visibleItems.map((item) => ({
       key: item.id || item.shopProductId || item.productId || `${item.quantity}-${item.costPrice}`,
-      name: item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || "未知商品",
+      name: [
+        item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || "未知商品",
+        item.variantName || item.shopProductVariant?.variantName || item.productVariant?.variantName || ""
+      ].filter(Boolean).join(" / "),
       image: item.shopProduct?.image || item.product?.image || "",
       quantity: item.quantity,
     })),
@@ -1185,8 +1188,13 @@ function PurchasesContent() {
 
 
        <PurchaseOrderModal 
+        key={editingPurchase?.id || "create"}
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingPurchase(null);
+          setDetailReadOnly(false);
+        }}
         onSubmit={handleSave}
         onExport={handleExport}
         onOverview={(po) => setOverviewPurchases([po])}

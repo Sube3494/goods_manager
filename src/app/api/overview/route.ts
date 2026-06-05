@@ -59,8 +59,11 @@ export async function GET() {
         items: {
           select: {
             quantity: true,
+            variantName: true,
             product: { select: { name: true, image: true } },
             shopProduct: { select: { productName: true, productImage: true } },
+            productVariant: { select: { variantName: true } },
+            shopProductVariant: { select: { variantName: true } },
           },
         },
       },
@@ -82,8 +85,11 @@ export async function GET() {
           select: {
             quantity: true,
             price: true,
+            variantName: true,
             product: { select: { name: true, image: true } },
             shopProduct: { select: { productName: true, productImage: true } },
+            productVariant: { select: { variantName: true } },
+            shopProductVariant: { select: { variantName: true } },
           },
         },
       },
@@ -134,6 +140,11 @@ export async function GET() {
     const itemCount = order.items.length;
     const quantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
     const amount = order.items.reduce((sum, item) => sum + item.quantity * (item.price || 0), 0);
+    const firstVariantName =
+      order.items[0]?.variantName ||
+      order.items[0]?.shopProductVariant?.variantName ||
+      order.items[0]?.productVariant?.variantName ||
+      "";
     return {
       id: order.id,
       date: order.date,
@@ -144,6 +155,7 @@ export async function GET() {
       quantity,
       amount,
       firstItemName: order.items[0]?.shopProduct?.productName || order.items[0]?.product?.name || "未填写货品",
+      firstVariantName,
       firstItemImage: order.items[0]?.shopProduct?.productImage || order.items[0]?.product?.image || "",
     };
   });
@@ -160,6 +172,11 @@ export async function GET() {
       amount: order.totalAmount,
       image: order.items[0]?.shopProduct?.productImage || order.items[0]?.product?.image || "",
       productName: order.items[0]?.shopProduct?.productName || order.items[0]?.product?.name || "采购单",
+      variantName:
+        order.items[0]?.variantName ||
+        order.items[0]?.shopProductVariant?.variantName ||
+        order.items[0]?.productVariant?.variantName ||
+        "",
       quantity: order.items.reduce((sum, item) => sum + item.quantity, 0),
     })),
     ...shipmentSummaries.slice(0, 6).map((order) => ({
@@ -171,6 +188,7 @@ export async function GET() {
       amount: order.amount,
       image: order.firstItemImage,
       productName: order.firstItemName,
+      variantName: order.firstVariantName,
       quantity: order.quantity,
     })),
   ]

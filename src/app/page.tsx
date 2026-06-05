@@ -73,6 +73,7 @@ type OverviewData = {
     amount: number;
     image: string;
     productName: string;
+    variantName?: string;
     quantity: number;
   }>;
 };
@@ -85,6 +86,15 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function splitDisplayName(productName: string, variantName?: string) {
+  const baseName = String(productName || "").trim() || "未命名货品";
+  const normalizedVariant = String(variantName || "").trim();
+  return {
+    baseName,
+    variantLabel: normalizedVariant,
+  };
 }
 
 function getShipmentTone(status: string) {
@@ -462,8 +472,15 @@ export default function OverviewPage() {
                         </div>
                       )}
                     </div>
-                    <div className="min-w-0 flex-1 overflow-hidden truncate whitespace-nowrap text-[13px] font-bold text-foreground">
-                      {item.productName || item.title}
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <div className="truncate whitespace-nowrap text-[13px] font-bold text-foreground">
+                        {splitDisplayName(item.productName || item.title, item.variantName).baseName}
+                      </div>
+                      {splitDisplayName(item.productName || item.title, item.variantName).variantLabel ? (
+                        <div className="truncate whitespace-nowrap text-[10px] font-medium text-primary">
+                          {splitDisplayName(item.productName || item.title, item.variantName).variantLabel}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="shrink-0 pl-1 text-[13px] font-black text-foreground">x{numberText(item.quantity)}</div>
                   </div>
