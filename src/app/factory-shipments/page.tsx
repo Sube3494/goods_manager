@@ -1036,7 +1036,16 @@ function formatQuantity(order: OutboundOrder) {
 function extractRecipientCity(address?: string) {
   if (!address) return "";
   const compactAddress = address.replace(/\s+/g, "");
-  const cityMatch = compactAddress.match(/(?:[\u4e00-\u9fa5]+省|[\u4e00-\u9fa5]+自治区|[\u4e00-\u9fa5]+特别行政区)?([\u4e00-\u9fa5]{2,}市)/);
+  const municipalityMatch = compactAddress.match(/(北京市|上海市|天津市|重庆市)/);
+  if (municipalityMatch) {
+    return municipalityMatch[1];
+  }
+
+  const textAfterProvince = compactAddress.replace(
+    /^(?:[\u4e00-\u9fa5]{2,8}省|[\u4e00-\u9fa5]{2,12}自治区|[\u4e00-\u9fa5]{2,12}特别行政区)/,
+    ""
+  );
+  const cityMatch = textAfterProvince.match(/([\u4e00-\u9fa5]{2,6}?(?:市|州|地区|盟|特别行政区))/);
   return cityMatch?.[1] || "";
 }
 
