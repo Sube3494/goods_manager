@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search, Plus, Store, X, ArrowUp, Trash2 } from "lucide-react";
@@ -25,6 +26,7 @@ interface ShopProductsResponse {
 }
 
 export default function ShopGoodsPage() {
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [shops, setShops] = useState<Shop[]>([]);
   const [needsAddress, setNeedsAddress] = useState(false);
@@ -56,9 +58,12 @@ export default function ShopGoodsPage() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const editScrollTopRef = useRef<number | null>(null);
+  const autoOpenedEditKeyRef = useRef("");
   const isFetchingRef = useRef(false);
   const requestVersionRef = useRef(0);
   const hasMoreRef = useRef(true);
+  const requestedShopId = String(searchParams.get("shopId") || "").trim();
+  const requestedEditItemId = String(searchParams.get("editItemId") || "").trim();
 
   const selectedShop = useMemo(
     () => shops.find((shop) => shop.id === selectedShopId) || null,
@@ -122,6 +127,9 @@ export default function ShopGoodsPage() {
         const nextShops: Shop[] = Array.isArray(data?.shops) ? data.shops : [];
         setShops(nextShops);
         setSelectedShopId((current) => {
+          if (requestedShopId && nextShops.some((shop) => shop.id === requestedShopId)) {
+            return requestedShopId;
+          }
           if (current && nextShops.some((shop) => shop.id === current)) return current;
           return nextShops[0]?.id || "";
         });
@@ -468,6 +476,27 @@ export default function ShopGoodsPage() {
     });
     setIsEditOpen(true);
   }, []);
+
+  useEffect(() => {
+    if (!requestedShopId || !requestedEditItemId) {
+      return;
+    }
+    if (selectedShopId !== requestedShopId || isEditOpen || items.length === 0) {
+      return;
+    }
+
+    const target = items.find((item) => item.id === requestedEditItemId);
+    if (!target) {
+      return;
+    }
+
+    const currentKey = `${requestedShopId}:${requestedEditItemId}`;
+    if (autoOpenedEditKeyRef.current === currentKey) {
+      return;
+    }
+    autoOpenedEditKeyRef.current = currentKey;
+    openEditModal(target);
+  }, [isEditOpen, items, openEditModal, requestedEditItemId, requestedShopId, selectedShopId]);
 
   const restoreEditScrollPosition = useCallback(() => {
     const scrollTop = editScrollTopRef.current;

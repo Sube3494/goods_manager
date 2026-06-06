@@ -561,7 +561,7 @@ export async function GET(request: NextRequest) {
       const orderNo = extractOrderNoFromNote(outbound.note);
       if (!orderNo) return;
       const outboundCost = outbound.items.reduce((sum, item) => {
-        const unitCost = Number(item.shopProduct?.costPrice) || Number(item.product?.costPrice) || 0;
+        const unitCost = Number(item.shopProduct?.costPrice) || 0;
         return FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
       }, 0);
       outboundCostByOrderNo.set(

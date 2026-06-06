@@ -216,6 +216,12 @@ export interface AutoPickOrder {
   autoOutboundResolvedAt?: string | null;
   hasOutbound?: boolean;
   outboundOrderId?: string | null;
+  serviceFeeRate?: number | null;
+  productCost?: number | null;
+  pureProfit?: number | null;
+  productCostStatus?: "ready" | "pending-outbound" | "pending-backfill";
+  missingCostItemCount?: number | null;
+  firstMissingCostShopProductId?: string | null;
   lastSyncedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;

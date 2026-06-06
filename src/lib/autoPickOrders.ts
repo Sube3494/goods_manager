@@ -1285,7 +1285,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   }
 
   const isJD = order.platform === "京东" || order.channelTag === "daojia" || String(detailData.channel_tag || "").trim().toLowerCase() === "daojia";
-  const detailShopId = String(isJD ? (detailData.merchant_id || detailData.shop_id || "") : (detailData.shop_id || detailData.merchant_id || "")).trim();
+  const detailShopId = String(isJD ? (detailData.shop_id || "") : (detailData.shop_id || detailData.merchant_id || "")).trim();
   if (detailShopId) {
     order.shopId = detailShopId;
   }
@@ -2098,7 +2098,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
   const isJD = platform === "京东" || channelTag === "daojia" || String(input.source_tag || "").trim().toLowerCase() === "daojia" || String(input.goods_channel_tag || "").trim().toLowerCase() === "daojia";
 
   const shopIdValue = isJD
-    ? (input.merchant_id || input.merchantId || input.shop_id || input.shopId)
+    ? (input.shop_id || input.shopId)
     : (
         input.shop_id
         || input.shopId
@@ -4091,10 +4091,7 @@ async function resolveAutoInboundCompensationCostPrice(
       },
     });
 
-    return FinanceMath.add(
-      Number(shopProduct?.costPrice) || Number(shopProduct?.product?.costPrice) || 0,
-      0
-    );
+    return FinanceMath.add(Number(shopProduct?.costPrice) || 0, 0);
   }
 
   if (item.productId) {

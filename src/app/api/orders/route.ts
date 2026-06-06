@@ -748,7 +748,10 @@ export async function GET(request: NextRequest) {
           }),
       prisma.user.findUnique({
         where: { id: session.id },
-        select: { permissions: true },
+        select: {
+          permissions: true,
+          shippingAddresses: true,
+        },
       }),
       !includeMetrics
         ? Promise.resolve(0)
@@ -805,6 +808,22 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             note: true,
+            items: {
+              select: {
+                shopProductId: true,
+                quantity: true,
+                shopProduct: {
+                  select: {
+                    costPrice: true,
+                  },
+                },
+                product: {
+                  select: {
+                    costPrice: true,
+                  },
+                },
+              },
+            },
           },
           orderBy: {
             createdAt: "desc",
@@ -813,13 +832,37 @@ export async function GET(request: NextRequest) {
       : [];
     perf.lap("outbound-lookup");
 
-    const outboundByOrderNo = new Map<string, { id: string }>();
+    const userAddresses = userProfile && Array.isArray(userProfile.shippingAddresses)
+      ? userProfile.shippingAddresses as Array<Record<string, unknown>>
+      : [];
+    const shopRateMap = new Map<string, number>();
+    userAddresses.forEach((addr) => {
+      const label = String(addr.label || "").trim();
+      if (label && typeof addr.serviceFeeRate === "number") {
+        shopRateMap.set(label, addr.serviceFeeRate);
+      }
+    });
+
+    const outboundByOrderNo = new Map<string, { id: string; productCost: number; missingCostItemCount: number; firstMissingCostShopProductId: string | null }>();
     for (const outbound of outboundRows) {
       const note = String(outbound.note || "");
       const match = note.match(/平台单号:\s*([^\s|]+)/);
       const orderNo = String(match?.[1] || "").trim();
       if (orderNo && !outboundByOrderNo.has(orderNo)) {
-        outboundByOrderNo.set(orderNo, { id: outbound.id });
+        let missingCostItemCount = 0;
+        let firstMissingCostShopProductId: string | null = null;
+        const productCost = outbound.items.reduce((sum, item) => {
+          const unitCost = Number(item.shopProduct?.costPrice) || 0;
+          const quantity = Math.max(0, Number(item.quantity || 0));
+          if (unitCost <= 0) {
+            missingCostItemCount += 1;
+            if (!firstMissingCostShopProductId) {
+              firstMissingCostShopProductId = String(item.shopProductId || "").trim() || null;
+            }
+          }
+          return sum + Math.round(unitCost * 100) * quantity;
+        }, 0);
+        outboundByOrderNo.set(orderNo, { id: outbound.id, productCost, missingCostItemCount, firstMissingCostShopProductId });
       }
     }
 
@@ -931,8 +974,6 @@ export async function GET(request: NextRequest) {
         autoCompleteJobStatus: order.autoCompleteJob?.status || null,
         autoCompleteJobError: order.autoCompleteJob?.lastError || null,
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
-        hasOutbound: outboundByOrderNo.has(order.orderNo),
-        outboundOrderId: outboundByOrderNo.get(order.orderNo)?.id || null,
       };
     }).map((order) => {
       const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
@@ -945,6 +986,22 @@ export async function GET(request: NextRequest) {
       const matchedShopId = lockedResolvedShop?.id || null;
       const matchedShopName = String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName;
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
+      const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
+      const serviceFeeRate = order.platform === "线下交易"
+        ? 0
+        : (shopRateMap.get(matchedShopName) ?? 0.06);
+      const productCost = outboundMeta?.productCost || 0;
+      const deliveryFee = readDeliveryFee(order.delivery);
+      const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
+      const hasOutbound = Boolean(outboundMeta);
+      const productCostStatus = !hasOutbound
+        ? "pending-outbound" as const
+        : missingCostItemCount > 0
+          ? "pending-backfill" as const
+          : "ready" as const;
+      const pureProfit = productCostStatus === "ready"
+        ? Math.round(Number(order.expectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+        : null;
 
       return {
         ...order,
@@ -954,6 +1011,14 @@ export async function GET(request: NextRequest) {
         autoOutboundError: autoOutboundMeta.error,
         autoOutboundAttemptedAt: autoOutboundMeta.attemptedAt,
         autoOutboundResolvedAt: autoOutboundMeta.resolvedAt,
+        hasOutbound,
+        outboundOrderId: outboundMeta?.id || null,
+        serviceFeeRate,
+        productCost: productCostStatus === "ready" ? productCost : null,
+        pureProfit,
+        productCostStatus,
+        missingCostItemCount,
+        firstMissingCostShopProductId: outboundMeta?.firstMissingCostShopProductId || null,
         items: order.items.map((item) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
           const skuSegments = splitCompositeSkuSegments(item.productNo);

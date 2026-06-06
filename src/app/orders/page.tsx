@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   ArrowUp,
@@ -164,6 +165,11 @@ const ALL_ORDERS_BATCH_SIZE = 50;
 function toCurrency(value: number | null | undefined) {
   const amount = Number(value || 0) / 100;
   return `¥${amount.toFixed(2)}`;
+}
+
+function formatPercent(value: number | null | undefined) {
+  const rate = Number(value || 0);
+  return `${(rate * 100).toFixed(1)}%`;
 }
 
 function getCommissionDisplay(value: number | null | undefined) {
@@ -553,6 +559,17 @@ function getFilterDateValue(value: string | null | undefined) {
   return match?.[0] || "";
 }
 
+function getProductCostStatusText(order: Pick<AutoPickOrder, "productCostStatus" | "missingCostItemCount">) {
+  if (order.productCostStatus === "pending-backfill") {
+    const count = Math.max(0, Number(order.missingCostItemCount || 0));
+    return count > 0 ? `待回填（${count}项缺成本）` : "待回填";
+  }
+  if (order.productCostStatus === "pending-outbound") {
+    return "待出库";
+  }
+  return "";
+}
+
 function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange">) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
@@ -767,8 +784,8 @@ function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "statu
   const display = getDisplayStatus(order);
   const tone = getStatusTone(display);
   return (
-    <span className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black", tone.badge)}>
-      <span className={cn("h-2 w-2 rounded-full", tone.dot)} />
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs", tone.badge)}>
+      <span className={cn("h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2", tone.dot)} />
       {display}
     </span>
   );
@@ -889,6 +906,7 @@ function OrderCard({
   actingId,
   onToggleExpanded,
   onRunAction,
+  onOpenCostBackfill,
   onOpenMatchEditor,
   onClearManualMatch,
 }: {
@@ -897,9 +915,12 @@ function OrderCard({
   actingId: string;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
+  onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onClearManualMatch: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
 }) {
+  const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
+  const profitTooltipRef = useRef<HTMLDivElement | null>(null);
   const itemCount = getItemCount(order.items);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
@@ -914,6 +935,28 @@ function OrderCard({
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
+  const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
+  const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
+  const productCostStatusText = getProductCostStatusText(order);
+  const serviceFeeRate = Number(order.serviceFeeRate || 0);
+  const deliveryFee = getDeliveryFee(order.delivery);
+  const productCost = Number(order.productCost || 0);
+  const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
+  const pureProfitTooltipRows = hasPureProfit
+    ? [
+        { label: "预计到手", value: toCurrency(expectedIncome) },
+        { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
+        { label: "减配送费", value: toCurrency(deliveryFee) },
+        { label: "减货品成本", value: toCurrency(productCost) },
+      ]
+    : productCostStatusText
+      ? [
+          { label: "预计到手", value: toCurrency(expectedIncome) },
+          { label: "抽出率", value: formatPercent(serviceFeeRate) },
+          { label: "配送费", value: toCurrency(deliveryFee) },
+          { label: "货品成本", value: productCostStatusText },
+        ]
+      : [];
   const sourceLabel = getOrderSourceLabel(order);
   const deadlineDisplay = getDeadlineDisplay(order);
   const autoCompleteFailed = hasAutoCompleteFailure(order);
@@ -921,16 +964,30 @@ function OrderCard({
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
   const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
+
+  useEffect(() => {
+    if (!isProfitTooltipOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!profitTooltipRef.current?.contains(event.target as Node)) {
+        setIsProfitTooltipOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isProfitTooltipOpen]);
+
   return (
-    <article className="overflow-hidden rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/4 sm:rounded-[30px]">
+    <article className="overflow-visible rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/4 sm:rounded-[30px]">
       <div className="border-b border-black/6 px-3.5 py-3.5 dark:border-white/6 sm:px-5 sm:py-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-2.5 sm:gap-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black/8 bg-black/3 pl-2 pr-2.5 text-foreground dark:border-white/10 dark:bg-white/4">
-                    <span className="inline-flex h-5 w-5 items-center justify-center">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="inline-flex h-7 items-center gap-1 rounded-full border border-black/8 bg-black/3 pl-1.5 pr-2 text-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:gap-1.5 sm:pl-2 sm:pr-2.5">
+                    <span className="inline-flex h-5 w-5 items-center justify-center sm:h-5 sm:w-5">
                       <Image
                         src={platformMeta.iconSrc}
                         alt={platformMeta.iconAlt}
@@ -940,35 +997,140 @@ function OrderCard({
                         unoptimized
                       />
                     </span>
-                    <span className="pr-0.5 text-[15px] font-semibold leading-none tracking-tight">#{order.dailyPlatformSequence || 0}</span>
+                    <span className="pr-0.5 text-[14px] font-semibold leading-none tracking-tight sm:text-[15px]">#{order.dailyPlatformSequence || 0}</span>
                   </span>
                   {sourceLabel ? (
-                    <span className="inline-flex h-8 min-w-0 max-w-[calc(100vw-11rem)] items-center rounded-full border border-black/8 bg-black/3 px-2.5 text-[13px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:max-w-55">
+                    <span className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-2 text-[12px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]">
                       <span className="truncate">{sourceLabel}</span>
                     </span>
                   ) : null}
                   {orderTypeLabel ? (
-                    <span className="inline-flex h-8 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2.5 text-[13px] font-medium leading-none text-violet-700 dark:text-violet-400">
+                    <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2 text-[12px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       {orderTypeLabel}
                     </span>
                   ) : null}
                   {pickup && order.platform !== "线下交易" ? (
-                    <span className="inline-flex h-8 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2.5 text-[13px] font-medium leading-none text-sky-700 dark:text-sky-400">
+                    <span className="inline-flex h-7 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2 text-[12px] font-medium leading-none text-sky-700 dark:text-sky-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       到店自取
                     </span>
                   ) : null}
                   {showBrushMarker ? (
-                    <span className="inline-flex h-8 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 text-[13px] font-medium leading-none text-rose-700 dark:text-rose-400">
+                    <span className="inline-flex h-7 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[12px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       刷单
                     </span>
                   ) : null}
                   {autoOutboundFailed ? (
-                    <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 text-[13px] font-medium leading-none text-rose-700 dark:text-rose-400">
-                      <TriangleAlert size={13} />
+                    <span className="inline-flex h-7 items-center gap-1 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[12px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
+                      <TriangleAlert size={12} />
                       出库待处理
                     </span>
                   ) : null}
                   <StatusBadge order={order} />
+                  {completed && (hasPureProfit || order.productCostStatus === "pending-backfill") ? (
+                    <div ref={profitTooltipRef} className="group/profit relative">
+                      {hasPureProfit ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsProfitTooltipOpen((current) => !current)}
+                          aria-expanded={isProfitTooltipOpen}
+                          className={cn(
+                            "inline-flex h-7 min-w-0 items-center gap-1 rounded-full border px-2 text-[12px] font-medium leading-none transition-all hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
+                            pureProfit >= 0
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/14 dark:text-emerald-300"
+                              : "border-rose-500/20 bg-rose-500/10 text-rose-700 hover:border-rose-500/35 hover:bg-rose-500/14 dark:text-rose-300"
+                          )}
+                        >
+                          <span className="shrink-0">纯利润</span>
+                          <span className="truncate font-semibold">{toCurrency(pureProfit)}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onOpenCostBackfill(order)}
+                          className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[12px] font-medium leading-none text-orange-700 transition-all hover:border-orange-500/35 hover:bg-orange-500/14 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                        >
+                          <span className="shrink-0">成本</span>
+                          <span className="truncate">{productCostStatusText}</span>
+                        </button>
+                      )}
+                      {pureProfitTooltipRows.length > 0 ? (
+                        <>
+                          {isProfitTooltipOpen ? (
+                            <div
+                              className="fixed inset-0 z-40 bg-slate-950/42 backdrop-blur-[2px] sm:hidden"
+                              onClick={() => setIsProfitTooltipOpen(false)}
+                            />
+                          ) : null}
+                          <div className={cn(
+                            "pointer-events-none fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-[48%] overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left opacity-0 shadow-[0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-md transition-all duration-150 dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:pointer-events-none sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-[280px] sm:max-h-none sm:-translate-x-1/2 sm:translate-y-1 sm:overflow-visible sm:opacity-0 sm:group-hover/profit:translate-y-0 sm:group-hover/profit:opacity-100",
+                            isProfitTooltipOpen && "pointer-events-auto -translate-y-1/2 opacity-100 sm:pointer-events-auto sm:translate-y-0 sm:opacity-100"
+                          )}>
+                          <div className="hidden absolute left-12 top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block sm:left-1/2 sm:-translate-x-1/2" />
+                          <button
+                            type="button"
+                            onClick={() => setIsProfitTooltipOpen(false)}
+                            className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition-colors hover:text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-white/55 dark:hover:text-white sm:hidden"
+                            aria-label="关闭利润计算"
+                          >
+                            <X size={14} />
+                          </button>
+                          <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 pb-2 pr-10 dark:border-white/8 sm:items-center sm:pr-0">
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 dark:text-white/45">
+                                利润拆解
+                              </div>
+                              <div className="mt-0.5 text-[13px] font-semibold text-slate-900 dark:text-white">
+                                {hasPureProfit ? "这单的纯利润计算" : "这单的成本状态"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            {pureProfitTooltipRows.map((row, index) => (
+                              <div
+                                key={row.label}
+                                className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2 text-[12px] leading-5 dark:bg-white/5"
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-500 shadow-sm dark:bg-white/10 dark:text-white/55">
+                                    {index + 1}
+                                  </span>
+                                  <span className="truncate text-slate-600 dark:text-white/68">
+                                    {row.label}
+                                  </span>
+                                </div>
+                                <span className="shrink-0 font-semibold text-slate-950 dark:text-white">
+                                  {row.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className={cn(
+                            "mt-3 rounded-xl border px-3 py-2.5",
+                            hasPureProfit
+                              ? (pureProfit >= 0
+                                ? "border-emerald-500/20 bg-emerald-500/8 dark:border-emerald-500/20 dark:bg-emerald-500/10"
+                                : "border-rose-500/20 bg-rose-500/8 dark:border-rose-500/20 dark:bg-rose-500/10")
+                              : "border-orange-500/20 bg-orange-500/8 dark:border-orange-500/20 dark:bg-orange-500/10"
+                          )}>
+                            <div className="flex items-center justify-between gap-4 text-[13px]">
+                              <span className="whitespace-nowrap font-semibold text-slate-900 dark:text-white">
+                                {hasPureProfit ? "最终纯利润" : "当前状态"}
+                              </span>
+                              <span className={cn(
+                                "whitespace-nowrap text-[15px] font-bold",
+                                hasPureProfit
+                                  ? (pureProfit >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300")
+                                  : "text-orange-700 dark:text-orange-300"
+                              )}>
+                                {hasPureProfit ? toCurrency(pureProfit) : productCostStatusText}
+                              </span>
+                            </div>
+                          </div>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="w-full rounded-[18px] border border-black/8 bg-black/2 px-3 py-2.5 dark:border-white/10 dark:bg-white/3 sm:hidden">
@@ -1178,7 +1340,7 @@ function OrderCard({
                 <DetailStat label="订单状态" value={getDisplayStatus(order)} />
                 <DetailStat label="订单类型" value={orderTypeLabel || "普通单"} />
                 <DetailStat label="刷单标记" value={showBrushMarker ? "主系统自配" : "否"} />
-                <DetailStat label="出库状态" value={hasOutbound ? "已出库" : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
+                <DetailStat label="出库状态" value={hasOutbound ? (productCostStatusText ? `已出库 · ${productCostStatusText}` : "已出库") : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
                 <DetailStat label={pickup ? "取货时间" : "最晚送达"} value={deadlineDisplay} />
@@ -1292,6 +1454,8 @@ function OrderCard({
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
                   <DetailStat label="预计到手" value={toCurrency(expectedIncome)} />
+                  <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
+                  <DetailStat label="纯利润" value={hasPureProfit ? toCurrency(pureProfit) : (productCostStatusText || "-")} />
                   <div className="col-span-2">
                     <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
                   </div>
@@ -2090,6 +2254,7 @@ function BrushSyncPickerModal({
 }
 
 export default function OrdersPage() {
+  const router = useRouter();
   const { showToast } = useToast();
   const todayDate = formatLocalDate(new Date());
   const modalRef = useRef<HTMLDivElement | null>(null);
@@ -2322,6 +2487,23 @@ export default function OrdersPage() {
   const patchOrder = useCallback((orderId: string, updater: (order: AutoPickOrder) => AutoPickOrder) => {
     setOrders((current) => current.map((order) => (order.id === orderId ? updater(order) : order)));
   }, []);
+
+  const openCostBackfill = useCallback((order: AutoPickOrder) => {
+    const resolvedShopName = String(order.matchedShopName || "").trim();
+    const shopId = localShops.find((shop) => shop.name === resolvedShopName)?.id || "";
+    if (!shopId) {
+      showToast("当前订单还没有识别到系统店铺，暂时无法直接回填成本", "error");
+      return;
+    }
+
+    const params = new URLSearchParams({ shopId });
+    const editItemId = String(order.firstMissingCostShopProductId || "").trim();
+    if (editItemId) {
+      params.set("editItemId", editItemId);
+    }
+
+    router.push(`/shop-goods?${params.toString()}`);
+  }, [localShops, router, showToast]);
 
   const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem) => {
     const resolvedShopName = order.matchedShopName || "";
@@ -3336,6 +3518,7 @@ export default function OrdersPage() {
                   actingId={actingId}
                   onToggleExpanded={toggleExpanded}
                   onRunAction={runAction}
+                  onOpenCostBackfill={openCostBackfill}
                   onOpenMatchEditor={openMatchEditor}
                   onClearManualMatch={clearManualMatch}
                 />
@@ -3369,6 +3552,7 @@ export default function OrdersPage() {
                       actingId={actingId}
                       onToggleExpanded={toggleExpanded}
                       onRunAction={runAction}
+                      onOpenCostBackfill={openCostBackfill}
                       onOpenMatchEditor={openMatchEditor}
                       onClearManualMatch={clearManualMatch}
                     />
