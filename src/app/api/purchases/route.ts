@@ -14,17 +14,25 @@ async function resolvePurchaseOrderResponse<T extends {
   paymentVouchers?: unknown;
   trackingData?: unknown;
   items: Array<{
+    variantName?: string | null;
+    variantSku?: string | null;
     shopProduct?: {
       productImage?: string | null;
       productName?: string | null;
     } | null;
     shopProductVariant?: {
+      variantName?: string | null;
+      optionSummary?: string | null;
+      sku?: string | null;
       variantImage?: string | null;
     } | null;
     product?: {
       image?: string | null;
     } | null;
     productVariant?: {
+      variantName?: string | null;
+      optionSummary?: string | null;
+      sku?: string | null;
       image?: string | null;
     } | null;
   }>;
