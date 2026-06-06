@@ -50,6 +50,18 @@ async function resolvePurchaseOrderResponse<T extends {
       : purchase.trackingData,
     items: purchase.items.map((item) => ({
       ...item,
+      variantName:
+        item.variantName
+        || item.shopProductVariant?.variantName
+        || item.shopProductVariant?.optionSummary
+        || item.productVariant?.variantName
+        || item.productVariant?.optionSummary
+        || null,
+      variantSku:
+        item.variantSku
+        || item.shopProductVariant?.sku
+        || item.productVariant?.sku
+        || null,
       shopProduct: item.shopProduct
         ? {
             ...item.shopProduct,

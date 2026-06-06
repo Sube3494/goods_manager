@@ -67,6 +67,21 @@ interface SelectedShipmentItem {
   shippingFee?: number;
 }
 
+function getLooseProductVariantLabel(product: Product | null | undefined) {
+  const candidate = product as (Product & { variantName?: string | null; optionSummary?: string | null }) | null | undefined;
+  return String(candidate?.variantName || candidate?.optionSummary || "").trim();
+}
+
+function buildShipmentItemDisplayName(product: Product) {
+  const rawName = String(product.name || "").trim();
+  const parts = rawName.split(" / ").map((part) => part.trim()).filter(Boolean);
+  const variantLabel = getLooseProductVariantLabel(product);
+  if ((parts.length > 1) || !variantLabel) {
+    return rawName;
+  }
+  return [rawName, variantLabel].filter(Boolean).join(" / ");
+}
+
 type CustomerAddressOption = {
   id: string;
   contactName?: string;
@@ -218,6 +233,7 @@ const ShipmentItemRow = memo(({
   onUpdateShippingFee,
   getItemKey,
   showTrackingInput = false,
+  showShippingFee = true,
   onUpdateTrackingNumber,
   onUpdateLogisticsName,
   onCopyItem,
@@ -235,6 +251,7 @@ const ShipmentItemRow = memo(({
   onUpdateShippingFee?: (key: string, val: string) => void;
   getItemKey: (item: SelectedShipmentItem) => string;
   showTrackingInput?: boolean;
+  showShippingFee?: boolean;
   onUpdateTrackingNumber?: (key: string, val: string) => void;
   onUpdateLogisticsName?: (key: string, val: string) => void;
   onCopyItem?: (item: SelectedShipmentItem) => void;
@@ -261,8 +278,12 @@ const ShipmentItemRow = memo(({
   const shippingFee = Number(item.shippingFee) || 0;
   const totalPrice = qty * price + shippingFee;
   const isLogisticsSelected = hasSelectedLogisticsName(item.logisticsName);
-  const valueGridClass = "grid w-full grid-cols-[minmax(0,1fr)_72px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_76px_92px_86px] md:grid-cols-[minmax(180px,1fr)_78px_minmax(120px,0.8fr)_minmax(112px,0.75fr)_108px_24px] md:grid-rows-[auto_36px] md:gap-x-2.5 md:gap-y-1 lg:grid-cols-[minmax(220px,1fr)_88px_156px_136px_112px_28px] lg:gap-x-3";
-  const trackingValueGridClass = "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_76px_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_92px_112px_80px] md:items-end";
+  const valueGridClass = showShippingFee
+    ? "grid w-full grid-cols-[minmax(0,1fr)_72px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_76px_92px_86px] md:grid-cols-[minmax(180px,1fr)_78px_minmax(120px,0.8fr)_minmax(112px,0.75fr)_108px_24px] md:grid-rows-[auto_36px] md:gap-x-2.5 md:gap-y-1 lg:grid-cols-[minmax(220px,1fr)_88px_156px_136px_112px_28px] lg:gap-x-3"
+    : "grid w-full grid-cols-[minmax(0,1fr)_72px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_76px_92px_86px] md:grid-cols-[minmax(180px,1fr)_78px_minmax(120px,0.8fr)_108px_24px] md:grid-rows-[auto_36px] md:gap-x-2.5 md:gap-y-1 lg:grid-cols-[minmax(220px,1fr)_88px_156px_112px_28px] lg:gap-x-3";
+  const trackingValueGridClass = showShippingFee
+    ? "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_76px_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_92px_112px_80px] md:items-end"
+    : "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_112px_80px] md:items-end";
 
   return (
     <div
@@ -368,22 +389,24 @@ const ShipmentItemRow = memo(({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">运费 (￥)</span>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    disabled={disabled}
-                    value={item.shippingFee ?? ""}
-                    onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
-                    className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="0.00"
-                  />
+              {showShippingFee ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">运费 (￥)</span>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={disabled}
+                      value={item.shippingFee ?? ""}
+                      onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
+                      className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="col-span-2 flex flex-col gap-1 min-[430px]:col-span-1">
                 <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">小计</span>
@@ -540,8 +563,13 @@ const ShipmentItemRow = memo(({
               </div>
             </div>
 
-            {/* 下面一行：物流、快递单号、运费、小计 */}
-            <div className="grid w-full grid-cols-[130px_minmax(150px,1.8fr)_minmax(85px,0.9fr)_minmax(105px,1.1fr)] items-center gap-2.5">
+            {/* 下面一行：物流、快递单号、小计 */}
+            <div className={cn(
+              "grid w-full items-center gap-2.5",
+              showShippingFee
+                ? "grid-cols-[130px_minmax(150px,1.8fr)_minmax(85px,0.9fr)_minmax(105px,1.1fr)]"
+                : "grid-cols-[130px_minmax(180px,1.9fr)_minmax(120px,1fr)]"
+            )}>
               {/* 物流公司 */}
               <CustomSelect
                 options={logisticsOptions}
@@ -565,20 +593,21 @@ const ShipmentItemRow = memo(({
                 className="h-9 w-full rounded-xl border border-border bg-white px-3 py-1.5 text-xs text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-[#2b313d] disabled:cursor-not-allowed disabled:opacity-50"
               />
 
-              {/* 运费 */}
-              <div className="relative">
-                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">运费 ￥</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  disabled={disabled}
-                  value={item.shippingFee ?? ""}
-                  onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
-                  className="h-9 w-full rounded-xl border border-border bg-white pl-10 pr-2 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="0.00"
-                />
-              </div>
+              {showShippingFee ? (
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">运费 ￥</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    disabled={disabled}
+                    value={item.shippingFee ?? ""}
+                    onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
+                    className="h-9 w-full rounded-xl border border-border bg-white pl-10 pr-2 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="0.00"
+                  />
+                </div>
+              ) : null}
 
               {/* 小计 */}
               <div className="flex h-9 min-w-0 items-center justify-between rounded-xl border border-border/50 bg-background/70 px-2.5 dark:border-white/8 dark:bg-white/4">
@@ -708,7 +737,9 @@ const ShipmentItemRow = memo(({
             <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">商品</span>
             <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">数量</span>
             <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">单价 (￥)</span>
-            <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">运费 (￥)</span>
+            {showShippingFee ? (
+              <span className="hidden text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">运费 (￥)</span>
+            ) : null}
             <span className="hidden justify-end text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:flex md:items-end">小计</span>
             <div className="hidden md:block" />
 
@@ -766,22 +797,24 @@ const ShipmentItemRow = memo(({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1 md:gap-0">
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">运费 (￥)</span>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  disabled={disabled}
-                  value={item.shippingFee ?? ""}
-                  onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
-                  className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="0.00"
-                />
+            {showShippingFee ? (
+              <div className="flex flex-col gap-1 md:gap-0">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider md:hidden">运费 (￥)</span>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">￥</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    disabled={disabled}
+                    value={item.shippingFee ?? ""}
+                    onChange={(e) => onUpdateShippingFee?.(itemKey, e.target.value)}
+                    className="h-9 w-full rounded-xl border border-border bg-white pl-7 pr-3 py-1 text-right font-mono text-sm font-bold placeholder:font-normal text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 no-spinner dark:border-white/10 dark:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="flex h-9 min-w-0 items-center justify-end rounded-xl border border-border/50 bg-background/70 px-3 text-right dark:border-white/8 dark:bg-white/[0.04]">
               <div className="truncate text-[16px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
@@ -1030,6 +1063,37 @@ function splitShipmentDisplayName(name?: string) {
   };
 }
 
+function resolveShipmentSummaryItemName(item: {
+  variantName?: string | null;
+  shopProduct?: { name?: string | null; productName?: string | null } | null;
+  product?: { name?: string | null } | null;
+  shopProductVariant?: { variantName?: string | null; optionSummary?: string | null } | null;
+  productVariant?: { variantName?: string | null; optionSummary?: string | null } | null;
+}) {
+  const baseName = String(
+    item.shopProduct?.name
+    || item.shopProduct?.productName
+    || item.product?.name
+    || "未知商品"
+  ).trim();
+  const variantLabel = String(
+    item.shopProductVariant?.variantName
+    || item.shopProductVariant?.optionSummary
+    || item.productVariant?.variantName
+    || item.productVariant?.optionSummary
+    || item.variantName
+    || ""
+  ).trim();
+  if (!variantLabel) {
+    return baseName;
+  }
+  const splitName = splitShipmentDisplayName(baseName);
+  if (splitName.variantLabel) {
+    return baseName;
+  }
+  return `${baseName} / ${variantLabel}`;
+}
+
 function getItemKey(item: {
   productId?: string | null;
   productVariantId?: string | null;
@@ -1114,12 +1178,12 @@ function formatShipmentCopyNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
 }
 
-function formatShipmentItemCopyLine(item: SelectedShipmentItem, recipientName?: string) {
+function formatShipmentItemCopyLine(item: SelectedShipmentItem, recipientLabel?: string) {
   const qty = Number(item.quantity) || 0;
   const price = Number(item.price) || 0;
   const shippingFee = Number(item.shippingFee) || 0;
   const totalPrice = qty * price + shippingFee;
-  const title = [recipientName?.trim(), item.name.trim()].filter(Boolean).join("-");
+  const title = [recipientLabel?.trim(), item.name.trim()].filter(Boolean).join("-");
   const trackingNumbers = (item.trackingNumber || "")
     .split(/[，,]/)
     .map((part) => part.trim())
@@ -1143,8 +1207,8 @@ function getShipmentItemCopyTotal(item: SelectedShipmentItem) {
   return qty * price + shippingFee;
 }
 
-function formatShipmentCopyAllText(items: SelectedShipmentItem[], recipientName?: string) {
-  const lines = items.map((item) => formatShipmentItemCopyLine(item, recipientName));
+function formatShipmentCopyAllText(items: SelectedShipmentItem[], recipientLabel?: string) {
+  const lines = items.map((item) => formatShipmentItemCopyLine(item, recipientLabel));
   const totals = items.map(getShipmentItemCopyTotal);
   const totalFormula = totals.map(formatShipmentCopyNumber).join("+");
   const grandTotal = totals.reduce((sum, value) => sum + value, 0);
@@ -1158,8 +1222,35 @@ function formatShipmentCopyAllText(items: SelectedShipmentItem[], recipientName?
   ].join("\n");
 }
 
-function formatShipmentCopySingleText(item: SelectedShipmentItem, recipientName?: string) {
-  return [format(new Date(), "M.d"), formatShipmentItemCopyLine(item, recipientName)].join("\n");
+function formatShipmentCopySingleText(item: SelectedShipmentItem, recipientLabel?: string) {
+  return [format(new Date(), "M.d"), formatShipmentItemCopyLine(item, recipientLabel)].join("\n");
+}
+
+function getShipmentInfoSpecLabel(item: SelectedShipmentItem) {
+  const rawName = item.name.trim();
+  if (!rawName) return "";
+  const segments = rawName.split("/").map((segment) => segment.trim()).filter(Boolean);
+  return segments.length > 1 ? segments[segments.length - 1] : segments[0];
+}
+
+function formatShipmentInfoItemLine(item: SelectedShipmentItem, index: number) {
+  const qty = Math.max(0, Number(item.quantity) || 0);
+  const itemName = getShipmentInfoSpecLabel(item) || item.sku?.trim() || `货品${index + 1}`;
+  return `${itemName}×${formatShipmentCopyNumber(qty)}`;
+}
+
+function formatShipmentInfoText(
+  recipientLine: string,
+  recipient: { recipientName: string; recipientPhone: string; recipientAddress: string },
+  items: SelectedShipmentItem[]
+) {
+  const lines = items.map((item, index) => formatShipmentInfoItemLine(item, index));
+  const normalizedRecipientLine = recipientLine.trim() || [recipient.recipientName.trim(), recipient.recipientPhone.trim(), recipient.recipientAddress.trim()].filter(Boolean).join(" ");
+  return [
+    normalizedRecipientLine,
+    "",
+    `货品：${lines.join("\n")}`,
+  ].join("\n");
 }
 
 function formatFactoryShipmentError(message: string, items: SelectedShipmentItem[]) {
@@ -1475,21 +1566,24 @@ function FactoryShipmentDetailModal({
     });
     setEditItems(
       order.items.map((item) => {
-        const trackingEntry = parsed.trackingEntries.find(
-          (entry: FactoryShipmentTrackingEntry) =>
-            entry.itemKey ===
-            (item.shopProductId || item.shopProduct?.id || item.productId || item.shopProduct?.productId || item.product?.id || "")
-        );
-        return {
+        const normalizedItemIds = {
           productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
           productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
           shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
           shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
+        };
+        const trackingEntry = parsed.trackingEntries.find(
+          (entry: FactoryShipmentTrackingEntry) => entry.itemKey === getItemKey(normalizedItemIds)
+        );
+        return {
+          ...normalizedItemIds,
           name: item.shopProductVariant?.variantName
             ? `${item.shopProduct?.name || item.product?.name || "未知商品"} / ${item.shopProductVariant.variantName}`
             : item.productVariant?.variantName
               ? `${item.product?.name || "未知商品"} / ${item.productVariant.variantName}`
-              : item.shopProduct?.name || item.product?.name || "未知商品",
+              : item.variantName
+                ? `${item.shopProduct?.name || item.product?.name || "未知商品"} / ${item.variantName}`
+                : item.shopProduct?.name || item.product?.name || "未知商品",
           sku: item.shopProductVariant?.sku || item.productVariant?.sku || item.shopProduct?.sku || item.product?.sku || "",
           quantity: item.quantity,
           image: item.shopProductVariant?.image || item.productVariant?.image || item.shopProduct?.image || item.product?.image || "",
@@ -1628,7 +1722,7 @@ function FactoryShipmentDetailModal({
           productVariantId: product.productVariantId || null,
           shopProductId: product.shopProductId || undefined,
           shopProductVariantId: product.shopProductVariantId || null,
-          name: product.name,
+          name: buildShipmentItemDisplayName(product),
           sku: product.sku || "",
           image: product.image || "",
           stock: Number(product.stock || 0),
@@ -1685,11 +1779,26 @@ function FactoryShipmentDetailModal({
   if (!mounted) return null;
   const parsed = order ? parseFactoryShipmentNote(order.note) : null;
   const selectedProductIds = editItems.map((item) => String(getItemKey(item))).filter(Boolean);
-  const copyRecipientName = parseQuickAddressInput(editForm.recipientLine).recipientName || editForm.recipientName;
+  const parsedCopyRecipient = parseQuickAddressInput(editForm.recipientLine);
+  const copyRecipientLabel = formatRecipientWithRegion(
+    parsedCopyRecipient.recipientName || editForm.recipientName,
+    parsedCopyRecipient.recipientAddress || editForm.recipientAddress
+  );
 
   const copyEditItem = async (item: SelectedShipmentItem) => {
-    const success = await copyToClipboard(formatShipmentCopySingleText(item, copyRecipientName));
-    showToast(success ? "已复制货品文本" : "复制失败", success ? "success" : "error");
+    const parsedRecipient = parseQuickAddressInput(editForm.recipientLine);
+    const recipient = {
+      recipientName: (parsedRecipient.recipientName.trim() || editForm.recipientName.trim()),
+      recipientPhone: (parsedRecipient.recipientPhone.trim() || editForm.recipientPhone.trim()),
+      recipientAddress: (parsedRecipient.recipientAddress.trim() || editForm.recipientAddress.trim()),
+    };
+    if (!recipient.recipientName || !recipient.recipientPhone || !recipient.recipientAddress) {
+      showToast("请先填写完整收件信息后再复制", "error");
+      return;
+    }
+    const text = formatShipmentInfoText(editForm.recipientLine, recipient, [item]);
+    const success = await copyToClipboard(text);
+    showToast(success ? "已复制单个发货信息" : "复制失败", success ? "success" : "error");
   };
 
   const copyAllEditItems = async () => {
@@ -1698,7 +1807,7 @@ function FactoryShipmentDetailModal({
       return;
     }
 
-    const text = formatShipmentCopyAllText(editItems, copyRecipientName);
+    const text = formatShipmentCopyAllText(editItems, copyRecipientLabel);
     const success = await copyToClipboard(text);
     showToast(success ? `已复制 ${editItems.length} 项货品文本` : "复制失败", success ? "success" : "error");
   };
@@ -2198,9 +2307,11 @@ function FactoryShipmentDetailModal({
                 )}
 
                 <div className="rounded-[20px] border border-border/50 bg-linear-to-br from-zinc-50 to-white p-4 shadow-sm dark:border-white/10 dark:from-white/6 dark:to-white/3">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h4 className="text-base font-black tracking-tight text-foreground">货品明细</h4>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h4 className="text-base font-black tracking-tight text-foreground">货品明细</h4>
+                      </div>
                       <p className="mt-1 text-xs font-medium text-muted-foreground">当前发货单包含的商品项目</p>
                     </div>
                     <span className="text-xs font-bold text-muted-foreground">共 {editItems.length} 项</span>
@@ -2417,7 +2528,7 @@ function FactoryShipmentCreateModal({
           productVariantId: product.productVariantId || null,
           shopProductId: product.shopProductId || undefined,
           shopProductVariantId: product.shopProductVariantId || null,
-          name: product.name,
+          name: buildShipmentItemDisplayName(product),
           sku: product.sku || "",
           image: product.image || "",
           stock: Number(product.stock || 0),
@@ -2760,6 +2871,7 @@ function FactoryShipmentCreateModal({
                         onUpdatePrice={updatePrice}
                         onUpdateShippingFee={updateShippingFee}
                         getItemKey={getItemKey}
+                        showShippingFee={false}
                         disabled={false}
                         logisticsOptions={logisticsOptions}
                         onAddNewLogistics={onAddNewLogistics}
@@ -3555,7 +3667,7 @@ export default function FactoryShipmentsPage() {
                                   );
                                   return {
                                     id: cItem.itemKey,
-                                    name: matched?.shopProduct?.name || matched?.product?.name || "未知商品",
+                                    name: resolveShipmentSummaryItemName(matched || {}),
                                     image: matched?.shopProduct?.image || matched?.product?.image || "",
                                     quantity: cItem.quantity,
                                     isShipped: parsed.compensationStatus === "已补偿",
@@ -3563,7 +3675,7 @@ export default function FactoryShipmentsPage() {
                                 })
                               : order.items.map((item) => ({
                                   id: item.id,
-                                  name: item.shopProduct?.name || item.product?.name || "未知商品",
+                                  name: resolveShipmentSummaryItemName(item),
                                   image: item.shopProduct?.image || item.product?.image || "",
                                   quantity: item.quantity,
                                   isShipped: isShipmentItemMarkedShipped(item, parsed, derivedStatus),
@@ -3757,7 +3869,7 @@ export default function FactoryShipmentsPage() {
                             );
                             return {
                               id: cItem.itemKey,
-                              name: matched?.shopProduct?.name || matched?.product?.name || "未知商品",
+                              name: resolveShipmentSummaryItemName(matched || {}),
                               image: matched?.shopProduct?.image || matched?.product?.image || "",
                               quantity: cItem.quantity,
                               isShipped: parsed.compensationStatus === "已补偿",
@@ -3765,7 +3877,7 @@ export default function FactoryShipmentsPage() {
                           })
                         : order.items.map((item) => ({
                             id: item.id,
-                            name: item.shopProduct?.name || item.product?.name || "未知商品",
+                            name: resolveShipmentSummaryItemName(item),
                             image: item.shopProduct?.image || item.product?.image || "",
                             quantity: item.quantity,
                             isShipped: isShipmentItemMarkedShipped(item, parsed, derivedStatus),

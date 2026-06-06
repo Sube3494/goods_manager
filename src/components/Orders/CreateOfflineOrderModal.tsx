@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Trash2, Loader2, Calendar, DollarSign, MapPin, FileText, Store, ShoppingBag } from "lucide-react";
+import { X, Plus, Trash2, Loader2, MapPin, FileText, Store, ShoppingBag } from "lucide-react";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";

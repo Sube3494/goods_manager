@@ -15,6 +15,105 @@ import { cn } from "@/lib/utils";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 
+type PurchaseOrderItemWithClientKey = PurchaseOrderItem & {
+  clientRowKey?: string;
+};
+
+function createPurchaseItemClientKey() {
+  return `purchase-item-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getPurchaseItemIdentity(item: PurchaseOrderItem) {
+  return item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "";
+}
+
+function getPurchaseItemRowKey(item: PurchaseOrderItemWithClientKey) {
+  return item.id || item.clientRowKey || getPurchaseItemIdentity(item);
+}
+
+function ensurePurchaseItemRowKey<T extends PurchaseOrderItem>(item: T): T & { clientRowKey?: string } {
+  if (item.id || (item as PurchaseOrderItemWithClientKey).clientRowKey) {
+    return item as T & { clientRowKey?: string };
+  }
+  return {
+    ...item,
+    clientRowKey: createPurchaseItemClientKey(),
+  };
+}
+
+function splitPurchaseItemDisplayName(value: string | null | undefined) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return { baseName: "", variantName: "" };
+  }
+  const segments = normalized.split("/").map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length <= 1) {
+    return { baseName: normalized, variantName: "" };
+  }
+  return {
+    baseName: segments.slice(0, -1).join(" / "),
+    variantName: segments[segments.length - 1],
+  };
+}
+
+function getLooseProductVariantLabel(product: Product | null | undefined) {
+  const candidate = product as (Product & { variantName?: string | null; optionSummary?: string | null }) | null | undefined;
+  return String(candidate?.variantName || candidate?.optionSummary || "").trim();
+}
+
+function buildPurchaseItemDisplayName(product: Product) {
+  const rawName = String(product.name || "").trim();
+  const splitName = splitPurchaseItemDisplayName(rawName);
+  const variantLabel = getLooseProductVariantLabel(product);
+  if (splitName.variantName || !variantLabel) {
+    return rawName;
+  }
+  return [splitName.baseName || rawName, variantLabel].filter(Boolean).join(" / ");
+}
+
+function resolvePurchaseVariantLabel(
+  item: PurchaseOrderItem,
+  runtimeProduct?: Product | null,
+  fallbackProduct?: Product | null
+) {
+  const directVariant =
+    String(
+      item.variantName
+      || item.shopProductVariant?.variantName
+      || item.productVariant?.variantName
+      || item.productVariant?.optionSummary
+      || item.shopProductVariant?.optionSummary
+      || ""
+    ).trim();
+  if (directVariant) {
+    return directVariant;
+  }
+
+  const runtimeVariant = getLooseProductVariantLabel(runtimeProduct);
+  if (runtimeVariant) {
+    return runtimeVariant;
+  }
+
+  const fallbackVariant = getLooseProductVariantLabel(fallbackProduct);
+  if (fallbackVariant) {
+    return fallbackVariant;
+  }
+
+  const nameCandidates = [
+    item.product?.name,
+    runtimeProduct?.name,
+    fallbackProduct?.name,
+  ];
+  for (const candidate of nameCandidates) {
+    const splitName = splitPurchaseItemDisplayName(candidate);
+    if (splitName.variantName) {
+      return splitName.variantName;
+    }
+  }
+
+  return "";
+}
+
 interface PurchaseOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -37,24 +136,29 @@ const PurchaseItemRow = memo(({
     onToggle,
     onManageShelfLife
 }: { 
-    item: PurchaseOrderItem; 
+    item: PurchaseOrderItemWithClientKey; 
     readOnly: boolean; 
     products: Product[]; 
     suppliers: Supplier[];
-    onUpdate: (productId: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => void;
-    onRemove: (productId: string) => void;
+    onUpdate: (rowKey: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => void;
+    onRemove: (rowKey: string) => void;
     isChecked?: boolean;
-    onToggle?: (productId: string) => void;
+    onToggle?: (rowKey: string) => void;
     onManageShelfLife?: (item: PurchaseOrderItem) => void;
 }) => {
-    const itemKey = item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "";
+    const itemKey = getPurchaseItemIdentity(item);
+    const rowKey = getPurchaseItemRowKey(item);
     const productData = useMemo(() => {
         const p = products.find(g =>
             (g.shopProductVariantId || g.productVariantId || g.shopProductId || g.id) === itemKey
         );
+        const runtimeProduct = item.product as (Product & { variantName?: string | null; optionSummary?: string | null }) | undefined;
         const supplierId = item.shopProduct?.supplierId || item.supplierId;
-        const baseName = item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || p?.name || "加载中...";
-        const variantLabel = item.variantName || item.shopProductVariant?.variantName || item.productVariant?.variantName || "";
+        const runtimeDisplayName = runtimeProduct ? buildPurchaseItemDisplayName(runtimeProduct) : "";
+        const rawDisplayName = item.shopProduct?.productName || item.shopProduct?.name || runtimeDisplayName || item.product?.name || p?.name || "加载中...";
+        const splitName = splitPurchaseItemDisplayName(rawDisplayName);
+        const baseName = splitName.baseName || rawDisplayName;
+        const variantLabel = resolvePurchaseVariantLabel(item, runtimeProduct, p) || splitName.variantName || "";
         return {
             imageUrl: item.shopProduct?.image || item.image || item.product?.image || p?.image,
             productName: [baseName, variantLabel].filter(Boolean).join(" / "),
@@ -70,12 +174,12 @@ const PurchaseItemRow = memo(({
     const handleDeleteClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirmingDelete) {
-            onRemove(itemKey);
+            onRemove(rowKey);
         } else {
             setConfirmingDelete(true);
             setTimeout(() => setConfirmingDelete(false), 2500);
         }
-    }, [confirmingDelete, itemKey, onRemove]);
+    }, [confirmingDelete, onRemove, rowKey]);
 
     return (
         <div 
@@ -88,7 +192,7 @@ const PurchaseItemRow = memo(({
                     : 'bg-white dark:bg-white/10 border-border dark:border-white/5',
                 readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_80px_120px_120px_40px]'
             )}
-            onClick={isBatchMode ? () => onToggle(itemKey) : undefined}
+            onClick={isBatchMode ? () => onToggle(rowKey) : undefined}
         >
             {/* Product Info Column */}
             <div className="flex w-full items-center gap-3">
@@ -201,7 +305,7 @@ const PurchaseItemRow = memo(({
                             type="number" 
                             min="1"
                             value={item.quantity || ""}
-                            onChange={(e) => onUpdate(itemKey, "quantity", e.target.value)}
+                            onChange={(e) => onUpdate(rowKey, "quantity", e.target.value)}
                             className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                         />
                     )}
@@ -222,7 +326,7 @@ const PurchaseItemRow = memo(({
                                 type="number" 
                                 step="0.01"
                                 value={item.costPrice || ""}
-                                onChange={(e) => onUpdate(itemKey, "costPrice", e.target.value)}
+                                onChange={(e) => onUpdate(rowKey, "costPrice", e.target.value)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                             />
                         </div>
@@ -245,7 +349,7 @@ const PurchaseItemRow = memo(({
                                 step="0.01"
                                 min="0"
                                 value={item.quantity && item.costPrice ? Number((item.quantity * item.costPrice).toFixed(2)) : ""}
-                                onChange={(e) => onUpdate(itemKey, "lineTotal", e.target.value)}
+                                onChange={(e) => onUpdate(rowKey, "lineTotal", e.target.value)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs text-right no-spinner"
                             />
                         </div>
@@ -456,18 +560,19 @@ export function PurchaseOrderModal({
     const nextQuery: Record<string, string> = { all: "true" };
     return nextQuery;
   }, []);
-  const getPurchaseItemKey = useCallback((item: PurchaseOrderItem) => item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "", []);
+  const getPurchaseProductKey = useCallback((item: PurchaseOrderItem) => getPurchaseItemIdentity(item), []);
+  const getPurchaseRowKey = useCallback((item: PurchaseOrderItemWithClientKey) => getPurchaseItemRowKey(item), []);
 
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return formData.items;
     const query = searchQuery.toLowerCase();
     return formData.items.filter(item => {
-        const product = item.product || products.find(p => p.id === getPurchaseItemKey(item));
+        const product = item.product || products.find(p => p.id === getPurchaseProductKey(item));
         const nameMatch = product?.name.toLowerCase().includes(query);
         const skuMatch = product?.sku?.toLowerCase().includes(query);
         return nameMatch || skuMatch;
     });
-  }, [formData.items, searchQuery, products, getPurchaseItemKey]);
+  }, [formData.items, searchQuery, products, getPurchaseProductKey]);
   const [, setIsUploadingVoucher] = useState(false);
   const [galleryState, setGalleryState] = useState<{
     isOpen: boolean;
@@ -501,8 +606,8 @@ export function PurchaseOrderModal({
   }, [confirmingDeleteIndex]);
 
   const selectedProductIds = useMemo(() => {
-    return formData.items.map(item => getPurchaseItemKey(item)).filter(Boolean);
-  }, [formData.items, getPurchaseItemKey]);
+    return formData.items.map(item => getPurchaseProductKey(item)).filter(Boolean);
+  }, [formData.items, getPurchaseProductKey]);
 
 
   // Robust scroll lock logic: standard overflow hidden on both body and html to prevent leakage
@@ -563,7 +668,7 @@ export function PurchaseOrderModal({
             (item) => item.product?.sku,
             (item) => item.product?.name
         );
-        setFormData({ ...initialData, items: sortedItems });
+        setFormData({ ...initialData, items: sortedItems.map((item) => ensurePurchaseItemRowKey(item)) });
         setShippingFeeInput(initialData.shippingFees?.toString() || "0");
         setExtraFeeInput(initialData.extraFees?.toString() || "0");
         return;
@@ -611,18 +716,25 @@ export function PurchaseOrderModal({
           : (product.productId || product.id);
 
         // Check against the growing newItems list to prevent duplicates within the same batch
-        if (!newItems.some(item => getPurchaseItemKey(item) === itemKey)) {
-          newItems.push({
+        if (!newItems.some(item => getPurchaseProductKey(item) === itemKey)) {
+          const displayName = buildPurchaseItemDisplayName(product);
+          const splitName = splitPurchaseItemDisplayName(displayName);
+          newItems.push(ensurePurchaseItemRowKey({
             productId: resolvedProductId,
             productVariantId: product.productVariantId || null,
             shopProductId: product.shopProductId,
             shopProductVariantId: product.shopProductVariantId || null,
-            product: product, // Store snapshot for stable name display
+            product: {
+              ...product,
+              name: displayName,
+            }, // Store snapshot for stable name display
             image: product.image,
             supplierId: product.supplierId,
+            variantName: splitName.variantName || undefined,
+            variantSku: product.sku || undefined,
             quantity: 1,
             costPrice: product.costPrice
-          });
+          }));
         }
       });
 
@@ -636,17 +748,17 @@ export function PurchaseOrderModal({
     });
   };
 
-  const removeItem = useCallback((itemKey: string) => {
+  const removeItem = useCallback((rowKey: string) => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.filter(item => getPurchaseItemKey(item) !== itemKey)
+      items: prev.items.filter(item => getPurchaseRowKey(item) !== rowKey)
     }));
-  }, [getPurchaseItemKey]);
+  }, [getPurchaseRowKey]);
 
-  const toggleBatchSelect = useCallback((itemKey: string) => {
+  const toggleBatchSelect = useCallback((rowKey: string) => {
     setBatchSelected(prev => {
       const next = new Set(prev);
-      if (next.has(itemKey)) next.delete(itemKey); else next.add(itemKey);
+      if (next.has(rowKey)) next.delete(rowKey); else next.add(rowKey);
       return next;
     });
   }, []);
@@ -654,16 +766,16 @@ export function PurchaseOrderModal({
   const batchDelete = useCallback(() => {
     setFormData(prev => ({
       ...prev,
-      items: prev.items.filter(item => !batchSelected.has(getPurchaseItemKey(item)))
+      items: prev.items.filter(item => !batchSelected.has(getPurchaseRowKey(item)))
     }));
     setBatchSelected(new Set());
     setBatchMode(false);
-  }, [batchSelected, getPurchaseItemKey]);
+  }, [batchSelected, getPurchaseRowKey]);
 
-  const updateItem = useCallback((itemKey: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => {
+  const updateItem = useCallback((rowKey: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => {
     setFormData(prev => {
       const newItems = [...prev.items];
-      const index = newItems.findIndex(item => getPurchaseItemKey(item) === itemKey);
+      const index = newItems.findIndex(item => getPurchaseRowKey(item) === rowKey);
       if (index === -1) return prev;
       
       let processedValue: string | number = value;
@@ -687,7 +799,7 @@ export function PurchaseOrderModal({
       newItems[index] = { ...newItems[index], [field]: processedValue };
       return { ...prev, items: newItems };
     });
-  }, [getPurchaseItemKey]);
+  }, [getPurchaseRowKey]);
 
   const inferStatus = (currentData: PurchaseOrder): PurchaseStatus => {
     if (currentData.status === "Received") return "Received";
@@ -1017,13 +1129,13 @@ export function PurchaseOrderModal({
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const allIds = filteredItems.map(i => getPurchaseItemKey(i)).filter(Boolean);
+                                                        const allIds = filteredItems.map(i => getPurchaseRowKey(i)).filter(Boolean);
                                                         const allSelected = allIds.every(id => batchSelected.has(id));
                                                         setBatchSelected(allSelected ? new Set() : new Set(allIds));
                                                     }}
                                                     className="text-[11px] font-bold text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted/80 transition-all active:scale-95 whitespace-nowrap"
                                                 >
-                                                    {filteredItems.every(i => batchSelected.has(getPurchaseItemKey(i))) ? "取消全选" : "全选"}
+                                                    {filteredItems.every(i => batchSelected.has(getPurchaseRowKey(i))) ? "取消全选" : "全选"}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -1118,14 +1230,14 @@ export function PurchaseOrderModal({
 
                             {filteredItems.map((item) => (
                                 <PurchaseItemRow 
-                                    key={getPurchaseItemKey(item)}
+                                    key={getPurchaseRowKey(item)}
                                     item={item}
                                     readOnly={effectiveReadOnly}
                                     products={products}
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
-                                    isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
+                                    isChecked={batchMode ? batchSelected.has(getPurchaseRowKey(item)) : undefined}
                                     onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
                                     onManageShelfLife={handleOpenShelfLifeModal}
                                 />

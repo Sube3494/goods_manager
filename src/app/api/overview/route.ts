@@ -71,10 +71,14 @@ export async function GET() {
     prisma.outboundOrder.findMany({
       where: {
         userId: user.id,
+        status: { notIn: ["Returned", "已退回"] },
         OR: [
           { note: { contains: "[销售]" } },
           { note: { contains: "[厂家发货]" } },
         ],
+        NOT: {
+          note: { contains: "(已退回:" },
+        },
       },
       orderBy: { date: "desc" },
       select: {

@@ -452,7 +452,7 @@ export default function OverviewPage() {
               <div className="flex flex-col flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
-                    <StatusPill className={item.type === "采购" ? "border-blue-500/20 bg-blue-500/10 text-blue-500" : "border-sky-500/20 bg-sky-500/10 text-sky-500"}>
+                    <StatusPill className={item.type === "采购" ? "border-amber-500/25 bg-amber-500/12 text-amber-400" : "border-cyan-500/25 bg-cyan-500/12 text-cyan-400"}>
                       {item.type}
                     </StatusPill>
                     {item.type === "发货" && item.title ? (
