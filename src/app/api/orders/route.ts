@@ -984,7 +984,9 @@ export async function GET(request: NextRequest) {
         userProfile?.permissions
       );
       const matchedShopId = lockedResolvedShop?.id || null;
-      const matchedShopName = String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName;
+      const matchedShopName = String(
+        String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
+      ).trim();
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const serviceFeeRate = order.platform === "线下交易"
