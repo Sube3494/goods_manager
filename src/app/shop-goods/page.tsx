@@ -59,6 +59,7 @@ export default function ShopGoodsPage() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const editScrollTopRef = useRef<number | null>(null);
   const autoOpenedEditKeyRef = useRef("");
+  const autoLookupEditKeyRef = useRef("");
   const isFetchingRef = useRef(false);
   const requestVersionRef = useRef(0);
   const hasMoreRef = useRef(true);
@@ -486,17 +487,54 @@ export default function ShopGoodsPage() {
     }
 
     const target = items.find((item) => item.id === requestedEditItemId);
-    if (!target) {
-      return;
-    }
-
     const currentKey = `${requestedShopId}:${requestedEditItemId}`;
     if (autoOpenedEditKeyRef.current === currentKey) {
       return;
     }
-    autoOpenedEditKeyRef.current = currentKey;
-    openEditModal(target);
-  }, [isEditOpen, items, openEditModal, requestedEditItemId, requestedShopId, selectedShopId]);
+
+    if (target) {
+      autoOpenedEditKeyRef.current = currentKey;
+      openEditModal(target);
+      return;
+    }
+
+    if (autoLookupEditKeyRef.current === currentKey) {
+      return;
+    }
+    autoLookupEditKeyRef.current = currentKey;
+
+    let cancelled = false;
+    const fetchTargetItem = async () => {
+      try {
+        const queryParams = buildAggregateQuery(1, {
+          ids: requestedEditItemId,
+          pageSize: "1",
+          shopId: requestedShopId,
+        });
+        const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
+        const data: ShopProductsResponse = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error || "读取待回填商品失败");
+        }
+        const fetchedItem = Array.isArray(data.items) ? data.items[0] : null;
+        if (!fetchedItem || cancelled) {
+          return;
+        }
+        setItems((prev) => (
+          prev.some((item) => item.id === fetchedItem.id) ? prev : [fetchedItem, ...prev]
+        ));
+        autoOpenedEditKeyRef.current = currentKey;
+        openEditModal(fetchedItem);
+      } catch (error) {
+        console.error("Failed to fetch requested edit item:", error);
+      }
+    };
+
+    void fetchTargetItem();
+    return () => {
+      cancelled = true;
+    };
+  }, [buildAggregateQuery, isEditOpen, items, openEditModal, requestedEditItemId, requestedShopId, selectedShopId]);
 
   const restoreEditScrollPosition = useCallback(() => {
     const scrollTop = editScrollTopRef.current;

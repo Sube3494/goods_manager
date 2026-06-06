@@ -556,18 +556,23 @@ export async function GET(request: NextRequest) {
           },
         })
       : [];
-    const outboundCostByOrderNo = new Map<string, number>();
+    const outboundMetaByOrderNo = new Map<string, { productCost: number; missingCostItemCount: number }>();
     outboundOrdersForCost.forEach((outbound) => {
       const orderNo = extractOrderNoFromNote(outbound.note);
       if (!orderNo) return;
+      let missingCostItemCount = 0;
       const outboundCost = outbound.items.reduce((sum, item) => {
         const unitCost = Number(item.shopProduct?.costPrice) || 0;
+        if (unitCost <= 0) {
+          missingCostItemCount += 1;
+        }
         return FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
       }, 0);
-      outboundCostByOrderNo.set(
-        orderNo,
-        FinanceMath.add(outboundCostByOrderNo.get(orderNo) || 0, outboundCost)
-      );
+      const current = outboundMetaByOrderNo.get(orderNo);
+      outboundMetaByOrderNo.set(orderNo, {
+        productCost: FinanceMath.add(current?.productCost || 0, outboundCost),
+        missingCostItemCount: (current?.missingCostItemCount || 0) + missingCostItemCount,
+      });
     });
 
     let userPaid = 0;
@@ -585,7 +590,8 @@ export async function GET(request: NextRequest) {
         const commissionYuan = isOffline ? 0 : (paidYuan * rate);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
 
-        const orderCostYuan = outboundCostByOrderNo.get(String(order.orderNo || "").trim()) || 0;
+        const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
+        const orderCostYuan = orderCostMeta?.productCost || 0;
 
         userPaid = FinanceMath.add(userPaid, paidYuan);
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
@@ -630,6 +636,7 @@ export async function GET(request: NextRequest) {
       productCost: 0,
       brushExpense: 0,
       promotionExpense: 0,
+      pureProfit: 0,
     });
 
     const businessTrendMap = new Map<string, {
@@ -643,6 +650,7 @@ export async function GET(request: NextRequest) {
       productCost: number;
       brushExpense: number;
       promotionExpense: number;
+      pureProfit: number;
     }>();
     dateSeries.forEach((item) => {
       businessTrendMap.set(item.date, createTrendBucket());
@@ -729,13 +737,33 @@ export async function GET(request: NextRequest) {
             platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, paidYuan);
           }
         } else {
-          const orderCostYuan = outboundCostByOrderNo.get(String(order.orderNo || "").trim()) || 0;
+          const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
+          const orderCostYuan = orderCostMeta?.productCost || 0;
 
           if (point) {
             point.productCost = FinanceMath.add(point.productCost, orderCostYuan);
           }
           if (platformPoint) {
             platformPoint.productCost = FinanceMath.add(platformPoint.productCost, orderCostYuan);
+          }
+
+          const expectedIncomeYuan = Number(order.expectedIncome || 0) / 100;
+          const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
+          const isOffline = order.platform === "线下交易";
+          const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
+          const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+          const hasReadyCost = Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0;
+          if (hasReadyCost) {
+            const pureProfit = FinanceMath.add(
+              FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
+              -deliveryYuan - orderCostYuan
+            );
+            if (point) {
+              point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
+            }
+            if (platformPoint) {
+              platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, pureProfit);
+            }
           }
         }
       } else {
@@ -788,13 +816,8 @@ export async function GET(request: NextRequest) {
         cumulativeOrders += orderCount;
         
         const profit = FinanceMath.add(
-          point?.userPaid || 0,
-          -(point?.brushPaid || 0)
-          - (point?.platformCommission || 0)
-          - (point?.brushExpense || 0)
-          - (point?.deliveryExpense || 0)
-          - (point?.productCost || 0)
-          - (point?.promotionExpense || 0)
+          point?.pureProfit || 0,
+          -(point?.promotionExpense || 0)
         );
 
         return {
