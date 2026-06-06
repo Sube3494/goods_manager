@@ -518,6 +518,21 @@ export async function GET(request: NextRequest) {
       return Number.isFinite(value) ? Math.max(0, value) : 0;
     }
 
+    function parseOutboundCostSnapshot(value: unknown) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+      }
+      const raw = value as Record<string, unknown>;
+      const quantity = Number(raw.quantity || 0);
+      const totalCost = Number(raw.totalCost || 0);
+      const averageUnitCost = Number(raw.averageUnitCost || 0);
+      return {
+        quantity: Number.isFinite(quantity) ? quantity : 0,
+        totalCost: Number.isFinite(totalCost) ? totalCost : 0,
+        averageUnitCost: Number.isFinite(averageUnitCost) ? averageUnitCost : 0,
+      };
+    }
+
     const purchaseAmount = purchaseOrdersInRange.reduce((sum, order) => FinanceMath.add(sum, order.totalAmount || 0), 0);
     const brushExpense = brushOrdersInRange.reduce(
       (sum, order) => FinanceMath.add(sum, FinanceMath.add((order.paymentAmount || 0) - (order.receivedAmount || 0), order.commission || 0)),
@@ -541,6 +556,7 @@ export async function GET(request: NextRequest) {
             items: {
               select: {
                 quantity: true,
+                costSnapshot: true,
                 shopProduct: {
                   select: {
                     costPrice: true,
@@ -562,11 +578,16 @@ export async function GET(request: NextRequest) {
       if (!orderNo) return;
       let missingCostItemCount = 0;
       const outboundCost = outbound.items.reduce((sum, item) => {
-        const unitCost = Number(item.shopProduct?.costPrice) || 0;
+        const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
+        const unitCost = snapshot
+          ? Number(snapshot.averageUnitCost || 0)
+          : (Number(item.shopProduct?.costPrice) || 0);
         if (unitCost <= 0) {
           missingCostItemCount += 1;
         }
-        return FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
+        return snapshot
+          ? FinanceMath.add(sum, Number(snapshot.totalCost || 0))
+          : FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
       }, 0);
       const current = outboundMetaByOrderNo.get(orderNo);
       outboundMetaByOrderNo.set(orderNo, {

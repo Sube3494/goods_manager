@@ -32,6 +32,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
+import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { CreateOfflineOrderModal } from "@/components/Orders/CreateOfflineOrderModal";
 import {
   getBaseAutoPickStatusDisplay,
@@ -41,11 +42,11 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderTerminalStatus,
 } from "@/lib/autoPickOrderStatus";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
-type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync";
+type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "all";
 
 type OrderResponse = {
@@ -941,6 +942,7 @@ function OrderCard({
   const serviceFeeRate = Number(order.serviceFeeRate || 0);
   const deliveryFee = getDeliveryFee(order.delivery);
   const productCost = Number(order.productCost || 0);
+  const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const pureProfitTooltipRows = hasPureProfit
     ? [
@@ -1020,10 +1022,15 @@ function OrderCard({
                     </span>
                   ) : null}
                   {autoOutboundFailed ? (
-                    <span className="inline-flex h-7 items-center gap-1 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[12px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
+                    <button
+                      type="button"
+                      onClick={() => void onRunAction(order.id, "outbound")}
+                      disabled={actingId === `${order.id}:outbound`}
+                      className="inline-flex h-7 items-center gap-1 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[12px] font-medium leading-none text-rose-700 transition-all hover:border-rose-500/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                    >
                       <TriangleAlert size={12} />
-                      出库待处理
-                    </span>
+                      {actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}
+                    </button>
                   ) : null}
                   <StatusBadge order={order} />
                   {completed && (hasPureProfit || order.productCostStatus === "pending-backfill") ? (
@@ -1104,6 +1111,30 @@ function OrderCard({
                               </div>
                             ))}
                           </div>
+                          {hasPureProfit && productCostBreakdown.length > 0 ? (
+                            <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/8 dark:bg-white/4">
+                              <div className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-white/45">
+                                货品成本明细
+                              </div>
+                              <div className="mt-2 space-y-2">
+                                {productCostBreakdown.map((item, index) => (
+                                  <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
+                                    <div className="min-w-0">
+                                      <div className="truncate font-medium text-slate-900 dark:text-white">
+                                        {item.name}
+                                      </div>
+                                      <div className="mt-0.5 text-[11px] text-slate-500 dark:text-white/45">
+                                        x{item.quantity} · {toCurrency(item.unitCost)}/件
+                                      </div>
+                                    </div>
+                                    <div className="shrink-0 font-semibold text-slate-900 dark:text-white">
+                                      {toCurrency(item.totalCost)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                           <div className={cn(
                             "mt-3 rounded-xl border px-3 py-2.5",
                             hasPureProfit
@@ -1442,6 +1473,16 @@ function OrderCard({
                     </div>
                     <div className="mt-2 sm:mt-2.5">
                       <DetailBlock label="失败原因" value={order.autoOutboundError || "-"} />
+                    </div>
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => void onRunAction(order.id, "outbound")}
+                        disabled={actingId === `${order.id}:outbound`}
+                        className="inline-flex h-9 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/12 px-3 text-[12px] font-medium text-rose-700 transition-all hover:border-rose-500/35 hover:bg-rose-500/18 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300"
+                      >
+                        {actingId === `${order.id}:outbound` ? "正在检查库存..." : "创建采购单"}
+                      </button>
                     </div>
                   </div>
                 ) : null}
@@ -2302,6 +2343,7 @@ export default function OrdersPage() {
     amountTaobao: 0,
   });
   const [isCreateOfflineOpen, setIsCreateOfflineOpen] = useState(false);
+  const [purchaseDraft, setPurchaseDraft] = useState<PurchaseOrder | null>(null);
 
   const effectivePromotionDate = useMemo(() => {
     return activeTab === "today" ? todayDate : (startDate || todayDate);
@@ -2488,6 +2530,76 @@ export default function OrdersPage() {
     setOrders((current) => current.map((order) => (order.id === orderId ? updater(order) : order)));
   }, []);
 
+  const openPurchaseDraftForInsufficientStock = useCallback((
+    order: AutoPickOrder,
+    insufficientItems: Array<{
+      productId?: string | null;
+      shopProductId?: string | null;
+      name?: string;
+      quantity?: number;
+      availableQuantity?: number;
+      missingQuantity?: number;
+      mappedShopName?: string | null;
+    }>
+  ) => {
+    const resolvedShopName = String(order.matchedShopName || insufficientItems[0]?.mappedShopName || "").trim();
+    const matchedShop = localShops.find((shop) => shop.name === resolvedShopName) || null;
+    const draftItems: PurchaseOrderItem[] = insufficientItems
+      .map((item) => {
+        const missingQuantity = Math.max(1, Number(item.missingQuantity || 0));
+        const resolvedProductId = String(item.productId || "").trim() || null;
+        const resolvedShopProductId = String(item.shopProductId || "").trim() || null;
+        return {
+          productId: resolvedProductId,
+          shopProductId: resolvedShopProductId,
+          quantity: missingQuantity,
+          remainingQuantity: missingQuantity,
+          costPrice: 0,
+          product: resolvedProductId
+            ? {
+                id: resolvedProductId,
+                name: String(item.name || "未命名商品").trim() || "未命名商品",
+              }
+            : undefined,
+          shopProduct: resolvedShopProductId
+            ? {
+                id: resolvedShopProductId,
+                name: String(item.name || "未命名商品").trim() || "未命名商品",
+                productName: String(item.name || "未命名商品").trim() || "未命名商品",
+                shopId: matchedShop?.id || "",
+                shopName: resolvedShopName,
+                costPrice: 0,
+                stock: Math.max(0, Number(item.availableQuantity || 0)),
+                isPublic: true,
+                isDiscontinued: false,
+              }
+            : undefined,
+        } as PurchaseOrderItem;
+      })
+      .filter((item) => item.productId || item.shopProductId);
+
+    if (draftItems.length === 0) {
+      showToast("缺货商品还没匹配到可采购的系统商品", "error");
+      return;
+    }
+
+    const now = new Date();
+    setPurchaseDraft({
+      id: `PO-${now.toISOString().slice(0, 10).replace(/-/g, "")}-AUTO`,
+      status: "Confirmed",
+      type: "Purchase",
+      date: now.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
+      items: draftItems,
+      shippingFees: 0,
+      extraFees: 0,
+      totalAmount: 0,
+      discountAmount: 0,
+      shippingAddress: matchedShop?.address || "",
+      shopName: resolvedShopName,
+      note: `由订单 ${order.orderNo || order.id} 缺库存创建`,
+    } as PurchaseOrder);
+  }, [localShops, showToast]);
+
   const openCostBackfill = useCallback((order: AutoPickOrder) => {
     const resolvedShopName = String(order.matchedShopName || "").trim();
     const shopId = localShops.find((shop) => shop.name === resolvedShopName)?.id || "";
@@ -2613,6 +2725,23 @@ export default function OrdersPage() {
       setIsSavingMatch(false);
     }
   }, [applyItemMatchedProduct, showToast]);
+
+  const savePurchaseDraft = useCallback(async (data: PurchaseOrder) => {
+    const response = await fetch("/api/purchases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        status: "Received",
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || "创建采购单失败");
+    }
+    showToast("采购单已创建并入库", "success");
+    setPurchaseDraft(null);
+  }, [showToast]);
 
   const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number }) => {
     if (isFetchingRef.current) {
@@ -2779,11 +2908,20 @@ export default function OrdersPage() {
   const runAction = async (orderId: string, action: OrderAction) => {
     setActingId(`${orderId}:${action}`);
     try {
+      const targetOrder = orders.find((item) => item.id === orderId) || null;
       const requestInit: RequestInit = { method: "POST" };
 
       const response = await fetch(`/api/orders/${orderId}/${action}`, requestInit);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (action === "outbound" && data?.reason === "insufficient-stock" && targetOrder) {
+          openPurchaseDraftForInsufficientStock(
+            targetOrder,
+            Array.isArray(data?.insufficientItems) ? data.insufficientItems : []
+          );
+          showToast("库存不足，已为这单打开采购单草稿", "success");
+          return;
+        }
         showToast(getOrderActionErrorMessage(data?.error || data?.reason), "error");
         return;
       }
@@ -3618,6 +3756,22 @@ export default function OrdersPage() {
           onClose={() => setIsCreateOfflineOpen(false)}
           onSuccess={() => {
             void fetchOrders();
+          }}
+        />
+      ) : null}
+
+      {isMounted && purchaseDraft ? (
+        <PurchaseOrderModal
+          isOpen={Boolean(purchaseDraft)}
+          initialData={purchaseDraft}
+          onClose={() => setPurchaseDraft(null)}
+          onSubmit={(data) => {
+            void savePurchaseDraft(data).then(() => {
+              void fetchOrders({ silent: true });
+            }).catch((error) => {
+              console.error("Failed to create purchase draft:", error);
+              showToast(error instanceof Error ? error.message : "创建采购单失败", "error");
+            });
           }}
         />
       ) : null}

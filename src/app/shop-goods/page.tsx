@@ -512,7 +512,7 @@ export default function ShopGoodsPage() {
           shopId: requestedShopId,
         });
         const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
-        const data: ShopProductsResponse = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as ShopProductsResponse & { error?: string };
         if (!res.ok) {
           throw new Error(data?.error || "读取待回填商品失败");
         }

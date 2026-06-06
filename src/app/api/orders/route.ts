@@ -599,6 +599,57 @@ function readDeliveryFee(delivery: unknown) {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
+type ParsedOutboundCostSnapshot = {
+  quantity: number;
+  totalCost: number;
+  averageUnitCost: number;
+  batches: Array<{
+    purchaseOrderItemId: string;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+  }>;
+};
+
+function parseOutboundCostSnapshot(value: unknown): ParsedOutboundCostSnapshot | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const raw = value as Record<string, unknown>;
+  const batches = Array.isArray(raw.batches)
+    ? raw.batches
+        .map((entry) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            return null;
+          }
+          const batch = entry as Record<string, unknown>;
+          const purchaseOrderItemId = String(batch.purchaseOrderItemId || "").trim();
+          const quantity = Number(batch.quantity || 0);
+          const unitCost = Number(batch.unitCost || 0);
+          const totalCost = Number(batch.totalCost || 0);
+          if (!purchaseOrderItemId || !Number.isFinite(quantity) || quantity <= 0) {
+            return null;
+          }
+          return {
+            purchaseOrderItemId,
+            quantity,
+            unitCost: Number.isFinite(unitCost) ? unitCost : 0,
+            totalCost: Number.isFinite(totalCost) ? totalCost : 0,
+          };
+        })
+        .filter((entry): entry is ParsedOutboundCostSnapshot["batches"][number] => Boolean(entry))
+    : [];
+  const quantity = Number(raw.quantity || 0);
+  const totalCost = Number(raw.totalCost || 0);
+  const averageUnitCost = Number(raw.averageUnitCost || 0);
+  return {
+    quantity: Number.isFinite(quantity) ? quantity : 0,
+    totalCost: Number.isFinite(totalCost) ? totalCost : 0,
+    averageUnitCost: Number.isFinite(averageUnitCost) ? averageUnitCost : 0,
+    batches,
+  };
+}
+
 export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
   const session = await getAuthorizedUser("order:manage");
@@ -812,13 +863,16 @@ export async function GET(request: NextRequest) {
               select: {
                 shopProductId: true,
                 quantity: true,
+                costSnapshot: true,
                 shopProduct: {
                   select: {
+                    productName: true,
                     costPrice: true,
                   },
                 },
                 product: {
                   select: {
+                    name: true,
                     costPrice: true,
                   },
                 },
@@ -843,7 +897,19 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const outboundByOrderNo = new Map<string, { id: string; productCost: number; missingCostItemCount: number; firstMissingCostShopProductId: string | null }>();
+    const outboundByOrderNo = new Map<string, {
+      id: string;
+      productCost: number;
+      missingCostItemCount: number;
+      firstMissingCostShopProductId: string | null;
+      breakdown: Array<{
+        name: string;
+        quantity: number;
+        unitCost: number;
+        totalCost: number;
+        shopProductId: string | null;
+      }>;
+    }>();
     for (const outbound of outboundRows) {
       const note = String(outbound.note || "");
       const match = note.match(/平台单号:\s*([^\s|]+)/);
@@ -851,18 +917,39 @@ export async function GET(request: NextRequest) {
       if (orderNo && !outboundByOrderNo.has(orderNo)) {
         let missingCostItemCount = 0;
         let firstMissingCostShopProductId: string | null = null;
-        const productCost = outbound.items.reduce((sum, item) => {
-          const unitCost = Number(item.shopProduct?.costPrice) || 0;
+        const breakdown = outbound.items.map((item) => {
+          const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
+          const unitCost = snapshot
+            ? Number(snapshot.averageUnitCost || 0)
+            : (Number(item.shopProduct?.costPrice) || 0);
           const quantity = Math.max(0, Number(item.quantity || 0));
+          const totalCost = snapshot
+            ? Number(snapshot.totalCost || 0)
+            : (Math.round(unitCost * 100) * quantity) / 100;
+          const shopProductId = String(item.shopProductId || "").trim() || null;
           if (unitCost <= 0) {
             missingCostItemCount += 1;
             if (!firstMissingCostShopProductId) {
-              firstMissingCostShopProductId = String(item.shopProductId || "").trim() || null;
+              firstMissingCostShopProductId = shopProductId;
             }
           }
-          return sum + Math.round(unitCost * 100) * quantity;
+          return {
+            name: String(item.shopProduct?.productName || item.product?.name || "未命名商品").trim() || "未命名商品",
+            quantity,
+            unitCost,
+            totalCost,
+            shopProductId,
+          };
+        });
+        const productCost = outbound.items.reduce((sum, item) => {
+          const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
+          const unitCost = snapshot
+            ? Number(snapshot.totalCost || 0)
+            : (Number(item.shopProduct?.costPrice) || 0);
+          const quantity = Math.max(0, Number(item.quantity || 0));
+          return sum + (snapshot ? Math.round(unitCost * 100) : Math.round(unitCost * 100) * quantity);
         }, 0);
-        outboundByOrderNo.set(orderNo, { id: outbound.id, productCost, missingCostItemCount, firstMissingCostShopProductId });
+        outboundByOrderNo.set(orderNo, { id: outbound.id, productCost, missingCostItemCount, firstMissingCostShopProductId, breakdown });
       }
     }
 
@@ -1017,6 +1104,7 @@ export async function GET(request: NextRequest) {
         outboundOrderId: outboundMeta?.id || null,
         serviceFeeRate,
         productCost: productCostStatus === "ready" ? productCost : null,
+        productCostBreakdown: productCostStatus === "ready" ? (outboundMeta?.breakdown || []) : null,
         pureProfit,
         productCostStatus,
         missingCostItemCount,

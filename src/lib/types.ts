@@ -218,6 +218,13 @@ export interface AutoPickOrder {
   outboundOrderId?: string | null;
   serviceFeeRate?: number | null;
   productCost?: number | null;
+  productCostBreakdown?: Array<{
+    name: string;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    shopProductId?: string | null;
+  }> | null;
   pureProfit?: number | null;
   productCostStatus?: "ready" | "pending-outbound" | "pending-backfill";
   missingCostItemCount?: number | null;
@@ -524,6 +531,20 @@ export interface BrushOrder {
   updatedAt?: string;
 }
 
+export interface OutboundCostSnapshotBatch {
+  purchaseOrderItemId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+}
+
+export interface OutboundCostSnapshot {
+  quantity: number;
+  totalCost: number;
+  averageUnitCost: number;
+  batches: OutboundCostSnapshotBatch[];
+}
+
 export interface OutboundOrderItem {
   id?: string;
   outboundOrderId?: string;
@@ -533,6 +554,7 @@ export interface OutboundOrderItem {
   shopProduct?: ShopCatalogItem;
   quantity: number;
   price: number;
+  costSnapshot?: OutboundCostSnapshot | null;
 }
 
 export interface OutboundOrder {

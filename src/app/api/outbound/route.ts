@@ -118,6 +118,16 @@ export async function POST(request: Request) {
 
     // 使用事务确保数据原子性，业务逻辑委托给 InventoryService
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const costSnapshots = await InventoryService.processOutboundFIFO(
+        tx,
+        user.id,
+        normalizedItems.map((item) => ({
+          productId: item.productId || null,
+          shopProductId: item.shopProductId || null,
+          quantity: item.quantity,
+        }))
+      );
+
       // 1. 创建出库单记录
       const order = await tx.outboundOrder.create({
         data: {
@@ -126,18 +136,19 @@ export async function POST(request: Request) {
           note: note || "",
           userId: user.id,
           items: {
-            create: normalizedItems.map((item) => ({
-              productId: item.productId || null,
-              shopProductId: item.shopProductId || null,
-              quantity: item.quantity,
-              price: FinanceMath.add(item.price || 0, 0)
-            }))
+            create: normalizedItems.map((item) => {
+              const costSnapshot = costSnapshots.shift();
+              return {
+                productId: item.productId || null,
+                shopProductId: item.shopProductId || null,
+                quantity: item.quantity,
+                price: FinanceMath.add(item.price || 0, 0),
+                costSnapshot: (costSnapshot || Prisma.JsonNull) as Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput,
+              };
+            })
           }
         }
       });
-
-      // 2. 委托 Service 处理 FIFO 扣减及库存更新
-      await InventoryService.processOutboundFIFO(tx, user.id, normalizedItems);
 
       return order;
     });

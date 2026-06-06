@@ -1,5 +1,17 @@
 import { Prisma } from "../../prisma/generated-client";
 
+type OutboundFifoItemSnapshot = {
+  quantity: number;
+  totalCost: number;
+  averageUnitCost: number;
+  batches: Array<{
+    purchaseOrderItemId: string;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+  }>;
+};
+
 /**
  * 库存核心服务
  */
@@ -14,9 +26,11 @@ export class InventoryService {
     tx: Prisma.TransactionClient,
     userId: string,
     items: { productId?: string | null; shopProductId?: string | null; quantity: number }[]
-  ) {
+  ): Promise<OutboundFifoItemSnapshot[]> {
+    const snapshots: OutboundFifoItemSnapshot[] = [];
     for (const item of items) {
       let remainingToDeduct = item.quantity;
+      const consumedBatches: OutboundFifoItemSnapshot["batches"] = [];
 
       if (!item.shopProductId && !item.productId) {
         throw new Error("出库商品缺少关联标识，无法扣减库存");
@@ -79,6 +93,14 @@ export class InventoryService {
           }
         });
 
+        const unitCost = Number(batch.costPrice || 0);
+        consumedBatches.push({
+          purchaseOrderItemId: batch.id,
+          quantity: deductFromThisBatch,
+          unitCost,
+          totalCost: unitCost * deductFromThisBatch,
+        });
+
         remainingToDeduct -= deductFromThisBatch;
       }
 
@@ -89,7 +111,17 @@ export class InventoryService {
 
       // 4. 根据实际扣减完的批次，统一同步该商品及其关联的主库商品物理库存
       await this.syncStockFromBatches(tx, item.productId || null, item.shopProductId || null);
+
+      const totalCost = consumedBatches.reduce((sum, batch) => sum + batch.totalCost, 0);
+      const quantity = Math.max(0, Number(item.quantity || 0));
+      snapshots.push({
+        quantity,
+        totalCost,
+        averageUnitCost: quantity > 0 ? totalCost / quantity : 0,
+        batches: consumedBatches,
+      });
     }
+    return snapshots;
   }
 
   /**
