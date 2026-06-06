@@ -63,7 +63,10 @@ const toolbarButtonClass =
   "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-primary transition-all duration-300 hover:bg-primary hover:text-primary-foreground active:scale-95 shadow-sm disabled:cursor-not-allowed disabled:opacity-50";
 
 const toolbarButtonMutedClass =
-  "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-border bg-white/5 px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-muted-foreground transition-all duration-300 hover:border-primary/20 hover:bg-primary/10 hover:text-primary active:scale-95";
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-border bg-white px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-foreground transition-all duration-300 hover:border-primary/20 hover:text-primary active:scale-95 dark:bg-white/5 dark:text-muted-foreground dark:hover:bg-primary/10 dark:hover:text-primary";
+
+const sectionActionButtonClass =
+  "inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-border bg-white px-3 text-[10px] sm:text-[11px] font-medium tracking-wide text-foreground shadow-sm transition-all duration-300 hover:border-primary/20 hover:text-primary active:scale-95 dark:bg-white/5 dark:text-muted-foreground dark:hover:bg-primary/10 dark:hover:text-primary";
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -1687,17 +1690,17 @@ export function ProductFormModal({
                             <button
                                 type="button"
                                 onClick={handleAddVariant}
-                                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary px-3 py-1.5 rounded-full border border-primary/20 transition-all duration-300 active:scale-95 shadow-sm"
+                                className={sectionActionButtonClass}
                             >
                                 <Plus size={12} strokeWidth={3} /> 添加规格
                             </button>
                         </div>
                             {variantDrafts.map((variant, index) => (
-                                <div key={variant.panelKey} className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.025))] p-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
+                                <div key={variant.panelKey} className="rounded-[24px] border border-border/70 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.025))] dark:shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
                                     <div className="flex items-center gap-2">
-                                        <div className="group flex min-w-0 flex-1 flex-col gap-3 rounded-[20px] border border-white/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] px-4 py-3 transition-all hover:border-cyan-400/25 hover:bg-[linear-gradient(135deg,rgba(34,211,238,0.09),rgba(255,255,255,0.04))] sm:flex-row sm:items-center sm:gap-3 sm:py-2.5">
+                                        <div className="group flex min-w-0 flex-1 flex-col gap-3 px-1 py-1 transition-all sm:flex-row sm:items-center sm:gap-3">
                                             <div className="flex min-w-0 items-center gap-3">
-                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/15 bg-cyan-400/10 text-[11px] font-semibold tracking-[0.12em] text-cyan-300">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 text-[11px] font-semibold tracking-[0.12em] text-sky-700 dark:border-cyan-400/15 dark:bg-cyan-400/10 dark:text-cyan-300">
                                                     {String(index + 1).padStart(2, "0")}
                                                 </div>
                                                 <div className="min-w-0 flex-1">
@@ -1709,7 +1712,7 @@ export function ProductFormModal({
                                                     <button
                                                         type="button"
                                                         onClick={() => handleToggleVariant(variant.panelKey)}
-                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/6 bg-white/[0.03] text-muted-foreground/80 transition-all hover:border-cyan-400/20 hover:bg-white/8 hover:text-foreground active:scale-95"
+                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white text-muted-foreground transition-all hover:border-primary/20 hover:bg-primary/10 hover:text-primary active:scale-95 dark:border-white/6 dark:bg-white/[0.03] dark:text-muted-foreground/80 dark:hover:border-cyan-400/20 dark:hover:bg-white/8 dark:hover:text-foreground"
                                                         title={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
                                                         aria-label={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
                                                         aria-expanded={expandedVariantKeys.includes(variant.panelKey)}
@@ -1740,17 +1743,17 @@ export function ProductFormModal({
                                                     </span>
                                                 ) : null}
                                                 {variant.costPrice ? (
-                                                    <span className="inline-flex items-center rounded-full border border-emerald-400/12 bg-emerald-400/8 px-2.5 py-1 font-normal text-emerald-300">
+                                                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:border-emerald-400/12 dark:bg-emerald-400/8 dark:text-emerald-300">
                                                         进价 {variant.costPrice}
                                                     </span>
                                                 ) : null}
                                                 {variant.salePrice ? (
-                                                    <span className="inline-flex items-center rounded-full border border-sky-400/12 bg-sky-400/8 px-2.5 py-1 font-normal text-sky-300">
+                                                    <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:border-sky-400/12 dark:bg-sky-400/8 dark:text-sky-300">
                                                         售价 {variant.salePrice}
                                                     </span>
                                                 ) : null}
                                                 {Number(variant.stock ?? 0) > 0 ? (
-                                                    <span className="inline-flex items-center rounded-full border border-amber-400/12 bg-amber-400/8 px-2.5 py-1 font-normal text-amber-200">
+                                                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-medium text-amber-700 dark:border-amber-400/12 dark:bg-amber-400/8 dark:text-amber-200">
                                                         库存 {Number(variant.stock ?? 0)}
                                                     </span>
                                                 ) : null}
@@ -1759,7 +1762,7 @@ export function ProductFormModal({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleToggleVariant(variant.panelKey)}
-                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/6 bg-white/[0.03] text-muted-foreground/80 transition-all hover:border-cyan-400/20 hover:bg-white/8 hover:text-foreground active:scale-95"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white text-muted-foreground transition-all hover:border-primary/20 hover:bg-primary/10 hover:text-primary active:scale-95 dark:border-white/6 dark:bg-white/[0.03] dark:text-muted-foreground/80 dark:hover:border-cyan-400/20 dark:hover:bg-white/8 dark:hover:text-foreground"
                                                     title={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
                                                     aria-label={expandedVariantKeys.includes(variant.panelKey) ? "收起规格" : "展开规格"}
                                                     aria-expanded={expandedVariantKeys.includes(variant.panelKey)}
@@ -1775,7 +1778,7 @@ export function ProductFormModal({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveVariant(index)}
-                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/6 bg-white/[0.03] text-destructive/45 transition-all hover:border-destructive/15 hover:bg-destructive/10 hover:text-destructive active:scale-95"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white text-destructive/55 transition-all hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive active:scale-95 dark:border-white/6 dark:bg-white/[0.03] dark:text-destructive/45"
                                                     title="删除此规格"
                                                     aria-label="删除此规格"
                                                 >
@@ -1794,7 +1797,7 @@ export function ProductFormModal({
                                                 className="overflow-hidden"
                                             >
                                                 <div className="space-y-3 px-2 pt-3">
-                                                    <div className="rounded-[18px] border border-white/6 bg-black/10 p-3">
+                                                    <div className="rounded-[18px] border border-border/70 bg-muted/20 p-3 dark:border-white/6 dark:bg-black/10">
                                                         <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
                                                             基础信息
                                                         </div>
@@ -1806,7 +1809,7 @@ export function ProductFormModal({
                                                                     value={variant.variantName}
                                                                     onChange={(e) => handleUpdateVariant(index, "variantName", e.target.value)}
                                                                     placeholder="如 大杯 / 红色 / 500ml"
-                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                    className="w-full rounded-2xl bg-white dark:bg-white/[0.04] border border-border dark:border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
                                                                 />
                                                             </div>
                                                             <div className="space-y-1.5">
@@ -1816,12 +1819,12 @@ export function ProductFormModal({
                                                                     value={variant.sku}
                                                                     onChange={(e) => handleUpdateVariant(index, "sku", e.target.value)}
                                                                     placeholder="规格 SKU"
-                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                    className="w-full rounded-2xl bg-white dark:bg-white/[0.04] border border-border dark:border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
                                                                 />
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-[18px] border border-white/6 bg-black/10 p-3">
+                                                    <div className="rounded-[18px] border border-border/70 bg-muted/20 p-3 dark:border-white/6 dark:bg-black/10">
                                                         <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
                                                             价格与库存
                                                         </div>
@@ -1836,7 +1839,7 @@ export function ProductFormModal({
                                                                     onChange={(e) => handleUpdateVariant(index, "costPrice", e.target.value)}
                                                                     placeholder="进价"
                                                                     aria-label="规格进价"
-                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                    className="w-full rounded-2xl bg-white dark:bg-white/[0.04] border border-border dark:border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
                                                                 />
                                                             </div>
                                                             <div className="space-y-1.5">
@@ -1849,12 +1852,12 @@ export function ProductFormModal({
                                                                     onChange={(e) => handleUpdateVariant(index, "salePrice", e.target.value)}
                                                                     placeholder="售价"
                                                                     aria-label="规格售价"
-                                                                    className="w-full rounded-2xl bg-white/[0.05] dark:bg-white/[0.04] border border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
+                                                                    className="w-full rounded-2xl bg-white dark:bg-white/[0.04] border border-border dark:border-white/8 px-4 py-2.5 text-xs text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all"
                                                                 />
                                                             </div>
                                                             <div className="space-y-1.5">
                                                                 <label className="text-[11px] font-medium text-muted-foreground">规格库存</label>
-                                                                <div className="flex h-[42px] items-center rounded-2xl border border-amber-400/10 bg-amber-400/[0.06] px-4 text-xs font-medium text-amber-100">
+                                                                <div className="flex h-[42px] items-center rounded-2xl border border-border bg-white px-4 text-xs font-medium text-foreground dark:border-amber-400/10 dark:bg-amber-400/[0.06] dark:text-amber-100">
                                                                     {Number(variant.stock ?? 0)}
                                                                 </div>
                                                             </div>
@@ -1885,7 +1888,7 @@ export function ProductFormModal({
                             <button
                                 type="button"
                                 onClick={handleAddSpec}
-                                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary-foreground bg-primary/10 hover:bg-primary px-3 py-1.5 rounded-full border border-primary/20 transition-all duration-300 active:scale-95 shadow-sm"
+                                className={sectionActionButtonClass}
                             >
                                 <Plus size={12} strokeWidth={3} /> 添加参数
                             </button>
@@ -1920,7 +1923,7 @@ export function ProductFormModal({
                                 </div>
                             ))}
                             {Object.keys((formData.specs as Record<string, string>) || {}).length === 0 && (
-                                <div className="text-center py-4 bg-muted/20 rounded-xl border border-dashed border-border/50">
+                                <div className="rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/80 py-5 text-center dark:border-border/50 dark:bg-muted/20">
                                     <span className="text-xs text-muted-foreground">暂无自定义参数</span>
                                 </div>
                             )}
