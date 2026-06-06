@@ -24,9 +24,6 @@ ENV npm_config_registry="https://registry.npmmirror.com"
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
 
-# 先基于 schema 生成 Prisma Client，避免业务代码改动导致这一层失效
-RUN bunx prisma generate
-
 COPY . .
 
 # 构建 Next.js（standalone 模式减小镜像体积）
