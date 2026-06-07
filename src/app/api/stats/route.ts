@@ -204,6 +204,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const permissionsObj = user?.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions)
+      ? user.permissions as Record<string, unknown>
+      : {};
+    const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
+    const defaultBrushCommission = integrationConfig.defaultBrushCommission || 0;
+
     const rangeMode = request.nextUrl.searchParams.get("range");
     const shopName = (request.nextUrl.searchParams.get("shopName") || "").trim();
     const settings = await prisma.systemSetting.findFirst({
@@ -432,6 +438,7 @@ export async function GET(request: NextRequest) {
           paymentAmount: true,
           receivedAmount: true,
           commission: true,
+          platformOrderId: true,
         },
         orderBy: { date: "asc" },
       }),
@@ -534,10 +541,12 @@ export async function GET(request: NextRequest) {
     }
 
     const purchaseAmount = purchaseOrdersInRange.reduce((sum, order) => FinanceMath.add(sum, order.totalAmount || 0), 0);
-    const brushExpense = brushOrdersInRange.reduce(
-      (sum, order) => FinanceMath.add(sum, FinanceMath.add((order.paymentAmount || 0) - (order.receivedAmount || 0), order.commission || 0)),
-      0
-    );
+    let brushExpense = brushOrdersInRange
+      .filter((order) => !order.platformOrderId)
+      .reduce(
+        (sum, order) => FinanceMath.add(sum, FinanceMath.add((order.paymentAmount || 0) - (order.receivedAmount || 0), order.commission || 0)),
+        0
+      );
     const outboundLookupOrderNos = Array.from(new Set(
       filteredAutoPickOrdersInRange
         .map((order) => String(order.orderNo || "").trim())
@@ -618,6 +627,8 @@ export async function GET(request: NextRequest) {
         if (!isBrush) {
           userPaid = FinanceMath.add(userPaid, paidYuan);
           productCost = FinanceMath.add(productCost, orderCostYuan);
+        } else {
+          brushExpense = FinanceMath.add(brushExpense, defaultBrushCommission);
         }
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
@@ -762,11 +773,11 @@ export async function GET(request: NextRequest) {
         if (isBrush) {
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, paidYuan);
-            point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan);
+            point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission);
           }
           if (platformPoint) {
             platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, paidYuan);
-            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan);
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission);
           }
         } else {
           const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
@@ -819,6 +830,7 @@ export async function GET(request: NextRequest) {
     });
 
     brushOrdersInRange.forEach((order) => {
+      if (order.platformOrderId) return; // 排除自动同步的订单，自配送订单的刷单佣金已合并在订单利润 pureProfit 中扣除
       const key = formatDateKey(new Date(order.date));
       const point = businessTrendMap.get(key);
       const expense = FinanceMath.add((order.paymentAmount || 0) - (order.receivedAmount || 0), order.commission || 0);
