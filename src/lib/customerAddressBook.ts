@@ -89,8 +89,7 @@ export async function collectFactoryShipmentCustomer(
   });
 
   const existingIndex = addresses.findIndex((item) => {
-    if (getCustomerKey(item) === incomingKey) return true;
-    return Boolean(recipientPhone) && item.contactPhone === recipientPhone && item.contactName === recipientName;
+    return getCustomerKey(item) === incomingKey;
   });
 
   const nextAddresses = [...addresses];
