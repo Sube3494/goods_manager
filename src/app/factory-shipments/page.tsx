@@ -2110,22 +2110,7 @@ function FactoryShipmentDetailModal({
                         </div>
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">备注</div>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editForm.remark}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, remark: e.target.value }))}
-                          placeholder="可选，补充这条发货记录的备注"
-                          className="mt-2.5 h-11 w-full rounded-2xl border border-border/70 bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-[#2b313d]"
-                        />
-                      ) : (
-                        <div className="mt-3 w-full min-w-0 rounded-2xl border border-border/50 bg-white/80 px-4 py-3.5 text-sm leading-relaxed text-muted-foreground dark:border-white/10 dark:bg-white/4">
-                          {parsed.remark || "无备注"}
-                        </div>
-                      )}
-                    </div>
+
                   </div>
                 </div>
 
@@ -2762,20 +2747,7 @@ function FactoryShipmentCreateModal({
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-border/50 bg-white/70 px-4 py-3 shadow-sm dark:bg-white/5">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      <FileText size={13} /> 补充备注
-                    </div>
-                    <div className="mt-2">
-                      <input
-                        type="text"
-                        value={form.remark}
-                        onChange={(e) => updateForm("remark", e.target.value)}
-                        placeholder="可选，额外补充给发货单的备注"
-                        className="w-full h-10 rounded-xl border border-border bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-white/5"
-                      />
-                    </div>
-                  </div>
+
                 </div>
               </div>
 

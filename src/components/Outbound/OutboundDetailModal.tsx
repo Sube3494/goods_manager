@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Copy, Check, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle, ArrowLeftRight } from "lucide-react";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
-import { parseOutboundNote, copyToClipboard, cn, parseFactoryShipmentNote } from "@/lib/utils";
+import { parseOutboundNote, copyToClipboard, cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
@@ -27,7 +27,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
   const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
 
   const displayUserNote = order.type === "FactoryShipment"
-    ? parseFactoryShipmentNote(order.note).remark
+    ? null
     : parsed.userNote;
 
   const handleCopy = async (text: string, field: string) => {
