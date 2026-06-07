@@ -217,7 +217,7 @@ export default function CostBackfillModal({
               <Coins size={12} className="text-orange-500" />
               订单成本回填与修改
             </div>
-            <h2 className="mt-1 text-lg font-black tracking-tight text-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h2 className="mt-1 text-lg font-bold tracking-tight text-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>单号: {order.orderNo}</span>
               <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
                 {order.matchedShopName}
@@ -304,7 +304,7 @@ export default function CostBackfillModal({
                                 onChange={(e) => handleInputChange(batch.purchaseOrderItemId, e.target.value)}
                                 placeholder="输入采购单价"
                                 disabled={isSaving}
-                                className="h-10 w-full sm:w-40 rounded-xl border border-black/8 bg-white/50 px-3 text-sm font-bold text-foreground outline-none focus:border-primary/30 focus:ring-2 focus:ring-primary/12 dark:border-white/10 dark:bg-white/5 dark:focus:border-primary/40"
+                                className="h-10 w-full sm:w-40 rounded-xl border border-black/8 bg-white/50 px-3 text-sm font-medium text-foreground outline-none focus:border-primary/30 focus:ring-2 focus:ring-primary/12 dark:border-white/10 dark:bg-white/5 dark:focus:border-primary/40"
                               />
                             </div>
                             
@@ -325,7 +325,7 @@ export default function CostBackfillModal({
                                         onClick={() => handleApplyRefPrice(batch.purchaseOrderItemId, ref.price)}
                                         disabled={isSaving}
                                         title={`采购单: ${ref.orderId} (${ref.date})`}
-                                        className="text-primary hover:underline hover:text-primary/80 font-bold bg-primary/8 px-1.5 py-0.25 rounded cursor-pointer transition-colors active:scale-95"
+                                        className="text-primary hover:underline hover:text-primary/80 font-medium bg-primary/8 px-1.5 py-0.25 rounded cursor-pointer transition-colors active:scale-95"
                                       >
                                         ¥{ref.price.toFixed(2)}
                                       </button>
@@ -357,14 +357,14 @@ export default function CostBackfillModal({
             <button
               onClick={onClose}
               disabled={isSaving}
-              className="h-10 px-4 rounded-xl border border-black/8 bg-white/85 text-xs font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 cursor-pointer"
+              className="h-10 px-4 rounded-xl border border-black/8 bg-white/85 text-xs font-medium text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 cursor-pointer"
             >
               取消
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving || !order.productCostBreakdown || order.productCostBreakdown.length === 0}
-              className="h-10 px-5 rounded-xl bg-foreground text-xs font-black text-background transition-all hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-black flex items-center gap-2 cursor-pointer"
+              className="h-10 px-5 rounded-xl bg-foreground text-xs font-medium text-background transition-all hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-black flex items-center gap-2 cursor-pointer"
             >
               {isSaving ? (
                 <>
