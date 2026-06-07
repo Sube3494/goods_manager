@@ -941,14 +941,12 @@ export async function GET(request: NextRequest) {
             shopProductId,
           };
         });
-        const productCost = outbound.items.reduce((sum, item) => {
-          const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
-          const unitCost = snapshot
-            ? Number(snapshot.totalCost || 0)
-            : (Number(item.shopProduct?.costPrice) || 0);
-          const quantity = Math.max(0, Number(item.quantity || 0));
-          return sum + (snapshot ? Math.round(unitCost * 100) : Math.round(unitCost * 100) * quantity);
-        }, 0);
+        const productCost = Math.round(
+          breakdown.reduce((sum, item) => {
+            const itemTotalCost = Number(item.totalCost || 0);
+            return sum + (Number.isFinite(itemTotalCost) ? itemTotalCost : 0);
+          }, 0) * 100
+        ) / 100;
         outboundByOrderNo.set(orderNo, { id: outbound.id, productCost, missingCostItemCount, firstMissingCostShopProductId, breakdown });
       }
     }
