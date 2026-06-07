@@ -839,7 +839,14 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            // 4.2 创建真实的出库单 (OutboundOrder)
+            // 4.2 调用带并发安全锁的 FIFO 出库扣减服务，获得库存出库快照
+            const costSnapshots = await InventoryService.processOutboundFIFO(tx, userId, matchedItems.map(i => ({
+              productId: i.productId,
+              shopProductId: i.shopProductId,
+              quantity: i.quantity
+            })));
+
+            // 4.3 创建真实的出库单 (OutboundOrder)，保存 shopProductId 和 costSnapshot 成本快照
             const outboundNote = shopName 
                 ? `[店铺:${shopName}] [流水号:${dailySerial || '无'}] [${platform}导入] 平台单号: ${platformOrderId} ${note ? ' | 备注: ' + note : ''}`
                 : `[流水号:${dailySerial || '无'}] [${platform}导入] 平台单号: ${platformOrderId} ${note ? ' | 备注: ' + note : ''}`;
@@ -852,21 +859,19 @@ export async function POST(req: NextRequest) {
                 userId,
                 note: outboundNote,
                 items: {
-                  create: matchedItems.map(item => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    price: parseFloat(String(payment)) / matchedItems.length // 简单均摊价格
-                  }))
+                  create: matchedItems.map((item) => {
+                    const costSnapshot = costSnapshots.shift();
+                    return {
+                      productId: item.productId,
+                      shopProductId: item.shopProductId,
+                      quantity: item.quantity,
+                      price: parseFloat(String(payment)) / matchedItems.length, // 简单均摊价格
+                      costSnapshot: (costSnapshot || Prisma.JsonNull) as Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput,
+                    };
+                  })
                 }
               }
             });
-
-            // 4.3 调用带并发安全锁的 FIFO 出库扣减服务
-            await InventoryService.processOutboundFIFO(tx, userId, matchedItems.map(i => ({
-              productId: i.productId,
-              shopProductId: i.shopProductId,
-              quantity: i.quantity
-            })));
           });
 
           if (existingBrush || existingOutbound) {
