@@ -106,8 +106,11 @@ export default function CostBackfillModal({
       const displayBatches = resolveDisplayBatches(item);
       if (displayBatches.length > 0) {
         displayBatches.forEach((batch) => {
-          // 如果成本是 0，默认输入框为空，方便用户输入；否则显示当前成本
-          initialInputs[batch.purchaseOrderItemId] = batch.unitCost <= 0 ? "" : String(batch.unitCost);
+          // 优先使用批次单价，若为0则使用商品已有的单价做默认初始值，方便直接回填
+          const defaultPrice = batch.unitCost > 0
+            ? batch.unitCost
+            : (item.unitCost > 0 ? item.unitCost : 0);
+          initialInputs[batch.purchaseOrderItemId] = defaultPrice <= 0 ? "" : String(defaultPrice);
         });
       } else if (item.outboundOrderItemId) {
         // 无可用批次，兜底纯手动回填
@@ -357,7 +360,7 @@ export default function CostBackfillModal({
                                   <span className="text-muted-foreground">出库后补录成本</span>
                                 </div>
                                 <div className="mt-0.5 text-muted-foreground/80">
-                                  出库量: {item.quantity} 件
+                                  回填数量: {item.quantity} 件
                                 </div>
                               </div>
 
@@ -427,7 +430,7 @@ export default function CostBackfillModal({
                               <span className="font-mono text-muted-foreground">{batch.purchaseOrderId || "未知入库单"}</span>
                             </div>
                             <div className="mt-0.5 text-muted-foreground/80">
-                              {batch.isVirtual ? `分配出库量: ${batch.quantity} 件` : `批次出库量: ${batch.quantity} 件`}
+                              {`回填数量: ${batch.quantity} 件`}
                             </div>
                           </div>
 
