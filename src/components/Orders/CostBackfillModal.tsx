@@ -261,7 +261,7 @@ export default function CostBackfillModal({
                         <span>数量: x{item.quantity}</span>
                         <span>·</span>
                         {item.unitCost > 0 ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">当前成本: ¥{item.unitCost.toFixed(2)}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">当前成本: ¥{(item.unitCost / 100).toFixed(2)}</span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 font-semibold bg-orange-500/10 px-1.5 py-0.25 rounded-md">
                             待回填成本
