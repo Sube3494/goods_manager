@@ -254,7 +254,7 @@ export default function CostBackfillModal({
                   {/* 商品头部信息 */}
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <h3 className="text-sm font-bold text-foreground leading-snug break-all line-clamp-2">
+                      <h3 className="text-sm font-medium text-foreground leading-snug break-all line-clamp-2">
                         {item.name}
                       </h3>
                       <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
