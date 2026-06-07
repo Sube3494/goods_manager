@@ -786,8 +786,8 @@ function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "statu
   const display = getDisplayStatus(order);
   const tone = getStatusTone(display);
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs", tone.badge)}>
-      <span className={cn("h-1.5 w-1.5 rounded-full sm:h-2 sm:w-2", tone.dot)} />
+    <span className={cn("inline-flex h-7 items-center gap-1 rounded-full border px-1.5 text-[10px] font-black sm:h-8 sm:gap-2 sm:px-3 sm:text-xs", tone.badge)}>
+      <span className={cn("h-1 w-1 rounded-full sm:h-2 sm:w-2", tone.dot)} />
       {display}
     </span>
   );
@@ -993,37 +993,37 @@ function OrderCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-2.5 sm:gap-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
-                  <span className="inline-flex h-7 items-center gap-1 rounded-full border border-black/8 bg-black/3 pl-1.5 pr-2 text-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:gap-1.5 sm:pl-2 sm:pr-2.5">
-                    <span className="inline-flex h-5 w-5 items-center justify-center sm:h-5 sm:w-5">
+                <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
+                  <span className="inline-flex h-7 items-center gap-0.5 rounded-full border border-black/8 bg-black/3 pl-1 pr-1.5 text-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:gap-1.5 sm:pl-2 sm:pr-2.5">
+                    <span className="inline-flex h-4 w-4 items-center justify-center sm:h-5 sm:w-5">
                       <Image
                         src={platformMeta.iconSrc}
                         alt={platformMeta.iconAlt}
-                        width={20}
-                        height={20}
-                        className="h-5 w-5 object-cover"
+                        width={16}
+                        height={16}
+                        className="h-4 w-4 object-cover"
                         unoptimized
                       />
                     </span>
-                    <span className="pr-0.5 text-[14px] font-semibold leading-none tracking-tight sm:text-[15px]">#{order.dailyPlatformSequence || 0}</span>
+                    <span className="pr-0.5 text-[12px] font-semibold leading-none tracking-tight sm:text-[15px]">#{order.dailyPlatformSequence || 0}</span>
                   </span>
                   {sourceLabel ? (
-                    <span className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-2 text-[12px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-1.5 text-[11px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]">
                       <span className="truncate">{sourceLabel}</span>
                     </span>
                   ) : null}
                   {orderTypeLabel ? (
-                    <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2 text-[12px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-1.5 text-[11px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       {orderTypeLabel}
                     </span>
                   ) : null}
                   {pickup && order.platform !== "线下交易" ? (
-                    <span className="inline-flex h-7 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2 text-[12px] font-medium leading-none text-sky-700 dark:text-sky-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-1.5 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       到店自取
                     </span>
                   ) : null}
                   {showBrushMarker ? (
-                    <span className="inline-flex h-7 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[12px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       刷单
                     </span>
                   ) : null}
@@ -1032,9 +1032,9 @@ function OrderCard({
                       type="button"
                       onClick={() => void onRunAction(order.id, "outbound")}
                       disabled={actingId === `${order.id}:outbound`}
-                      className="inline-flex h-7 items-center gap-1 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[12px] font-medium leading-none text-rose-700 transition-all hover:border-rose-500/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                      className="inline-flex h-7 items-center gap-0.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 transition-all hover:border-rose-500/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
                     >
-                      <TriangleAlert size={12} />
+                      <TriangleAlert size={10} className="sm:h-3 sm:w-3" />
                       {actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}
                     </button>
                   ) : null}
@@ -1047,7 +1047,7 @@ function OrderCard({
                           onClick={() => setIsProfitTooltipOpen((current) => !current)}
                           aria-expanded={isProfitTooltipOpen}
                           className={cn(
-                            "inline-flex h-7 min-w-0 items-center gap-1 rounded-full border px-2 text-[12px] font-medium leading-none transition-all hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
+                            "inline-flex h-7 min-w-0 items-center gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-none transition-all hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
                             pureProfit >= 0
                               ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/14 dark:text-emerald-300"
                               : "border-rose-500/20 bg-rose-500/10 text-rose-700 hover:border-rose-500/35 hover:bg-rose-500/14 dark:text-rose-300"
@@ -1060,7 +1060,7 @@ function OrderCard({
                         <button
                           type="button"
                           onClick={() => onOpenCostBackfill(order)}
-                          className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[12px] font-medium leading-none text-orange-700 transition-all hover:border-orange-500/35 hover:bg-orange-500/14 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                          className="inline-flex h-7 min-w-0 items-center gap-0.5 rounded-full border border-orange-500/20 bg-orange-500/10 px-1.5 text-[11px] font-medium leading-none text-orange-700 transition-all hover:border-orange-500/35 hover:bg-orange-500/14 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
                         >
                           <span className="shrink-0">成本</span>
                           <span className="truncate">{productCostStatusText}</span>
