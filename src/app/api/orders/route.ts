@@ -1195,6 +1195,12 @@ export async function GET(request: NextRequest) {
       shopName: item.shop?.name || null,
     }));
 
+    const permissionsObj = userProfile?.permissions && typeof userProfile.permissions === "object" && !Array.isArray(userProfile.permissions)
+      ? userProfile.permissions as Record<string, unknown>
+      : {};
+    const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
+    const brushCommission = Math.round((integrationConfig.defaultBrushCommission || 0) * 100);
+
     const enrichedOrders = orders.map((order) => {
       const expectedIncome = typeof order.expectedIncome === "number"
         ? order.expectedIncome
@@ -1253,9 +1259,11 @@ export async function GET(request: NextRequest) {
         : missingCostItemCount > 0
           ? "pending-backfill" as const
           : "ready" as const;
-      const pureProfit = productCostStatus === "ready"
-        ? Math.round(Number(order.expectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
-        : null;
+      const pureProfit = order.isMainSystemSelfDelivery
+        ? - (Number(order.platformCommission || 0) + brushCommission)
+        : (productCostStatus === "ready"
+          ? Math.round(Number(order.expectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+          : null);
 
       return {
         ...order,

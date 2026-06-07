@@ -946,12 +946,17 @@ function OrderCard({
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const pureProfitTooltipRows = hasPureProfit
-    ? [
-        { label: "预计到手", value: toCurrency(expectedIncome) },
-        { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
-        { label: "减配送费", value: toCurrency(deliveryFee) },
-        { label: "减货品成本", value: toCurrency(productCost) },
-      ]
+    ? (order.isMainSystemSelfDelivery
+      ? [
+          { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
+          { label: "扣刷单佣金", value: toCurrency(-pureProfit - Number(order.platformCommission || 0)) },
+        ]
+      : [
+          { label: "预计到手", value: toCurrency(expectedIncome) },
+          { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
+          { label: "减配送费", value: toCurrency(deliveryFee) },
+          { label: "减货品成本", value: toCurrency(productCost) },
+        ])
     : productCostStatusText
       ? [
           { label: "预计到手", value: toCurrency(expectedIncome) },
