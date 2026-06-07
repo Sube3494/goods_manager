@@ -4077,6 +4077,7 @@ type InsufficientAutoPickStockItem = {
   availableQuantity: number;
   missingQuantity: number;
   mappedShopName: string | null;
+  systemStock?: number;
 };
 
 async function resolveOutboundItemsForAutoPickOrder(
@@ -4414,11 +4415,13 @@ export async function createOutboundFromAutoPickOrder(
             where: { id: item.shopProductId },
             select: {
               productName: true,
+              stock: true,
               shop: { select: { name: true } },
             },
           }),
         ]);
         const currentBatchStock = aggregateResult._sum.remainingQuantity || 0;
+        const currentSystemStock = shopProduct?.stock || 0;
         if (currentBatchStock < item.quantity) {
           insufficientItems.push({
             productId: item.productId,
@@ -4428,6 +4431,7 @@ export async function createOutboundFromAutoPickOrder(
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,
             mappedShopName: shopProduct?.shop?.name || resolved.mappedShopName || null,
+            systemStock: currentSystemStock,
           });
         }
       } else if (item.productId) {
@@ -4445,10 +4449,11 @@ export async function createOutboundFromAutoPickOrder(
           }),
           tx.product.findUnique({
             where: { id: item.productId },
-            select: { name: true },
+            select: { name: true, stock: true },
           }),
         ]);
         const currentBatchStock = aggregateResult._sum.remainingQuantity || 0;
+        const currentSystemStock = product?.stock || 0;
         if (currentBatchStock < item.quantity) {
           insufficientItems.push({
             productId: item.productId,
@@ -4458,6 +4463,7 @@ export async function createOutboundFromAutoPickOrder(
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,
             mappedShopName: resolved.mappedShopName || null,
+            systemStock: currentSystemStock,
           });
         }
       }

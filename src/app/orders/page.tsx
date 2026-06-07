@@ -2544,6 +2544,7 @@ export default function OrdersPage() {
       availableQuantity?: number;
       missingQuantity?: number;
       mappedShopName?: string | null;
+      systemStock?: number;
     }>
   ) => {
     const resolvedShopName = String(order.matchedShopName || insufficientItems[0]?.mappedShopName || "").trim();
@@ -2588,8 +2589,12 @@ export default function OrdersPage() {
     }
 
     const now = new Date();
+    const formattedDate = now.toISOString().slice(0, 10).replace(/-/g, "");
+    // 不管库存是 0 还是不够，全部缺货出库一律生成普通采购单，不标记为 -AUTO 自动补库存
+    const draftId = `PO-${formattedDate}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
+
     setPurchaseDraft({
-      id: `PO-${now.toISOString().slice(0, 10).replace(/-/g, "")}-AUTO`,
+      id: draftId,
       status: "Confirmed",
       type: "Purchase",
       date: now.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
