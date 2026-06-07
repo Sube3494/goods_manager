@@ -650,6 +650,13 @@ function parseOutboundCostSnapshot(value: unknown): ParsedOutboundCostSnapshot |
   };
 }
 
+function roundCurrency(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.round(value * 100) / 100;
+}
+
 export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
   const session = await getAuthorizedUser("order:manage");
@@ -917,7 +924,7 @@ export async function GET(request: NextRequest) {
       if (orderNo && !outboundByOrderNo.has(orderNo)) {
         let missingCostItemCount = 0;
         let firstMissingCostShopProductId: string | null = null;
-        const breakdown = outbound.items.map((item) => {
+        const rawBreakdown = outbound.items.map((item) => {
           const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
           const unitCost = snapshot
             ? Number(snapshot.averageUnitCost || 0)
@@ -936,17 +943,31 @@ export async function GET(request: NextRequest) {
           return {
             name: String(item.shopProduct?.productName || item.product?.name || "未命名商品").trim() || "未命名商品",
             quantity,
-            unitCost,
-            totalCost,
+            unitCost: roundCurrency(unitCost),
+            totalCost: roundCurrency(totalCost),
             shopProductId,
           };
         });
-        const productCost = Math.round(
-          breakdown.reduce((sum, item) => {
-            const itemTotalCost = Number(item.totalCost || 0);
-            return sum + (Number.isFinite(itemTotalCost) ? itemTotalCost : 0);
-          }, 0) * 100
-        ) / 100;
+        const productCost = outbound.items.reduce((sum, item) => {
+          const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
+          const unitCost = snapshot
+            ? Number(snapshot.totalCost || 0)
+            : (Number(item.shopProduct?.costPrice) || 0);
+          const quantity = Math.max(0, Number(item.quantity || 0));
+          return sum + (snapshot ? Math.round(unitCost * 100) : Math.round(unitCost * 100) * quantity);
+        }, 0);
+        const rawBreakdownTotal = roundCurrency(
+          rawBreakdown.reduce((sum, item) => sum + (Number(item.totalCost || 0) || 0), 0)
+        );
+        const shouldScaleBreakdown = rawBreakdownTotal > 0
+          && Math.abs(productCost - rawBreakdownTotal * 100) < 0.01;
+        const breakdown = shouldScaleBreakdown
+          ? rawBreakdown.map((item) => ({
+              ...item,
+              unitCost: roundCurrency(item.unitCost * 100),
+              totalCost: roundCurrency(item.totalCost * 100),
+            }))
+          : rawBreakdown;
         outboundByOrderNo.set(orderNo, { id: outbound.id, productCost, missingCostItemCount, firstMissingCostShopProductId, breakdown });
       }
     }
