@@ -1696,7 +1696,7 @@ export function ProductFormModal({
                             </button>
                         </div>
                             {variantDrafts.map((variant, index) => (
-                                <div key={variant.panelKey} className="rounded-[24px] border border-border/70 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.025))] dark:shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
+                                <div key={variant.panelKey} className="rounded-[24px] border border-border/70 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
                                     <div className="flex items-center gap-2">
                                         <div className="group flex min-w-0 flex-1 flex-col gap-3 px-1 py-1 transition-all sm:flex-row sm:items-center sm:gap-3">
                                             <div className="flex min-w-0 items-center gap-3">
