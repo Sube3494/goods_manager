@@ -106,15 +106,16 @@ export default function CostBackfillModal({
       const displayBatches = resolveDisplayBatches(item);
       if (displayBatches.length > 0) {
         displayBatches.forEach((batch) => {
-          // 优先使用批次单价，若为0则使用商品已有的单价做默认初始值，方便直接回填
+          // 优先使用批次单价（元），若为0则使用商品已有的单价（分，除以100转为元）做默认初始值，方便直接回填
           const defaultPrice = batch.unitCost > 0
             ? batch.unitCost
-            : (item.unitCost > 0 ? item.unitCost : 0);
+            : (item.unitCost > 0 ? item.unitCost / 100 : 0);
           initialInputs[batch.purchaseOrderItemId] = defaultPrice <= 0 ? "" : String(defaultPrice);
         });
       } else if (item.outboundOrderItemId) {
-        // 无可用批次，兜底纯手动回填
-        initialInputs[item.outboundOrderItemId] = item.unitCost <= 0 ? "" : String(item.unitCost);
+        // 无可用批次，兜底纯手动回填（由于item.unitCost单位为分，需除以100转为元）
+        const defaultPrice = item.unitCost > 0 ? item.unitCost / 100 : 0;
+        initialInputs[item.outboundOrderItemId] = defaultPrice <= 0 ? "" : String(defaultPrice);
       }
     });
     setCostInputs(initialInputs);
