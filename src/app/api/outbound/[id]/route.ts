@@ -460,11 +460,14 @@ export async function PUT(
 
       if (notePayload) {
         try {
+          const wasShipped = existingOrder.status === "已发货" || existingOrder.status === "部分发货";
+          const willBeShipped = finalStatus === "已发货" || finalStatus === "部分发货";
+          const isShipped = !wasShipped && willBeShipped;
           await collectFactoryShipmentCustomer(tx, session.id, {
             recipientName: notePayload.recipientName,
             recipientPhone: notePayload.recipientPhone,
             recipientAddress: notePayload.recipientAddress,
-          });
+          }, isShipped);
         } catch (err) {
           console.error("Failed to auto-collect customer during outbound update:", err);
         }

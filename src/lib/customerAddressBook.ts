@@ -65,7 +65,8 @@ export function normalizeCustomerAddresses(addresses: unknown): CustomerAddressI
 export async function collectFactoryShipmentCustomer(
   tx: Prisma.TransactionClient,
   userId: string,
-  input: CustomerAddressInput
+  input: CustomerAddressInput,
+  isShipped: boolean = false
 ) {
   const recipientName = normalizeText(input.recipientName);
   const recipientPhone = normalizeText(input.recipientPhone);
@@ -105,7 +106,7 @@ export async function collectFactoryShipmentCustomer(
       source: existing.source || "factory-shipment",
       updatedAt: now,
       lastUsedAt: now,
-      usageCount: (existing.usageCount || 0) + 1,
+      usageCount: (existing.usageCount || 0) + (isShipped ? 1 : 0),
     };
   } else {
     nextAddresses.push({
@@ -120,7 +121,7 @@ export async function collectFactoryShipmentCustomer(
       createdAt: now,
       updatedAt: now,
       lastUsedAt: now,
-      usageCount: 1,
+      usageCount: isShipped ? 1 : 0,
     });
   }
 

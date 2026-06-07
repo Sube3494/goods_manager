@@ -941,12 +941,8 @@ function parseQuickAddressInput(input: string) {
     };
   }
 
-  const remarkParts = Array.from(normalized.matchAll(/\(([^()]{2,100})\)/g))
-    .map((match) => match[1].trim())
-    .filter(Boolean);
-  const remark = remarkParts.join("；");
+  const remark = "";
   const core = normalized
-    .replace(/\(([^()]*)\)/g, " ")
     .replace(/[|｜]/g, "\n")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{2,}/g, "\n")

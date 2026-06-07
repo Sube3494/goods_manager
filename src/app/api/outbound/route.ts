@@ -226,7 +226,8 @@ export async function POST(request: Request) {
       try {
         const parsed = parseFactoryShipmentNote(note);
         if (parsed.isFactoryShipment) {
-          await collectFactoryShipmentCustomer(tx, user.id, parsed);
+          const isShipped = finalStatus === "已发货" || finalStatus === "部分发货";
+          await collectFactoryShipmentCustomer(tx, user.id, parsed, isShipped);
         }
       } catch (err) {
         console.error("Failed to auto-collect customer during outbound creation:", err);
