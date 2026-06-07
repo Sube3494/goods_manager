@@ -26,6 +26,7 @@ interface PurchaseOrderModalProps {
   onOverview?: (po: PurchaseOrder) => void;
   initialData?: PurchaseOrder | null;
   readOnly?: boolean;
+  costBackfillItemId?: string | null;
   defaultType?: "Purchase" | "Inbound";
 }
 
@@ -36,20 +37,22 @@ const PurchaseItemRow = memo(({
     suppliers, 
     onUpdate, 
     onRemove,
+    allowCostEdit,
     isChecked,
     onToggle,
     onManageShelfLife
-}: { 
+  }: { 
     item: PurchaseOrderItem; 
     readOnly: boolean; 
     products: Product[]; 
     suppliers: Supplier[];
     onUpdate: (productId: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => void;
     onRemove: (productId: string) => void;
+    allowCostEdit?: boolean;
     isChecked?: boolean;
     onToggle?: (productId: string) => void;
     onManageShelfLife?: (item: PurchaseOrderItem) => void;
-}) => {
+  }) => {
     const itemKey = item.shopProductId || item.productId || "";
     const productData = useMemo(() => {
         const p = products.find(g => g.id === itemKey);
@@ -209,7 +212,7 @@ const PurchaseItemRow = memo(({
                 {/* Price Column */}
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">单价</label>
-                    {readOnly ? (
+                    {readOnly && !allowCostEdit ? (
                         <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono text-foreground">
                             <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
                             {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -231,7 +234,7 @@ const PurchaseItemRow = memo(({
                 {/* Total Column */}
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">小计</label>
-                    {readOnly ? (
+                    {readOnly || allowCostEdit ? (
                         <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs overflow-hidden whitespace-nowrap">
                             <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
                             {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -335,6 +338,7 @@ export function PurchaseOrderModal({
   onOverview,
   initialData,
   readOnly = false,
+  costBackfillItemId = null,
   defaultType = "Purchase",
 }: PurchaseOrderModalProps) {
   const { showToast } = useToast();
@@ -377,6 +381,10 @@ export function PurchaseOrderModal({
     formData.type === "Return" ||
     formData.type === "InternalReturn" ||
     formData.type === AUTO_INBOUND_TYPE;
+  const canBackfillReceivedCosts = !readOnly
+    && !isSystemGenerated
+    && formData.status === "Received"
+    && Boolean(costBackfillItemId);
 
 
 
@@ -848,7 +856,7 @@ export function PurchaseOrderModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (effectiveReadOnly && formData.status !== "Confirmed" && formData.status !== "Shipped") return; // Prevent normal form submit if read-only, unless it's for tracking updates
+    if (effectiveReadOnly && !canBackfillReceivedCosts && formData.status !== "Confirmed" && formData.status !== "Shipped") return;
     handleAction(formData.status);
   };
 
@@ -1210,6 +1218,7 @@ export function PurchaseOrderModal({
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
+                                    allowCostEdit={canBackfillReceivedCosts}
                                     isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
                                     onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
                                     onManageShelfLife={handleOpenShelfLifeModal}
@@ -1325,6 +1334,14 @@ export function PurchaseOrderModal({
                             {/* Actions Container */}
                             {!readOnly && (
                                 <div className="flex items-center gap-2 sm:border-l sm:border-border/10 sm:pl-6 h-9 sm:h-10">
+                                    {canBackfillReceivedCosts && (
+                                        <button
+                                            type="submit"
+                                            className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-primary text-primary-foreground shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                                        >
+                                            保存成本
+                                        </button>
+                                    )}
                                     {formData.status === "Received" && !isSystemGenerated && (
                                         <button
                                             type="button"
@@ -1334,7 +1351,7 @@ export function PurchaseOrderModal({
                                             撤销入库
                                         </button>
                                     )}
-                                    {((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered" || formData.status === "Shipped") && (
+                                    {!canBackfillReceivedCosts && ((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered" || formData.status === "Shipped") && (
                                         <>
                                             <button
                                                 type="submit"

@@ -909,6 +909,8 @@ export async function GET(request: NextRequest) {
       productCost: number;
       missingCostItemCount: number;
       firstMissingCostShopProductId: string | null;
+      firstMissingCostPurchaseOrderId: string | null;
+      firstMissingCostPurchaseOrderItemId: string | null;
       breakdown: Array<{
         name: string;
         quantity: number;
@@ -917,6 +919,26 @@ export async function GET(request: NextRequest) {
         shopProductId: string | null;
       }>;
     }>();
+    const purchaseOrderItemIds = Array.from(new Set(
+      outboundRows.flatMap((outbound) => outbound.items.flatMap((item) => {
+        const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
+        return snapshot?.batches.map((batch) => String(batch.purchaseOrderItemId || "").trim()).filter(Boolean) || [];
+      }))
+    ));
+    const purchaseOrderItems = purchaseOrderItemIds.length > 0
+      ? await prisma.purchaseOrderItem.findMany({
+          where: {
+            id: { in: purchaseOrderItemIds },
+          },
+          select: {
+            id: true,
+            purchaseOrderId: true,
+          },
+        })
+      : [];
+    const purchaseOrderIdByItemId = new Map(
+      purchaseOrderItems.map((item) => [item.id, item.purchaseOrderId] as const)
+    );
     for (const outbound of outboundRows) {
       const note = String(outbound.note || "");
       const match = note.match(/平台单号:\s*([^\s|]+)/);
@@ -924,6 +946,8 @@ export async function GET(request: NextRequest) {
       if (orderNo && !outboundByOrderNo.has(orderNo)) {
         let missingCostItemCount = 0;
         let firstMissingCostShopProductId: string | null = null;
+        let firstMissingCostPurchaseOrderId: string | null = null;
+        let firstMissingCostPurchaseOrderItemId: string | null = null;
         const rawBreakdown = outbound.items.map((item) => {
           const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
           const unitCost = snapshot
@@ -938,6 +962,15 @@ export async function GET(request: NextRequest) {
             missingCostItemCount += 1;
             if (!firstMissingCostShopProductId) {
               firstMissingCostShopProductId = shopProductId;
+            }
+            if (!firstMissingCostPurchaseOrderItemId) {
+              const purchaseOrderItemId = String(
+                snapshot?.batches.find((batch) => String(batch.purchaseOrderItemId || "").trim())?.purchaseOrderItemId || ""
+              ).trim();
+              if (purchaseOrderItemId) {
+                firstMissingCostPurchaseOrderItemId = purchaseOrderItemId;
+                firstMissingCostPurchaseOrderId = purchaseOrderIdByItemId.get(purchaseOrderItemId) || null;
+              }
             }
           }
           return {
@@ -968,7 +1001,15 @@ export async function GET(request: NextRequest) {
               totalCost: roundCurrency(item.totalCost * 100),
             }))
           : rawBreakdown;
-        outboundByOrderNo.set(orderNo, { id: outbound.id, productCost, missingCostItemCount, firstMissingCostShopProductId, breakdown });
+        outboundByOrderNo.set(orderNo, {
+          id: outbound.id,
+          productCost,
+          missingCostItemCount,
+          firstMissingCostShopProductId,
+          firstMissingCostPurchaseOrderId,
+          firstMissingCostPurchaseOrderItemId,
+          breakdown,
+        });
       }
     }
 
@@ -1128,6 +1169,8 @@ export async function GET(request: NextRequest) {
         productCostStatus,
         missingCostItemCount,
         firstMissingCostShopProductId: outboundMeta?.firstMissingCostShopProductId || null,
+        firstMissingCostPurchaseOrderId: outboundMeta?.firstMissingCostPurchaseOrderId || null,
+        firstMissingCostPurchaseOrderItemId: outboundMeta?.firstMissingCostPurchaseOrderItemId || null,
         items: order.items.map((item) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
           const skuSegments = splitCompositeSkuSegments(item.productNo);

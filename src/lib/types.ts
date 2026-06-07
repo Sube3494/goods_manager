@@ -229,6 +229,8 @@ export interface AutoPickOrder {
   productCostStatus?: "ready" | "pending-outbound" | "pending-backfill";
   missingCostItemCount?: number | null;
   firstMissingCostShopProductId?: string | null;
+  firstMissingCostPurchaseOrderId?: string | null;
+  firstMissingCostPurchaseOrderItemId?: string | null;
   lastSyncedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;

@@ -4,6 +4,7 @@ import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 import { FinanceMath } from "@/lib/math";
 import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
+import { Prisma } from "../../../../../prisma/generated-client";
 
 function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
   const nextStock = currentStock - revertQty;
@@ -16,6 +17,130 @@ function calculateRevertedCostPrice(currentStock: number, currentCost: number, r
   const nextTotalValue = FinanceMath.add(currentTotalValue, -revertTotalValue);
 
   return Math.max(0, FinanceMath.divide(nextTotalValue, nextStock));
+}
+
+type ParsedOutboundSnapshotBatch = {
+  purchaseOrderItemId: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+};
+
+type ParsedOutboundSnapshot = {
+  quantity: number;
+  totalCost: number;
+  averageUnitCost: number;
+  batches: ParsedOutboundSnapshotBatch[];
+};
+
+function parseOutboundCostSnapshot(value: unknown): ParsedOutboundSnapshot | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const raw = value as Record<string, unknown>;
+  const batches = Array.isArray(raw.batches)
+    ? raw.batches
+        .map((entry) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            return null;
+          }
+          const batch = entry as Record<string, unknown>;
+          const purchaseOrderItemId = String(batch.purchaseOrderItemId || "").trim();
+          const quantity = Number(batch.quantity || 0);
+          if (!purchaseOrderItemId || !Number.isFinite(quantity) || quantity <= 0) {
+            return null;
+          }
+          const unitCost = Number(batch.unitCost || 0);
+          const totalCost = Number(batch.totalCost || 0);
+          return {
+            purchaseOrderItemId,
+            quantity,
+            unitCost: Number.isFinite(unitCost) ? unitCost : 0,
+            totalCost: Number.isFinite(totalCost) ? totalCost : 0,
+          };
+        })
+        .filter((entry): entry is ParsedOutboundSnapshotBatch => Boolean(entry))
+    : [];
+  const quantity = Number(raw.quantity || 0);
+  const totalCost = Number(raw.totalCost || 0);
+  const averageUnitCost = Number(raw.averageUnitCost || 0);
+  return {
+    quantity: Number.isFinite(quantity) ? quantity : 0,
+    totalCost: Number.isFinite(totalCost) ? totalCost : 0,
+    averageUnitCost: Number.isFinite(averageUnitCost) ? averageUnitCost : 0,
+    batches,
+  };
+}
+
+function rebuildOutboundCostSnapshot(
+  snapshot: ParsedOutboundSnapshot,
+  costPriceByPurchaseOrderItemId: Map<string, number>
+) {
+  let changed = false;
+  const nextBatches = snapshot.batches.map((batch) => {
+    const nextUnitCost = costPriceByPurchaseOrderItemId.get(batch.purchaseOrderItemId);
+    if (nextUnitCost === undefined) {
+      return batch;
+    }
+    changed = true;
+    return {
+      ...batch,
+      unitCost: nextUnitCost,
+      totalCost: FinanceMath.multiply(nextUnitCost, batch.quantity),
+    };
+  });
+  if (!changed) {
+    return null;
+  }
+  const nextTotalCost = nextBatches.reduce(
+    (sum, batch) => FinanceMath.add(sum, batch.totalCost),
+    0
+  );
+  return {
+    quantity: snapshot.quantity,
+    totalCost: nextTotalCost,
+    averageUnitCost: snapshot.quantity > 0 ? FinanceMath.divide(nextTotalCost, snapshot.quantity) : 0,
+    batches: nextBatches,
+  };
+}
+
+async function syncOutboundCostSnapshotsForPurchaseItems(
+  tx: Prisma.TransactionClient,
+  purchaseOrderUserId: string | null | undefined,
+  costPriceByPurchaseOrderItemId: Map<string, number>
+) {
+  if (costPriceByPurchaseOrderItemId.size <= 0) {
+    return;
+  }
+  const outboundItems = await tx.outboundOrderItem.findMany({
+    where: purchaseOrderUserId
+      ? {
+          outboundOrder: {
+            userId: purchaseOrderUserId,
+          },
+        }
+      : undefined,
+    select: {
+      id: true,
+      costSnapshot: true,
+    },
+  });
+  for (const outboundItem of outboundItems) {
+    const snapshot = parseOutboundCostSnapshot(outboundItem.costSnapshot);
+    if (!snapshot || snapshot.batches.length <= 0) {
+      continue;
+    }
+    const nextSnapshot = rebuildOutboundCostSnapshot(snapshot, costPriceByPurchaseOrderItemId);
+    if (!nextSnapshot) {
+      continue;
+    }
+    await tx.outboundOrderItem.update({
+      where: { id: outboundItem.id },
+      data: {
+        costSnapshot: nextSnapshot as Prisma.InputJsonValue,
+      },
+    });
+  }
 }
 
 export async function PUT(
@@ -36,7 +161,9 @@ export async function PUT(
       paymentVouchers,
       date,
       shippingAddress,
-      shopName
+      shopName,
+      costBackfill,
+      costBackfillItemId,
     } = body;
 
     const purchase = await prisma.$transaction(async (tx) => {
@@ -57,6 +184,100 @@ export async function PUT(
         : previousStatus;
       const isReceivingNow = previousStatus !== "Received" && nextStatus === "Received";
       const isRevokingReceived = previousStatus === "Received" && nextStatus !== "Received";
+      const isReceivedCostBackfill = previousStatus === "Received" && costBackfill === true;
+
+      if (isReceivedCostBackfill) {
+        if (!Array.isArray(items) || items.length <= 0) {
+          throw new Error("缺少待补录的入库批次成本数据");
+        }
+        if (nextStatus !== "Received") {
+          throw new Error("已入库批次补录成本时不能修改单据状态");
+        }
+        const existingItemsById = new Map(existingPurchase.items.map((item) => [item.id, item] as const));
+        const costPriceByPurchaseOrderItemId = new Map<string, number>();
+        let nextItemsTotalAmount = 0;
+
+        for (const rawItem of items as PurchaseOrderItemType[]) {
+          const itemId = String(rawItem.id || "").trim();
+          const existingItem = itemId ? existingItemsById.get(itemId) : null;
+          if (!existingItem) {
+            throw new Error("已入库批次补录成本时不能新增或替换商品明细");
+          }
+          const nextQuantity = Number(rawItem.quantity || 0);
+          if (nextQuantity !== Number(existingItem.quantity || 0)) {
+            throw new Error("已入库批次补录成本时不能修改数量");
+          }
+          if ((rawItem.productId || null) !== (existingItem.productId || null)
+            || (rawItem.shopProductId || null) !== (existingItem.shopProductId || null)) {
+            throw new Error("已入库批次补录成本时不能修改关联商品");
+          }
+          const nextCostPrice = FinanceMath.add(Number(rawItem.costPrice) || 0, 0);
+          costPriceByPurchaseOrderItemId.set(existingItem.id, nextCostPrice);
+          nextItemsTotalAmount = FinanceMath.add(
+            nextItemsTotalAmount,
+            FinanceMath.multiply(nextCostPrice, nextQuantity)
+          );
+        }
+
+        if (existingItemsById.size !== costPriceByPurchaseOrderItemId.size) {
+          throw new Error("已入库批次补录成本时需要保留完整的原始明细");
+        }
+
+        for (const existingItem of existingPurchase.items) {
+          const nextCostPrice = costPriceByPurchaseOrderItemId.get(existingItem.id);
+          if (nextCostPrice === undefined || nextCostPrice === Number(existingItem.costPrice || 0)) {
+            continue;
+          }
+          await tx.purchaseOrderItem.update({
+            where: { id: existingItem.id },
+            data: {
+              costPrice: nextCostPrice,
+            },
+          });
+        }
+
+        await tx.purchaseOrder.update({
+          where: { id },
+          data: {
+            totalAmount: totalAmount !== undefined
+              ? FinanceMath.add(Number(totalAmount), 0)
+              : nextItemsTotalAmount,
+          },
+        });
+
+        await syncOutboundCostSnapshotsForPurchaseItems(
+          tx,
+          existingPurchase.userId,
+          costPriceByPurchaseOrderItemId
+        );
+
+        const refreshedPurchase = await tx.purchaseOrder.findUnique({
+          where: { id },
+          include: {
+            items: {
+              include: {
+                product: true,
+                shopProduct: true,
+                supplier: true,
+                batches: true,
+              },
+            },
+          },
+        });
+
+        if (!refreshedPurchase) {
+          throw new Error("采购单不存在");
+        }
+
+        if (costBackfillItemId) {
+          const requestedItemId = String(costBackfillItemId).trim();
+          if (requestedItemId && !refreshedPurchase.items.some((item) => item.id === requestedItemId)) {
+            throw new Error("目标批次不属于当前采购单");
+          }
+        }
+
+        return refreshedPurchase;
+      }
 
       if (isRevokingReceived) {
         for (const item of existingPurchase.items) {

@@ -110,6 +110,7 @@ function PurchasesContent() {
 
 
   const [detailReadOnly, setDetailReadOnly] = useState(false);
+  const [costBackfillItemId, setCostBackfillItemId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<PurchaseStatusFilter>("Confirmed");
   const [shopFilter, setShopFilter] = useState<string>("All");
@@ -200,20 +201,59 @@ function PurchasesContent() {
   // 2. Auto-open detail if orderId in URL (Depends on purchases being loaded)
   useEffect(() => {
     const orderIdParam = searchParams.get('orderId');
-    if (orderIdParam && purchases.length > 0) {
-      const order = purchases.find(p => p.id === orderIdParam);
-      if (order) {
-        const handle = requestAnimationFrame(() => {
-            setEditingPurchase(order);
-            setIsModalOpen(true);
-            // Clean up URL parameter
-            const params = new URLSearchParams(searchParams);
-            params.delete('orderId');
-            router.replace(`${pathname}?${params.toString()}`);
-        });
-        return () => cancelAnimationFrame(handle);
-      }
+    const costBackfillItemIdParam = String(searchParams.get('costItemId') || "").trim();
+    const costBackfillMode = searchParams.get('costBackfill') === '1';
+    if (!orderIdParam) {
+      return;
     }
+    const order = purchases.find(p => p.id === orderIdParam);
+    const openTargetOrder = (target: PurchaseOrder) => {
+      const handle = requestAnimationFrame(() => {
+        setEditingPurchase(target);
+        setDetailReadOnly(false);
+        setCostBackfillItemId(costBackfillMode ? (costBackfillItemIdParam || null) : null);
+        setIsModalOpen(true);
+        const params = new URLSearchParams(searchParams);
+        params.delete('orderId');
+        params.delete('costItemId');
+        params.delete('costBackfill');
+        router.replace(`${pathname}?${params.toString()}`);
+      });
+      return () => cancelAnimationFrame(handle);
+    };
+    if (order) {
+      return openTargetOrder(order);
+    }
+    let cancelled = false;
+    const fetchTargetOrder = async () => {
+      try {
+        const res = await fetch(`/api/purchases?orderId=${encodeURIComponent(orderIdParam)}&pageSize=1`);
+        const data = await res.json().catch(() => ({})) as { items?: PurchaseOrder[]; error?: string };
+        if (!res.ok) {
+          throw new Error(data?.error || "读取采购单失败");
+        }
+        const fetchedOrder = Array.isArray(data.items) ? data.items[0] : null;
+        if (!fetchedOrder || cancelled) {
+          return;
+        }
+        setPurchases((prev) => sortPurchasesByRecency([fetchedOrder, ...prev.filter((item) => item.id !== fetchedOrder.id)]));
+        setEditingPurchase(fetchedOrder);
+        setDetailReadOnly(false);
+        setCostBackfillItemId(costBackfillMode ? (costBackfillItemIdParam || null) : null);
+        setIsModalOpen(true);
+        const params = new URLSearchParams(searchParams);
+        params.delete('orderId');
+        params.delete('costItemId');
+        params.delete('costBackfill');
+        router.replace(`${pathname}?${params.toString()}`);
+      } catch (error) {
+        console.error("Failed to fetch purchase order for auto-open:", error);
+      }
+    };
+    void fetchTargetOrder();
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams, purchases, router, pathname]);
 
 
@@ -234,6 +274,7 @@ function PurchasesContent() {
   const handleCreate = () => {
     setEditingPurchase(null);
     setDetailReadOnly(false);
+    setCostBackfillItemId(null);
     setIsModalOpen(true);
   };
 
@@ -242,6 +283,7 @@ function PurchasesContent() {
   const handleEdit = (po: PurchaseOrder) => {
     setEditingPurchase(po);
     setDetailReadOnly(false);
+    setCostBackfillItemId(null);
     setIsModalOpen(true);
   };
 
@@ -299,7 +341,15 @@ function PurchasesContent() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(
+          costBackfillItemId
+            ? {
+                ...data,
+                costBackfill: true,
+                costBackfillItemId,
+              }
+            : data
+        ),
       });
 
       if (res.ok) {
@@ -333,6 +383,7 @@ function PurchasesContent() {
         
         const msg = isEdit ? "采购单已更新" : "采购单已创建";
         showToast(msg, "success");
+        setCostBackfillItemId(null);
         setIsModalOpen(false);
       } else {
         const errorData = await res.json().catch(() => ({}));
@@ -1205,12 +1256,16 @@ function PurchasesContent() {
 
        <PurchaseOrderModal 
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setCostBackfillItemId(null);
+        }}
         onSubmit={handleSave}
         onExport={handleExport}
         onOverview={(po) => setOverviewPurchases([po])}
         initialData={editingPurchase || undefined}
         readOnly={detailReadOnly}
+        costBackfillItemId={costBackfillItemId}
         defaultType="Purchase"
       />
 

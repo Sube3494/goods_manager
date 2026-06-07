@@ -67,6 +67,7 @@ export async function GET(request: Request) {
   const session = await getFreshSession() as SessionUser | null;
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
+  const orderId = String(searchParams.get("orderId") || searchParams.get("id") || "").trim();
   const productId = searchParams.get("productId");
   const page = parseInt(searchParams.get("page") || "1");
   const pageSize = parseInt(searchParams.get("pageSize") || "50");
@@ -84,6 +85,9 @@ export async function GET(request: Request) {
 
   try {
     const andWhere: Prisma.PurchaseOrderWhereInput[] = [];
+    if (orderId) {
+      andWhere.push({ id: orderId });
+    }
     if (type === "Inbound") {
       andWhere.push({
         OR: [

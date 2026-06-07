@@ -2601,21 +2601,22 @@ export default function OrdersPage() {
   }, [localShops, showToast]);
 
   const openCostBackfill = useCallback((order: AutoPickOrder) => {
-    const resolvedShopName = String(order.matchedShopName || "").trim();
-    const shopId = localShops.find((shop) => shop.name === resolvedShopName)?.id || "";
-    if (!shopId) {
-      showToast("当前订单还没有识别到系统店铺，暂时无法直接回填成本", "error");
+    const purchaseOrderId = String(order.firstMissingCostPurchaseOrderId || "").trim();
+    if (!purchaseOrderId) {
+      showToast("这单缺成本的入库批次还没定位到，暂时无法直接补录", "error");
       return;
     }
-
-    const params = new URLSearchParams({ shopId });
-    const editItemId = String(order.firstMissingCostShopProductId || "").trim();
-    if (editItemId) {
-      params.set("editItemId", editItemId);
+    const params = new URLSearchParams({
+      status: "Received",
+      orderId: purchaseOrderId,
+      costBackfill: "1",
+    });
+    const costItemId = String(order.firstMissingCostPurchaseOrderItemId || "").trim();
+    if (costItemId) {
+      params.set("costItemId", costItemId);
     }
-
-    router.push(`/shop-goods?${params.toString()}`);
-  }, [localShops, router, showToast]);
+    router.push(`/purchases?${params.toString()}`);
+  }, [router, showToast]);
 
   const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem) => {
     const resolvedShopName = order.matchedShopName || "";
