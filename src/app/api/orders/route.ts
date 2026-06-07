@@ -868,6 +868,7 @@ export async function GET(request: NextRequest) {
             note: true,
             items: {
               select: {
+                productId: true,
                 shopProductId: true,
                 quantity: true,
                 costSnapshot: true,
@@ -958,6 +959,17 @@ export async function GET(request: NextRequest) {
             ? Number(snapshot.totalCost || 0)
             : (Math.round(unitCost * 100) * quantity) / 100;
           const shopProductId = String(item.shopProductId || "").trim() || null;
+          const productId = String(item.productId || "").trim() || null;
+
+          const batches = (snapshot?.batches || []).map((batch) => {
+            const purchaseOrderItemId = batch.purchaseOrderItemId;
+            const purchaseOrderId = purchaseOrderIdByItemId.get(purchaseOrderItemId) || null;
+            return {
+              ...batch,
+              purchaseOrderId,
+            };
+          });
+
           if (unitCost <= 0) {
             missingCostItemCount += 1;
             if (!firstMissingCostShopProductId) {
@@ -979,6 +991,8 @@ export async function GET(request: NextRequest) {
             unitCost: roundCurrency(unitCost),
             totalCost: roundCurrency(totalCost),
             shopProductId,
+            productId,
+            batches,
           };
         });
         const productCost = outbound.items.reduce((sum, item) => {
@@ -1163,8 +1177,8 @@ export async function GET(request: NextRequest) {
         hasOutbound,
         outboundOrderId: outboundMeta?.id || null,
         serviceFeeRate,
-        productCost: productCostStatus === "ready" ? productCost : null,
-        productCostBreakdown: productCostStatus === "ready" ? (outboundMeta?.breakdown || []) : null,
+        productCost: hasOutbound ? productCost : null,
+        productCostBreakdown: outboundMeta?.breakdown || [],
         pureProfit,
         productCostStatus,
         missingCostItemCount,

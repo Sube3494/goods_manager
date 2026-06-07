@@ -34,6 +34,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { CreateOfflineOrderModal } from "@/components/Orders/CreateOfflineOrderModal";
+import CostBackfillModal from "@/components/Orders/CostBackfillModal";
 import {
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderAbnormalStatus,
@@ -2343,6 +2344,9 @@ export default function OrdersPage() {
     amountTaobao: 0,
   });
   const [isCreateOfflineOpen, setIsCreateOfflineOpen] = useState(false);
+  const [backfillTarget, setBackfillTarget] = useState<AutoPickOrder | null>(null);
+  const [outboundTriggerOrderId, setOutboundTriggerOrderId] = useState<string | null>(null);
+  const runActionRef = useRef<((orderId: string, action: OrderAction) => Promise<void>) | null>(null);
   const [purchaseDraft, setPurchaseDraft] = useState<PurchaseOrder | null>(null);
 
   const effectivePromotionDate = useMemo(() => {
@@ -2601,22 +2605,8 @@ export default function OrdersPage() {
   }, [localShops, showToast]);
 
   const openCostBackfill = useCallback((order: AutoPickOrder) => {
-    const purchaseOrderId = String(order.firstMissingCostPurchaseOrderId || "").trim();
-    if (!purchaseOrderId) {
-      showToast("这单缺成本的入库批次还没定位到，暂时无法直接补录", "error");
-      return;
-    }
-    const params = new URLSearchParams({
-      status: "Received",
-      orderId: purchaseOrderId,
-      costBackfill: "1",
-    });
-    const costItemId = String(order.firstMissingCostPurchaseOrderItemId || "").trim();
-    if (costItemId) {
-      params.set("costItemId", costItemId);
-    }
-    router.push(`/purchases?${params.toString()}`);
-  }, [router, showToast]);
+    setBackfillTarget(order);
+  }, []);
 
   const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem) => {
     const resolvedShopName = order.matchedShopName || "";
@@ -2742,7 +2732,18 @@ export default function OrdersPage() {
     }
     showToast("采购单已创建并入库", "success");
     setPurchaseDraft(null);
-  }, [showToast]);
+
+    // 如果有被库存不足中断的出库订单，保存采购单后自动重新出库一次
+    if (outboundTriggerOrderId) {
+      const targetId = outboundTriggerOrderId;
+      setOutboundTriggerOrderId(null);
+      setTimeout(() => {
+        if (runActionRef.current) {
+          void runActionRef.current(targetId, "outbound");
+        }
+      }, 500);
+    }
+  }, [showToast, outboundTriggerOrderId]);
 
   const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number }) => {
     if (isFetchingRef.current) {
@@ -2916,6 +2917,7 @@ export default function OrdersPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         if (action === "outbound" && data?.reason === "insufficient-stock" && targetOrder) {
+          setOutboundTriggerOrderId(targetOrder.id);
           openPurchaseDraftForInsufficientStock(
             targetOrder,
             Array.isArray(data?.insufficientItems) ? data.insufficientItems : []
@@ -2972,6 +2974,7 @@ export default function OrdersPage() {
       setActingId("");
     }
   };
+  runActionRef.current = runAction;
 
   const saveIntegrationConfig = useCallback(async (
     nextConfig?: AutoPickIntegrationConfig,
@@ -3765,7 +3768,10 @@ export default function OrdersPage() {
         <PurchaseOrderModal
           isOpen={Boolean(purchaseDraft)}
           initialData={purchaseDraft}
-          onClose={() => setPurchaseDraft(null)}
+          onClose={() => {
+            setPurchaseDraft(null);
+            setOutboundTriggerOrderId(null);
+          }}
           onSubmit={(data) => {
             void savePurchaseDraft(data).then(() => {
               void fetchOrders({ silent: true });
@@ -3828,6 +3834,18 @@ export default function OrdersPage() {
         }}
         emptyStateText={matchEditorTarget?.shopName ? `当前店铺“${matchEditorTarget.shopName}”下没有找到候选商品` : "未找到相关商品"}
       />
+
+      {backfillTarget && (
+        <CostBackfillModal
+          order={backfillTarget}
+          onClose={() => setBackfillTarget(null)}
+          onSuccess={() => {
+            setBackfillTarget(null);
+            showToast("成本回填成功！净利润已重新计算", "success");
+            void fetchOrders({ targetPage: currentPage });
+          }}
+        />
+      )}
 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>

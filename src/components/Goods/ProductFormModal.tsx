@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2, Calendar } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2, Calendar, Pencil } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -168,6 +168,50 @@ export function ProductFormModal({
   // 移动端排序模式 (Mobile reorder mode)
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingCostValue, setEditingCostValue] = useState<string>("");
+  const [isSavingCost, setIsSavingCost] = useState<boolean>(false);
+
+  const handleSaveCost = async (purchaseOrderItemId: string, orderId: string) => {
+    const costPrice = Number(editingCostValue);
+    if (isNaN(costPrice) || costPrice < 0) {
+      showToast("请输入合法的进价", "error");
+      return;
+    }
+
+    setIsSavingCost(true);
+    try {
+      const res = await fetch("/api/purchases/backfill-cost", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: [{ purchaseOrderItemId, costPrice }]
+        })
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        showToast("进价修改成功！已自动重算采购单总额与销售利润成本快照", "success");
+        setInboundHistory(prev => prev.map(order => {
+          if (order.id === orderId) {
+            return {
+              ...order,
+              items: order.items.map(item => item.id === purchaseOrderItemId ? { ...item, costPrice } : item)
+            };
+          }
+          return order;
+        }));
+        setEditingItemId(null);
+        setEditingCostValue("");
+      } else {
+        showToast(data?.error || "保存失败", "error");
+      }
+    } catch (err) {
+      console.error("Failed to save cost price:", err);
+      showToast("网络请求失败", "error");
+    } finally {
+      setIsSavingCost(false);
+    }
+  };
   const jdSkuPreview = useMemo(() => normalizeJdSkuPreview(formData.jdSkuId), [formData.jdSkuId]);
 
   const [shelfLifeVal, setShelfLifeVal] = useState("");
@@ -1324,9 +1368,78 @@ export function ProductFormModal({
                                                                 </span>
                                                             )}
                                                         </div>
-                                                         <div className="text-[10px] text-muted-foreground">
-                                                             单价: ￥{item.costPrice} | 合计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}
-                                                         </div>
+                                                        {order.status === "Received" ? (
+                                                            editingItemId === itemId ? (
+                                                                <div className="flex items-center gap-1 mt-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
+                                                                    <span className="text-[10px] text-muted-foreground">进价: ￥</span>
+                                                                    <input 
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        value={editingCostValue}
+                                                                        onChange={(e) => setEditingCostValue(e.target.value)}
+                                                                        className="w-16 h-6 px-1.5 text-[10px] text-right rounded border border-border dark:border-white/10 bg-white/5 text-foreground focus:outline-none focus:border-primary"
+                                                                        placeholder="0.00"
+                                                                        disabled={isSavingCost}
+                                                                        autoFocus
+                                                                    />
+                                                                    <button 
+                                                                        onClick={() => handleSaveCost(itemId, order.id)}
+                                                                        disabled={isSavingCost}
+                                                                        className="p-0.5 text-green-500 hover:bg-green-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center"
+                                                                        title="保存"
+                                                                    >
+                                                                        <Check size={12} />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setEditingItemId(null);
+                                                                            setEditingCostValue("");
+                                                                        }}
+                                                                        disabled={isSavingCost}
+                                                                        className="p-0.5 text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center"
+                                                                        title="取消"
+                                                                    >
+                                                                        <X size={12} />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-[10px] text-muted-foreground flex items-center justify-end gap-1.5 mt-0.5">
+                                                                    {item.costPrice === 0 ? (
+                                                                        <>
+                                                                            <span className="text-[9px] text-orange-500 font-medium bg-orange-500/10 px-1 py-0.2 rounded">无进价</span>
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    setEditingItemId(itemId);
+                                                                                    setEditingCostValue("");
+                                                                                }}
+                                                                                className="text-[10px] text-primary hover:underline font-medium flex items-center gap-0.5"
+                                                                            >
+                                                                                补录
+                                                                            </button>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span>单价: ￥{item.costPrice} | 合计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    setEditingItemId(itemId);
+                                                                                    setEditingCostValue(String(item.costPrice));
+                                                                                }}
+                                                                                className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center"
+                                                                                title="修改价格"
+                                                                            >
+                                                                                <Pencil size={10} />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        ) : (
+                                                            <div className="text-[10px] text-muted-foreground">
+                                                                单价: ￥{item.costPrice} | 合计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
 
