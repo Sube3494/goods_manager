@@ -949,7 +949,7 @@ function OrderCard({
     ? (order.isMainSystemSelfDelivery
       ? [
           { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
-          { label: "扣刷单佣金", value: toCurrency(-pureProfit - Number(order.platformCommission || 0)) },
+          { label: "扣刷单佣金", value: toCurrency(- (Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0)))) },
         ]
       : [
           { label: "预计到手", value: toCurrency(expectedIncome) },
