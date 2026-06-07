@@ -189,29 +189,7 @@ export async function POST(request: Request) {
           throw new Error("对应的出库明细项未找到，或不属于当前用户");
         }
 
-        // 校验批次可用剩余库存量
-        const remaining = dbPurchaseItem.remainingQuantity || 0;
-        if (remaining < deductQty) {
-          throw new Error(`批次库存不足分配。批次ID: ${purchaseOrderItemId}，剩余库存: ${remaining}，请求分配: ${deductQty}`);
-        }
-
-        // 扣减采购批次剩余数量
-        await tx.purchaseOrderItem.update({
-          where: { id: purchaseOrderItemId },
-          data: {
-            remainingQuantity: { decrement: deductQty },
-          },
-        });
-
-        // 联动扣减保质期批次库存 ProductBatch
-        await tx.productBatch.updateMany({
-          where: { purchaseOrderItemId },
-          data: {
-            remainingStock: { decrement: deductQty },
-          },
-        });
-
-        // 写入并更新该出库明细的快照 costSnapshot，追加该批次关联
+        // 写入并更新该出库明细的快照 costSnapshot，追加该批次关联（回填成本仅关联批次用于计价对账，绝不扣减库存数量，防止二次扣减）
         const snapshot = parseOutboundCostSnapshot(dbOutboundItem.costSnapshot) || {
           quantity: dbOutboundItem.quantity,
           totalCost: 0,
