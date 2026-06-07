@@ -1260,7 +1260,7 @@ export async function GET(request: NextRequest) {
           ? "pending-backfill" as const
           : "ready" as const;
       const pureProfit = order.isMainSystemSelfDelivery
-        ? - (Number(order.platformCommission || 0) + brushCommission)
+        ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
         : (productCostStatus === "ready"
           ? Math.round(Number(order.expectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
           : null);
