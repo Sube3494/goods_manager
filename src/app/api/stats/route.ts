@@ -614,10 +614,13 @@ export async function GET(request: NextRequest) {
         const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
         const orderCostYuan = orderCostMeta?.productCost || 0;
 
-        userPaid = FinanceMath.add(userPaid, paidYuan);
+        const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+        if (!isBrush) {
+          userPaid = FinanceMath.add(userPaid, paidYuan);
+          productCost = FinanceMath.add(productCost, orderCostYuan);
+        }
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
-        productCost = FinanceMath.add(productCost, orderCostYuan);
       } else {
         const platformStr = String(order.platform || "").trim().toLowerCase();
         const deliveryObj = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
@@ -739,13 +742,19 @@ export async function GET(request: NextRequest) {
         const commissionYuan = isOffline ? 0 : (paidYuan * rate);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
 
+        if (!isBrush) {
+          if (point) {
+            point.userPaid = FinanceMath.add(point.userPaid, paidYuan);
+          }
+          if (platformPoint) {
+            platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, paidYuan);
+          }
+        }
         if (point) {
-          point.userPaid = FinanceMath.add(point.userPaid, paidYuan);
           point.platformCommission = FinanceMath.add(point.platformCommission, commissionYuan);
           point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
         }
         if (platformPoint) {
-          platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, paidYuan);
           platformPoint.platformCommission = FinanceMath.add(platformPoint.platformCommission, commissionYuan);
           platformPoint.deliveryExpense = FinanceMath.add(platformPoint.deliveryExpense, deliveryYuan);
         }
@@ -753,9 +762,11 @@ export async function GET(request: NextRequest) {
         if (isBrush) {
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, paidYuan);
+            point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan);
           }
           if (platformPoint) {
             platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, paidYuan);
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan);
           }
         } else {
           const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
@@ -838,7 +849,7 @@ export async function GET(request: NextRequest) {
         
         const profit = FinanceMath.add(
           point?.pureProfit || 0,
-          -(point?.promotionExpense || 0)
+          -(point?.promotionExpense || 0) - (point?.brushExpense || 0)
         );
 
         return {
