@@ -219,11 +219,27 @@ export interface AutoPickOrder {
   serviceFeeRate?: number | null;
   productCost?: number | null;
   productCostBreakdown?: Array<{
+    outboundOrderItemId?: string | null;
+    productId?: string | null;
     name: string;
     quantity: number;
     unitCost: number;
     totalCost: number;
     shopProductId?: string | null;
+    batches?: Array<{
+      purchaseOrderItemId: string;
+      purchaseOrderId: string | null;
+      quantity: number;
+      unitCost: number;
+    }>;
+    availableBatches?: Array<{
+      purchaseOrderItemId: string;
+      purchaseOrderId: string | null;
+      quantity: number;
+      remainingQuantity: number;
+      costPrice: number;
+      date: string | null;
+    }>;
   }> | null;
   pureProfit?: number | null;
   productCostStatus?: "ready" | "pending-outbound" | "pending-backfill";

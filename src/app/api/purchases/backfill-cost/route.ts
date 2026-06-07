@@ -146,80 +146,219 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Items must be a non-empty array" }, { status: 400 });
     }
 
-    const costPriceByPurchaseOrderItemId = new Map<string, number>();
-    for (const item of items) {
-      const id = String(item.purchaseOrderItemId || "").trim();
-      const costPrice = Number(item.costPrice);
-      if (!id || !Number.isFinite(costPrice) || costPrice < 0) {
-        return NextResponse.json({ error: `Invalid item data: ${JSON.stringify(item)}` }, { status: 400 });
-      }
-      costPriceByPurchaseOrderItemId.set(id, costPrice);
-    }
-
     await prisma.$transaction(async (tx) => {
-      // 1. 查询这些采购明细，并校验是否属于当前用户、状态为已入库
-      const dbItems = await tx.purchaseOrderItem.findMany({
-        where: {
-          id: { in: Array.from(costPriceByPurchaseOrderItemId.keys()) },
-          purchaseOrder: {
-            userId: session.id,
-            status: "Received",
-          },
-        },
-        include: {
-          purchaseOrder: {
-            include: {
-              items: true,
-            },
-          },
-        },
-      });
+      // 1. 分类处理传入的数据项目
+      const bindItems = items.filter((item) => item.outboundOrderItemId && item.purchaseOrderItemId);
+      const manualOnlyItems = items.filter((item) => item.outboundOrderItemId && !item.purchaseOrderItemId);
+      const regularItems = items.filter((item) => !item.outboundOrderItemId && item.purchaseOrderItemId);
 
-      if (dbItems.length !== costPriceByPurchaseOrderItemId.size) {
-        throw new Error("部分入库批次未找到，或对应的单据未入库、不属于当前用户");
-      }
+      const costPriceByPurchaseOrderItemId = new Map<string, number>();
 
-      // 2. 更新明细的采购价
-      for (const dbItem of dbItems) {
-        const nextCostPrice = costPriceByPurchaseOrderItemId.get(dbItem.id)!;
-        await tx.purchaseOrderItem.update({
-          where: { id: dbItem.id },
-          data: {
-            costPrice: nextCostPrice,
-          },
-        });
-      }
+      // A. 先处理补录绑定匹配（包含出库单明细 ID 和采购批次 ID）
+      for (const item of bindItems) {
+        const outboundItemId = String(item.outboundOrderItemId).trim();
+        const purchaseOrderItemId = String(item.purchaseOrderItemId).trim();
+        const costPrice = Number(item.costPrice);
+        const deductQty = Number(item.quantity || 1);
 
-      // 3. 按采购单分组重算 totalAmount
-      const purchaseOrders = Array.from(
-        new Map(dbItems.map((item) => [item.purchaseOrder.id, item.purchaseOrder])).values()
-      );
-      for (const order of purchaseOrders) {
-        const allOrderItems = await tx.purchaseOrderItem.findMany({
-          where: { purchaseOrderId: order.id },
-        });
-        
-        let newTotalAmount = 0;
-        for (const item of allOrderItems) {
-          const price = item.costPrice || 0;
-          const qty = item.quantity || 0;
-          newTotalAmount = FinanceMath.add(newTotalAmount, FinanceMath.multiply(price, qty));
+        if (!outboundItemId || !purchaseOrderItemId || !Number.isFinite(costPrice) || costPrice < 0) {
+          throw new Error(`回填数据项无效: ${JSON.stringify(item)}`);
         }
 
-        await tx.purchaseOrder.update({
-          where: { id: order.id },
+        // 校验采购入库批次
+        const dbPurchaseItem = await tx.purchaseOrderItem.findUnique({
+          where: { id: purchaseOrderItemId },
+          include: { purchaseOrder: true },
+        });
+
+        if (
+          !dbPurchaseItem ||
+          dbPurchaseItem.purchaseOrder.userId !== session.id ||
+          dbPurchaseItem.purchaseOrder.status !== "Received"
+        ) {
+          throw new Error("部分入库批次未找到，或对应的单据未入库、不属于当前用户");
+        }
+
+        // 校验出库明细项
+        const dbOutboundItem = await tx.outboundOrderItem.findUnique({
+          where: { id: outboundItemId },
+          include: { outboundOrder: true },
+        });
+
+        if (!dbOutboundItem || dbOutboundItem.outboundOrder.userId !== session.id) {
+          throw new Error("对应的出库明细项未找到，或不属于当前用户");
+        }
+
+        // 校验批次可用剩余库存量
+        const remaining = dbPurchaseItem.remainingQuantity || 0;
+        if (remaining < deductQty) {
+          throw new Error(`批次库存不足分配。批次ID: ${purchaseOrderItemId}，剩余库存: ${remaining}，请求分配: ${deductQty}`);
+        }
+
+        // 扣减采购批次剩余数量
+        await tx.purchaseOrderItem.update({
+          where: { id: purchaseOrderItemId },
           data: {
-            totalAmount: newTotalAmount,
+            remainingQuantity: { decrement: deductQty },
+          },
+        });
+
+        // 联动扣减保质期批次库存 ProductBatch
+        await tx.productBatch.updateMany({
+          where: { purchaseOrderItemId },
+          data: {
+            remainingStock: { decrement: deductQty },
+          },
+        });
+
+        // 写入并更新该出库明细的快照 costSnapshot，追加该批次关联
+        const snapshot = parseOutboundCostSnapshot(dbOutboundItem.costSnapshot) || {
+          quantity: dbOutboundItem.quantity,
+          totalCost: 0,
+          averageUnitCost: 0,
+          batches: [],
+        };
+
+        const existingBatch = snapshot.batches.find((b) => b.purchaseOrderItemId === purchaseOrderItemId);
+        if (existingBatch) {
+          existingBatch.quantity += deductQty;
+          existingBatch.unitCost = costPrice;
+          existingBatch.totalCost = FinanceMath.multiply(existingBatch.quantity, costPrice);
+        } else {
+          snapshot.batches.push({
+            purchaseOrderItemId,
+            quantity: deductQty,
+            unitCost: costPrice,
+            totalCost: FinanceMath.multiply(deductQty, costPrice),
+          });
+        }
+
+        const nextTotalCost = snapshot.batches.reduce((sum, b) => FinanceMath.add(sum, b.totalCost), 0);
+        const nextAverageUnitCost = snapshot.quantity > 0 ? FinanceMath.divide(nextTotalCost, snapshot.quantity) : 0;
+
+        await tx.outboundOrderItem.update({
+          where: { id: outboundItemId },
+          data: {
+            costSnapshot: {
+              quantity: snapshot.quantity,
+              totalCost: nextTotalCost,
+              averageUnitCost: nextAverageUnitCost,
+              batches: snapshot.batches,
+            } as Prisma.InputJsonValue,
+          },
+        });
+
+        costPriceByPurchaseOrderItemId.set(purchaseOrderItemId, costPrice);
+      }
+
+      // B. 处理纯手动兜底回填（仅有出库单明细 ID，没有可用入库批次）
+      for (const item of manualOnlyItems) {
+        const outboundItemId = String(item.outboundOrderItemId).trim();
+        const costPrice = Number(item.costPrice);
+
+        if (!outboundItemId || !Number.isFinite(costPrice) || costPrice < 0) {
+          throw new Error(`手动回填数据项无效: ${JSON.stringify(item)}`);
+        }
+
+        const dbOutboundItem = await tx.outboundOrderItem.findUnique({
+          where: { id: outboundItemId },
+          include: { outboundOrder: true },
+        });
+
+        if (!dbOutboundItem || dbOutboundItem.outboundOrder.userId !== session.id) {
+          throw new Error("对应的出库明细项未找到，或不属于当前用户");
+        }
+
+        const qty = dbOutboundItem.quantity;
+        const totalCost = FinanceMath.multiply(costPrice, qty);
+
+        const nextSnapshot = {
+          quantity: qty,
+          totalCost: totalCost,
+          averageUnitCost: costPrice,
+          batches: [],
+        };
+
+        await tx.outboundOrderItem.update({
+          where: { id: outboundItemId },
+          data: {
+            costSnapshot: nextSnapshot as Prisma.InputJsonValue,
           },
         });
       }
 
-      // 4. 同步出库成本快照
-      await syncOutboundCostSnapshotsForPurchaseItems(
-        tx,
-        session.id,
-        costPriceByPurchaseOrderItemId
-      );
+      // C. 处理常规回填（只含有采购批次ID的价格变动同步）
+      for (const item of regularItems) {
+        const id = String(item.purchaseOrderItemId || "").trim();
+        const costPrice = Number(item.costPrice);
+        if (!id || !Number.isFinite(costPrice) || costPrice < 0) {
+          throw new Error(`常规回填数据项无效: ${JSON.stringify(item)}`);
+        }
+        costPriceByPurchaseOrderItemId.set(id, costPrice);
+      }
+
+      // D. 统一同步采购批次的新采购单价，并重新计算关联的出库成本和利润
+      if (costPriceByPurchaseOrderItemId.size > 0) {
+        const allPurchaseItemIds = Array.from(costPriceByPurchaseOrderItemId.keys());
+        const dbItems = await tx.purchaseOrderItem.findMany({
+          where: {
+            id: { in: allPurchaseItemIds },
+            purchaseOrder: {
+              userId: session.id,
+              status: "Received",
+            },
+          },
+          include: {
+            purchaseOrder: true,
+          },
+        });
+
+        if (dbItems.length !== costPriceByPurchaseOrderItemId.size) {
+          throw new Error("部分入库批次未找到，或对应的单据未入库、不属于当前用户");
+        }
+
+        // 更新采购明细的价格
+        for (const dbItem of dbItems) {
+          const nextCostPrice = costPriceByPurchaseOrderItemId.get(dbItem.id)!;
+          await tx.purchaseOrderItem.update({
+            where: { id: dbItem.id },
+            data: {
+              costPrice: nextCostPrice,
+            },
+          });
+        }
+
+        // 按采购单重新计算 totalAmount
+        const purchaseOrders = Array.from(
+          new Map(dbItems.map((item) => [item.purchaseOrder.id, item.purchaseOrder])).values()
+        );
+        for (const order of purchaseOrders) {
+          const allOrderItems = await tx.purchaseOrderItem.findMany({
+            where: { purchaseOrderId: order.id },
+          });
+          
+          let newTotalAmount = 0;
+          for (const item of allOrderItems) {
+            const price = item.costPrice || 0;
+            const qty = item.quantity || 0;
+            newTotalAmount = FinanceMath.add(newTotalAmount, FinanceMath.multiply(price, qty));
+          }
+
+          await tx.purchaseOrder.update({
+            where: { id: order.id },
+            data: {
+              totalAmount: newTotalAmount,
+            },
+          });
+        }
+
+        // 统一更新和价格联动有关的出库快照数据
+        await syncOutboundCostSnapshotsForPurchaseItems(
+          tx,
+          session.id,
+          costPriceByPurchaseOrderItemId
+        );
+      }
     });
 
     return NextResponse.json({ success: true });

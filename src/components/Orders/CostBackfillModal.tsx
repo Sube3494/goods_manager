@@ -7,16 +7,26 @@ type OutboundBatch = {
   purchaseOrderId: string | null;
   quantity: number;
   unitCost: number;
+  isVirtual?: boolean;
 };
 
 type OutboundBreakdownItem = {
+  outboundOrderItemId?: string | null;
+  productId?: string | null;
   name: string;
   quantity: number;
   unitCost: number;
   totalCost: number;
   shopProductId?: string | null;
-  productId?: string | null;
   batches?: OutboundBatch[];
+  availableBatches?: Array<{
+    purchaseOrderItemId: string;
+    purchaseOrderId: string | null;
+    quantity: number;
+    remainingQuantity: number;
+    costPrice: number;
+    date: string | null;
+  }>;
 };
 
 interface CostBackfillModalProps {
@@ -44,7 +54,7 @@ export default function CostBackfillModal({
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // 记录每个批次输入框的修改值: { purchaseOrderItemId: string_value }
+  // 记录每个批次输入框的修改值: { purchaseOrderItemId_or_outboundOrderItemId: string_value }
   const [costInputs, setCostInputs] = useState<Record<string, string>>({});
   
   // 记录各商品的历史参考价格: { productId_or_shopProductId: ReferencePrice[] }
@@ -56,17 +66,52 @@ export default function CostBackfillModal({
     return () => setIsMounted(false);
   }, []);
 
+  // 虚拟绑定 FIFO 计算方法
+  const resolveDisplayBatches = (item: OutboundBreakdownItem): OutboundBatch[] => {
+    if (item.batches && item.batches.length > 0) {
+      return item.batches;
+    }
+
+    if (!item.availableBatches || item.availableBatches.length === 0) {
+      return [];
+    }
+
+    const displayBatches: OutboundBatch[] = [];
+    let remaining = item.quantity;
+
+    for (const available of item.availableBatches) {
+      if (remaining <= 0) break;
+      const deduct = Math.min(available.remainingQuantity, remaining);
+      if (deduct > 0) {
+        displayBatches.push({
+          purchaseOrderItemId: available.purchaseOrderItemId,
+          purchaseOrderId: available.purchaseOrderId,
+          quantity: deduct,
+          unitCost: available.costPrice,
+          isVirtual: true,
+        });
+        remaining -= deduct;
+      }
+    }
+
+    return displayBatches;
+  };
+
   // 1. 初始化成本输入框的值
   useEffect(() => {
     if (!order.productCostBreakdown) return;
     
     const initialInputs: Record<string, string> = {};
     order.productCostBreakdown.forEach((item) => {
-      if (item.batches && item.batches.length > 0) {
-        item.batches.forEach((batch) => {
+      const displayBatches = resolveDisplayBatches(item);
+      if (displayBatches.length > 0) {
+        displayBatches.forEach((batch) => {
           // 如果成本是 0，默认输入框为空，方便用户输入；否则显示当前成本
           initialInputs[batch.purchaseOrderItemId] = batch.unitCost <= 0 ? "" : String(batch.unitCost);
         });
+      } else if (item.outboundOrderItemId) {
+        // 无可用批次，兜底纯手动回填
+        initialInputs[item.outboundOrderItemId] = item.unitCost <= 0 ? "" : String(item.unitCost);
       }
     });
     setCostInputs(initialInputs);
@@ -81,7 +126,11 @@ export default function CostBackfillModal({
       if (!targetId) return;
 
       // 如果当前商品的某些批次价格 <= 0，就去查询历史记录
-      const hasMissingCost = item.batches?.some((b) => b.unitCost <= 0) || item.unitCost <= 0;
+      const displayBatches = resolveDisplayBatches(item);
+      const hasMissingCost = displayBatches.length > 0
+        ? displayBatches.some((b) => b.unitCost <= 0)
+        : item.unitCost <= 0;
+
       if (!hasMissingCost) return;
 
       // 防止重复加载
@@ -149,14 +198,20 @@ export default function CostBackfillModal({
     if (isSaving) return;
     
     // 构造待提交的数据项
-    const submitItems: Array<{ purchaseOrderItemId: string; costPrice: number }> = [];
+    const submitItems: Array<{
+      purchaseOrderItemId?: string;
+      outboundOrderItemId?: string;
+      quantity?: number;
+      costPrice: number;
+    }> = [];
     let hasEmptyOrZero = false;
 
     if (!order.productCostBreakdown) return;
 
     for (const item of order.productCostBreakdown) {
-      if (item.batches && item.batches.length > 0) {
-        for (const batch of item.batches) {
+      const displayBatches = resolveDisplayBatches(item);
+      if (displayBatches.length > 0) {
+        for (const batch of displayBatches) {
           const rawVal = costInputs[batch.purchaseOrderItemId];
           const costPrice = parseFloat(rawVal || "0");
           
@@ -166,9 +221,24 @@ export default function CostBackfillModal({
           
           submitItems.push({
             purchaseOrderItemId: batch.purchaseOrderItemId,
+            outboundOrderItemId: batch.isVirtual ? (item.outboundOrderItemId || undefined) : undefined,
+            quantity: batch.isVirtual ? batch.quantity : undefined,
             costPrice: isNaN(costPrice) ? 0 : costPrice,
           });
         }
+      } else if (item.outboundOrderItemId) {
+        // 兜底手动回填
+        const rawVal = costInputs[item.outboundOrderItemId];
+        const costPrice = parseFloat(rawVal || "0");
+        
+        if (isNaN(costPrice) || costPrice <= 0) {
+          hasEmptyOrZero = true;
+        }
+        
+        submitItems.push({
+          outboundOrderItemId: item.outboundOrderItemId,
+          costPrice: isNaN(costPrice) ? 0 : costPrice,
+        });
       }
     }
 
@@ -273,12 +343,75 @@ export default function CostBackfillModal({
 
                   {/* 批次编辑区域 */}
                   <div className="space-y-3 pt-2 border-t border-black/4 dark:border-white/4">
-                    {!item.batches || item.batches.length === 0 ? (
-                      <div className="text-xs text-muted-foreground/60 italic py-1">
-                        未定位到该商品绑定的采购入库明细。
-                      </div>
-                    ) : (
-                      item.batches.map((batch) => (
+                    {(() => {
+                      const displayBatches = resolveDisplayBatches(item);
+                      if (displayBatches.length === 0) {
+                        // 如果完全没有批次，且也没有候选批次，退回到纯手动兜底回填
+                        if (item.outboundOrderItemId) {
+                          const idKey = item.outboundOrderItemId;
+                          return (
+                            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="text-xs">
+                                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                  <span className="text-[10px] bg-amber-200 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.25 rounded">无关联入库</span>
+                                  <span className="text-muted-foreground">出库后补录成本</span>
+                                </div>
+                                <div className="mt-0.5 text-muted-foreground/80">
+                                  出库量: {item.quantity} 件
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-1.5 items-end shrink-0 w-full sm:w-auto">
+                                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                  <span className="text-sm font-bold text-muted-foreground">¥</span>
+                                  <input
+                                    type="text"
+                                    value={costInputs[idKey] || ""}
+                                    onChange={(e) => handleInputChange(idKey, e.target.value)}
+                                    placeholder="输入采购单价"
+                                    disabled={isSaving}
+                                    className="h-10 w-full sm:w-40 rounded-xl border border-black/8 bg-white/50 px-3 text-sm font-medium text-foreground outline-none focus:border-primary/30 focus:ring-2 focus:ring-primary/12 dark:border-white/10 dark:bg-white/5 dark:focus:border-primary/40"
+                                  />
+                                </div>
+                                {targetId && (
+                                  <div className="text-[11px] text-muted-foreground flex flex-wrap gap-1.5 justify-end">
+                                    {isHistoryLoading ? (
+                                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                                        <RefreshCw size={10} className="animate-spin" />
+                                        查询历史进价中...
+                                      </span>
+                                    ) : historyCosts.length > 0 ? (
+                                      <>
+                                        <span>参考历史:</span>
+                                        {historyCosts.map((ref, idx) => (
+                                          <button
+                                            key={idx}
+                                            onClick={() => handleApplyRefPrice(idKey, ref.price)}
+                                            disabled={isSaving}
+                                            title={`采购单: ${ref.orderId} (${ref.date})`}
+                                            className="text-primary hover:underline hover:text-primary/80 font-medium bg-primary/8 px-1.5 py-0.25 rounded cursor-pointer transition-colors active:scale-95"
+                                          >
+                                            ¥{ref.price.toFixed(2)}
+                                          </button>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground/40">无历史进价记录</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="text-xs text-muted-foreground/60 italic py-1">
+                            未定位到该商品绑定的采购入库明细。
+                          </div>
+                        );
+                      }
+
+                      return displayBatches.map((batch) => (
                         <div 
                           key={batch.purchaseOrderItemId}
                           className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between"
@@ -286,11 +419,15 @@ export default function CostBackfillModal({
                           {/* 批次信息描述 */}
                           <div className="text-xs">
                             <div className="font-semibold text-foreground flex items-center gap-1.5">
-                              <span className="text-[10px] bg-slate-200 dark:bg-white/10 text-muted-foreground px-1.5 py-0.25 rounded">批次</span>
+                              {batch.isVirtual ? (
+                                <span className="text-[10px] bg-orange-200 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 px-1.5 py-0.25 rounded">补录关联批次</span>
+                              ) : (
+                                <span className="text-[10px] bg-slate-200 dark:bg-white/10 text-muted-foreground px-1.5 py-0.25 rounded">批次</span>
+                              )}
                               <span className="font-mono text-muted-foreground">{batch.purchaseOrderId || "未知入库单"}</span>
                             </div>
                             <div className="mt-0.5 text-muted-foreground/80">
-                              批次出库量: {batch.quantity} 件
+                              {batch.isVirtual ? `分配出库量: ${batch.quantity} 件` : `批次出库量: ${batch.quantity} 件`}
                             </div>
                           </div>
 
@@ -338,8 +475,8 @@ export default function CostBackfillModal({
                             )}
                           </div>
                         </div>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </div>
                 </div>
               );

@@ -868,6 +868,7 @@ export async function GET(request: NextRequest) {
             note: true,
             items: {
               select: {
+                id: true,
                 productId: true,
                 shopProductId: true,
                 quantity: true,
@@ -940,6 +941,90 @@ export async function GET(request: NextRequest) {
     const purchaseOrderIdByItemId = new Map(
       purchaseOrderItems.map((item) => [item.id, item.purchaseOrderId] as const)
     );
+
+    // 查询所有相关出库商品的可用采购批次列表，供后续回填补录参考
+    const allOutboundProductIds = Array.from(new Set(
+      outboundRows.flatMap((outbound) => outbound.items.map((item) => String(item.productId || "").trim()).filter(Boolean))
+    ));
+    const allOutboundShopProductIds = Array.from(new Set(
+      outboundRows.flatMap((outbound) => outbound.items.map((item) => String(item.shopProductId || "").trim()).filter(Boolean))
+    ));
+
+    const availablePurchaseItems = (allOutboundProductIds.length > 0 || allOutboundShopProductIds.length > 0)
+      ? await prisma.purchaseOrderItem.findMany({
+          where: {
+            purchaseOrder: {
+              userId: session.id,
+              status: "Received",
+            },
+            remainingQuantity: { gt: 0 },
+            OR: [
+              ...(allOutboundProductIds.length > 0 ? [{ productId: { in: allOutboundProductIds } }] : []),
+              ...(allOutboundShopProductIds.length > 0 ? [{ shopProductId: { in: allOutboundShopProductIds } }] : []),
+            ],
+          },
+          select: {
+            id: true,
+            purchaseOrderId: true,
+            productId: true,
+            shopProductId: true,
+            quantity: true,
+            remainingQuantity: true,
+            costPrice: true,
+            purchaseOrder: {
+              select: {
+                date: true,
+              },
+            },
+          },
+          orderBy: {
+            purchaseOrder: {
+              date: "asc",
+            },
+          },
+        })
+      : [];
+
+    const availableBatchesByProduct = new Map<string, Array<{
+      purchaseOrderItemId: string;
+      purchaseOrderId: string | null;
+      quantity: number;
+      remainingQuantity: number;
+      costPrice: number;
+      date: string | null;
+    }>>();
+
+    const availableBatchesByShopProduct = new Map<string, Array<{
+      purchaseOrderItemId: string;
+      purchaseOrderId: string | null;
+      quantity: number;
+      remainingQuantity: number;
+      costPrice: number;
+      date: string | null;
+    }>>();
+
+    availablePurchaseItems.forEach((poi) => {
+      const item = {
+        purchaseOrderItemId: poi.id,
+        purchaseOrderId: poi.purchaseOrderId,
+        quantity: poi.quantity,
+        remainingQuantity: poi.remainingQuantity || 0,
+        costPrice: poi.costPrice,
+        date: poi.purchaseOrder?.date ? poi.purchaseOrder.date.toISOString() : null,
+      };
+
+      if (poi.shopProductId) {
+        const list = availableBatchesByShopProduct.get(poi.shopProductId) || [];
+        list.push(item);
+        availableBatchesByShopProduct.set(poi.shopProductId, list);
+      }
+      if (poi.productId) {
+        const list = availableBatchesByProduct.get(poi.productId) || [];
+        list.push(item);
+        availableBatchesByProduct.set(poi.productId, list);
+      }
+    });
+
     for (const outbound of outboundRows) {
       const note = String(outbound.note || "");
       const match = note.match(/平台单号:\s*([^\s|]+)/);
@@ -970,6 +1055,10 @@ export async function GET(request: NextRequest) {
             };
           });
 
+          const availableBatches = (shopProductId ? availableBatchesByShopProduct.get(shopProductId) : null)
+            || (productId ? availableBatchesByProduct.get(productId) : null)
+            || [];
+
           if (unitCost <= 0) {
             missingCostItemCount += 1;
             if (!firstMissingCostShopProductId) {
@@ -986,6 +1075,7 @@ export async function GET(request: NextRequest) {
             }
           }
           return {
+            outboundOrderItemId: item.id,
             name: String(item.shopProduct?.productName || item.product?.name || "未命名商品").trim() || "未命名商品",
             quantity,
             unitCost: roundCurrency(unitCost),
@@ -993,6 +1083,7 @@ export async function GET(request: NextRequest) {
             shopProductId,
             productId,
             batches,
+            availableBatches,
           };
         });
         const productCost = outbound.items.reduce((sum, item) => {
