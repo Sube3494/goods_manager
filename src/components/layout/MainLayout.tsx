@@ -58,7 +58,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isCollapsed, showSidebar]);
 
-  // Disable number input scrolling globally, and block global right-click
+  // Disable number input scrolling globally
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement;
@@ -69,22 +69,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const handleContextMenu = (e: MouseEvent) => {
-      // Allow right-click on specific elements if needed later, but globally prevent by default
-      if (process.env.NODE_ENV !== 'development') {
-        e.preventDefault();
-      } else {
-        // In development, still block it to test, unless holding Shift 
-        if (!e.shiftKey) e.preventDefault();
-      }
-    };
-
     window.addEventListener('wheel', handleWheel, { passive: false });
-    document.addEventListener('contextmenu', handleContextMenu);
     
     return () => {
       window.removeEventListener('wheel', handleWheel);
-      document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []);
 

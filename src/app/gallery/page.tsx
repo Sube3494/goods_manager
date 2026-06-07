@@ -82,7 +82,6 @@ const LightboxMediaItem = ({ item, onScaleChange, isVisible = true }: LightboxMe
                                     muted={isMuted}
                                     controlsList="nodownload noplaybackrate"
                                     loop
-                                    onContextMenu={(e) => e.preventDefault()}
                                     onClick={togglePlay}
                                     onTimeUpdate={() => {
                                         if (videoRef.current) {

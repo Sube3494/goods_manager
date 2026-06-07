@@ -263,7 +263,6 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
                                                 muted={isMuted}
                                                 controlsList="nodownload noplaybackrate"
                                                 className="w-full h-full object-contain cursor-pointer"
-                                                onContextMenu={(e) => e.preventDefault()}
                                                 onClick={() => {
                                                     if (videoRef.current?.paused) {
                                                         videoRef.current.play();
@@ -376,7 +375,6 @@ export function ImageGallery({ isOpen, images, initialIndex = 0, onClose }: Imag
                                             fill
                                             className="object-contain"
                                             draggable={false}
-                                            onContextMenu={(e) => e.preventDefault()}
                                             unoptimized
                                         />
                                     ) : null}
