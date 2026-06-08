@@ -839,7 +839,6 @@ export async function GET(request: NextRequest) {
               expectedIncome: true,
               platformCommission: true,
               delivery: true,
-              rawPayload: true,
               items: {
                 select: {
                   quantity: true,
@@ -1121,7 +1120,7 @@ export async function GET(request: NextRequest) {
     const summary = !includeMetrics
       ? null
       : summaryOrders.reduce((acc, order) => {
-          const expectedIncome = readExpectedIncomeFromRawPayload(order.rawPayload);
+          const expectedIncome = order.expectedIncome;
           const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           if (!cancelled) {
