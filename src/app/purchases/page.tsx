@@ -905,15 +905,15 @@ function PurchasesContent() {
                <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
             </div>
           ) : paginatedPurchases.length > 0 ? (
-          <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
             <colgroup>
               <col className="w-[44px]" />
-              <col className="w-[50px]" />
-              <col className="w-[110px]" />
-              <col className="w-[260px]" />
-              <col className="w-[100px]" />
+              <col className="w-[40px]" />
               <col className="w-[90px]" />
-              <col className="w-[160px]" />
+              <col className="w-[155px]" />
+              <col className="w-[90px]" />
+              <col className="w-[80px]" />
+              <col className="w-[130px]" />
               <col className="w-[90px]" />
             </colgroup>
             <thead>
@@ -999,15 +999,15 @@ function PurchasesContent() {
                           </span>
                       ) : <span className="text-[10px] text-muted-foreground/30 italic">未归属</span>}
                     </td>
-                    <td className="px-5 py-4 text-center text-sm">
+                    <td className="px-3 py-4 text-center text-sm">
                       {(() => {
                         const summary = formatPurchaseItemsSummary(po);
                         return (
-                          <div className="mx-auto flex max-w-[300px] flex-wrap justify-center gap-2">
+                          <div className="mx-auto flex max-w-[130px] flex-wrap justify-center gap-1.5">
                             {summary.items.length > 0 ? summary.items.map((item) => (
                               <div
                                 key={item.key}
-                                className="flex min-w-0 max-w-[220px] items-center gap-2 rounded-full border border-border/50 bg-secondary/30 p-0.5 pr-2.5 shadow-sm transition-all hover:border-primary/30 dark:bg-white/5"
+                                className="flex min-w-0 max-w-[105px] items-center gap-1.5 rounded-full border border-border/50 bg-secondary/30 p-0.5 pr-2 shadow-sm transition-all hover:border-primary/30 dark:bg-white/5"
                                 title={item.name}
                               >
                                 <div className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
@@ -1048,33 +1048,32 @@ function PurchasesContent() {
                     <td className="px-4 py-4 text-center whitespace-nowrap">
                       <PurchaseStatusBadge status={po.status} />
                     </td>
-                    <td className="px-4 py-4 text-center text-sm text-muted-foreground whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                          <Calendar size={14} />
-                          <span className="font-mono">
+                    <td className="px-2 py-4 text-center text-sm text-muted-foreground whitespace-nowrap">
+                      <div className="flex items-center justify-center">
+                          <span className="font-mono text-xs">
                               {formatLocalDateTime(po.date)}
                           </span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-3">
+                    <td className="px-2 py-4 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2">
                         {/* Unified Detail/Manage Button */}
                         <button 
                             onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
-                            className="h-9 w-9 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm group/btn"
+                            className="h-8 w-8 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm group/btn"
                             title="详细管理"
                         >
-                          <Eye size={18} className="group-hover/btn:scale-110 transition-transform" />
+                          <Eye size={15} className="group-hover/btn:scale-110 transition-transform" />
                         </button>
 
                         {/* Delete Action */}
                         {canEdit && (
                            <button 
                                onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
-                               className="h-9 w-9 flex items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-sm group/btn"
+                               className="h-8 w-8 flex items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-sm group/btn"
                                title="删除"
                            >
-                             <Trash2 size={18} className="group-hover/btn:scale-110 transition-transform" />
+                             <Trash2 size={15} className="group-hover/btn:scale-110 transition-transform" />
                            </button>
                         )}
                       </div>

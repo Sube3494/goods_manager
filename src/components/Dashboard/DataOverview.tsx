@@ -129,7 +129,7 @@ function ChartTooltip({
 
   return (
     <div className="min-w-[148px] rounded-[18px] border border-black/8 bg-white/92 px-3.5 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/92 dark:shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
-      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label}</div>
       <div className="mt-2.5 space-y-2">
         {payload.map((item) => {
           const rawName = String(item.name || "");
