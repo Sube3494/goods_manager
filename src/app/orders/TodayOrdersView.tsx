@@ -23,6 +23,7 @@ interface TodayOrdersViewProps {
   refreshTrigger: number;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
+  onOpenPurchaseDraft?: (draft: any) => void;
   onDataLoad: (data: {
     summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number };
     overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number };
@@ -42,6 +43,7 @@ export function TodayOrdersView({
   onOpenMatchEditor,
   onDataLoad,
   localShops,
+  onOpenPurchaseDraft,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -205,6 +207,41 @@ export function TodayOrdersView({
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        if (response.status === 409 && data.reason === "insufficient-stock" && Array.isArray(data.insufficientItems)) {
+          if (onOpenPurchaseDraft) {
+            const today = new Date();
+            const draft = {
+              id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
+              status: "Confirmed",
+              type: "Purchase",
+              date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
+              items: data.insufficientItems.map((item: any) => ({
+                productId: item.productId || null,
+                shopProductId: item.shopProductId || null,
+                product: {
+                  id: item.shopProductId || item.productId,
+                  name: item.name || "未命名商品",
+                  sku: "",
+                  image: null,
+                  costPrice: 0,
+                },
+                image: null,
+                supplierId: null,
+                quantity: item.missingQuantity,
+                costPrice: 0,
+              })),
+              shippingFees: 0,
+              extraFees: 0,
+              totalAmount: 0,
+              discountAmount: 0,
+              shippingAddress: "",
+              shopName: data.insufficientItems[0]?.mappedShopName || "",
+            };
+            onOpenPurchaseDraft(draft);
+            showToast("库存不足，已为您生成采购草稿单，请输入成本并确认入库", "warning");
+            return;
+          }
+        }
         throw new Error(getOrderActionErrorMessage(data.error || data.message || "操作失败"));
       }
 

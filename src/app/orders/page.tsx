@@ -1895,6 +1895,7 @@ export default function OrdersPage() {
             refreshTrigger={refreshTrigger}
             onOpenCostBackfill={setBackfillTarget}
             onOpenMatchEditor={openMatchEditor}
+            onOpenPurchaseDraft={setPurchaseDraft}
             onDataLoad={handleDataLoad}
             localShops={localShops}
           />
@@ -1903,6 +1904,7 @@ export default function OrdersPage() {
             refreshTrigger={refreshTrigger}
             onOpenCostBackfill={setBackfillTarget}
             onOpenMatchEditor={openMatchEditor}
+            onOpenPurchaseDraft={setPurchaseDraft}
             onDataLoad={handleDataLoad}
             localShops={localShops}
           />
