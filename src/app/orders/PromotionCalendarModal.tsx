@@ -101,6 +101,7 @@ interface DayData {
   realOrderTaobao: number;
   brushOrderCount: number;
   cancelledOrderCount: number;
+  shopBreakdown?: Record<string, number>;
 }
 
 interface PromotionCalendarModalProps {
@@ -153,10 +154,14 @@ export function PromotionCalendarModal({
   const [activeTab, setActiveTab] = useState<"calendar" | "chart">("calendar");
   // 当前展示趋势图的平台
   const [chartPlatform, setChartPlatform] = useState<"amountMeituan" | "amountJingdong" | "amountTaobao">("amountMeituan");
+  // 趋势图当前选择的店铺（空字符串 = 全部汇总）
+  const [chartShopName, setChartShopName] = useState<string>("");
 
   // 日历网格数据状态与 Loading 状态
   const [calendarData, setCalendarData] = useState<Record<string, DayData>>({});
   const [isLoading, setIsLoading] = useState(false);
+  // 日历 hover 气泡状态
+  const [hoveredDateStr, setHoveredDateStr] = useState<string | null>(null);
 
   const [selectedShopName, setSelectedShopName] = useState(() => {
     return localShops?.[0]?.name || "";
@@ -253,14 +258,15 @@ export function PromotionCalendarModal({
     };
   }, [chartData, chartPlatform]);
 
-  // 从后端拉取整个日期网格的数据
-  const fetchCalendarData = async () => {
+  // 从后端拉取整个日期网格的数据（支持按店铺过滤，用于趋势图）
+  const fetchCalendarData = useCallback(async (shopFilter?: string) => {
     if (gridDays.length === 0) return;
     setIsLoading(true);
     const startDateStr = formatDate(gridDays[0]);
     const endDateStr = formatDate(gridDays[gridDays.length - 1]);
+    const shopParam = shopFilter ? `&shopName=${encodeURIComponent(shopFilter)}` : "";
     try {
-      const res = await fetch(`/api/promotion/calendar?startDate=${startDateStr}&endDate=${endDateStr}`, { cache: "no-store" });
+      const res = await fetch(`/api/promotion/calendar?startDate=${startDateStr}&endDate=${endDateStr}${shopParam}`, { cache: "no-store" });
       if (res.ok) {
         const body = await res.json();
         if (body.success && body.data) {
@@ -275,11 +281,20 @@ export function PromotionCalendarModal({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [gridDays, showToast]);
 
   useEffect(() => {
     fetchCalendarData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentYear, currentMonth]);
+
+  // 趋势图切换店铺时，重新拉取对应店铺的日历数据
+  useEffect(() => {
+    if (activeTab === "chart") {
+      fetchCalendarData(chartShopName || undefined);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartShopName, activeTab]);
 
   // 获取当前日期所有店铺的推广费明细列表
   const fetchDayDetail = useCallback(async (dateStr: string) => {
@@ -549,13 +564,19 @@ export function PromotionCalendarModal({
                   const isSelected = dayStr === selectedDateStr;
                   const isToday = formatDate(today) === dayStr;
                   const dayDetail = calendarData[dayStr];
+                  const isHovered = hoveredDateStr === dayStr;
                   
                   const promoAmount = dayDetail?.promotionAmount || 0;
+                  const shopBreakdown = dayDetail?.shopBreakdown || {};
+                  const shopEntries = Object.entries(shopBreakdown).filter(([, v]) => v > 0);
+                  const hasMultiShop = shopEntries.length > 1;
 
                   return (
                     <div
                       key={`${dayStr}-${idx}`}
                       onClick={() => isCurrentMonth && setSelectedDateStr(dayStr)}
+                      onMouseEnter={() => isCurrentMonth && promoAmount > 0 && setHoveredDateStr(dayStr)}
+                      onMouseLeave={() => setHoveredDateStr(null)}
                       className={`group relative flex h-14 sm:h-16 min-h-[56px] sm:min-h-[64px] cursor-pointer flex-col items-center justify-center rounded-xl border p-1 sm:p-2 transition-all duration-150 ${
                         !isCurrentMonth
                           ? "pointer-events-none border-transparent text-slate-200 dark:text-slate-800 opacity-20"
@@ -592,6 +613,34 @@ export function PromotionCalendarModal({
                           </span>
                         </div>
                       )}
+
+                      {/* Hover 气泡：各店铺推广明细（仅多店铺时展示分店信息） */}
+                      {isHovered && isCurrentMonth && promoAmount > 0 && (
+                        <div
+                          className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 w-max max-w-[180px] rounded-2xl border border-black/8 bg-white/95 px-3 py-2.5 shadow-xl backdrop-blur-sm dark:border-white/12 dark:bg-slate-900/96 pointer-events-none"
+                          style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.14))" }}
+                        >
+                          {/* 尖角 */}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0" style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: "6px solid rgba(255,255,255,0.95)" }} />
+                          <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">{dayStr} 推广费</p>
+                          {hasMultiShop ? (
+                            <div className="space-y-1">
+                              {shopEntries.map(([name, amount]) => (
+                                <div key={name} className="flex items-center justify-between gap-3">
+                                  <span className="text-[11px] text-muted-foreground truncate max-w-[90px]">{name}</span>
+                                  <span className="text-[11px] text-orange-600 dark:text-orange-400 tabular-nums shrink-0">-¥{amount.toFixed(0)}</span>
+                                </div>
+                              ))}
+                              <div className="border-t border-black/6 dark:border-white/8 pt-1 mt-1 flex items-center justify-between gap-3">
+                                <span className="text-[11px] text-foreground">合计</span>
+                                <span className="text-[11px] text-orange-600 dark:text-orange-400 tabular-nums font-medium">-¥{promoAmount.toFixed(0)}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[13px] text-orange-600 dark:text-orange-400 tabular-nums">-¥{promoAmount.toFixed(2)}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -599,26 +648,60 @@ export function PromotionCalendarModal({
             </>
           ) : (
             <div className="flex-1 flex flex-col mt-4 space-y-4 overflow-hidden">
-              {/* 平台选择 */}
-              <div className="flex justify-center sm:justify-start gap-2 flex-wrap">
-                {[
-                  { key: "amountMeituan" as const, label: "美团", logo: "/platform/美团.svg", activeColor: "border-[#FFB800] bg-[#FFB800]/5 text-[#FFB800]" },
-                  { key: "amountJingdong" as const, label: "京东", logo: "/platform/京东.svg", activeColor: "border-[#DF1E1D] bg-[#DF1E1D]/5 text-[#DF1E1D]" },
-                  { key: "amountTaobao" as const, label: "淘宝", logo: "/platform/淘宝.svg", activeColor: "border-[#FF5500] bg-[#FF5500]/5 text-[#FF5500]" },
-                ].map((p) => (
-                  <button
-                    key={p.key}
-                    onClick={() => setChartPlatform(p.key)}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition-all cursor-pointer ${
-                      chartPlatform === p.key
-                        ? p.activeColor
-                        : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
-                    }`}
-                  >
-                    <img src={p.logo} alt={p.label} className="h-4 w-4 object-contain" />
-                    <span>{p.label}趋势</span>
-                  </button>
-                ))}
+              {/* 平台选择 + 多店铺时的店铺切换 */}
+              <div className="flex flex-col gap-2">
+                {/* 店铺切换（多店时显示） */}
+                {localShops && localShops.length > 1 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">店铺</span>
+                    <div className="flex gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => setChartShopName("")}
+                        className={`rounded-lg border px-2.5 py-1 text-xs transition-all cursor-pointer ${
+                          chartShopName === ""
+                            ? "border-primary/30 bg-primary/8 text-primary dark:border-primary/40 dark:bg-primary/15"
+                            : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
+                        }`}
+                      >
+                        全部汇总
+                      </button>
+                      {localShops.map((shop) => (
+                        <button
+                          key={shop.id}
+                          onClick={() => setChartShopName(shop.name)}
+                          className={`rounded-lg border px-2.5 py-1 text-xs transition-all cursor-pointer ${
+                            chartShopName === shop.name
+                              ? "border-primary/30 bg-primary/8 text-primary dark:border-primary/40 dark:bg-primary/15"
+                              : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
+                          }`}
+                        >
+                          {shop.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 平台选择 */}
+                <div className="flex justify-start gap-2 flex-wrap">
+                  {[
+                    { key: "amountMeituan" as const, label: "美团", logo: "/platform/美团.svg", activeColor: "border-[#FFB800] bg-[#FFB800]/5 text-[#FFB800]" },
+                    { key: "amountJingdong" as const, label: "京东", logo: "/platform/京东.svg", activeColor: "border-[#DF1E1D] bg-[#DF1E1D]/5 text-[#DF1E1D]" },
+                    { key: "amountTaobao" as const, label: "淘宝", logo: "/platform/淘宝.svg", activeColor: "border-[#FF5500] bg-[#FF5500]/5 text-[#FF5500]" },
+                  ].map((p) => (
+                    <button
+                      key={p.key}
+                      onClick={() => setChartPlatform(p.key)}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition-all cursor-pointer ${
+                        chartPlatform === p.key
+                          ? p.activeColor
+                          : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
+                      }`}
+                    >
+                      <img src={p.logo} alt={p.label} className="h-4 w-4 object-contain" />
+                      <span>{p.label}趋势</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* 折线图图表 */}

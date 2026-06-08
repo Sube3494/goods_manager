@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
 
     const startDateStr = request.nextUrl.searchParams.get("startDate");
     const endDateStr = request.nextUrl.searchParams.get("endDate");
+    // 可选：按店铺过滤推广费数据（为空则汇总所有店铺）
+    const shopName = request.nextUrl.searchParams.get("shopName") || null;
 
     if (!startDateStr || !endDateStr) {
       return NextResponse.json({ error: "Missing startDate or endDate" }, { status: 400 });
@@ -59,7 +61,7 @@ export async function GET(request: NextRequest) {
     const startDate = startOfDay(new Date(startDateStr));
     const endDate = endOfDay(new Date(endDateStr));
 
-    // 1. 获取时间范围内的推广费记录
+    // 1. 获取时间范围内的推广费记录（可按店铺过滤）
     const promotionExpenses = await prisma.dailyPromotionExpense.findMany({
       where: {
         userId: user.id,
@@ -67,9 +69,11 @@ export async function GET(request: NextRequest) {
           gte: startDate,
           lte: endDate,
         },
+        ...(shopName ? { shopName } : {}),
       },
       select: {
         date: true,
+        shopName: true,
         amount: true,
         amountMeituan: true,
         amountJingdong: true,
@@ -107,6 +111,8 @@ export async function GET(request: NextRequest) {
       realOrderTaobao: number;
       brushOrderCount: number;
       cancelledOrderCount: number;
+      // 各店铺的推广费明细（仅在未过滤时携带，用于悬停展示）
+      shopBreakdown: Record<string, number>;
     }> = {};
 
     const cursor = new Date(startDate);
@@ -125,11 +131,12 @@ export async function GET(request: NextRequest) {
         realOrderTaobao: 0,
         brushOrderCount: 0,
         cancelledOrderCount: 0,
+        shopBreakdown: {},
       };
       cursor.setDate(cursor.getDate() + 1);
     }
 
-    // 4. 填充推广费数据（多店铺累加）
+    // 4. 填充推广费数据（多店铺累加，并记录各店铺明细）
     promotionExpenses.forEach((item) => {
       const key = formatDateKey(new Date(item.date));
       if (dataMap[key]) {
@@ -138,6 +145,9 @@ export async function GET(request: NextRequest) {
         dataMap[key].amountJingdong += item.amountJingdong || 0;
         dataMap[key].amountTaobao += item.amountTaobao || 0;
         dataMap[key].amountOther += Math.max(0, (item.amount || 0) - (item.amountMeituan || 0) - (item.amountJingdong || 0) - (item.amountTaobao || 0));
+        // 按店铺汇总总推广费（用于日历悬停气泡）
+        const name = item.shopName || "默认";
+        dataMap[key].shopBreakdown[name] = (dataMap[key].shopBreakdown[name] || 0) + (item.amount || 0);
       }
     });
 
