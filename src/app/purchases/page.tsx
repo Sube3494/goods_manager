@@ -905,16 +905,16 @@ function PurchasesContent() {
                <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
             </div>
           ) : paginatedPurchases.length > 0 ? (
-          <table className="w-full min-w-[1120px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
             <colgroup>
               <col className="w-[44px]" />
-              <col className="w-[58px]" />
-              <col className="w-[130px]" />
-              <col className="w-[330px]" />
-              <col className="w-[135px]" />
-              <col className="w-[120px]" />
-              <col className="w-[190px]" />
-              <col className="w-[113px]" />
+              <col className="w-[50px]" />
+              <col className="w-[110px]" />
+              <col className="w-[260px]" />
+              <col className="w-[100px]" />
+              <col className="w-[90px]" />
+              <col className="w-[160px]" />
+              <col className="w-[90px]" />
             </colgroup>
             <thead>
               <tr className="border-b border-border bg-muted/30">
