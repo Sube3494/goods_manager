@@ -33,6 +33,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TodayOrdersView } from "./TodayOrdersView";
 import { AllOrdersView } from "./AllOrdersView";
+import { PromotionCalendarModal } from "./PromotionCalendarModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { CreateOfflineOrderModal } from "@/components/Orders/CreateOfflineOrderModal";
@@ -932,122 +933,14 @@ type PromotionPlatformAmounts = {
   amountTaobao: number;
 };
 
-const PROMOTION_PLATFORM_ROWS: { key: keyof PromotionPlatformAmounts; label: string; icon: string }[] = [
-  { key: "amountMeituan", label: "美团", icon: "/platform/美团.svg" },
-  { key: "amountJingdong", label: "京东", icon: "/platform/京东.svg" },
-  { key: "amountTaobao", label: "淘宝", icon: "/platform/淘宝.svg" },
-];
-
-function PromotionEditModal({
-  platforms,
-  date,
-  onSave,
-  onClose,
-}: {
-  platforms: PromotionPlatformAmounts;
-  date: string;
-  onSave: (vals: PromotionPlatformAmounts) => Promise<boolean>;
-  onClose: () => void;
-}) {
-  const [vals, setVals] = useState<PromotionPlatformAmounts>({ ...platforms });
-  const [isSaving, setIsSaving] = useState(false);
-  const total = vals.amountMeituan + vals.amountJingdong + vals.amountTaobao;
-
-  const setField = (key: keyof PromotionPlatformAmounts, raw: string) => {
-    const v = parseFloat(raw);
-    setVals((prev) => ({ ...prev, [key]: isNaN(v) ? 0 : Math.max(0, v) }));
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    const ok = await onSave(vals);
-    setIsSaving(false);
-    if (ok) onClose();
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-100000 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98">
-        <div className="flex items-start justify-between gap-3 px-6 pt-6 pb-4">
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费录入</div>
-            <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">{date}</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground dark:border-white/10 dark:bg-white/4"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="px-6 flex flex-col gap-3">
-          {PROMOTION_PLATFORM_ROWS.map((row, i) => (
-            <label key={row.key} className="flex items-center gap-3 rounded-2xl border border-black/8 bg-black/2 px-4 dark:border-white/10 dark:bg-white/3 focus-within:ring-2 focus-within:ring-primary/12 focus-within:border-primary/30 transition-all">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={row.icon}
-                alt={row.label}
-                className="h-5 w-5 shrink-0 rounded-md object-contain"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-              <span className="w-10 shrink-0 text-sm font-semibold text-foreground">{row.label}</span>
-              <span className="text-sm font-bold text-muted-foreground">¥</span>
-              <input
-                autoFocus={i === 0}
-                type="number"
-                step="0.01"
-                min="0"
-                value={vals[row.key] === 0 ? "" : String(vals[row.key])}
-                onChange={(e) => setField(row.key, e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSave(); else if (e.key === "Escape") onClose(); }}
-                disabled={isSaving}
-                placeholder="0.00"
-                className="h-12 flex-1 bg-transparent text-sm font-semibold text-foreground outline-none placeholder:text-muted-foreground/50"
-              />
-            </label>
-          ))}
-        </div>
-
-        <div className="mt-5 flex items-center justify-between gap-3 border-t border-black/6 dark:border-white/8 px-6 py-4">
-          <div className="text-sm text-muted-foreground">
-            合计 <span className="text-lg font-black text-foreground">¥{total.toFixed(2)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              disabled={isSaving}
-              className="h-10 px-4 rounded-xl border border-black/8 bg-white/85 text-sm font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="h-10 px-5 rounded-xl bg-foreground text-sm font-black text-background transition-all hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-black flex items-center gap-2"
-            >
-              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              保存
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
 function PromotionMetricCard({
   amount,
-  platforms,
   date,
-  onSave,
+  onRefresh,
 }: {
   amount: number;
-  platforms: PromotionPlatformAmounts;
   date: string;
-  onSave: (vals: PromotionPlatformAmounts) => Promise<boolean>;
+  onRefresh?: () => void;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -1078,11 +971,12 @@ function PromotionMetricCard({
       </div>
 
       {isMounted && isModalOpen && (
-        <PromotionEditModal
-          platforms={platforms}
-          date={date}
-          onSave={onSave}
-          onClose={() => setIsModalOpen(false)}
+        <PromotionCalendarModal
+          initialDate={date}
+          onClose={() => {
+            setIsModalOpen(false);
+            onRefresh?.();
+          }}
         />
       )}
     </>
@@ -1882,9 +1776,8 @@ export default function OrdersPage() {
               />
               <PromotionMetricCard
                 amount={promotionAmount}
-                platforms={promotionPlatforms}
                 date={promotionDate || todayDate}
-                onSave={handleSavePromotionExpense}
+                onRefresh={fetchPromotionExpense}
               />
             </div>
           </div>
