@@ -200,7 +200,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
         )}
       </button>
 
-      {mounted && portalNode && createPortal(
+      {isOpen && mounted && portalNode && createPortal(
         <AnimatePresence>
           {isOpen && (
           <motion.div
