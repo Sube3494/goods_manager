@@ -13,6 +13,16 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function isValidDate(date: unknown): date is Date {
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+function parseSafeDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return isValidDate(date) ? date : null;
+}
+
 interface DatePickerProps {
   value: string; // YYYY-MM-DD
   onChange: (value: string) => void;
@@ -27,7 +37,10 @@ interface DatePickerProps {
 
 export function DatePicker({ value, onChange, placeholder = "选择日期", className, showClear = true, minDate, maxDate, isCompact, triggerClassName }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(value ? new Date(value) : new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => {
+    const parsed = parseSafeDate(value);
+    return parsed && isValidDate(parsed) ? parsed : new Date();
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -39,12 +52,13 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
     showAbove?: boolean;
   }>({ top: 0, left: 0, width: 0 });
 
-  const selectedDate = value ? new Date(value) : null;
+  const selectedDate = parseSafeDate(value);
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(handle);
   }, []);
+
 
   const updatePosition = useCallback(() => {
     if (isOpen && containerRef.current) {
@@ -111,44 +125,70 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
     }
   }, [isOpen, updatePosition]);
 
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const nextYear = () => setCurrentMonth(addMonths(currentMonth, 12));
-  const prevYear = () => setCurrentMonth(subMonths(currentMonth, 12));
+  const nextMonth = () => setCurrentMonth(curr => {
+    const next = addMonths(curr, 1);
+    return isValidDate(next) ? next : new Date();
+  });
+  const prevMonth = () => setCurrentMonth(curr => {
+    const prev = subMonths(curr, 1);
+    return isValidDate(prev) ? prev : new Date();
+  });
+  const nextYear = () => setCurrentMonth(curr => {
+    const next = addMonths(curr, 12);
+    return isValidDate(next) ? next : new Date();
+  });
+  const prevYear = () => setCurrentMonth(curr => {
+    const prev = subMonths(curr, 12);
+    return isValidDate(prev) ? prev : new Date();
+  });
+
+  const safeCurrentMonth = isValidDate(currentMonth) ? currentMonth : new Date();
 
   const days = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 }),
-    end: endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 }),
+    start: startOfWeek(startOfMonth(safeCurrentMonth), { weekStartsOn: 1 }),
+    end: endOfWeek(endOfMonth(safeCurrentMonth), { weekStartsOn: 1 }),
   });
 
   const handleDateClick = (date: Date) => {
-    if (minDate && isSameDay(date, new Date(minDate)) === false && date < startOfDay(new Date(minDate))) return;
-    if (maxDate && isSameDay(date, new Date(maxDate)) === false && date > endOfDay(new Date(maxDate))) return;
+    if (!isValidDate(date)) return;
+    const parsedMin = minDate ? parseSafeDate(minDate) : null;
+    const parsedMax = maxDate ? parseSafeDate(maxDate) : null;
+
+    if (parsedMin && isSameDay(date, parsedMin) === false && date < startOfDay(parsedMin)) return;
+    if (parsedMax && isSameDay(date, parsedMax) === false && date > endOfDay(parsedMax)) return;
 
     onChange(format(date, "yyyy-MM-dd"));
     setIsOpen(false);
   };
 
+  const portalNode = typeof document !== "undefined" ? document.body : null;
+
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen) {
+            const parsed = parseSafeDate(value);
+            setCurrentMonth(parsed && isValidDate(parsed) ? parsed : new Date());
+          }
+          setIsOpen(!isOpen);
+        }}
         className={cn(
           "flex w-full h-full items-center justify-between rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm transition-all outline-none ring-offset-background",
           isCompact && "px-2 text-xs",
           isOpen ? "ring-2 ring-primary/20 border-primary/20 shadow-lg" : "hover:bg-muted/50 dark:hover:bg-white/10",
-          !selectedDate && "text-muted-foreground",
+          (!selectedDate || !isValidDate(selectedDate)) && "text-muted-foreground",
           triggerClassName
         )}
       >
         <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
-            {!isCompact && <CalendarIcon size={14} className={cn("shrink-0", selectedDate ? "text-primary" : "text-muted-foreground")} />}
-            <span className={cn("truncate", selectedDate ? "text-foreground font-medium" : "text-muted-foreground")}>
-            {selectedDate ? format(selectedDate, "yyyy-MM-dd", { locale: zhCN }) : placeholder}
+            {!isCompact && <CalendarIcon size={14} className={cn("shrink-0", selectedDate && isValidDate(selectedDate) ? "text-primary" : "text-muted-foreground")} />}
+            <span className={cn("truncate", selectedDate && isValidDate(selectedDate) ? "text-foreground font-medium" : "text-muted-foreground")}>
+            {selectedDate && isValidDate(selectedDate) ? format(selectedDate, "yyyy-MM-dd", { locale: zhCN }) : placeholder}
             </span>
         </div>
-        {showClear && selectedDate && (
+        {showClear && selectedDate && isValidDate(selectedDate) && (
             <X 
                 size={14} 
                 className="text-muted-foreground hover:text-foreground transition-colors" 
@@ -160,7 +200,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
         )}
       </button>
 
-      {mounted && createPortal(
+      {mounted && portalNode && createPortal(
         <AnimatePresence>
           {isOpen && (
           <motion.div
@@ -192,7 +232,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                         <ChevronLeft size={14} strokeWidth={3} />
                     </button>
                     <h4 className="text-sm font-bold text-foreground whitespace-nowrap">
-                    {format(currentMonth, "yyyy年 MM月", { locale: zhCN })}
+                    {isValidDate(safeCurrentMonth) ? format(safeCurrentMonth, "yyyy年 MM月", { locale: zhCN }) : ""}
                     </h4>
                     <button
                         type="button"
@@ -233,11 +273,13 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
 
               <div className="grid grid-cols-7 gap-1 px-1">
                 {days.map((day, idx) => {
-                  const isSelected = selectedDate && isSameDay(day, selectedDate);
-                  const isCurrentMonth = isSameMonth(day, currentMonth);
-                  const isTodayDate = isToday(day);
-                  const isBeforeMin = minDate ? startOfDay(day) < startOfDay(new Date(minDate)) : false;
-                  const isAfterMax = maxDate ? startOfDay(day) > startOfDay(new Date(maxDate)) : false;
+                  const isSelected = selectedDate && isValidDate(selectedDate) && isValidDate(day) && isSameDay(day, selectedDate);
+                  const isCurrentMonth = isValidDate(day) && isValidDate(safeCurrentMonth) && isSameMonth(day, safeCurrentMonth);
+                  const isTodayDate = isValidDate(day) && isToday(day);
+                  const parsedMin = minDate ? parseSafeDate(minDate) : null;
+                  const parsedMax = maxDate ? parseSafeDate(maxDate) : null;
+                  const isBeforeMin = parsedMin && isValidDate(day) ? startOfDay(day) < startOfDay(parsedMin) : false;
+                  const isAfterMax = parsedMax && isValidDate(day) ? startOfDay(day) > startOfDay(parsedMax) : false;
                   const isDisabled = isBeforeMin || isAfterMax;
 
                   return (
@@ -255,7 +297,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                         isTodayDate && !isSelected && "text-primary ring-1 ring-primary/30"
                       )}
                     >
-                      {format(day, "d")}
+                      {isValidDate(day) ? format(day, "d") : ""}
                     </button>
                   );
                 })}
@@ -281,7 +323,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
           </motion.div>
           )}
         </AnimatePresence>,
-        document.body
+        portalNode
       )}
     </div>
   );

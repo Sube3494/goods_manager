@@ -3505,7 +3505,7 @@ export default function OrdersPage() {
   return (
     <div className="relative px-2 sm:px-1">
       {pageError && (
-        <div className="fixed top-4 left-4 right-4 z-[999999] rounded-2xl border border-rose-500 bg-rose-50 p-4 text-xs text-rose-700 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:bg-rose-950/90 dark:text-rose-200 flex items-start gap-3">
+        <div className="fixed top-4 left-4 right-4 z-999999 rounded-2xl border border-rose-500 bg-rose-50 p-4 text-xs text-rose-700 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:bg-rose-950/90 dark:text-rose-200 flex items-start gap-3">
           <span className="text-base shrink-0">🚨</span>
           <div className="min-w-0 flex-1">
             <h4 className="font-bold">页面运行出错</h4>
