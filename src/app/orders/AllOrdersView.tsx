@@ -76,12 +76,8 @@ export function AllOrdersView({
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 2);
-    return formatLocalDate(d);
-  });
-  const [endDate, setEndDate] = useState(() => formatLocalDate(new Date()));
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [actingId, setActingId] = useState("");
