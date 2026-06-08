@@ -37,7 +37,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
-import { OutboundOrder, OutboundOrderItem, Product } from "@/lib/types";
+import { OutboundOrder, Product } from "@/lib/types";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import {
@@ -2022,26 +2022,12 @@ function FactoryShipmentDetailModal({
                       </div>
                     </div>
                   </div>
-                  {isEditing ? (
-                    <div className="mt-3">
-                      <DatePicker
-                        value={editForm.date ? editForm.date.slice(0, 10) : ""}
-                        onChange={(val) => {
-                          setEditForm((prev) => ({ ...prev, date: val }));
-                        }}
-                        showClear={false}
-                        className="h-10 w-full"
-                        triggerClassName="h-10 rounded-2xl border border-border/70 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/5"
-                      />
+                  <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
+                    <div className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
+                      {format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
                     </div>
-                  ) : (
-                    <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
-                      <div className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-                        {format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
                 <div className="rounded-[22px] border border-border/50 bg-linear-to-br from-zinc-50 via-white to-zinc-50/70 p-4 shadow-sm dark:border-white/10 dark:from-white/7 dark:via-white/4 dark:to-white/2">
                   <div className="min-w-0">

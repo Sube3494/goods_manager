@@ -6,7 +6,6 @@ import { InventoryService as OutboundInventoryService } from "@/services/invento
 import { buildFactoryShipmentNote } from "@/lib/utils";
 import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
 import { Prisma } from "../../../../../prisma/generated-client";
-import { parseAsShanghaiTime } from "@/lib/dateUtils";
 
 /**
  * 实现“退货入库”逻辑 (对冲出库)
@@ -234,7 +233,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { status, date, notePayload, items } = body;
+    const { status, notePayload, items } = body;
 
     const requestedShopProductIds = Array.isArray(items)
       ? items
@@ -478,7 +477,6 @@ export async function PUT(
         where: { id },
         data: {
           ...(status !== undefined && { status }),
-          ...(date !== undefined && { date: parseAsShanghaiTime(date) }),
           ...(note !== undefined && { note }),
         },
       });
