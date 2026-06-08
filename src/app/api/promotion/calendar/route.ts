@@ -129,15 +129,15 @@ export async function GET(request: NextRequest) {
       cursor.setDate(cursor.getDate() + 1);
     }
 
-    // 4. 填充推广费数据
+    // 4. 填充推广费数据（多店铺累加）
     promotionExpenses.forEach((item) => {
       const key = formatDateKey(new Date(item.date));
       if (dataMap[key]) {
-        dataMap[key].promotionAmount = item.amount || 0;
-        dataMap[key].amountMeituan = item.amountMeituan || 0;
-        dataMap[key].amountJingdong = item.amountJingdong || 0;
-        dataMap[key].amountTaobao = item.amountTaobao || 0;
-        dataMap[key].amountOther = Math.max(0, (item.amount || 0) - (item.amountMeituan || 0) - (item.amountJingdong || 0) - (item.amountTaobao || 0));
+        dataMap[key].promotionAmount += item.amount || 0;
+        dataMap[key].amountMeituan += item.amountMeituan || 0;
+        dataMap[key].amountJingdong += item.amountJingdong || 0;
+        dataMap[key].amountTaobao += item.amountTaobao || 0;
+        dataMap[key].amountOther += Math.max(0, (item.amount || 0) - (item.amountMeituan || 0) - (item.amountJingdong || 0) - (item.amountTaobao || 0));
       }
     });
 

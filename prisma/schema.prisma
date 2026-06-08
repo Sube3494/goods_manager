@@ -755,6 +755,7 @@ model DailyPromotionExpense {
   id              String   @id @default(cuid())
   userId          String
   date            DateTime
+  shopName        String   @default("")
   amount          Float    @default(0)
   amountMeituan   Float    @default(0)
   amountJingdong  Float    @default(0)
@@ -763,6 +764,6 @@ model DailyPromotionExpense {
   updatedAt       DateTime @updatedAt
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, date])
+  @@unique([userId, date, shopName])
   @@index([userId, date])
 }

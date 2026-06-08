@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, Loader2, Check, Calendar as CalendarIcon } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { cn } from "@/lib/utils";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import {
   ResponsiveContainer,
   LineChart,
@@ -103,6 +105,7 @@ interface DayData {
 
 interface PromotionCalendarModalProps {
   initialDate: string;
+  localShops?: Array<{ id: string; name: string; address: string }>;
   onClose: () => void;
 }
 
@@ -115,6 +118,7 @@ function formatDate(date: Date): string {
 
 export function PromotionCalendarModal({
   initialDate,
+  localShops,
   onClose,
 }: PromotionCalendarModalProps) {
   const { showToast } = useToast();
@@ -153,6 +157,12 @@ export function PromotionCalendarModal({
   // 日历网格数据状态与 Loading 状态
   const [calendarData, setCalendarData] = useState<Record<string, DayData>>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const [selectedShopName, setSelectedShopName] = useState(() => {
+    return localShops?.[0]?.name || "";
+  });
+  const [shopExpenses, setShopExpenses] = useState<Record<string, PromotionPlatformAmounts>>({});
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
 
   // 右侧表单编辑状态
   const [editVals, setEditVals] = useState<PromotionPlatformAmounts>({
@@ -271,15 +281,58 @@ export function PromotionCalendarModal({
     fetchCalendarData();
   }, [currentYear, currentMonth]);
 
-  // 每次选择日期变化，或者日历数据变化时，更新右侧表单的值
+  // 获取当前日期所有店铺的推广费明细列表
+  const fetchDayDetail = useCallback(async (dateStr: string) => {
+    setIsDetailLoading(true);
+    try {
+      const res = await fetch(`/api/promotion?date=${dateStr}`, { cache: "no-store" });
+      if (res.ok) {
+        const body = await res.json();
+        const items = Array.isArray(body.items) ? body.items : [];
+        const mapped: Record<string, PromotionPlatformAmounts> = {};
+
+        // 初始化所有已知店铺为 0 确保防空
+        localShops?.forEach((shop) => {
+          mapped[shop.name] = {
+            amountMeituan: 0,
+            amountJingdong: 0,
+            amountTaobao: 0,
+            amountOther: 0,
+          };
+        });
+
+        items.forEach((item: any) => {
+          mapped[item.shopName || ""] = {
+            amountMeituan: item.amountMeituan || 0,
+            amountJingdong: item.amountJingdong || 0,
+            amountTaobao: item.amountTaobao || 0,
+            amountOther: item.amountOther || 0,
+          };
+        });
+
+        setShopExpenses(mapped);
+      }
+    } catch (e) {
+      console.error("Failed to fetch day detail:", e);
+    } finally {
+      setIsDetailLoading(false);
+    }
+  }, [localShops]);
+
+  // 当选择日期变化时，异步拉取该日期各店铺的明细
   useEffect(() => {
-    const data = calendarData[selectedDateStr];
-    if (data) {
+    void fetchDayDetail(selectedDateStr);
+  }, [selectedDateStr, fetchDayDetail]);
+
+  // 当店铺选择或已加载的数据变化时，回填输入框
+  useEffect(() => {
+    const currentData = shopExpenses[selectedShopName];
+    if (currentData) {
       setEditVals({
-        amountMeituan: data.amountMeituan || 0,
-        amountJingdong: data.amountJingdong || 0,
-        amountTaobao: data.amountTaobao || 0,
-        amountOther: data.amountOther || 0,
+        amountMeituan: currentData.amountMeituan || 0,
+        amountJingdong: currentData.amountJingdong || 0,
+        amountTaobao: currentData.amountTaobao || 0,
+        amountOther: currentData.amountOther || 0,
       });
     } else {
       setEditVals({
@@ -289,7 +342,7 @@ export function PromotionCalendarModal({
         amountOther: 0,
       });
     }
-  }, [selectedDateStr, calendarData]);
+  }, [selectedShopName, shopExpenses]);
 
   // 切换上个月
   const handlePrevMonth = () => {
@@ -337,6 +390,7 @@ export function PromotionCalendarModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: selectedDateStr,
+          shopName: selectedShopName,
           amountMeituan: editVals.amountMeituan,
           amountJingdong: editVals.amountJingdong,
           amountTaobao: editVals.amountTaobao,
@@ -345,32 +399,20 @@ export function PromotionCalendarModal({
       });
 
       if (res.ok) {
-        showToast(`${selectedDateStr} 推广费已保存`, "success");
-        // 本地更新该格数据，避免重新发起大请求
-        setCalendarData((prev) => {
-          const total = editVals.amountMeituan + editVals.amountJingdong + editVals.amountTaobao + editVals.amountOther;
-          const currentDay = prev[selectedDateStr] || {
-            promotionAmount: 0,
-            amountMeituan: 0,
-            amountJingdong: 0,
-            amountTaobao: 0,
-            amountOther: 0,
-            realOrderCount: 0,
-            brushOrderCount: 0,
-            cancelledOrderCount: 0,
-          };
-          return {
-            ...prev,
-            [selectedDateStr]: {
-              ...currentDay,
-              promotionAmount: total,
-              amountMeituan: editVals.amountMeituan,
-              amountJingdong: editVals.amountJingdong,
-              amountTaobao: editVals.amountTaobao,
-              amountOther: editVals.amountOther,
-            },
-          };
-        });
+        showToast(`${selectedDateStr} [${selectedShopName || "默认"}] 推广费已保存`, "success");
+        // 1. 本地更新店铺明细数据缓存，免去重新加载明细
+        setShopExpenses((prev) => ({
+          ...prev,
+          [selectedShopName]: {
+            amountMeituan: editVals.amountMeituan,
+            amountJingdong: editVals.amountJingdong,
+            amountTaobao: editVals.amountTaobao,
+            amountOther: editVals.amountOther,
+          },
+        }));
+
+        // 2. 重新加载该月统计以同步更新大盘日历的聚合求和结果
+        void fetchCalendarData();
       } else {
         showToast("保存失败，请稍后重试", "error");
       }
@@ -736,9 +778,31 @@ export function PromotionCalendarModal({
               </div>
             )}
 
+            {/* 选择店铺录入（当识别到有多个店铺时渲染选择框） */}
+            {localShops && localShops.length > 1 && (
+              <div className="space-y-2">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground block">选择店铺录入</span>
+                <CustomSelect
+                  value={selectedShopName}
+                  onChange={setSelectedShopName}
+                  options={localShops.map((shop) => ({
+                    value: shop.name,
+                    label: shop.name,
+                  }))}
+                  className="h-10"
+                  triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/4"
+                />
+              </div>
+            )}
+
             {/* 各平台金额输入（经典清爽文本标签布局） */}
             <div className="space-y-3">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground block">渠道推广费</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground">渠道推广费</span>
+                {isDetailLoading && (
+                  <Loader2 size={11} className="animate-spin text-primary" />
+                )}
+              </div>
               {PROMOTION_PLATFORM_ROWS.map((row) => (
                 <label
                   key={row.key}

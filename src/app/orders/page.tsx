@@ -936,10 +936,12 @@ type PromotionPlatformAmounts = {
 function PromotionMetricCard({
   amount,
   date,
+  localShops,
   onRefresh,
 }: {
   amount: number;
   date: string;
+  localShops: LocalShopOption[];
   onRefresh?: () => void;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -973,6 +975,7 @@ function PromotionMetricCard({
       {isMounted && isModalOpen && (
         <PromotionCalendarModal
           initialDate={date}
+          localShops={localShops}
           onClose={() => {
             setIsModalOpen(false);
             onRefresh?.();
@@ -1777,6 +1780,7 @@ export default function OrdersPage() {
               <PromotionMetricCard
                 amount={promotionAmount}
                 date={promotionDate || todayDate}
+                localShops={localShops}
                 onRefresh={fetchPromotionExpense}
               />
             </div>
