@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
         status: true,
         orderTime: true,
         rawPayload: true,
+        platform: true,
       },
     });
 
@@ -99,7 +100,11 @@ export async function GET(request: NextRequest) {
       amountMeituan: number;
       amountJingdong: number;
       amountTaobao: number;
+      amountOther: number;
       realOrderCount: number;
+      realOrderMeituan: number;
+      realOrderJingdong: number;
+      realOrderTaobao: number;
       brushOrderCount: number;
       cancelledOrderCount: number;
     }> = {};
@@ -113,7 +118,11 @@ export async function GET(request: NextRequest) {
         amountMeituan: 0,
         amountJingdong: 0,
         amountTaobao: 0,
+        amountOther: 0,
         realOrderCount: 0,
+        realOrderMeituan: 0,
+        realOrderJingdong: 0,
+        realOrderTaobao: 0,
         brushOrderCount: 0,
         cancelledOrderCount: 0,
       };
@@ -128,6 +137,7 @@ export async function GET(request: NextRequest) {
         dataMap[key].amountMeituan = item.amountMeituan || 0;
         dataMap[key].amountJingdong = item.amountJingdong || 0;
         dataMap[key].amountTaobao = item.amountTaobao || 0;
+        dataMap[key].amountOther = Math.max(0, (item.amount || 0) - (item.amountMeituan || 0) - (item.amountJingdong || 0) - (item.amountTaobao || 0));
       }
     });
 
@@ -144,6 +154,13 @@ export async function GET(request: NextRequest) {
           dataMap[key].brushOrderCount += 1;
         } else {
           dataMap[key].realOrderCount += 1;
+          if (order.platform === "美团") {
+            dataMap[key].realOrderMeituan += 1;
+          } else if (order.platform === "京东") {
+            dataMap[key].realOrderJingdong += 1;
+          } else if (order.platform === "淘宝") {
+            dataMap[key].realOrderTaobao += 1;
+          }
         }
       }
     });
