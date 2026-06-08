@@ -451,7 +451,7 @@ export function TodayOrdersView({
             <EmptyState
               icon={<Package2 size={56} strokeWidth={1.5} className="text-muted-foreground/25" />}
               title="今天还没有订单推送"
-              description="可以手动拉取，或者确保 auto-pick 插件后台配置的回调地址能正常推送。"
+              description="可以手动拉取。"
             />
           </div>
         ) : null}
