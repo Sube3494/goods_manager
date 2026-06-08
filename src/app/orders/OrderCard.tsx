@@ -950,7 +950,7 @@ export function OrderCard({
   const pickup = Boolean(order.isPickup) || order.platform === "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
-  const showBrushMarker = order.isMainSystemSelfDelivery && !abnormal && !pickup;
+  const showBrushMarker = !pickup;
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
@@ -1404,7 +1404,7 @@ export function OrderCard({
                   <div className="flex items-center p-0.5 rounded-xl border border-black/8 dark:border-white/10 bg-black/2 dark:bg-black/20 w-full mt-2 h-8.5">
                     <button
                       type="button"
-                      disabled={isUpdatingBrush || terminal}
+                      disabled={isUpdatingBrush || cancelled || deleted}
                       onClick={() => void handleUpdateBrush(true)}
                       className={cn(
                         "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
@@ -1417,7 +1417,7 @@ export function OrderCard({
                     </button>
                     <button
                       type="button"
-                      disabled={isUpdatingBrush || terminal}
+                      disabled={isUpdatingBrush || cancelled || deleted}
                       onClick={() => void handleUpdateBrush(false)}
                       className={cn(
                         "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",

@@ -647,42 +647,11 @@ export function PromotionCalendarModal({
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col mt-4 space-y-4 overflow-hidden">
-              {/* 平台选择 + 多店铺时的店铺切换 */}
-              <div className="flex flex-col gap-2">
-                {/* 店铺切换（多店时显示） */}
-                {localShops && localShops.length > 1 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">店铺</span>
-                    <div className="flex gap-1.5 flex-wrap">
-                      <button
-                        onClick={() => setChartShopName("")}
-                        className={`rounded-lg border px-2.5 py-1 text-xs transition-all cursor-pointer ${
-                          chartShopName === ""
-                            ? "border-primary/30 bg-primary/8 text-primary dark:border-primary/40 dark:bg-primary/15"
-                            : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
-                        }`}
-                      >
-                        全部汇总
-                      </button>
-                      {localShops.map((shop) => (
-                        <button
-                          key={shop.id}
-                          onClick={() => setChartShopName(shop.name)}
-                          className={`rounded-lg border px-2.5 py-1 text-xs transition-all cursor-pointer ${
-                            chartShopName === shop.name
-                              ? "border-primary/30 bg-primary/8 text-primary dark:border-primary/40 dark:bg-primary/15"
-                              : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
-                          }`}
-                        >
-                          {shop.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* 平台选择 */}
-                <div className="flex justify-start gap-2 flex-wrap">
+            <div className="flex-1 flex flex-col mt-4 space-y-4 min-h-0">
+              {/* 工具栏：平台切换（左）+ 店铺切换（右），移动端自动折行 */}
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 overflow-visible">
+                {/* 左：平台选择 */}
+                <div className="flex gap-2 flex-wrap">
                   {[
                     { key: "amountMeituan" as const, label: "美团", logo: "/platform/美团.svg", activeColor: "border-[#FFB800] bg-[#FFB800]/5 text-[#FFB800]" },
                     { key: "amountJingdong" as const, label: "京东", logo: "/platform/京东.svg", activeColor: "border-[#DF1E1D] bg-[#DF1E1D]/5 text-[#DF1E1D]" },
@@ -691,17 +660,31 @@ export function PromotionCalendarModal({
                     <button
                       key={p.key}
                       onClick={() => setChartPlatform(p.key)}
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs transition-all cursor-pointer ${
                         chartPlatform === p.key
                           ? p.activeColor
                           : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
                       }`}
                     >
-                      <img src={p.logo} alt={p.label} className="h-4 w-4 object-contain" />
-                      <span>{p.label}趋势</span>
+                      <img src={p.logo} alt={p.label} className="h-3.5 w-3.5 object-contain" />
+                      <span className="hidden sm:inline">{p.label}</span>
                     </button>
                   ))}
                 </div>
+
+                {/* 右：店铺过滤（多店铺时才显示） */}
+                {localShops && localShops.length > 1 && (
+                  <CustomSelect
+                    value={chartShopName}
+                    onChange={setChartShopName}
+                    options={[
+                      { value: "", label: "全部汇总" },
+                      ...localShops.map((shop) => ({ value: shop.name, label: shop.name })),
+                    ]}
+                    className="h-8 w-32 shrink-0"
+                    triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs shadow-none dark:border-white/10 dark:bg-white/4"
+                   />
+                )}
               </div>
 
               {/* 折线图图表 */}
