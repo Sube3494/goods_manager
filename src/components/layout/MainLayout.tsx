@@ -170,7 +170,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             )}>
                 <div className={cn(
                     "animate-fade-in",
-                    isWideCanvasPage ? "flex min-h-0 flex-1 flex-col" : "h-full",
+                    isWideCanvasPage ? "flex min-h-0 flex-1 flex-col" : "w-full",
                     !isFullScreenPage && !isWideCanvasPage && "mx-auto max-w-7xl"
                 )}>
                     {isLoading && !isFullScreenPage ? (
