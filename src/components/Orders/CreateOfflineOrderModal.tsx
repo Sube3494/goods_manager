@@ -41,6 +41,7 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+  const [isShopSelectOpen, setIsShopSelectOpen] = useState(false);
   
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -59,14 +60,14 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
-      if (isProductPickerOpen) return;
+      if (isProductPickerOpen || isShopSelectOpen) return;
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
         onClose();
       }
     };
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [onClose, isProductPickerOpen]);
+  }, [onClose, isProductPickerOpen, isShopSelectOpen]);
 
   const handleSelectProducts = (selectedProducts: any[]) => {
     if (!selectedProducts || selectedProducts.length === 0) return;
@@ -285,6 +286,7 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
                         showToast("已切换归属店铺，为了保证出库库存精确，已清空商品列表", "warning");
                       }
                     }}
+                    onOpenChange={setIsShopSelectOpen}
                     options={formattedShopOptions}
                     placeholder="请选择归属店铺"
                     className="w-full h-11"
