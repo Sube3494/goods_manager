@@ -38,12 +38,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         return NextResponse.json({ error: "已取消订单不能生成出库" }, { status: 409 });
       case "no-items":
         return NextResponse.json({ error: "没有可生成出库的商品" }, { status: 400 });
-      case "insufficient-stock":
-        return NextResponse.json({
-          error: "库存不足，请先主动创建采购单",
-          reason: "insufficient-stock",
-          insufficientItems: result.insufficientItems || [],
-        }, { status: 409 });
+
       default:
         return NextResponse.json({ error: "Failed to create outbound order" }, { status: 409 });
     }

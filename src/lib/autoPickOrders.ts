@@ -9,6 +9,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
+import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -4317,6 +4318,50 @@ async function resolveOutboundItemsForAutoPickOrder(
   };
 }
 
+async function resolveAutoInboundCompensationCostPrice(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  item: { productId: string | null; shopProductId: string | null }
+) {
+  if (item.shopProductId) {
+    const shopProduct = await tx.shopProduct.findFirst({
+      where: {
+        id: item.shopProductId,
+        shop: { userId },
+      },
+      select: {
+        costPrice: true,
+        product: {
+          select: {
+            costPrice: true,
+          },
+        },
+      },
+    });
+
+    return FinanceMath.add(
+      Number(shopProduct?.costPrice) || Number(shopProduct?.product?.costPrice) || 0,
+      0
+    );
+  }
+
+  if (item.productId) {
+    const product = await tx.product.findFirst({
+      where: {
+        id: item.productId,
+        userId,
+      },
+      select: {
+        costPrice: true,
+      },
+    });
+
+    return FinanceMath.add(Number(product?.costPrice) || 0, 0);
+  }
+
+  return 0;
+}
+
 export async function createOutboundFromAutoPickOrder(
   userId: string,
   orderId: string,
@@ -4470,10 +4515,69 @@ export async function createOutboundFromAutoPickOrder(
     }
 
     if (insufficientItems.length > 0) {
-      return {
-        kind: "insufficient" as const,
-        insufficientItems,
-      };
+      for (const insufficientItem of insufficientItems) {
+        if (!insufficientItem.productId) continue;
+
+        const batchGap = insufficientItem.missingQuantity;
+        const compensateOrderId = `PO-AUTO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        
+        const costPrice = await resolveAutoInboundCompensationCostPrice(tx, userId, {
+          productId: insufficientItem.productId,
+          shopProductId: insufficientItem.shopProductId,
+        });
+
+        await tx.purchaseOrder.create({
+          data: {
+            id: compensateOrderId,
+            type: AUTO_INBOUND_TYPE,
+            status: "Received", // 自动入库
+            totalAmount: FinanceMath.multiply(costPrice, batchGap),
+            date: new Date(),
+            note: `[自动出库] 自动生成出库单(订单号:${order.orderNo})时批次库存不足，系统自动补齐 ${batchGap} 件`,
+            shopName: insufficientItem.mappedShopName || null,
+            userId: userId,
+            items: {
+              create: [{
+                productId: insufficientItem.productId,
+                shopProductId: insufficientItem.shopProductId,
+                quantity: batchGap,
+                remainingQuantity: batchGap,
+                costPrice
+              }]
+            }
+          }
+        });
+
+        // 仅当系统总库存也不足时，才按实际差额增补总库存
+        const currentProduct = await tx.product.findUnique({
+          where: { id: insufficientItem.productId },
+          select: { stock: true }
+        });
+        const currentSystemStock = currentProduct?.stock || 0;
+        const systemCompensateQty = Math.max(0, insufficientItem.quantity - currentSystemStock);
+        if (systemCompensateQty > 0) {
+          await tx.product.update({
+            where: { id: insufficientItem.productId },
+            data: { stock: { increment: systemCompensateQty } }
+          });
+        }
+
+        // 对称补齐对应店铺商品的物理库存
+        if (insufficientItem.shopProductId) {
+          const currentShopProduct = await tx.shopProduct.findUnique({
+            where: { id: insufficientItem.shopProductId },
+            select: { stock: true }
+          });
+          const currentShopStock = currentShopProduct?.stock || 0;
+          const shopCompensateQty = Math.max(0, insufficientItem.quantity - currentShopStock);
+          if (shopCompensateQty > 0) {
+            await tx.shopProduct.update({
+              where: { id: insufficientItem.shopProductId },
+              data: { stock: { increment: shopCompensateQty } }
+            });
+          }
+        }
+      }
     }
 
     const costSnapshots = await InventoryService.processOutboundFIFO(
@@ -4523,14 +4627,7 @@ export async function createOutboundFromAutoPickOrder(
     };
   });
 
-  if (created.kind === "insufficient") {
-    return {
-      ok: false,
-      skipped: true,
-      reason: "insufficient-stock" as const,
-      insufficientItems: created.insufficientItems,
-    };
-  }
+
 
   return {
     ok: true,
@@ -4624,18 +4721,7 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
         error: "订单没有可生成出库的商品",
       });
     }
-    if (result.reason === "insufficient-stock") {
-      const summary = Array.isArray(result.insufficientItems)
-        ? result.insufficientItems
-            .map((item) => `${item.name} 缺 ${item.missingQuantity} 件`)
-            .join("；")
-        : "";
-      await updateAutoPickOrderAutoOutboundState(userId, orderId, {
-        status: "failed",
-        attemptedAt,
-        error: summary ? `库存不足，请先创建采购单：${summary}` : "库存不足，请先创建采购单",
-      });
-    }
+
 
     return result;
   } catch (error) {
