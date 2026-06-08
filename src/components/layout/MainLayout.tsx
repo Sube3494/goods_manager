@@ -40,7 +40,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
   const visibleItems = getVisibleNavItems(user as SessionUser | null);
-  const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 1;
+  const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 0;
 
   // Track initialization to prevent initial mount transition
   useEffect(() => {
@@ -58,33 +58,32 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isCollapsed, showSidebar]);
 
-  // Disable number input scrolling globally, and block global right-click
+  // Disable number input scrolling locally when focused to avoid global wheel passive-listener performance penalty
   useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
+    const preventScroll = (e: Event) => {
+      e.preventDefault();
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'number') {
-        if (document.activeElement === target) {
-          e.preventDefault();
-        }
+      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "number") {
+        target.addEventListener("wheel", preventScroll, { passive: false });
       }
     };
 
-    const handleContextMenu = (e: MouseEvent) => {
-      // Allow right-click on specific elements if needed later, but globally prevent by default
-      if (process.env.NODE_ENV !== 'development') {
-        e.preventDefault();
-      } else {
-        // In development, still block it to test, unless holding Shift 
-        if (!e.shiftKey) e.preventDefault();
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "number") {
+        target.removeEventListener("wheel", preventScroll);
       }
     };
 
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    document.addEventListener('contextmenu', handleContextMenu);
-    
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("focusout", handleFocusOut);
+
     return () => {
-      window.removeEventListener('wheel', handleWheel);
-      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("focusout", handleFocusOut);
     };
   }, []);
 
@@ -183,7 +182,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                                 </div>
                             </div>
                             <p className="text-sm text-muted-foreground font-medium animate-pulse tracking-wide">
-                                正在准备 PickNote 空间...
+                                正在准备腾荣科技空间...
                             </p>
                         </div>
                     ) : (
