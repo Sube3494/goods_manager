@@ -468,6 +468,7 @@ export function AllOrdersView({
                   onOpenCostBackfill={onOpenCostBackfill}
                   onOpenMatchEditor={onOpenMatchEditor}
                   onClearManualMatch={clearManualMatch}
+                  onRefresh={() => fetchOrders({ silent: true })}
                 />
               </OrderCardErrorBoundary>
             ))}

@@ -28,6 +28,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/Toast";
 import { createPortal } from "react-dom";
 import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig } from "@/lib/types";
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
@@ -899,6 +900,7 @@ export function OrderCard({
   onOpenCostBackfill,
   onOpenMatchEditor,
   onClearManualMatch,
+  onRefresh,
 }: {
   order: AutoPickOrder;
   expanded: boolean;
@@ -908,8 +910,36 @@ export function OrderCard({
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onClearManualMatch: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
+  onRefresh?: () => void;
 }) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
+  const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
+  const { showToast } = useToast();
+
+  const handleUpdateBrush = useCallback(async (val: boolean) => {
+    if (val === order.isMainSystemSelfDelivery) return;
+    try {
+      setIsUpdatingBrush(true);
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isMainSystemSelfDelivery: val }),
+      });
+      if (res.ok) {
+        showToast("刷单标记修改成功", "success");
+        onRefresh?.();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || "修改失败", "error");
+      }
+    } catch (err) {
+      console.error("更新刷单状态失败", err);
+      showToast("网络请求失败，请稍后重试", "error");
+    } finally {
+      setIsUpdatingBrush(false);
+    }
+  }, [order.id, order.isMainSystemSelfDelivery, showToast, onRefresh]);
+
   const profitTooltipRef = useRef<HTMLDivElement | null>(null);
   const itemCount = getItemCount(order.items);
   const completed = isCompletedStatus(order.status);
@@ -1364,7 +1394,42 @@ export function OrderCard({
               <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <DetailStat label="订单状态" value={getDisplayStatus(order)} />
                 <DetailStat label="订单类型" value={orderTypeLabel || "普通单"} />
-                <DetailStat label="刷单标记" value={showBrushMarker ? "主系统自配" : "否"} />
+                <div className="rounded-2xl border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/8 dark:bg-white/3 sm:px-3 sm:py-2 flex flex-col justify-between">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">刷单标记</span>
+                    {isUpdatingBrush && (
+                      <Loader2 size={10} className="animate-spin text-primary" />
+                    )}
+                  </div>
+                  <div className="flex items-center p-0.5 rounded-xl border border-black/8 dark:border-white/10 bg-black/2 dark:bg-black/20 w-full mt-2 h-8.5">
+                    <button
+                      type="button"
+                      disabled={isUpdatingBrush || terminal}
+                      onClick={() => void handleUpdateBrush(true)}
+                      className={cn(
+                        "flex-1 h-full rounded-[10px] text-xs font-bold transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
+                        order.isMainSystemSelfDelivery
+                          ? "bg-white dark:bg-white/10 shadow-[0_1px_2.5px_rgba(0,0,0,0.15)] text-black dark:text-white"
+                          : "bg-transparent text-zinc-400 dark:text-zinc-500 hover:text-foreground/80"
+                      )}
+                    >
+                      是
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isUpdatingBrush || terminal}
+                      onClick={() => void handleUpdateBrush(false)}
+                      className={cn(
+                        "flex-1 h-full rounded-[10px] text-xs font-bold transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
+                        !order.isMainSystemSelfDelivery
+                          ? "bg-white dark:bg-white/10 shadow-[0_1px_2.5px_rgba(0,0,0,0.15)] text-black dark:text-white"
+                          : "bg-transparent text-zinc-400 dark:text-zinc-500 hover:text-foreground/80"
+                      )}
+                    >
+                      否
+                    </button>
+                  </div>
+                </div>
                 <DetailStat label="出库状态" value={hasOutbound ? (productCostStatusText ? `已出库 · ${productCostStatusText}` : "已出库") : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />

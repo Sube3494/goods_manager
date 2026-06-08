@@ -440,6 +440,7 @@ export function TodayOrdersView({
                   onOpenCostBackfill={onOpenCostBackfill}
                   onOpenMatchEditor={onOpenMatchEditor}
                   onClearManualMatch={clearManualMatch}
+                  onRefresh={() => fetchOrders({ silent: true })}
                 />
               </OrderCardErrorBoundary>
             ))}
@@ -475,6 +476,7 @@ export function TodayOrdersView({
                       onOpenCostBackfill={onOpenCostBackfill}
                       onOpenMatchEditor={onOpenMatchEditor}
                       onClearManualMatch={clearManualMatch}
+                      onRefresh={() => fetchOrders({ silent: true })}
                     />
                   </OrderCardErrorBoundary>
                 ))}
