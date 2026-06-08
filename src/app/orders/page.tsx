@@ -2333,7 +2333,7 @@ function BrushSyncPickerModal({
   );
 }
 
-export default function OrdersPage() {
+function OrdersPage() {
   const router = useRouter();
   const { showToast } = useToast();
   const [pageError, setPageError] = useState<string | null>(null);
@@ -2341,12 +2341,35 @@ export default function OrdersPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     
+    const showGlobalErrorDOM = (msg: string) => {
+      if (typeof document === "undefined" || !document.body) return;
+      
+      const oldEl = document.getElementById("native-global-error-popup");
+      if (oldEl) oldEl.remove();
+
+      const el = document.createElement("div");
+      el.id = "native-global-error-popup";
+      el.style.cssText = "position: fixed; top: 12px; left: 12px; right: 12px; z-index: 2147483647; background: #fff5f5; border: 2px solid #f87171; border-radius: 16px; padding: 16px; color: #991b1b; font-family: monospace; font-size: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); pointer-events: auto;";
+      el.innerHTML = `
+        <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+          🚨 系统致命运行错误 (原生捕获)
+        </h4>
+        <p style="margin: 0 0 12px 0; word-break: break-all; line-height: 1.5; background: #fee2e2; padding: 8px; border-radius: 8px;">${msg}</p>
+        <button onclick="document.getElementById('native-global-error-popup').remove()" style="background: #991b1b; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">关闭提示</button>
+      `;
+      document.body.appendChild(el);
+    };
+
     const handleError = (event: ErrorEvent) => {
-      setPageError(`JavaScript 错误: ${event.message} 在 ${event.filename}:${event.lineno}`);
+      const errMsg = `JavaScript 错误: ${event.message} 在 ${event.filename}:${event.lineno}`;
+      setPageError(errMsg);
+      showGlobalErrorDOM(errMsg);
     };
     
     const handleRejection = (event: PromiseRejectionEvent) => {
-      setPageError(`未捕获的 Promise 错误: ${event.reason}`);
+      const errMsg = `未捕获的 Promise 错误: ${event.reason}`;
+      setPageError(errMsg);
+      showGlobalErrorDOM(errMsg);
     };
 
     window.addEventListener("error", handleError);
@@ -3940,6 +3963,68 @@ export default function OrdersPage() {
         document.body
       )}
     </div>
+  );
+}
+
+class GlobalOrdersPageErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: unknown) {
+    console.error("OrdersPage Rendering Error Captured by ErrorBoundary:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 max-w-xl mx-auto my-12 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/30 rounded-3xl shadow-xl">
+          <div className="flex items-start gap-4">
+            <span className="text-3xl">🚨</span>
+            <div className="flex-1">
+              <h2 className="text-lg font-black text-rose-800 dark:text-rose-200">
+                订单管理页面渲染出错
+              </h2>
+              <p className="mt-2 text-xs font-mono text-rose-700 dark:text-rose-300 bg-white/50 dark:bg-black/20 p-4 rounded-xl break-all leading-relaxed whitespace-pre-wrap">
+                {this.state.error?.stack || this.state.error?.message || "未知错误"}
+              </p>
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-rose-800 text-white rounded-xl text-xs font-bold hover:bg-rose-900 transition-colors"
+                >
+                  刷新页面
+                </button>
+                <button
+                  onClick={() => this.setState({ hasError: false, error: null })}
+                  className="px-4 py-2 border border-rose-300 text-rose-800 rounded-xl text-xs font-bold hover:bg-rose-100 transition-colors dark:text-rose-200"
+                >
+                  重试渲染
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default function OrdersPageWithBoundary() {
+  return (
+    <GlobalOrdersPageErrorBoundary>
+      <OrdersPage />
+    </GlobalOrdersPageErrorBoundary>
   );
 }
 
