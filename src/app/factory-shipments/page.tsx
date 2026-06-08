@@ -1996,7 +1996,7 @@ function FactoryShipmentDetailModal({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">发货安排</div>
-                      <div className="mt-1 text-xs text-muted-foreground">单据与发货时间</div>
+                      <div className="mt-1 text-xs text-muted-foreground">单据与创建时间</div>
                     </div>
                     <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-border/60 bg-white/80 px-3 text-[11px] text-muted-foreground shadow-xs dark:border-white/10 dark:bg-white/6">
                       {editItems.length || order.items.length} 项货品
@@ -2023,7 +2023,7 @@ function FactoryShipmentDetailModal({
                     </div>
                   </div>
                   <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
                     <div className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
                       {format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
                     </div>
