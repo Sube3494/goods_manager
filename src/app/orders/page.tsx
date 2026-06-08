@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -900,6 +900,39 @@ function ActionButton({
       <span className={cn(mobileIconOnly ? "sr-only sm:not-sr-only sm:inline" : "")}>{label}</span>
     </button>
   );
+}
+
+class OrderCardErrorBoundary extends Component<{ children: React.ReactNode; orderNo: string }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode; orderNo: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: unknown) {
+    console.error("OrderCard render failed for order:", this.props.orderNo, error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <article className="overflow-visible rounded-[26px] border border-rose-500/15 bg-rose-500/5 p-4 text-xs text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/8 sm:rounded-[30px]">
+          <div className="flex items-start gap-3">
+            <span className="text-base shrink-0">⚠️</span>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-bold text-[13px] text-rose-800 dark:text-rose-400">该订单在当前视图下渲染失败</h4>
+              <p className="mt-1 font-mono text-[11px] leading-4 text-rose-600 dark:text-rose-300">单号：{this.props.orderNo}</p>
+              <p className="mt-1 font-mono text-[11px] leading-4 break-all opacity-85 text-rose-600 dark:text-rose-300">{this.state.error?.stack || this.state.error?.message}</p>
+            </div>
+          </div>
+        </article>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function OrderCard({
@@ -2303,6 +2336,27 @@ function BrushSyncPickerModal({
 export default function OrdersPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const [pageError, setPageError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const handleError = (event: ErrorEvent) => {
+      setPageError(`JavaScript 错误: ${event.message} 在 ${event.filename}:${event.lineno}`);
+    };
+    
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      setPageError(`未捕获的 Promise 错误: ${event.reason}`);
+    };
+
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleRejection);
+    
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener("unhandledrejection", handleRejection);
+    };
+  }, []);
   const todayDate = formatLocalDate(new Date());
   const modalRef = useRef<HTMLDivElement | null>(null);
   const isFetchingRef = useRef(false);
@@ -3450,6 +3504,16 @@ export default function OrdersPage() {
 
   return (
     <div className="relative px-2 sm:px-1">
+      {pageError && (
+        <div className="fixed top-4 left-4 right-4 z-[999999] rounded-2xl border border-rose-500 bg-rose-50 p-4 text-xs text-rose-700 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:bg-rose-950/90 dark:text-rose-200 flex items-start gap-3">
+          <span className="text-base shrink-0">🚨</span>
+          <div className="min-w-0 flex-1">
+            <h4 className="font-bold">页面运行出错</h4>
+            <p className="mt-1 font-mono break-all leading-relaxed">{pageError}</p>
+            <button onClick={() => setPageError(null)} className="mt-2 text-[10px] font-bold text-rose-900 underline hover:no-underline dark:text-rose-100">关闭提示</button>
+          </div>
+        </div>
+      )}
       <div className="space-y-6 sm:space-y-8">
         <section className="rounded-3xl border border-black/8 bg-white/72 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/4 sm:px-5">
           <div className="flex flex-col gap-4">
@@ -3663,17 +3727,18 @@ export default function OrdersPage() {
           {!isLoading && visibleOrders.length > 0 ? (
             <div className="grid gap-4">
               {visibleOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  expanded={expandedIds.includes(order.id)}
-                  actingId={actingId}
-                  onToggleExpanded={toggleExpanded}
-                  onRunAction={runAction}
-                  onOpenCostBackfill={openCostBackfill}
-                  onOpenMatchEditor={openMatchEditor}
-                  onClearManualMatch={clearManualMatch}
-                />
+                <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
+                  <OrderCard
+                    order={order}
+                    expanded={expandedIds.includes(order.id)}
+                    actingId={actingId}
+                    onToggleExpanded={toggleExpanded}
+                    onRunAction={runAction}
+                    onOpenCostBackfill={openCostBackfill}
+                    onOpenMatchEditor={openMatchEditor}
+                    onClearManualMatch={clearManualMatch}
+                  />
+                </OrderCardErrorBoundary>
               ))}
             </div>
           ) : null}
@@ -3697,17 +3762,18 @@ export default function OrdersPage() {
               {showCompletedToday ? (
                 <div className="mt-4 grid gap-4">
                   {todayCompletedOrders.map((order) => (
-                    <OrderCard
-                      key={order.id}
-                      order={order}
-                      expanded={expandedIds.includes(order.id)}
-                      actingId={actingId}
-                      onToggleExpanded={toggleExpanded}
-                      onRunAction={runAction}
-                      onOpenCostBackfill={openCostBackfill}
-                      onOpenMatchEditor={openMatchEditor}
-                      onClearManualMatch={clearManualMatch}
-                    />
+                    <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
+                      <OrderCard
+                        order={order}
+                        expanded={expandedIds.includes(order.id)}
+                        actingId={actingId}
+                        onToggleExpanded={toggleExpanded}
+                        onRunAction={runAction}
+                        onOpenCostBackfill={openCostBackfill}
+                        onOpenMatchEditor={openMatchEditor}
+                        onClearManualMatch={clearManualMatch}
+                      />
+                    </OrderCardErrorBoundary>
                   ))}
                 </div>
               ) : null}
