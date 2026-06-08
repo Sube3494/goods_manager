@@ -99,9 +99,29 @@ export function parseAsShanghaiTime(input: string | Date | null | undefined): Da
   try {
     let normalized = str.replace(/\//g, '-');
     
-    // 如果只有日期没有时间，补充时间
+    // 如果只有日期没有时间，补充当前上海时间的时分秒以确保排序正确（时间以创建/操作时间为准）
     if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-      normalized += 'T00:00:00';
+      const now = new Date();
+      let hour = "00";
+      let minute = "00";
+      let second = "00";
+      try {
+        const timeParts = new Intl.DateTimeFormat('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).formatToParts(now);
+        hour = timeParts.find(p => p.type === 'hour')?.value || "00";
+        minute = timeParts.find(p => p.type === 'minute')?.value || "00";
+        second = timeParts.find(p => p.type === 'second')?.value || "00";
+      } catch {
+        hour = String(now.getHours()).padStart(2, "0");
+        minute = String(now.getMinutes()).padStart(2, "0");
+        second = String(now.getSeconds()).padStart(2, "0");
+      }
+      normalized += `T${hour}:${minute}:${second}`;
     } else if (normalized.includes(' ')) {
       normalized = normalized.replace(' ', 'T');
     }

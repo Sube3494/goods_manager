@@ -82,6 +82,16 @@ function buildShipmentItemDisplayName(product: Product) {
   return [rawName, variantLabel].filter(Boolean).join(" / ");
 }
 
+function parseSafeDate(dateInput: Date | string | null | undefined): Date {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+  const str = String(dateInput).trim();
+  if (str.endsWith('Z')) {
+    return new Date(str.slice(0, -1));
+  }
+  return new Date(str);
+}
+
 type CustomerAddressOption = {
   id: string;
   contactName?: string;
@@ -887,7 +897,7 @@ const compensationStatusOptions = [
 
 function createInitialForm(): ShipmentFormState {
   return {
-    date: format(new Date(), "yyyy-MM-dd HH:mm"),
+    date: format(new Date(), "yyyy-MM-dd"),
     recipientName: "",
     recipientPhone: "",
     recipientAddress: "",
@@ -935,9 +945,7 @@ function parseQuickAddressInput(input: string) {
       const year = dateMatch[2] || String(new Date().getFullYear());
       const month = String(dateMatch[3]).padStart(2, '0');
       const day = String(dateMatch[4]).padStart(2, '0');
-      const hour = String(dateMatch[5]).padStart(2, '0');
-      const minute = String(dateMatch[6]).padStart(2, '0');
-      parsedDate = `${year}-${month}-${day} ${hour}:${minute}`;
+      parsedDate = `${year}-${month}-${day}`;
       
       // 移除时间字符串以避免污染姓名和地址解析
       cleanInput = normalizedInput.replace(dateMatch[0], " ");
@@ -1585,7 +1593,7 @@ function FactoryShipmentDetailModal({
     const parsed = parseFactoryShipmentNote(order.note);
     setEditForm({
       status: deriveFactoryShipmentStatusFromOrder(order, parsed),
-      date: format(new Date(order.date), "yyyy-MM-dd HH:mm"),
+      date: format(parseSafeDate(order.date), "yyyy-MM-dd"),
       recipientLine: [parsed.recipientName, parsed.recipientPhone, parsed.recipientAddress].filter(Boolean).join(" "),
       recipientName: parsed.recipientName || "",
       recipientPhone: parsed.recipientPhone || "",
@@ -2015,26 +2023,22 @@ function FactoryShipmentDetailModal({
                     </div>
                   </div>
                   {isEditing ? (
-                    <div className="mt-3 flex items-center gap-2">
+                    <div className="mt-3">
                       <DatePicker
                         value={editForm.date ? editForm.date.slice(0, 10) : ""}
                         onChange={(val) => {
-                          const timePart = editForm.date && editForm.date.length > 10 ? editForm.date.slice(10) : ` ${format(new Date(), "HH:mm")}`;
-                          setEditForm((prev) => ({ ...prev, date: val + timePart }));
+                          setEditForm((prev) => ({ ...prev, date: val }));
                         }}
                         showClear={false}
-                        className="h-10 min-w-0 flex-1"
+                        className="h-10 w-full"
                         triggerClassName="h-10 rounded-2xl border border-border/70 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/5"
                       />
-                      <div className="inline-flex h-10 shrink-0 items-center rounded-2xl border border-border/70 bg-white px-4 font-mono text-sm font-semibold text-foreground dark:border-white/10 dark:bg-white/5">
-                        {editForm.date && editForm.date.length > 10 ? editForm.date.slice(11, 16) : format(new Date(), "HH:mm")}
-                      </div>
                     </div>
                   ) : (
                     <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
                       <div className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-                        {format(new Date(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
+                        {format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
                       </div>
                     </div>
                   )}
@@ -2743,25 +2747,15 @@ function FactoryShipmentCreateModal({
                       <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         <Calendar size={13} /> 发货日期<span className="text-rose-500 ml-0.5 font-bold">*</span>
                       </div>
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2">
                         <DatePicker
                           value={form.date ? form.date.slice(0, 10) : ""}
                           onChange={(val) => {
-                            const timePart = form.date && form.date.length > 10 ? form.date.slice(10) : " 00:00";
-                            updateForm("date", val + timePart);
+                            updateForm("date", val);
                           }}
                           showClear={false}
-                          className="h-10 flex-1 min-w-0"
+                          className="h-10 w-full"
                           triggerClassName="h-10 rounded-xl border border-border bg-white dark:border-white/10 dark:bg-white/5"
-                        />
-                        <input
-                          type="time"
-                          value={form.date && form.date.length > 10 ? form.date.slice(11, 16) : "00:00"}
-                          onChange={(e) => {
-                            const datePart = form.date ? form.date.slice(0, 10) : format(new Date(), "yyyy-MM-dd");
-                            updateForm("date", datePart + " " + e.target.value);
-                          }}
-                          className="h-10 w-24 shrink-0 rounded-xl border border-border bg-white dark:border-white/10 dark:bg-white/5 px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20 font-mono"
                         />
                       </div>
                     </div>
@@ -3397,7 +3391,7 @@ export default function FactoryShipmentsPage() {
     return shipmentOrders.filter((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
-      const orderDate = order.date ? new Date(order.date).toISOString().slice(0, 10) : "";
+      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
       const query = searchQuery.trim();
       const itemNames = order.items.map(
         (item) => item.shopProduct?.name || item.product?.name || ""
@@ -3656,7 +3650,7 @@ export default function FactoryShipmentsPage() {
                       <td className="px-4 py-4 text-center text-xs text-muted-foreground">
                         <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <Calendar size={14} className="shrink-0 text-muted-foreground/75" />
-                          <span className="font-mono tabular-nums">{format(new Date(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}</span>
+                          <span className="font-mono tabular-nums">{format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-center text-sm font-normal text-foreground">
@@ -3846,8 +3840,8 @@ export default function FactoryShipmentsPage() {
                         {(currentPage - 1) * pageSize + index + 1}
                       </span>
                       <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-border/50 bg-muted/40 px-2 text-[10px] font-normal leading-none text-muted-foreground dark:border-white/8 dark:bg-white/6">
-                        <span>{format(new Date(order.date), "MM-dd")}</span>
-                        <span>{format(new Date(order.date), "HH:mm")}</span>
+                        <span>{format(parseSafeDate(order.date), "MM-dd")}</span>
+                        <span>{format(parseSafeDate(order.date), "HH:mm")}</span>
                       </span>
                       <div className="min-w-0">
                         <div className="truncate text-sm font-normal text-foreground" title={[parsed.recipientName, parsed.recipientAddress].filter(Boolean).join(" ")}>

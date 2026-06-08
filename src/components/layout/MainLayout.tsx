@@ -58,21 +58,32 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isCollapsed, showSidebar]);
 
-  // Disable number input scrolling globally
+  // Disable number input scrolling locally when focused to avoid global wheel passive-listener performance penalty
   useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
+    const preventScroll = (e: Event) => {
+      e.preventDefault();
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'number') {
-        if (document.activeElement === target) {
-          e.preventDefault();
-        }
+      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "number") {
+        target.addEventListener("wheel", preventScroll, { passive: false });
       }
     };
 
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "number") {
+        target.removeEventListener("wheel", preventScroll);
+      }
+    };
+
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("focusout", handleFocusOut);
+
     return () => {
-      window.removeEventListener('wheel', handleWheel);
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("focusout", handleFocusOut);
     };
   }, []);
 

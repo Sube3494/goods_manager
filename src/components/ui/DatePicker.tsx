@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, eachDayOfInterval, isToday, startOfDay, endOfDay } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "lucide-react";
@@ -12,6 +12,12 @@ import { createPortal } from "react-dom";
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+const parseSafeDate = (value: string | Date | null | undefined, fallback: Date = new Date()): Date => {
+  if (!value) return fallback;
+  const d = typeof value === "string" ? new Date(value.replace(/-/g, "/")) : value;
+  return isNaN(d.getTime()) ? fallback : d;
+};
 
 interface DatePickerProps {
   value: string; // YYYY-MM-DD
@@ -27,7 +33,7 @@ interface DatePickerProps {
 
 export function DatePicker({ value, onChange, placeholder = "选择日期", className, showClear = true, minDate, maxDate, isCompact, triggerClassName }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(value ? new Date(value) : new Date());
+  const [currentMonth, setCurrentMonth] = useState(() => parseSafeDate(value));
   const containerRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -39,7 +45,24 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
     showAbove?: boolean;
   }>({ top: 0, left: 0, width: 0 });
 
-  const selectedDate = value ? new Date(value) : null;
+  const selectedDate = useMemo(() => {
+    if (!value) return null;
+    const d = new Date(value.replace(/-/g, "/"));
+    return isNaN(d.getTime()) ? null : d;
+  }, [value]);
+
+  const parsedMinDate = useMemo(() => {
+    if (!minDate) return null;
+    const d = new Date(minDate.replace(/-/g, "/"));
+    return isNaN(d.getTime()) ? null : startOfDay(d);
+  }, [minDate]);
+
+  const parsedMaxDate = useMemo(() => {
+    if (!maxDate) return null;
+    const d = new Date(maxDate.replace(/-/g, "/"));
+    return isNaN(d.getTime()) ? null : endOfDay(d);
+  }, [maxDate]);
+
 
   useEffect(() => {
     const handle = requestAnimationFrame(() => setMounted(true));
@@ -122,8 +145,8 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
   });
 
   const handleDateClick = (date: Date) => {
-    if (minDate && isSameDay(date, new Date(minDate)) === false && date < startOfDay(new Date(minDate))) return;
-    if (maxDate && isSameDay(date, new Date(maxDate)) === false && date > endOfDay(new Date(maxDate))) return;
+    if (parsedMinDate && date < parsedMinDate) return;
+    if (parsedMaxDate && date > parsedMaxDate) return;
 
     onChange(format(date, "yyyy-MM-dd"));
     setIsOpen(false);
@@ -236,8 +259,8 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                   const isSelected = selectedDate && isSameDay(day, selectedDate);
                   const isCurrentMonth = isSameMonth(day, currentMonth);
                   const isTodayDate = isToday(day);
-                  const isBeforeMin = minDate ? startOfDay(day) < startOfDay(new Date(minDate)) : false;
-                  const isAfterMax = maxDate ? startOfDay(day) > startOfDay(new Date(maxDate)) : false;
+                  const isBeforeMin = parsedMinDate ? startOfDay(day) < parsedMinDate : false;
+                  const isAfterMax = parsedMaxDate ? startOfDay(day) > parsedMaxDate : false;
                   const isDisabled = isBeforeMin || isAfterMax;
 
                   return (
