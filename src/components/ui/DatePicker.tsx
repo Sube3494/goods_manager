@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, eachDayOfInterval, isToday, startOfDay, endOfDay } from "date-fns";
-import { zhCN } from "date-fns/locale/zh-CN";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
@@ -15,7 +14,8 @@ function cn(...inputs: ClassValue[]) {
 
 const parseSafeDate = (value: string | Date | null | undefined, fallback: Date = new Date()): Date => {
   if (!value) return fallback;
-  const d = typeof value === "string" ? new Date(value.replace(/-/g, "/")) : value;
+  if (value instanceof Date) return isNaN(value.getTime()) ? fallback : value;
+  const d = typeof value === "string" ? new Date(value.replace(/-/g, "/")) : new Date(value);
   return isNaN(d.getTime()) ? fallback : d;
 };
 
@@ -168,7 +168,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
         <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
             {!isCompact && <CalendarIcon size={14} className={cn("shrink-0", selectedDate ? "text-primary" : "text-muted-foreground")} />}
             <span className={cn("truncate", selectedDate ? "text-foreground font-medium" : "text-muted-foreground")}>
-            {selectedDate ? format(selectedDate, "yyyy-MM-dd", { locale: zhCN }) : placeholder}
+            {selectedDate ? format(selectedDate, "yyyy-MM-dd") : placeholder}
             </span>
         </div>
         {showClear && selectedDate && (
@@ -215,7 +215,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                         <ChevronLeft size={14} strokeWidth={3} />
                     </button>
                     <h4 className="text-sm font-bold text-foreground whitespace-nowrap">
-                    {format(currentMonth, "yyyy年 MM月", { locale: zhCN })}
+                    {format(currentMonth, "yyyy年 MM月")}
                     </h4>
                     <button
                         type="button"
