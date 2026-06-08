@@ -763,7 +763,7 @@ export function DetailStat({
   return (
     <div className={cn("rounded-2xl border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/8 dark:bg-white/3 sm:px-3 sm:py-2", className)}>
       <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
-      <div className={cn("mt-1 text-sm font-semibold text-foreground", valueClassName)}>{value}</div>
+      <div className={cn("mt-1 text-sm font-medium text-foreground", valueClassName)}>{value}</div>
     </div>
   );
 }
@@ -1407,7 +1407,7 @@ export function OrderCard({
                       disabled={isUpdatingBrush || terminal}
                       onClick={() => void handleUpdateBrush(true)}
                       className={cn(
-                        "flex-1 h-full rounded-[10px] text-xs font-bold transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
+                        "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
                         order.isMainSystemSelfDelivery
                           ? "bg-white dark:bg-white/10 shadow-[0_1px_2.5px_rgba(0,0,0,0.15)] text-black dark:text-white"
                           : "bg-transparent text-zinc-400 dark:text-zinc-500 hover:text-foreground/80"
@@ -1420,7 +1420,7 @@ export function OrderCard({
                       disabled={isUpdatingBrush || terminal}
                       onClick={() => void handleUpdateBrush(false)}
                       className={cn(
-                        "flex-1 h-full rounded-[10px] text-xs font-bold transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
+                        "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
                         !order.isMainSystemSelfDelivery
                           ? "bg-white dark:bg-white/10 shadow-[0_1px_2.5px_rgba(0,0,0,0.15)] text-black dark:text-white"
                           : "bg-transparent text-zinc-400 dark:text-zinc-500 hover:text-foreground/80"
