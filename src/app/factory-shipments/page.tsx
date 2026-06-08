@@ -922,7 +922,31 @@ function hasSelectedLogisticsName(logisticsName?: string | null) {
 }
 
 function parseQuickAddressInput(input: string) {
-  const normalized = input
+  const normalizedInput = input || "";
+
+  // 匹配并提取时间，支持常见的订单时间格式（含下单时间等前缀）
+  const dateTimeRegex = /(?:(下单时间|创建时间|付款时间|申请时间|订单时间|时间)[:：]?\s*)?(?:(\d{4})[-/年.])?(\d{1,2})[-/月.](\d{1,2})日?\s+(\d{1,2})[点:](\d{1,2})(?:[分秒:]+(\d{1,2})秒?|分)?/i;
+  const dateMatch = normalizedInput.match(dateTimeRegex);
+  let parsedDate: string | undefined = undefined;
+  let cleanInput = normalizedInput;
+
+  if (dateMatch) {
+    try {
+      const year = dateMatch[2] || String(new Date().getFullYear());
+      const month = String(dateMatch[3]).padStart(2, '0');
+      const day = String(dateMatch[4]).padStart(2, '0');
+      const hour = String(dateMatch[5]).padStart(2, '0');
+      const minute = String(dateMatch[6]).padStart(2, '0');
+      parsedDate = `${year}-${month}-${day} ${hour}:${minute}`;
+      
+      // 移除时间字符串以避免污染姓名和地址解析
+      cleanInput = normalizedInput.replace(dateMatch[0], " ");
+    } catch (e) {
+      console.error("Failed to parse date in address parser:", e);
+    }
+  }
+
+  const normalized = cleanInput
     .replace(/[（【]/g, "(")
     .replace(/[）】]/g, ")")
     .replace(/\r\n?/g, "\n")
@@ -938,6 +962,7 @@ function parseQuickAddressInput(input: string) {
       recipientPhone: "",
       recipientAddress: "",
       remark: "",
+      parsedDate,
     };
   }
 
@@ -955,6 +980,7 @@ function parseQuickAddressInput(input: string) {
       recipientPhone: "",
       recipientAddress: core,
       remark,
+      parsedDate,
     };
   }
 
@@ -1022,6 +1048,7 @@ function parseQuickAddressInput(input: string) {
     recipientPhone,
     recipientAddress,
     remark,
+    parsedDate,
   };
 }
 
@@ -2085,13 +2112,19 @@ function FactoryShipmentDetailModal({
                           value={editForm.recipientLine}
                           onChange={(nextLine) => {
                             const nextParsed = parseQuickAddressInput(nextLine);
-                            setEditForm((prev) => ({
-                              ...prev,
-                              recipientLine: nextLine,
-                              recipientName: nextParsed.recipientName,
-                              recipientPhone: nextParsed.recipientPhone,
-                              recipientAddress: nextParsed.recipientAddress,
-                            }));
+                            setEditForm((prev) => {
+                              const next = {
+                                ...prev,
+                                recipientLine: nextLine,
+                                recipientName: nextParsed.recipientName,
+                                recipientPhone: nextParsed.recipientPhone,
+                                recipientAddress: nextParsed.recipientAddress,
+                              };
+                              if (nextParsed.parsedDate) {
+                                next.date = nextParsed.parsedDate;
+                              }
+                              return next;
+                            });
                           }}
                           placeholder="直接填写或粘贴：姓名 手机号 详细地址"
                           wrapperClassName="mt-2.5"
@@ -2471,12 +2504,18 @@ function FactoryShipmentCreateModal({
     setQuickAddressInput(nextValue);
     const parsed = parseQuickAddressInput(nextValue);
 
-    setForm((prev) => ({
-      ...prev,
-      recipientName: (selectedCustomer?.contactName || parsed.recipientName || "").trim(),
-      recipientPhone: (selectedCustomer?.contactPhone || parsed.recipientPhone || "").trim(),
-      recipientAddress: (selectedCustomer?.address || parsed.recipientAddress || "").trim(),
-    }));
+    setForm((prev) => {
+      const next = {
+        ...prev,
+        recipientName: (selectedCustomer?.contactName || parsed.recipientName || "").trim(),
+        recipientPhone: (selectedCustomer?.contactPhone || parsed.recipientPhone || "").trim(),
+        recipientAddress: (selectedCustomer?.address || parsed.recipientAddress || "").trim(),
+      };
+      if (parsed.parsedDate) {
+        next.date = parsed.parsedDate;
+      }
+      return next;
+    });
   }, []);
 
   const shipmentDraftId = `FS-${form.date.replace(/-/g, "")}-${Math.max(selectedItems.length, 1)

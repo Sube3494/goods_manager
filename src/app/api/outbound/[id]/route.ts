@@ -6,6 +6,7 @@ import { InventoryService as OutboundInventoryService } from "@/services/invento
 import { buildFactoryShipmentNote } from "@/lib/utils";
 import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
 import { Prisma } from "../../../../../prisma/generated-client";
+import { parseAsShanghaiTime } from "@/lib/dateUtils";
 
 /**
  * 实现“退货入库”逻辑 (对冲出库)
@@ -477,7 +478,7 @@ export async function PUT(
         where: { id },
         data: {
           ...(status !== undefined && { status }),
-          ...(date !== undefined && { date: new Date(date) }),
+          ...(date !== undefined && { date: parseAsShanghaiTime(date) }),
           ...(note !== undefined && { note }),
         },
       });

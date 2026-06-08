@@ -7,6 +7,7 @@ import { FinanceMath } from "@/lib/math";
 import { getStorageStrategy } from "@/lib/storage";
 import { parseFactoryShipmentNote, generateOutboundId } from "@/lib/utils";
 import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
+import { parseAsShanghaiTime } from "@/lib/dateUtils";
  
 interface OutboundItem {
   productId?: string | null;
@@ -196,7 +197,7 @@ export async function POST(request: Request) {
           id: orderId,
           type: type || "Sale",
           ...(finalStatus ? { status: finalStatus } : {}),
-          date: date ? new Date(date) : new Date(),
+          date: date ? parseAsShanghaiTime(date) : new Date(),
           note: note || "",
           userId: user.id,
           items: {
