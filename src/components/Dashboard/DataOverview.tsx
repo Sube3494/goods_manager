@@ -134,13 +134,15 @@ function ChartTooltip({
         {payload.map((item) => {
           const rawName = String(item.name || "");
           const displayName = nameMap?.[rawName] || rawName;
+          const valNum = Number(item.value);
+          const isNegative = !Number.isNaN(valNum) && valNum < 0;
           return (
             <div key={rawName} className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color || "#60a5fa" }} />
                 <span className="truncate text-xs font-medium text-slate-600 dark:text-slate-300">{displayName}</span>
               </div>
-              <span className="shrink-0 text-sm font-black tabular-nums text-slate-900 dark:text-white">{valueFormatter(item.value)}</span>
+              <span className={cn("shrink-0 text-sm font-black tabular-nums", isNegative ? "text-red-500" : "text-slate-900 dark:text-white")}>{valueFormatter(item.value)}</span>
             </div>
           );
         })}
