@@ -127,14 +127,14 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[13px] font-bold leading-5 tracking-tight text-foreground sm:truncate sm:leading-normal">
+                  <p className="line-clamp-2 text-[13px] font-medium leading-5 tracking-tight text-foreground sm:truncate sm:leading-normal">
                     {productName}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
                     <span className="font-mono">编号</span>
                     <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                     <span className="max-w-full truncate font-mono">{productSku || "未填写"}</span>
-                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-bold text-primary">数量 {item.quantity}</span>
+                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.quantity}</span>
                   </div>
                 </div>
               </div>
@@ -217,14 +217,14 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
               </div>
               <div className="min-w-0 flex-1">
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[13px] font-bold leading-5 tracking-tight text-foreground transition-colors group-hover:text-primary sm:truncate sm:leading-normal">
+                  <p className="line-clamp-2 text-[13px] font-medium leading-5 tracking-tight text-foreground transition-colors group-hover:text-primary sm:truncate sm:leading-normal">
                     {item.product.name}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
                     <span className="font-mono">编号</span>
                     <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                     <span className="max-w-full truncate font-mono">{item.product.sku || "未填写"}</span>
-                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-bold text-primary">数量 {item.totalQuantity}</span>
+                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.totalQuantity}</span>
                   </div>
                 </div>
               </div>
