@@ -151,6 +151,46 @@ function ChartTooltip({
   );
 }
 
+interface CustomizedDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: {
+    netProfit?: number;
+  };
+}
+
+function CustomizedDot(props: CustomizedDotProps) {
+  const { cx, cy, payload } = props;
+  if (cx == null || cy == null || !payload) return null;
+  const val = payload.netProfit;
+  const isNegative = typeof val === "number" && val < 0;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={2.5}
+      fill={isNegative ? "#ef4444" : "#22c55e"}
+    />
+  );
+}
+
+function CustomizedActiveDot(props: CustomizedDotProps) {
+  const { cx, cy, payload } = props;
+  if (cx == null || cy == null || !payload) return null;
+  const val = payload.netProfit;
+  const isNegative = typeof val === "number" && val < 0;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      stroke="#ffffff"
+      strokeWidth={2}
+      fill={isNegative ? "#ef4444" : "#22c55e"}
+    />
+  );
+}
+
 export function DataOverview({
   data,
   rangePreset,
@@ -445,7 +485,7 @@ export function DataOverview({
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={52} />
                 <Tooltip content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润" }} />} />
-                <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="#22c55e" fill="url(#netProfitFill)" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+                <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="#22c55e" fill="url(#netProfitFill)" strokeWidth={2.5} dot={<CustomizedDot />} activeDot={<CustomizedActiveDot />} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
