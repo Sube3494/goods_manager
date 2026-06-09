@@ -250,14 +250,6 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
 
   return (
     <section className={cardClass}>
-      <div className="border-b border-black/6 px-4 py-4 dark:border-white/8 sm:px-5">
-        <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">现场动态</div>
-          <h2 className="mt-2 text-xl font-black tracking-tight text-foreground">入库与销售</h2>
-          <p className="mt-1 text-sm text-muted-foreground">近期记录</p>
-        </div>
-      </div>
-
       <div className="flex items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
         <div className="min-w-0 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4">
