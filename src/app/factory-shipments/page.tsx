@@ -878,21 +878,22 @@ interface ShipmentFormState {
   remark: string;
 }
 
+
 const shippingStatusOptions = [
-  { value: "待发货", label: "待发货" },
-  { value: "部分发货", label: "部分发货" },
-  { value: "已发货", label: "已发货" },
+  { value: "待发货", label: "待发货", dotColor: "bg-orange-500" },
+  { value: "部分发货", label: "部分发货", dotColor: "bg-sky-500" },
+  { value: "已发货", label: "已发货", dotColor: "bg-emerald-500" },
 ];
 
 const paymentStatusOptions = [
-  { value: "未支付", label: "未支付" },
-  { value: "部分支付", label: "部分支付" },
-  { value: "已支付", label: "已支付" },
+  { value: "未支付", label: "未支付", dotColor: "bg-slate-400 dark:bg-zinc-500" },
+  { value: "部分支付", label: "部分支付", dotColor: "bg-amber-500" },
+  { value: "已支付", label: "已支付", dotColor: "bg-emerald-500" },
 ];
 
 const compensationStatusOptions = [
-  { value: "待补偿", label: "待补偿" },
-  { value: "已补偿", label: "已补偿" },
+  { value: "待补偿", label: "待补偿", dotColor: "bg-orange-500" },
+  { value: "已补偿", label: "已补偿", dotColor: "bg-sky-500" },
 ];
 
 function createInitialForm(): ShipmentFormState {
@@ -1144,6 +1145,26 @@ function getItemKey(item: {
   return item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "";
 }
 
+function getOrderTotalAmount(order: OutboundOrder) {
+  const parsed = parseFactoryShipmentNote(order.note);
+  return order.items.reduce((sum, item) => {
+    const qty = item.quantity || 0;
+    const price = item.price || item.shopProductVariant?.salePrice || item.productVariant?.salePrice || item.shopProduct?.costPrice || item.product?.costPrice || 0;
+    const normalizedItemIds = {
+      productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
+      productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
+      shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
+      shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
+    };
+    const trackingEntry = parsed.trackingEntries.find(
+      (entry) => entry.itemKey === getItemKey(normalizedItemIds)
+    );
+    const shippingFee = trackingEntry?.shippingFee || 0;
+    return sum + (qty * price + shippingFee);
+  }, 0);
+}
+
+
 function isShipmentItemMarkedShipped(
   item: { productId?: string | null; productVariantId?: string | null; shopProductId?: string | null; shopProductVariantId?: string | null },
   parsed: { trackingEntries?: FactoryShipmentTrackingEntry[] },
@@ -1304,12 +1325,12 @@ function formatFactoryShipmentError(message: string, items: SelectedShipmentItem
 
 function getPaymentTone(status: string) {
   if (status === "已支付") {
-    return "bg-emerald-500/8 text-emerald-700 border-emerald-500/15 dark:bg-emerald-500/12 dark:text-emerald-400 dark:border-emerald-500/25";
+    return "bg-emerald-500/6 text-emerald-600 border-emerald-500/15 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20";
   }
   if (status === "部分支付") {
-    return "bg-amber-500/8 text-amber-700 border-amber-500/15 dark:bg-amber-500/12 dark:text-amber-400 dark:border-amber-500/25";
+    return "bg-amber-500/6 text-amber-600 border-amber-500/15 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20";
   }
-  return "bg-rose-500/8 text-rose-700 border-rose-500/15 dark:bg-rose-500/12 dark:text-rose-400 dark:border-rose-500/25";
+  return "bg-slate-100/80 text-slate-500 border-slate-200/80 hover:bg-slate-200/50 dark:bg-white/5 dark:text-zinc-400 dark:border-white/8 dark:hover:bg-white/8";
 }
 
 function getShippingTone(status: string) {
@@ -1322,7 +1343,7 @@ function getShippingTone(status: string) {
   if (status === "已退回") {
     return "bg-slate-500/8 text-slate-600 border-slate-500/15 dark:bg-slate-500/12 dark:text-slate-400 dark:border-slate-500/25";
   }
-  return "bg-rose-500/8 text-rose-700 border-rose-500/15 dark:bg-rose-500/12 dark:text-rose-400 dark:border-rose-500/25";
+  return "bg-orange-500/6 text-orange-600 border-orange-500/15 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20";
 }
 function getCompensationTone(status: string) {
   if (status === "已补偿") {
@@ -1443,9 +1464,9 @@ function FactoryShipmentFilters({
             options={[{ value: "all", label: "发货状态" }, ...shippingStatusOptions]}
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border px-3 text-xs shadow-sm lg:text-sm",
+              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
               shippingFilter !== "all"
-                ? "bg-primary/10 border-primary/20 text-primary font-bold"
+                ? `${getShippingTone(shippingFilter)} font-normal`
                 : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
             )}
           />
@@ -1460,9 +1481,9 @@ function FactoryShipmentFilters({
             options={[{ value: "all", label: "货款状态" }, ...paymentStatusOptions]}
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border px-3 text-xs shadow-sm lg:text-sm",
+              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
               paymentFilter !== "all"
-                ? "bg-primary/10 border-primary/20 text-primary font-bold"
+                ? `${getPaymentTone(paymentFilter)} font-normal`
                 : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
             )}
           />
@@ -1474,9 +1495,9 @@ function FactoryShipmentFilters({
             options={[{ value: "all", label: "补偿状态" }, ...compensationStatusOptions]}
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border px-3 text-xs shadow-sm lg:text-sm",
+              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
               compensationFilter !== "all"
-                ? "bg-primary/10 border-primary/20 text-primary font-bold"
+                ? `${getCompensationTone(compensationFilter)} font-normal`
                 : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
             )}
           />
@@ -2042,11 +2063,7 @@ function FactoryShipmentDetailModal({
                         <CustomSelect
                           value={editForm.paymentStatus}
                           onChange={(val) => setEditForm(prev => ({ ...prev, paymentStatus: val }))}
-                          options={[
-                            { value: "未支付", label: "未支付" },
-                            { value: "部分支付", label: "部分支付" },
-                            { value: "已支付", label: "已支付" },
-                          ]}
+                          options={paymentStatusOptions}
                           triggerClassName="h-10 w-full rounded-2xl border border-border/70 bg-white px-3 text-sm dark:border-white/10 dark:bg-[#2b313d]"
                         />
                       ) : (
@@ -2078,11 +2095,11 @@ function FactoryShipmentDetailModal({
                           disabled={!canKeepShipmentExtras(editForm.status)}
                           options={[
                             { value: "", label: "无需补偿" },
-                            { value: "待补偿", label: "待补偿" },
-                            { value: "已补偿", label: "已补偿" },
+                            ...compensationStatusOptions,
                           ]}
                           triggerClassName="h-10 w-full rounded-2xl border border-border/70 bg-white px-3 text-sm dark:border-white/10 dark:bg-[#2b313d] disabled:opacity-50 disabled:cursor-not-allowed"
                         />
+
                       ) : (
                         <span className={cn("inline-flex h-8 items-center rounded-full border px-3 text-xs font-normal", getCompensationTone(parsed.compensationStatus || ""))}>
                           {parsed.compensationStatus || "无需补偿"}
@@ -2396,6 +2413,12 @@ function FactoryShipmentDetailModal({
                             onAddNewLogistics={onAddNewLogistics}
                           />
                         ))}
+                        <div className="flex items-center justify-end gap-3 rounded-2xl border border-border/70 bg-linear-to-br from-white to-slate-50/70 p-4 dark:border-white/8 dark:from-white/10 dark:to-white/4 shadow-sm mt-3">
+                          <span className="text-xs font-black text-muted-foreground">发货单总价:</span>
+                          <span className="font-mono text-lg font-black text-foreground">
+                            ￥{editItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0) + (item.shippingFee || 0)), 0).toFixed(2)}
+                          </span>
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -2874,6 +2897,12 @@ function FactoryShipmentCreateModal({
                         onAddNewLogistics={onAddNewLogistics}
                       />
                     ))}
+                    <div className="flex items-center justify-end gap-3 rounded-2xl border border-border/70 bg-linear-to-br from-white to-slate-50/70 p-4 dark:border-white/8 dark:from-white/10 dark:to-white/4 shadow-sm mt-3">
+                      <span className="text-xs font-black text-muted-foreground">发货单预估总价:</span>
+                      <span className="font-mono text-lg font-black text-foreground">
+                        ￥{selectedItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.price || 0) + (item.shippingFee || 0)), 0).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2983,9 +3012,7 @@ function FactoryShipmentBatchEditModal({
                 onChange={setPaymentStatus}
                 options={[
                   { value: "keep", label: "保持不变" },
-                  { value: "未支付", label: "未支付" },
-                  { value: "部分支付", label: "部分支付" },
-                  { value: "已支付", label: "已支付" },
+                  ...paymentStatusOptions,
                 ]}
                 triggerClassName="h-10 w-full rounded-2xl border border-border bg-white px-3 text-sm dark:bg-white/5 dark:border-white/10"
               />
@@ -2999,8 +3026,7 @@ function FactoryShipmentBatchEditModal({
                 options={[
                   { value: "keep", label: "保持不变" },
                   { value: "", label: "无需补偿" },
-                  { value: "待补偿", label: "待补偿" },
-                  { value: "已补偿", label: "已补偿" },
+                  ...compensationStatusOptions,
                 ]}
                 triggerClassName="h-10 w-full rounded-2xl border border-border bg-white px-3 text-sm dark:bg-white/5 dark:border-white/10"
               />
@@ -3405,6 +3431,9 @@ export default function FactoryShipmentsPage() {
 
   const stats = useMemo(() => {
     const totalQuantity = shipmentOrders.reduce((sum, order) => sum + formatQuantity(order), 0);
+    const totalAmount = shipmentOrders
+      .filter((order) => order.status !== "Returned" && order.status !== "已退回")
+      .reduce((sum, order) => sum + getOrderTotalAmount(order), 0);
     const unpaidCount = shipmentOrders.filter((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       return parsed.paymentStatus !== "已支付";
@@ -3420,6 +3449,7 @@ export default function FactoryShipmentsPage() {
     return {
       totalCount: shipmentOrders.length,
       totalQuantity,
+      totalAmount,
       unpaidCount,
       pendingCompensation,
       recipientCount,
@@ -3504,7 +3534,7 @@ export default function FactoryShipmentsPage() {
           <FactoryMetricCard
             label="发货件数"
             value={`${stats.totalQuantity}`}
-            hint="累计登记的出货总件数"
+            hint={`出货总货值 ￥${stats.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={<Package size={18} className="text-emerald-600 dark:text-emerald-400" />}
             accentClassName="border-emerald-500/15 bg-emerald-500/10"
           />
@@ -3593,13 +3623,13 @@ export default function FactoryShipmentsPage() {
                       </button>
                     </div>
                   </th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">序号</th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">发货时间</th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">收件人</th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">货品概览</th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">发货状态</th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">货款状态</th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">操作</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">序号</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">发货时间</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">收件人</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">货品概览</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">发货状态</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">货款 / 金额</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -3631,7 +3661,7 @@ export default function FactoryShipmentsPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-center text-xs font-bold text-muted-foreground">
+                      <td className="px-4 py-4 text-center text-xs font-normal text-muted-foreground">
                         {(currentPage - 1) * pageSize + index + 1}
                       </td>
                       <td className="px-4 py-4 text-center text-xs text-muted-foreground">
@@ -3704,7 +3734,7 @@ export default function FactoryShipmentsPage() {
                                       {splitShipmentDisplayName(item.name).baseName}
                                       {splitShipmentDisplayName(item.name).variantLabel ? ` / ${splitShipmentDisplayName(item.name).variantLabel}` : ""}
                                     </span>
-                                    <span className="shrink-0 text-[10px] font-black leading-none text-primary">x{item.quantity}</span>
+                                    <span className="shrink-0 text-[10px] font-normal leading-none text-primary">x{item.quantity}</span>
                                   </div>
                                 ))}
                               </>
@@ -3724,12 +3754,13 @@ export default function FactoryShipmentsPage() {
                         <div onClick={(e) => e.stopPropagation()} className="inline-flex justify-center w-full">
                           <CustomSelect
                             value={parsed.paymentStatus || "未支付"}
+                            displayValue={`${parsed.paymentStatus || "未支付"} ￥${getOrderTotalAmount(order).toFixed(2)}`}
                             onChange={(val) => handleQuickUpdateStatus(order, "paymentStatus", val)}
                             options={paymentStatusOptions}
                             disabled={updatingOrderId === order.id}
-                            className="w-24"
+                            className="w-[122px]"
                             triggerClassName={cn(
-                              "inline-flex h-8.5 w-full items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-all hover:scale-105 cursor-pointer shadow-xs",
+                              "inline-flex h-8.5 w-full items-center justify-center rounded-full border px-1.5 py-1 text-[11px] font-normal transition-all cursor-pointer shadow-none whitespace-nowrap gap-0.5",
                               getPaymentTone(parsed.paymentStatus || "未支付"),
                               updatingOrderId === order.id && "opacity-50"
                             )}
@@ -3899,7 +3930,7 @@ export default function FactoryShipmentsPage() {
                                 {splitShipmentDisplayName(item.name).baseName}
                                 {splitShipmentDisplayName(item.name).variantLabel ? ` / ${splitShipmentDisplayName(item.name).variantLabel}` : ""}
                               </span>
-                              <span className="shrink-0 font-black text-primary">x{item.quantity}</span>
+                              <span className="shrink-0 font-normal text-primary">x{item.quantity}</span>
                             </span>
                           ))}
                         </>
@@ -3910,27 +3941,28 @@ export default function FactoryShipmentsPage() {
                 <div className={cn(
                   "mt-3 grid items-center gap-1.5 border-t border-border/30 pt-2 dark:border-white/6",
                   isReturned
-                    ? "grid-cols-[96px_minmax(84px,1fr)_44px] min-[390px]:grid-cols-[116px_minmax(92px,1fr)_44px]"
-                    : "grid-cols-[96px_minmax(84px,1fr)_44px_40px] min-[390px]:grid-cols-[116px_minmax(92px,1fr)_44px_40px]"
+                    ? "grid-cols-[72px_minmax(110px,1fr)_44px] min-[390px]:grid-cols-[84px_minmax(120px,1fr)_44px]"
+                    : "grid-cols-[72px_minmax(110px,1fr)_44px_40px] min-[390px]:grid-cols-[84px_minmax(120px,1fr)_44px_40px]"
                 )}>
-                  <div className="flex h-11 min-w-0 items-center rounded-2xl border border-border/40 bg-muted/25 px-2.5 dark:border-white/6 dark:bg-white/4">
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">合计</div>
-                      <div className="mt-0.5 text-sm font-black leading-none text-foreground">{formatQuantity(order)} 件</div>
+                  <div className="flex h-11 min-w-0 items-center justify-center rounded-2xl border border-border/40 bg-muted/25 px-2.5 dark:border-white/6 dark:bg-white/4">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                      <span>合计</span>
+                      <span className="font-normal text-foreground">{formatQuantity(order)}件</span>
                     </div>
                   </div>
                   <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
                     <CustomSelect
                       value={parsed.paymentStatus || "未支付"}
+                      displayValue={`${parsed.paymentStatus || "未支付"} ￥${getOrderTotalAmount(order).toFixed(2)}`}
                       onChange={(val) => handleQuickUpdateStatus(order, "paymentStatus", val)}
                       options={paymentStatusOptions}
                       disabled={updatingOrderId === order.id}
                       className="w-full"
-                      triggerClassName={cn(
-                        "inline-flex h-11 w-full items-center justify-center rounded-2xl border px-1.5 py-0 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm",
-                        getPaymentTone(parsed.paymentStatus || "未支付"),
-                        updatingOrderId === order.id && "opacity-50"
-                      )}
+                            triggerClassName={cn(
+                              "inline-flex h-11 w-full items-center justify-center rounded-2xl border px-1.5 py-0 text-[10px] font-normal transition-all active:scale-95 cursor-pointer shadow-none gap-1 whitespace-nowrap",
+                              getPaymentTone(parsed.paymentStatus || "未支付"),
+                              updatingOrderId === order.id && "opacity-50"
+                            )}
                     />
                   </div>
                   <button
