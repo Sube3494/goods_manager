@@ -6,6 +6,7 @@ import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
+import { getStorageStrategy } from "@/lib/storage";
 
 function startOfDay(input: Date) {
   const date = new Date(input);
@@ -203,6 +204,8 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const storage = await getStorageStrategy();
 
     const permissionsObj = user?.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions)
       ? user.permissions as Record<string, unknown>
@@ -922,7 +925,12 @@ export async function GET(request: NextRequest) {
     const transformedInboundItems = recentInboundItems.map((item) => ({
       id: item.id,
       productId: item.productId,
-      product: item.product,
+      product: item.product
+        ? {
+            ...item.product,
+            image: item.product.image ? storage.resolveUrl(item.product.image) : null,
+          }
+        : null,
       supplier: item.supplier,
       quantity: item.quantity,
       costPrice: item.costPrice,
