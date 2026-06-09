@@ -4879,3 +4879,85 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     brushOrderId: brushOrder.id,
   };
 }
+
+export function readShopNameFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const extend = record.extend && typeof record.extend === "object" && !Array.isArray(record.extend)
+    ? record.extend as Record<string, unknown>
+    : null;
+  const candidates = [
+    record.rawShopName,
+    extend?.channel_name,
+    record.channel_name,
+    record.shop_name,
+    record.shopName,
+    record.storeName,
+    record.merchantName,
+    record.merchant_name,
+  ];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+export function readShopAddressFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const candidates = [
+    record.rawShopAddress,
+    record.shopAddress,
+    record.storeAddress,
+    record.merchantAddress,
+    record.store_address,
+    record.merchant_address,
+  ];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+export function readShopIdFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const delivery = record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
+    ? record.delivery as Record<string, unknown>
+    : null;
+  const candidates = [record.shop_id, delivery?.shop_id];
+  for (const item of candidates) {
+    const value = String(item || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+export function resolveAutoPickMatchedShopName(
+  order: { shopId?: string | null; rawPayload?: unknown },
+  permissions: unknown
+) {
+  const resolved = readResolvedAutoPickShop(order.rawPayload);
+  const resolvedName = String(resolved?.name || "").trim();
+  if (resolvedName) {
+    return resolvedName;
+  }
+  const rawShopName = readShopNameFromRawPayload(order.rawPayload);
+  const rawShopAddress = readShopAddressFromRawPayload(order.rawPayload);
+  const mappedName = findMappedShopNameFromAutoPickConfig(
+    order.shopId || readShopIdFromRawPayload(order.rawPayload),
+    rawShopName,
+    rawShopAddress,
+    permissions
+  );
+  return String(mappedName || rawShopName || "").trim() || null;
+}
+

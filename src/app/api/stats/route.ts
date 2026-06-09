@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { FinanceMath } from "@/lib/math";
-import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
+import { normalizeAutoPickIntegrationConfig, resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
-import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
 import { getStorageStrategy } from "@/lib/storage";
 
 function startOfDay(input: Date) {
@@ -63,81 +62,6 @@ function readAutoPickSystemMeta(rawPayload: unknown) {
   return candidate as Record<string, unknown>;
 }
 
-function readResolvedAutoPickShop(rawPayload: unknown) {
-  const systemMeta = readAutoPickSystemMeta(rawPayload);
-  const resolvedShop = systemMeta?.resolvedShop;
-  if (!resolvedShop || typeof resolvedShop !== "object" || Array.isArray(resolvedShop)) {
-    return null;
-  }
-  const id = String((resolvedShop as Record<string, unknown>).id || "").trim();
-  const name = String((resolvedShop as Record<string, unknown>).name || "").trim();
-  if (!id && !name) {
-    return null;
-  }
-  return { id: id || null, name: name || null };
-}
-
-function readShopNameFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const extend = record.extend && typeof record.extend === "object" && !Array.isArray(record.extend)
-    ? record.extend as Record<string, unknown>
-    : null;
-  const candidates = [
-    record.rawShopName,
-    extend?.channel_name,
-    record.channel_name,
-    record.shop_name,
-    record.shopName,
-    record.storeName,
-    record.merchantName,
-    record.merchant_name,
-  ];
-  for (const item of candidates) {
-    const value = String(item || "").trim();
-    if (value) return value;
-  }
-  return null;
-}
-
-function readShopAddressFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const candidates = [
-    record.rawShopAddress,
-    record.shopAddress,
-    record.storeAddress,
-    record.merchantAddress,
-    record.store_address,
-    record.merchant_address,
-  ];
-  for (const item of candidates) {
-    const value = String(item || "").trim();
-    if (value) return value;
-  }
-  return null;
-}
-
-function readShopIdFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const delivery = record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
-    ? record.delivery as Record<string, unknown>
-    : null;
-  const candidates = [record.shop_id, delivery?.shop_id];
-  for (const item of candidates) {
-    const value = String(item || "").trim();
-    if (value) return value;
-  }
-  return null;
-}
-
 function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
   const systemMeta = readAutoPickSystemMeta(rawPayload);
   const marker = systemMeta?.mainSystemSelfDelivery;
@@ -145,54 +69,6 @@ function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
     return false;
   }
   return Boolean((marker as Record<string, unknown>).triggered);
-}
-
-function findMappedShopNameFromIntegrationConfig(
-  maiyatianShopId: string | null,
-  rawShopName: string | null,
-  rawShopAddress: string | null,
-  permissions: unknown
-) {
-  const config = normalizeAutoPickIntegrationConfig(permissions);
-  if (config.maiyatianShopMappings.length === 0) {
-    return null;
-  }
-  const normalizedShopId = normalizeExternalId(maiyatianShopId);
-  if (normalizedShopId) {
-    const matchedById = config.maiyatianShopMappings.find((item) => String(item.maiyatianShopId || "").trim() === normalizedShopId);
-    if (matchedById?.localShopName) {
-      return matchedById.localShopName;
-    }
-  }
-  const targetKey = buildShopDedupeKey({ name: rawShopName, address: rawShopAddress });
-  const matchedByIdentity = config.maiyatianShopMappings.find((item) => {
-    const mappingKey = buildShopDedupeKey({
-      name: item.maiyatianShopName,
-      address: item.maiyatianShopAddress,
-    });
-    if (mappingKey && mappingKey === targetKey) {
-      return true;
-    }
-    return normalizeShopNameKey(item.maiyatianShopName) === normalizeShopNameKey(rawShopName);
-  });
-  return matchedByIdentity?.localShopName || null;
-}
-
-function resolveAutoPickMatchedShopName(order: { shopId?: string | null; rawPayload?: unknown }, permissions: unknown) {
-  const resolved = readResolvedAutoPickShop(order.rawPayload);
-  const resolvedName = String(resolved?.name || "").trim();
-  if (resolvedName) {
-    return resolvedName;
-  }
-  const rawShopName = readShopNameFromRawPayload(order.rawPayload);
-  const rawShopAddress = readShopAddressFromRawPayload(order.rawPayload);
-  const mappedName = findMappedShopNameFromIntegrationConfig(
-    order.shopId || readShopIdFromRawPayload(order.rawPayload),
-    rawShopName,
-    rawShopAddress,
-    permissions
-  );
-  return String(mappedName || rawShopName || "").trim() || null;
 }
 
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "其他"] as const;

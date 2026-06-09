@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
+import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
 
 function startOfDay(input: Date) {
   const date = new Date(input);
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
         orderTime: true,
         rawPayload: true,
         platform: true,
+        shopId: true,
       },
     });
 
@@ -153,6 +155,16 @@ export async function GET(request: NextRequest) {
 
     // 5. 统计订单数据
     orders.forEach((order) => {
+      if (shopName) {
+        const matchedShopName = resolveAutoPickMatchedShopName(
+          { shopId: order.shopId, rawPayload: order.rawPayload },
+          user.permissions
+        );
+        if (matchedShopName !== shopName) {
+          return;
+        }
+      }
+
       const key = formatDateKey(new Date(order.orderTime));
       if (dataMap[key]) {
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
