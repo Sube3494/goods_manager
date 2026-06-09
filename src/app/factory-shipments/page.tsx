@@ -3680,7 +3680,7 @@ export default function FactoryShipmentsPage() {
 
                             return (
                               <>
-                                {listItems.slice(0, 2).map((item) => (
+                                {listItems.map((item) => (
                                   <div
                                     key={item.id}
                                     className={cn(
@@ -3707,11 +3707,6 @@ export default function FactoryShipmentsPage() {
                                     <span className="shrink-0 text-[10px] font-black leading-none text-primary">x{item.quantity}</span>
                                   </div>
                                 ))}
-                                {listItems.length > 2 && (
-                                  <div className="flex h-7 items-center justify-center rounded-full border border-border/50 bg-muted/50 px-3 text-[10px] font-bold text-muted-foreground">
-                                    +{listItems.length - 2}
-                                  </div>
-                                )}
                               </>
                             );
                           })()}
@@ -3882,7 +3877,7 @@ export default function FactoryShipmentsPage() {
 
                       return (
                         <>
-                          {listItems.slice(0, 4).map((item) => (
+                          {listItems.map((item) => (
                             <span
                               key={item.id}
                               className={cn(
@@ -3907,11 +3902,6 @@ export default function FactoryShipmentsPage() {
                               <span className="shrink-0 font-black text-primary">x{item.quantity}</span>
                             </span>
                           ))}
-                          {listItems.length > 4 && (
-                            <span className="inline-flex items-center justify-center rounded-full border border-border/50 bg-muted/50 px-2 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/8">
-                              另有 {listItems.length - 4} 项
-                            </span>
-                          )}
                         </>
                       );
                     })()}
