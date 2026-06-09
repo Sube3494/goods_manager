@@ -996,7 +996,8 @@ function parseQuickAddressInput(input: string) {
   const residual = core
     .slice(0, phoneMatch.index)
     .concat(" ", core.slice((phoneMatch.index || 0) + recipientPhone.length))
-    .replace(/[，,;；]+/g, " ")
+    .replace(/^[，,;；\s]+/, "")
+    .replace(/[，,;；\s]+$/, "")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{2,}/g, "\n")
     .trim();
@@ -1021,12 +1022,12 @@ function parseQuickAddressInput(input: string) {
 
   if (segments.length === 1) {
     const singleLine = segments[0];
-    const leadingNameMatch = singleLine.match(/^([\u4e00-\u9fa5·]{1,12})\s+(.+)$/);
+    const leadingNameMatch = singleLine.match(/^([\u4e00-\u9fa5·]{1,12})[\s，,;；]+(.+)$/);
     if (leadingNameMatch && isLikelyRecipientName(leadingNameMatch[1]) && isLikelyRecipientAddress(leadingNameMatch[2])) {
       recipientName = recipientName || leadingNameMatch[1].trim();
       recipientAddress = leadingNameMatch[2].trim();
     } else {
-      const trailingNameMatch = singleLine.match(/^(.+?)\s+([\u4e00-\u9fa5·]{1,12})$/);
+      const trailingNameMatch = singleLine.match(/^(.+?)[\s，,;；]+([\u4e00-\u9fa5·]{1,12})$/);
       if (trailingNameMatch && isLikelyRecipientAddress(trailingNameMatch[1]) && isLikelyRecipientName(trailingNameMatch[2])) {
         recipientAddress = trailingNameMatch[1].trim();
         recipientName = recipientName || trailingNameMatch[2].trim();
