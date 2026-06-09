@@ -60,6 +60,7 @@ export function TodayOrdersView({
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [showCompletedToday, setShowCompletedToday] = useState(false);
+  const [showCancelledToday, setShowCancelledToday] = useState(false);
   
   const isFetchingRef = useRef(false);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
@@ -317,8 +318,14 @@ export function TodayOrdersView({
     return filteredOrders.filter((order) => order.status === "done" || order.status === "配送完成");
   }, [filteredOrders]);
 
+  const todayCancelledOrders = useMemo(() => {
+    return filteredOrders.filter((order) => isCancelledStatus(order.status));
+  }, [filteredOrders]);
+
   const todayPendingOrders = useMemo(() => {
-    return filteredOrders.filter((order) => order.status !== "done" && order.status !== "配送完成");
+    return filteredOrders.filter(
+      (order) => order.status !== "done" && order.status !== "配送完成" && !isCancelledStatus(order.status)
+    );
   }, [filteredOrders]);
 
   const displayedSummary = useMemo(() => {
@@ -485,7 +492,45 @@ export function TodayOrdersView({
           </section>
         ) : null}
 
-        {!isLoading && todayPendingOrders.length === 0 && todayCompletedOrders.length === 0 ? (
+        {!isLoading && todayCancelledOrders.length > 0 ? (
+          <section className="rounded-[28px] border border-black/8 bg-white/76 p-3 shadow-xs dark:border-white/10 dark:bg-white/4">
+            <button
+              type="button"
+              onClick={() => setShowCancelledToday((current) => !current)}
+              className="flex w-full items-center justify-between rounded-[22px] border border-black/8 bg-black/2 px-4 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/3"
+            >
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">今日已取消</div>
+                <div className="mt-1 text-lg font-black text-foreground">{todayCancelledOrders.length} 单</div>
+              </div>
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/85 dark:border-white/10 dark:bg-white/4">
+                {showCancelledToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
+            </button>
+
+            {showCancelledToday ? (
+              <div className="mt-4 grid gap-4">
+                {todayCancelledOrders.map((order) => (
+                  <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
+                    <OrderCard
+                      order={order}
+                      expanded={expandedIds.includes(order.id)}
+                      actingId={actingId}
+                      onToggleExpanded={toggleExpanded}
+                      onRunAction={runAction}
+                      onOpenCostBackfill={onOpenCostBackfill}
+                      onOpenMatchEditor={onOpenMatchEditor}
+                      onClearManualMatch={clearManualMatch}
+                      onRefresh={() => fetchOrders({ silent: true })}
+                    />
+                  </OrderCardErrorBoundary>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {!isLoading && todayPendingOrders.length === 0 && todayCompletedOrders.length === 0 && todayCancelledOrders.length === 0 ? (
           <div className="rounded-[28px] border border-black/8 bg-white/76 py-8 dark:border-white/10 dark:bg-white/4">
             <EmptyState
               icon={<Package2 size={56} strokeWidth={1.5} className="text-muted-foreground/25" />}
