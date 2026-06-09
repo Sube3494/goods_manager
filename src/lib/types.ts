@@ -428,6 +428,7 @@ export interface RecentInboundItem {
     id: string;
     date: string;
     status: string;
+    shopName?: string;
   };
   subtotal: number;
 }

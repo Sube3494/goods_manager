@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       shopProductId?: string;
       totalQuantity: number;
       latestOutboundAt?: string;
+      shopName?: string;
       product: {
         id: string;
         name: string;
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest) {
           shopProductId: item.shopProductId || undefined,
           totalQuantity: item.quantity,
           latestOutboundAt: item.outboundOrder?.date instanceof Date ? item.outboundOrder.date.toISOString() : undefined,
+          shopName: item.shopProduct?.shop?.name || undefined,
           product: displayProduct,
         });
       }

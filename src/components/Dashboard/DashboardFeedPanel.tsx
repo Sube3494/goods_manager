@@ -16,6 +16,7 @@ interface TopOutboundProduct {
   productId: string;
   totalQuantity: number;
   latestOutboundAt?: string;
+  shopName?: string;
   product: {
     id: string;
     name: string;
@@ -131,6 +132,12 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
                     {productName}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
+                    {item.purchaseOrder?.shopName ? (
+                      <>
+                        <span className="rounded-full bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 text-muted-foreground font-medium">{item.purchaseOrder.shopName}</span>
+                        <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
+                      </>
+                    ) : null}
                     <span className="font-mono">编号</span>
                     <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                     <span className="max-w-full truncate font-mono">{productSku || "未填写"}</span>
@@ -221,6 +228,12 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
                     {item.product.name}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
+                    {item.shopName ? (
+                      <>
+                        <span className="rounded-full bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 text-muted-foreground font-medium">{item.shopName}</span>
+                        <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
+                      </>
+                    ) : null}
                     <span className="font-mono">编号</span>
                     <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                     <span className="max-w-full truncate font-mono">{item.product.sku || "未填写"}</span>

@@ -139,11 +139,19 @@ export function RecentInbound({ items, isLoading }: Props) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-medium tracking-tight text-foreground">{productName}</p>
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        {productSku ? (
-                          <span className="truncate font-mono">{productSku}</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
+                        {item.purchaseOrder?.shopName ? (
+                          <>
+                            <span className="rounded-full bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 text-muted-foreground font-medium">{item.purchaseOrder.shopName}</span>
+                            <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
+                          </>
                         ) : null}
-                        <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
+                        {productSku ? (
+                          <>
+                            <span className="truncate font-mono">{productSku}</span>
+                            <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
+                          </>
+                        ) : null}
                         <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.quantity}</span>
                       </div>
                     </div>

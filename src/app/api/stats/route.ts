@@ -347,7 +347,7 @@ export async function GET(request: NextRequest) {
         include: {
           product: { select: { id: true, name: true, sku: true, image: true } },
           supplier: { select: { id: true, name: true } },
-          purchaseOrder: { select: { id: true, date: true, status: true } },
+          purchaseOrder: { select: { id: true, date: true, status: true, shopName: true } },
         },
         orderBy: { purchaseOrder: { date: "desc" } },
       }),
