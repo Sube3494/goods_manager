@@ -950,7 +950,7 @@ export function OrderCard({
   const pickup = Boolean(order.isPickup) || order.platform === "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
-  const showBrushMarker = !pickup;
+  const showBrushMarker = !pickup && order.isMainSystemSelfDelivery;
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);

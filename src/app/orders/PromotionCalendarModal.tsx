@@ -605,11 +605,11 @@ export function PromotionCalendarModal({
                         )}
                       </div>
 
-                      {/* 中下部数据：精致居中的推广费用 */}
+                      {/* 中下部 data：精致居中的推广费用 */}
                       {isCurrentMonth && promoAmount > 0 && (
                         <div className="mt-1 flex items-center justify-center text-[9px] sm:text-[10px] text-center w-full leading-none">
                           <span className="text-orange-600 dark:text-orange-400 shrink-0 tabular-nums">
-                            -¥{promoAmount.toFixed(0)}
+                            -¥{promoAmount.toFixed(2)}
                           </span>
                         </div>
                       )}
@@ -628,12 +628,12 @@ export function PromotionCalendarModal({
                               {shopEntries.map(([name, amount]) => (
                                 <div key={name} className="flex items-center justify-between gap-3">
                                   <span className="text-[11px] text-muted-foreground truncate max-w-[90px]">{name}</span>
-                                  <span className="text-[11px] text-orange-600 dark:text-orange-400 tabular-nums shrink-0">-¥{amount.toFixed(0)}</span>
+                                  <span className="text-[11px] text-orange-600 dark:text-orange-400 tabular-nums shrink-0">-¥{amount.toFixed(2)}</span>
                                 </div>
                               ))}
                               <div className="border-t border-black/6 dark:border-white/8 pt-1 mt-1 flex items-center justify-between gap-3">
                                 <span className="text-[11px] text-foreground">合计</span>
-                                <span className="text-[11px] text-orange-600 dark:text-orange-400 tabular-nums font-medium">-¥{promoAmount.toFixed(0)}</span>
+                                <span className="text-[11px] text-orange-600 dark:text-orange-400 tabular-nums font-medium">-¥{promoAmount.toFixed(2)}</span>
                               </div>
                             </div>
                           ) : (
@@ -765,7 +765,7 @@ export function PromotionCalendarModal({
                 <div className="rounded-xl border border-slate-100 bg-white p-2 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/2 overflow-hidden">
                   <span className="text-[8.5px] sm:text-[10px] text-muted-foreground block uppercase truncate">累计推广费</span>
                   <span className="text-xs sm:text-sm text-foreground mt-0.5 block tabular-nums truncate">
-                    {summaryInfo.totalPromo > 0 ? "-" : ""}¥{summaryInfo.totalPromo.toFixed(1)}
+                    {summaryInfo.totalPromo > 0 ? "-" : ""}¥{summaryInfo.totalPromo.toFixed(2)}
                   </span>
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-white p-2 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/2 overflow-hidden">
@@ -777,7 +777,7 @@ export function PromotionCalendarModal({
                 <div className="rounded-xl border border-slate-100 bg-white p-2 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/2 overflow-hidden">
                   <span className="text-[8.5px] sm:text-[10px] text-muted-foreground block uppercase truncate">单均推广成本</span>
                   <span className="text-xs sm:text-sm text-foreground mt-0.5 block tabular-nums truncate">
-                    ¥{summaryInfo.avgCostPerOrder.toFixed(1)}
+                    ¥{summaryInfo.avgCostPerOrder.toFixed(2)}
                   </span>
                 </div>
               </div>
