@@ -1025,12 +1025,12 @@ function parseQuickAddressInput(input: string) {
     if (leadingNameMatch && isLikelyRecipientName(leadingNameMatch[1]) && isLikelyRecipientAddress(leadingNameMatch[2])) {
       recipientName = recipientName || leadingNameMatch[1].trim();
       recipientAddress = leadingNameMatch[2].trim();
-    }
-
-    const trailingNameMatch = singleLine.match(/^(.+?)\s+([\u4e00-\u9fa5·]{1,12})$/);
-    if (trailingNameMatch && isLikelyRecipientAddress(trailingNameMatch[1]) && isLikelyRecipientName(trailingNameMatch[2])) {
-      recipientAddress = trailingNameMatch[1].trim();
-      recipientName = recipientName || trailingNameMatch[2].trim();
+    } else {
+      const trailingNameMatch = singleLine.match(/^(.+?)\s+([\u4e00-\u9fa5·]{1,12})$/);
+      if (trailingNameMatch && isLikelyRecipientAddress(trailingNameMatch[1]) && isLikelyRecipientName(trailingNameMatch[2])) {
+        recipientAddress = trailingNameMatch[1].trim();
+        recipientName = recipientName || trailingNameMatch[2].trim();
+      }
     }
   }
 
