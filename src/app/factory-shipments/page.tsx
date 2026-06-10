@@ -2044,10 +2044,18 @@ function FactoryShipmentDetailModal({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
-                    <div className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-                      {format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
+                  <div className="mt-3 grid grid-cols-2 gap-2.5">
+                    <div className="rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
+                      <div className="mt-1.5 text-base font-semibold tracking-tight text-foreground">
+                        {format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
+                      <div className="mt-1.5 text-base font-semibold tracking-tight text-foreground">
+                        {format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm", { locale: zhCN })}
+                      </div>
                     </div>
                   </div>
                 </div>
