@@ -15,6 +15,12 @@ export async function GET(request: Request) {
     const pageSize = parseInt(searchParams.get("pageSize") || "20");
 
     const session = await getFreshSession() as SessionUser | null;
+
+    // Check if album requires login
+    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+    if (settings?.requireLoginForLightbox && (!session || !session.id)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     
     // 1. Build product-level filters
     const andConditions: Array<Record<string, unknown>> = [];
@@ -75,8 +81,7 @@ export async function GET(request: Request) {
     const total = allMatchingProducts.length;
     const skip = (page - 1) * pageSize;
 
-    // 3. Fetch System Settings for sort direction
-    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+    // 3. Use pre-fetched settings for sort direction
     const sortDesc = settings?.gallerySortDesc ?? true;
 
     // 4. Perform natural sort for products in memory

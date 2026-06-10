@@ -10,6 +10,13 @@ export async function GET(
 ) {
   try {
     const session = await getFreshSession() as SessionUser | null;
+
+    // Check if album requires login
+    const settings = await prisma.systemSetting.findUnique({ where: { id: "system" } });
+    if (settings?.requireLoginForLightbox && (!session || !session.id)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { productId } = await params;
 
     const product = await prisma.product.findUnique({

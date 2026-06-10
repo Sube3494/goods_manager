@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { uploadGalleryMedia } from "@/lib/galleryUpload";
-import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard, Upload, CircleHelp } from "lucide-react";
+import { Camera, ChevronRight, X, Check, Download, Plus, CheckCircle, Package, Search, PlayCircle, Play, Info, ArrowUp, Trash2, RefreshCcw, Link2, RotateCcw, Volume2, VolumeX, Maximize, Images, Clapperboard, Upload, CircleHelp, Lock } from "lucide-react";
 
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 
@@ -1093,6 +1093,34 @@ function GalleryContent() {
       showToast("正在尝试浏览器下载...", "info");
     }
   };
+
+  if (!isUserLoading && requireLoginForLightbox && !user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="max-w-md w-full text-center space-y-6 p-8 rounded-3xl border border-border/60 bg-white/75 dark:bg-white/5 backdrop-blur-md shadow-2xl shadow-primary/5">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
+            <Lock size={28} className="animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground">
+              实物相册已锁定
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              根据系统安全策略，当前实物相册仅限登录用户查看。请登录您的账号以继续浏览商品实拍与高清细节。
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+            }}
+            className="w-full h-11 inline-flex items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold transition-all hover:opacity-90 active:scale-95 shadow-lg shadow-primary/25"
+          >
+            立即登录
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

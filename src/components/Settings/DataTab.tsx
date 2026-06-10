@@ -275,7 +275,7 @@ export function DataTab({
             <Switch checked={allowGalleryUpload} onChange={toggleGalleryUpload} />
           </div>
           <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
-            <div><div className="text-sm font-black text-foreground">灯箱预览需要登录</div><div className="mt-1 text-xs text-muted-foreground">开启后，游客仍可浏览实物相册列表，但点击进入灯箱大图或视频预览时会先跳转登录。</div></div>
+            <div><div className="text-sm font-black text-foreground">实物相册需要登录</div><div className="mt-1 text-xs text-muted-foreground">开启后，游客无法浏览实物相册列表，必须登录后才能进入和查看相册页面。</div></div>
             <Switch checked={requireLoginForLightbox} onChange={toggleRequireLoginForLightbox} />
           </div>
           <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
