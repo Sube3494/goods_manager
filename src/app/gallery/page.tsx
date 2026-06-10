@@ -215,6 +215,7 @@ function GalleryContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isUploadAllowed, setIsUploadAllowed] = useState(false);
   const [requireLoginForLightbox, setRequireLoginForLightbox] = useState(false);
+  const [isSettingLoading, setIsSettingLoading] = useState(true);
 
   // Debouncing search
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -420,6 +421,8 @@ function GalleryContent() {
         }
       } catch (error) {
         console.error("Failed to fetch gallery meta:", error);
+      } finally {
+        setIsSettingLoading(false);
       }
     };
     
@@ -1093,6 +1096,17 @@ function GalleryContent() {
       showToast("正在尝试浏览器下载...", "info");
     }
   };
+
+  if (isUserLoading || isSettingLoading) {
+    return (
+      <div className="flex h-[60dvh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+          <span className="text-xs text-muted-foreground font-black tracking-widest animate-pulse">正在安全加载相册...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!isUserLoading && requireLoginForLightbox && !user) {
     return (
