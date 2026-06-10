@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { CustomMultiSelect } from "@/components/ui/CustomMultiSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
@@ -1422,14 +1423,14 @@ function FactoryShipmentFilters({
   onReset,
 }: {
   searchQuery: string;
-  shippingFilter: string;
+  shippingFilter: string[];
   paymentFilter: string;
   compensationFilter: string;
   startDate: string;
   endDate: string;
   hasActiveFilters: boolean;
   onSearchChange: (value: string) => void;
-  onShippingChange: (value: string) => void;
+  onShippingChange: (value: string[]) => void;
   onPaymentChange: (value: string) => void;
   onCompensationChange: (value: string) => void;
   onStartDateChange: (value: string) => void;
@@ -1458,17 +1459,20 @@ function FactoryShipmentFilters({
           ) : null}
         </div>
         <div className="h-10 min-w-0 lg:h-11">
-          <CustomSelect
+          <CustomMultiSelect
             value={shippingFilter}
             onChange={onShippingChange}
-            options={[{ value: "all", label: "发货状态" }, ...shippingStatusOptions]}
+            options={[{ value: "all", label: "全部发货状态" }, ...shippingStatusOptions]}
             className="h-full"
             triggerClassName={cn(
               "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-              shippingFilter !== "all"
-                ? `${getShippingTone(shippingFilter)} font-normal`
-                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+              shippingFilter.length === 1 && shippingFilter[0] !== "all"
+                ? `${getShippingTone(shippingFilter[0])} font-normal`
+                : shippingFilter.length > 1 && !shippingFilter.includes("all")
+                  ? "bg-primary/8 border-primary/15 text-primary dark:bg-primary/12 dark:border-primary/25 font-bold"
+                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
             )}
+            placeholder="发货状态"
           />
         </div>
       </div>
@@ -3123,7 +3127,7 @@ export default function FactoryShipmentsPage() {
   const [shipmentOrders, setShipmentOrders] = useState<OutboundOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [shippingFilter, setShippingFilter] = useState("all");
+  const [shippingFilter, setShippingFilter] = useState<string[]>(["all"]);
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [compensationFilter, setCompensationFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
@@ -3427,7 +3431,7 @@ export default function FactoryShipmentsPage() {
         pinyinMatch(parsed.paymentStatus || "", query) ||
         pinyinMatch(parsed.compensationStatus || "", query) ||
         itemNames.some((name) => pinyinMatch(name, query));
-      const matchesShipping = shippingFilter === "all" || derivedStatus === shippingFilter;
+      const matchesShipping = shippingFilter.includes("all") || shippingFilter.length === 0 || shippingFilter.includes(derivedStatus);
       const matchesPayment = paymentFilter === "all" || parsed.paymentStatus === paymentFilter;
       const matchesCompensation =
         compensationFilter === "all" || parsed.compensationStatus === compensationFilter;
@@ -3477,7 +3481,12 @@ export default function FactoryShipmentsPage() {
   }, [currentPage, totalPages]);
 
   const hasActiveFilters = Boolean(
-    searchQuery || shippingFilter !== "all" || paymentFilter !== "all" || compensationFilter !== "all" || startDate || endDate
+    searchQuery || 
+    (!shippingFilter.includes("all") && shippingFilter.length > 0) || 
+    paymentFilter !== "all" || 
+    compensationFilter !== "all" || 
+    startDate || 
+    endDate
   );
 
   const selectableFilteredOrderIds = useMemo(
@@ -3579,7 +3588,7 @@ export default function FactoryShipmentsPage() {
         onEndDateChange={setEndDate}
         onReset={() => {
           setSearchQuery("");
-          setShippingFilter("all");
+          setShippingFilter(["all"]);
           setPaymentFilter("all");
           setCompensationFilter("all");
           setStartDate("");
