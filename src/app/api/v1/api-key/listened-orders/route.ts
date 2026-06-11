@@ -15,23 +15,12 @@ export async function POST(request: NextRequest) {
   try {
     const requestApiKey = getRequestApiKey(request.headers, request.nextUrl.searchParams);
     if (!requestApiKey) {
-      console.warn("Auto-pick webhook rejected: missing api key", {
-        path: request.nextUrl.pathname,
-        hasAuthorization: Boolean(request.headers.get("authorization")),
-        hasXApiKey: Boolean(request.headers.get("x-api-key") || request.headers.get("x-auto-pick-key")),
-      });
       return NextResponse.json({
         error: "Unauthorized",
       }, { status: 401 });
     }
 
     if (!await isAutoPickWebhookApiKeyAuthorized(requestApiKey)) {
-      console.warn("Auto-pick webhook rejected: unauthorized api key", {
-        path: request.nextUrl.pathname,
-        keyLength: requestApiKey.length,
-        keyPrefix: requestApiKey.slice(0, 8),
-        keySuffix: requestApiKey.length > 8 ? requestApiKey.slice(-8) : "",
-      });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

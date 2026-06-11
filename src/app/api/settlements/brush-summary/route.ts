@@ -154,6 +154,7 @@ export async function GET(req: NextRequest) {
 
     const showSimulatedValues = canUseBrushSimulation && Boolean(profile?.brushCommissionBoostEnabled);
     const totals = new Map<string, number>();
+    const brushPlatformKeys = new Set<string>();
 
     for (const order of orders) {
       const shopName = String(order.shopName || "").trim();
@@ -161,6 +162,8 @@ export async function GET(req: NextRequest) {
 
       const platformName = normalizeBrushSettlementPlatform(String(order.type || ""));
       if (!platformName) continue;
+
+      brushPlatformKeys.add(`${shopName}__${platformName}`);
 
       const displayed = getDisplayedMetrics(order, { brushCommissionBoostEnabled: showSimulatedValues }, showSimulatedValues);
       const key = `${shopName}__${platformName}`;
@@ -200,16 +203,20 @@ export async function GET(req: NextRequest) {
         );
         if (!shopName) continue;
 
-        // 动态识别订单对应的对账平台（如美团闪购、京东秒送、淘宝闪购），将配送费归入各自平台行中
         const platformName = normalizeBrushSettlementPlatform(String(order.platform || "").trim());
         if (!platformName) continue;
 
-        // 订单的配送费以“分”为单位，需除以 100 转换成“元”再累加到以“元”为单位的刷单到手金额中
         const deliveryFee = readDeliveryFee(order.delivery) / 100;
         if (deliveryFee <= 0) continue;
 
-        const key = `${shopName}__${platformName}`;
-        totals.set(key, FinanceMath.add(totals.get(key) || 0, deliveryFee));
+        const platformKey = `${shopName}__${platformName}`;
+        const meituanKey = `${shopName}__美团闪购`;
+        const targetKey =
+          platformName !== "美团闪购" && !brushPlatformKeys.has(platformKey)
+            ? meituanKey
+            : platformKey;
+
+        totals.set(targetKey, FinanceMath.add(totals.get(targetKey) || 0, deliveryFee));
       }
     }
 
