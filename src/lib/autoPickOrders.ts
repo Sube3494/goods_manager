@@ -4973,7 +4973,13 @@ export async function fixHistoryShopOrdersForUser(userId: string): Promise<numbe
       select: { permissions: true },
     }),
     prisma.shop.findMany({
-      where: { userId }
+      where: { userId },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        externalId: true,
+      },
     })
   ]);
 
@@ -4996,17 +5002,69 @@ export async function fixHistoryShopOrdersForUser(userId: string): Promise<numbe
 
   for (const order of orders) {
     const rawPayload = order.rawPayload as { systemMeta?: { resolvedShop?: { id?: string; name?: string } } } | null;
-    const matchedShopName = resolveAutoPickMatchedShopName(
-      { shopId: order.shopId, rawPayload: order.rawPayload },
-      user.permissions
-    );
+    const rawPayloadRecord = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+      ? order.rawPayload as Record<string, unknown>
+      : {};
+    const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
+    const rawShopId = order.shopId || readShopIdFromRawPayload(order.rawPayload);
+    const rawShopName = readPreferredMaiyatianShopName(rawPayloadRecord)
+      || readShopNameFromRawPayload(order.rawPayload)
+      || lockedResolvedShop?.name
+      || null;
+    const rawShopAddress = readPreferredMaiyatianShopAddress(rawPayloadRecord)
+      || readShopAddressFromRawPayload(order.rawPayload)
+      || null;
 
-    const targetShop = systemShops.find(s => 
-      s.name === matchedShopName || 
-      s.id === order.shopId ||
-      (matchedShopName === "zunyi" && s.name.includes("遵义")) ||
-      (matchedShopName === "baiyun" && s.name.includes("白云"))
-    );
+    let targetShop = lockedResolvedShop?.id
+      ? systemShops.find((shop) => shop.id === lockedResolvedShop.id) || null
+      : null;
+
+    if (!targetShop && lockedResolvedShop?.name) {
+      targetShop = findMatchingShopRecord(systemShops, {
+        name: lockedResolvedShop.name,
+        address: normalizeShopAddress(rawShopAddress),
+      });
+    }
+
+    if (!targetShop) {
+      const mappedShopName = findMappedShopNameFromAutoPickConfig(
+        normalizeExternalId(rawShopId) || null,
+        String(rawShopName || "").trim() || null,
+        String(rawShopAddress || "").trim() || null,
+        user.permissions
+      );
+
+      if (mappedShopName) {
+        targetShop = findMatchingShopRecord(systemShops, {
+          name: mappedShopName,
+        });
+      }
+    }
+
+    if (!targetShop) {
+      targetShop = findMatchingShopRecord(systemShops, {
+        externalId: rawShopId,
+        name: rawShopName,
+        address: normalizeShopAddress(rawShopAddress),
+      });
+    }
+
+    if (!targetShop) {
+      const rawAddressKey = normalizeShopAddressKey(rawShopAddress);
+      if (rawAddressKey) {
+        const partialAddressMatchedShops = systemShops.filter((shop) => {
+          const currentAddressKey = normalizeShopAddressKey(shop.address);
+          if (!currentAddressKey) {
+            return false;
+          }
+          return currentAddressKey.includes(rawAddressKey) || rawAddressKey.includes(currentAddressKey);
+        });
+
+        if (partialAddressMatchedShops.length === 1) {
+          targetShop = partialAddressMatchedShops[0];
+        }
+      }
+    }
 
     if (targetShop) {
       const currentResolvedShop = rawPayload?.systemMeta?.resolvedShop;
