@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.user.findUnique({
         where: { id: session.id },
-        select: { brushCommissionBoostEnabled: true, permissions: true },
+        select: { brushCommissionBoostEnabled: true, permissions: true, shippingAddresses: true },
       }),
     ]);
 

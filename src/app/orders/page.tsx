@@ -251,6 +251,8 @@ function IntegrationModal({
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
   const [showInboundApiKey, setShowInboundApiKey] = useState(false);
   const [copiedCallback, setCopiedCallback] = useState(false);
+  const { showToast } = useToast();
+  const [isFixingHistory, setIsFixingHistory] = useState(false);
   const pillButtonClass = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 sm:min-h-9 sm:rounded-full sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-white/5 dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
     value: item.name,
@@ -614,6 +616,35 @@ function IntegrationModal({
                 onClick={() => onTestCookie()}
                 disabled={isTestingCookie}
               />
+            </div>
+
+            <div className="lg:col-span-2 lg:row-start-6 mt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (isFixingHistory) return;
+                  setIsFixingHistory(true);
+                  try {
+                    const res = await fetch("/api/orders/fix-history-shops", { method: "POST" });
+                    const data = await res.json();
+                    if (res.ok) {
+                      showToast(`成功修正 ${data.updatedCount} 单历史订单的店铺绑定关系！`, "success");
+                    } else {
+                      showToast(data.error || "修复失败", "error");
+                    }
+                  } catch (error) {
+                    console.error("Failed to fix history shop orders:", error);
+                    showToast("网络请求失败，请稍后重试", "error");
+                  } finally {
+                    setIsFixingHistory(false);
+                  }
+                }}
+                disabled={isFixingHistory}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-black text-primary transition-all hover:bg-primary/10 active:scale-95 disabled:opacity-50"
+              >
+                {isFixingHistory ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                一键修复历史订单店铺绑定 (重算未解析店铺的历史订单归属)
+              </button>
             </div>
           </div>
         </div>
