@@ -33,6 +33,83 @@ function resolveMonthRange(month: string) {
   return { start, end };
 }
 
+function isAddressMatch(addr1: string | null | undefined, addr2: string | null | undefined): boolean {
+  if (!addr1 || !addr2) return false;
+  const a1 = addr1.toLowerCase();
+  const a2 = addr2.toLowerCase();
+  if (a1.includes("香港路") && a2.includes("香港路")) return true;
+  if ((a1.includes("棠景街") || a1.includes("祥岗东街")) && (a2.includes("棠景街") || a2.includes("祥岗东街"))) return true;
+  if (a1.includes("华远东路") && a2.includes("华远东路")) return true;
+  return false;
+}
+
+function isNameAliasMatch(shopName: string, label: string): boolean {
+  const s = shopName.trim().toLowerCase();
+  const l = label.trim().toLowerCase();
+  if (s === l || l.includes(s) || s.includes(l)) return true;
+  
+  // 别名对齐映射关系
+  if (s === "遵义店" && l === "baiyun") return true;
+  if (s === "zunyi" && l === "zunyi") return true;
+  if (s === "4593" && l.includes("4593")) return true;
+  if (s === "2533" && l.includes("2533")) return true;
+  
+  return false;
+}
+
+function findShippingAddressLabel(
+  order: { shopId: string | null; rawPayload: unknown },
+  systemShops: Array<{ id: string; name: string; addressBookId: string | null; address: string | null }>,
+  userAddresses: Array<{ id: string; label?: string | null; address?: string | null }>,
+  permissions: unknown
+): string | null {
+  // 1. 如果有 shopId，优先通过 shopId 关联系统店铺
+  if (order.shopId) {
+    const shop = systemShops.find(s => s.id === order.shopId);
+    if (shop) {
+      // 1.1 优先通过已有的 addressBookId 直接匹配
+      if (shop.addressBookId) {
+        const addr = userAddresses.find(a => a.id === shop.addressBookId);
+        if (addr?.label) {
+          return addr.label.trim();
+        }
+      }
+      
+      // 1.2 通过名字和别名匹配
+      const addrByName = userAddresses.find(a => isNameAliasMatch(shop.name, a.label || ""));
+      if (addrByName?.label) {
+        return addrByName.label.trim();
+      }
+
+      // 1.3 通过地址内容模糊匹配
+      if (shop.address) {
+        const matchedAddrs = userAddresses.filter(a => isAddressMatch(shop.address, a.address));
+        if (matchedAddrs.length === 1) {
+          return (matchedAddrs[0].label || "").trim() || null;
+        } else if (matchedAddrs.length > 1) {
+          const best = matchedAddrs.find(a => isNameAliasMatch(shop.name, a.label || ""));
+          if (best?.label) return best.label.trim();
+          return (matchedAddrs[0].label || "").trim() || null;
+        }
+      }
+    }
+  }
+
+  // 2. 如果没有关联上，通过 resolveAutoPickMatchedShopName 得到的 shopName 兜底来找
+  const resolvedShopName = resolveAutoPickMatchedShopName(
+    { shopId: order.shopId, rawPayload: order.rawPayload },
+    permissions
+  );
+  if (!resolvedShopName) return null;
+
+  const matchedAddr = userAddresses.find(a => isNameAliasMatch(resolvedShopName, a.label || ""));
+  if (matchedAddr?.label) {
+    return matchedAddr.label.trim();
+  }
+
+  return resolvedShopName;
+}
+
 export async function GET(req: NextRequest) {
   const session = await getAuthorizedUser("settlement:manage");
   if (!session) {
@@ -47,7 +124,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const canUseBrushSimulation = hasPermission(session, "brush:simulate");
-    const [orders, profile] = await Promise.all([
+    const [orders, profile, systemShops] = await Promise.all([
       prisma.brushOrder.findMany({
         where: {
           userId: session.id,
@@ -68,6 +145,10 @@ export async function GET(req: NextRequest) {
       prisma.user.findUnique({
         where: { id: session.id },
         select: { brushCommissionBoostEnabled: true, permissions: true, shippingAddresses: true },
+      }),
+      prisma.shop.findMany({
+        where: { userId: session.id },
+        select: { id: true, name: true, addressBookId: true, address: true },
       }),
     ]);
 
@@ -104,13 +185,17 @@ export async function GET(req: NextRequest) {
         },
       });
 
+      const userAddresses = (profile?.shippingAddresses as Array<{ id: string; label?: string | null; address?: string | null }>) || [];
+
       for (const order of autoPickOrders) {
         if (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status)) {
           continue;
         }
 
-        const shopName = resolveAutoPickMatchedShopName(
+        const shopName = findShippingAddressLabel(
           { shopId: order.shopId, rawPayload: order.rawPayload },
+          systemShops,
+          userAddresses,
           profile?.permissions
         );
         if (!shopName) continue;
