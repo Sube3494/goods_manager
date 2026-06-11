@@ -4,6 +4,16 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { getDisplayedMetrics, normalizeBrushSettlementPlatform } from "@/lib/brushDisplay";
+import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
+import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
+
+function readDeliveryFee(delivery: unknown) {
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return 0;
+  }
+  const value = Number((delivery as Record<string, unknown>).sendFee || 0);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
 
 function resolveMonthRange(month: string) {
   const normalized = String(month || "").trim();
@@ -57,7 +67,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.user.findUnique({
         where: { id: session.id },
-        select: { brushCommissionBoostEnabled: true },
+        select: { brushCommissionBoostEnabled: true, permissions: true },
       }),
     ]);
 
@@ -74,6 +84,46 @@ export async function GET(req: NextRequest) {
       const displayed = getDisplayedMetrics(order, { brushCommissionBoostEnabled: showSimulatedValues }, showSimulatedValues);
       const key = `${shopName}__${platformName}`;
       totals.set(key, FinanceMath.add(totals.get(key) || 0, displayed.received));
+    }
+
+    if (showSimulatedValues) {
+      const autoPickOrders = await prisma.autoPickOrder.findMany({
+        where: {
+          userId: session.id,
+          orderTime: {
+            gte: range.start,
+            lt: range.end,
+          },
+        },
+        select: {
+          platform: true,
+          delivery: true,
+          shopId: true,
+          rawPayload: true,
+          status: true,
+        },
+      });
+
+      for (const order of autoPickOrders) {
+        if (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status)) {
+          continue;
+        }
+
+        const shopName = resolveAutoPickMatchedShopName(
+          { shopId: order.shopId, rawPayload: order.rawPayload },
+          profile?.permissions
+        );
+        if (!shopName) continue;
+
+        const platformName = normalizeBrushSettlementPlatform(String(order.platform || ""));
+        if (!platformName) continue;
+
+        const deliveryFee = readDeliveryFee(order.delivery);
+        if (deliveryFee <= 0) continue;
+
+        const key = `${shopName}__${platformName}`;
+        totals.set(key, FinanceMath.add(totals.get(key) || 0, deliveryFee));
+      }
     }
 
     return NextResponse.json({
