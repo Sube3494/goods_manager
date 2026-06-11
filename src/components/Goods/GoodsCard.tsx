@@ -5,6 +5,37 @@ import { Product } from "@/lib/types";
 import { getCategoryName, cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 
+function getDisplayStock(product: Product) {
+  if (!product.hasVariants || !Array.isArray(product.variants) || product.variants.length === 0) {
+    return Number(product.stock ?? 0);
+  }
+
+  return product.variants.reduce((sum, variant) => sum + Math.max(0, Number(variant.stock ?? 0)), 0);
+}
+
+function getDisplayPrice(product: Product) {
+  if (!product.hasVariants || !Array.isArray(product.variants) || product.variants.length === 0) {
+    const value = Number(product.salePrice ?? product.costPrice ?? 0);
+    return `¥${value.toLocaleString()}`;
+  }
+
+  const activePrices = product.variants
+    .filter((variant) => variant.isActive !== false)
+    .map((variant) => Number(variant.salePrice ?? variant.costPrice ?? product.salePrice ?? product.costPrice ?? 0))
+    .filter((price) => Number.isFinite(price));
+
+  if (activePrices.length === 0) {
+    const value = Number(product.salePrice ?? product.costPrice ?? 0);
+    return `¥${value.toLocaleString()}`;
+  }
+
+  const minPrice = Math.min(...activePrices);
+  const maxPrice = Math.max(...activePrices);
+  return minPrice === maxPrice
+    ? `¥${minPrice.toLocaleString()}`
+    : `¥${minPrice.toLocaleString()} - ¥${maxPrice.toLocaleString()}`;
+}
+
 export const GoodsCard = memo(function GoodsCard({ 
   product, 
   onEdit,
@@ -36,6 +67,8 @@ export const GoodsCard = memo(function GoodsCard({
 }) {
   const [isCopied, setIsCopied] = useState(false);
   const { showToast } = useToast();
+  const displayStock = getDisplayStock(product);
+  const displayPrice = getDisplayPrice(product);
 
   const handleCopyName = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,19 +219,19 @@ export const GoodsCard = memo(function GoodsCard({
           <div>
             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">{stockTitle}</p>
             <p className="text-sm font-bold mt-0.5 font-number leading-none h-5 flex items-baseline">
-              {product.stock === 0 && !disableLowStockTone ? (
+              {displayStock === 0 && !disableLowStockTone ? (
                 <>
                   <span className="text-rose-500 dark:text-rose-400 text-sm sm:text-base font-bold">0</span>
                   <span className="text-[10px] font-bold text-rose-500/70 dark:text-rose-400/70 ml-0.5">{stockUnit}</span>
                 </>
-              ) : !disableLowStockTone && product.stock < lowStockThreshold ? (
+              ) : !disableLowStockTone && displayStock < lowStockThreshold ? (
                 <>
-                  <span className="text-amber-500 dark:text-amber-400 text-sm sm:text-base font-bold">{product.stock}</span>
+                  <span className="text-amber-500 dark:text-amber-400 text-sm sm:text-base font-bold">{displayStock}</span>
                   <span className="text-[10px] font-bold text-amber-500/70 dark:text-amber-400/70 ml-0.5">{stockUnit}</span>
                 </>
               ) : (
                 <>
-                  <span className="text-foreground text-sm sm:text-base font-bold">{product.stock}</span>
+                  <span className="text-foreground text-sm sm:text-base font-bold">{displayStock}</span>
                   <span className="text-[10px] font-medium text-muted-foreground ml-0.5">{stockUnit}</span>
                 </>
               )}
@@ -207,7 +240,7 @@ export const GoodsCard = memo(function GoodsCard({
           <div className="text-right">
              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold">售价</p>
              <p className="font-bold text-foreground">
-                <span className="text-base sm:text-lg font-number">¥{Number(product.salePrice ?? product.costPrice ?? 0).toLocaleString()}</span>
+                <span className="text-base sm:text-lg font-number">{displayPrice}</span>
              </p>
            </div>
         </div>

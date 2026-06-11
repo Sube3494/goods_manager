@@ -461,16 +461,7 @@ export async function POST(request: Request) {
       });
     });
 
-    return NextResponse.json({
-      ...product,
-      image: product.image ? storage.resolveUrl(product.image) : null,
-      variants: product.variants.map((variant) => ({
-        ...variant,
-        image: variant.image ? storage.resolveUrl(variant.image) : null,
-      })),
-      assignedShopIds: product.shopProducts.map((item) => item.shopId),
-      jdSkuIds: product.jdSkuMappings.map((item) => item.jdSkuId),
-    });
+    return NextResponse.json(ProductService.normalizeProductForResponse(product, storage));
   } catch (error: unknown) {
     return handlePrismaError(error, "商品", "Failed to create product");
   }
@@ -591,15 +582,7 @@ export async function PUT(request: Request) {
       });
     });
 
-    return NextResponse.json({
-      ...updatedProduct,
-      image: updatedProduct.image ? storage.resolveUrl(updatedProduct.image) : null,
-      variants: updatedProduct.variants.map((variant) => ({
-        ...variant,
-        image: variant.image ? storage.resolveUrl(variant.image) : null,
-      })),
-      jdSkuIds: updatedProduct.jdSkuMappings.map((item) => item.jdSkuId),
-    });
+    return NextResponse.json(ProductService.normalizeProductForResponse(updatedProduct, storage));
   } catch (error: unknown) {
     return handlePrismaError(error, "商品", "Failed to update product");
   }

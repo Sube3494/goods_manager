@@ -18,6 +18,45 @@ export class ProductService {
     });
   }
 
+  static normalizeProductForResponse(
+    product: Record<string, unknown>,
+    storage: { resolveUrl: (value: string) => string }
+  ) {
+    const resolvedVariants: Array<Record<string, unknown>> = Array.isArray(product.variants)
+      ? (product.variants as Array<Record<string, unknown>>).map((variant) => ({
+          ...variant,
+          image: variant.image ? storage.resolveUrl(variant.image as string) : null,
+        }))
+      : [];
+
+    const hasVariants = Boolean(product.hasVariants) && resolvedVariants.length > 0;
+    const activeVariantPrices = hasVariants
+      ? resolvedVariants
+          .filter((variant) => variant.isActive !== false)
+          .map((variant) => Number(variant.salePrice ?? variant.costPrice ?? product.salePrice ?? product.costPrice ?? 0))
+          .filter((price) => Number.isFinite(price))
+      : [];
+
+    const normalizedSalePrice = hasVariants && activeVariantPrices.length > 0
+      ? Math.min(...activeVariantPrices)
+      : Number(product.salePrice ?? product.costPrice ?? 0);
+
+    const normalizedStock = hasVariants
+      ? resolvedVariants.reduce((sum, variant) => sum + Math.max(0, Number(variant.stock ?? 0)), 0)
+      : Number(product.stock ?? 0);
+
+    return {
+      ...product,
+      image: product.image ? storage.resolveUrl(product.image as string) : null,
+      salePrice: normalizedSalePrice,
+      stock: normalizedStock,
+      variants: resolvedVariants,
+      gallery: (product.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || [],
+      assignedShopIds: (product.shopProducts as Array<{ shopId: string }> | undefined)?.map((item) => item.shopId) || [],
+      jdSkuIds: (product.jdSkuMappings as Array<{ jdSkuId: string }> | undefined)?.map((item) => item.jdSkuId) || (product.jdSkuId ? [product.jdSkuId as string] : []),
+    };
+  }
+
   static async getProducts(params: {
     userId?: string;
     role?: string;
@@ -255,19 +294,7 @@ export class ProductService {
   static async formatResponse(products: unknown[], total: number, page: number, pageSize: number) {
     const storage = await getStorageStrategy();
     
-    const resolved = (products as Record<string, unknown>[]).map(p => ({
-      ...p,
-      image: p.image ? storage.resolveUrl(p.image as string) : null,
-      variants: Array.isArray(p.variants)
-        ? (p.variants as Array<Record<string, unknown>>).map((variant) => ({
-            ...variant,
-            image: variant.image ? storage.resolveUrl(variant.image as string) : null,
-          }))
-        : [],
-      gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || [],
-      assignedShopIds: (p.shopProducts as Array<{ shopId: string }> | undefined)?.map((item) => item.shopId) || [],
-      jdSkuIds: (p.jdSkuMappings as Array<{ jdSkuId: string }> | undefined)?.map((item) => item.jdSkuId) || (p.jdSkuId ? [p.jdSkuId as string] : []),
-    }));
+    const resolved = (products as Record<string, unknown>[]).map((p) => this.normalizeProductForResponse(p, storage));
 
     return {
       items: resolved,

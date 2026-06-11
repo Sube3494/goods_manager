@@ -819,6 +819,15 @@ export function ProductFormModal({
 
   // 使用 galleryImages 作为唯一数据源 (Use galleryImages as single source of truth)
   const displayList = galleryImages || [];
+  const totalVariantStock = useMemo(
+    () => variantDrafts.reduce((sum, variant) => sum + Math.max(0, Number(variant.stock ?? 0)), 0),
+    [variantDrafts]
+  );
+  const productLevelStock = Number(initialData?.stock ?? 0);
+  const showVariantStockFallbackHint =
+    Boolean(formData.hasVariants) &&
+    productLevelStock > 0 &&
+    totalVariantStock === 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1695,6 +1704,17 @@ export function ProductFormModal({
                                 <Plus size={12} strokeWidth={3} /> 添加规格
                             </button>
                         </div>
+                            <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3 text-xs text-muted-foreground dark:border-white/6 dark:bg-black/10">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-medium text-foreground">商品总库存 {productLevelStock}</span>
+                                    <span>规格库存由采购批次自动同步，不能在这里手动修改。</span>
+                                </div>
+                                {showVariantStockFallbackHint ? (
+                                    <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">
+                                        当前商品已有总库存，但历史库存尚未拆分到具体规格，所以各规格会暂时显示为 0。
+                                    </div>
+                                ) : null}
+                            </div>
                             {variantDrafts.map((variant, index) => (
                                 <div key={variant.panelKey} className="rounded-[24px] border border-border/70 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
                                     <div className="flex items-center gap-2">
@@ -1856,7 +1876,7 @@ export function ProductFormModal({
                                                                 />
                                                             </div>
                                                             <div className="space-y-1.5">
-                                                                <label className="text-[11px] font-medium text-muted-foreground">规格库存</label>
+                                                                <label className="text-[11px] font-medium text-muted-foreground">规格库存（采购同步）</label>
                                                                 <div className="flex h-[42px] items-center rounded-2xl border border-border bg-white px-4 text-xs font-medium text-foreground dark:border-amber-400/10 dark:bg-amber-400/[0.06] dark:text-amber-100">
                                                                     {Number(variant.stock ?? 0)}
                                                                 </div>
