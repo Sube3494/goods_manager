@@ -200,8 +200,9 @@ export async function GET(req: NextRequest) {
         );
         if (!shopName) continue;
 
-        // 所有平台的总配送费统一加到“美团闪购”的刷单到手金额中，避免京东和淘宝暴露
-        const platformName = "美团闪购";
+        // 动态识别订单对应的对账平台（如美团闪购、京东秒送、淘宝闪购），将配送费归入各自平台行中
+        const platformName = normalizeBrushSettlementPlatform(String(order.platform || "").trim());
+        if (!platformName) continue;
 
         // 订单的配送费以“分”为单位，需除以 100 转换成“元”再累加到以“元”为单位的刷单到手金额中
         const deliveryFee = readDeliveryFee(order.delivery) / 100;
