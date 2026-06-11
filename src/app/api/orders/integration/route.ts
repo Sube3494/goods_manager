@@ -4,6 +4,7 @@ import {
   getAutoPickIntegrationConfigByUserId,
   normalizeAutoPickIntegrationConfig,
   updateAutoPickIntegrationConfigByUserId,
+  fixHistoryShopOrdersForUser,
 } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,14 @@ export async function POST(request: NextRequest) {
     const config = normalizeAutoPickIntegrationConfig(body);
 
     const saved = await updateAutoPickIntegrationConfigByUserId(session.id, config);
+
+    // 保存配置后，自动进行历史订单店铺绑定匹配修正
+    try {
+      await fixHistoryShopOrdersForUser(session.id);
+    } catch (err) {
+      console.error("Failed to auto-fix history shop orders on config save:", err);
+    }
+
     return NextResponse.json(saved);
   } catch (error) {
     console.error("Failed to save order integration config:", error);

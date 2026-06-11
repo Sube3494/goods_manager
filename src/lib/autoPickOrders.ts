@@ -4966,3 +4966,87 @@ export function resolveAutoPickMatchedShopName(
   return String(mappedName || rawShopName || "").trim() || null;
 }
 
+export async function fixHistoryShopOrdersForUser(userId: string): Promise<number> {
+  const [user, systemShops] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { permissions: true },
+    }),
+    prisma.shop.findMany({
+      where: { userId }
+    })
+  ]);
+
+  if (!user) {
+    return 0;
+  }
+
+  const orders = await prisma.autoPickOrder.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      shopId: true,
+      rawPayload: true,
+      platform: true,
+    }
+  });
+
+  let updatedCount = 0;
+  const updates = [];
+
+  for (const order of orders) {
+    const rawPayload = order.rawPayload as { systemMeta?: { resolvedShop?: { id?: string; name?: string } } } | null;
+    const matchedShopName = resolveAutoPickMatchedShopName(
+      { shopId: order.shopId, rawPayload: order.rawPayload },
+      user.permissions
+    );
+
+    const targetShop = systemShops.find(s => 
+      s.name === matchedShopName || 
+      s.id === order.shopId ||
+      (matchedShopName === "zunyi" && s.name.includes("遵义")) ||
+      (matchedShopName === "baiyun" && s.name.includes("白云"))
+    );
+
+    if (targetShop) {
+      const currentResolvedShop = rawPayload?.systemMeta?.resolvedShop;
+      const needUpdate = !order.shopId 
+        || order.shopId !== targetShop.id 
+        || !currentResolvedShop 
+        || currentResolvedShop.id !== targetShop.id;
+
+      if (needUpdate) {
+        const nextSystemMeta = {
+          ...(rawPayload?.systemMeta || {}),
+          resolvedShop: {
+            id: targetShop.id,
+            name: targetShop.name,
+          }
+        };
+        const nextRawPayload = {
+          ...(order.rawPayload as Record<string, unknown> || {}),
+          systemMeta: nextSystemMeta
+        };
+
+        updates.push(
+          prisma.autoPickOrder.update({
+            where: { id: order.id },
+            data: {
+              shopId: targetShop.id,
+              rawPayload: nextRawPayload as Prisma.InputJsonValue
+            }
+          })
+        );
+        updatedCount++;
+      }
+    }
+  }
+
+  if (updates.length > 0) {
+    await prisma.$transaction(updates);
+  }
+
+  return updatedCount;
+}
+
+
