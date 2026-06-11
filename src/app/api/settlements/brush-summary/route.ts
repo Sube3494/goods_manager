@@ -115,8 +115,8 @@ export async function GET(req: NextRequest) {
         );
         if (!shopName) continue;
 
-        const platformName = normalizeBrushSettlementPlatform(String(order.platform || ""));
-        if (!platformName) continue;
+        // 所有平台的总配送费统一加到“美团闪购”的刷单到手金额中，避免京东和淘宝暴露
+        const platformName = "美团闪购";
 
         const deliveryFee = readDeliveryFee(order.delivery);
         if (deliveryFee <= 0) continue;
