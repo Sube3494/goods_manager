@@ -17,24 +17,28 @@ export async function GET() {
   }
 
   try {
-    const [config, unresolvedCount] = await Promise.all([
+    const [config, systemShops] = await Promise.all([
       getAutoPickIntegrationConfigByUserId(session.id),
-      prisma.autoPickOrder.count({
-        where: {
-          userId: session.id,
-          shopId: null,
-          NOT: {
-            status: {
-              in: ["已取消", "已删除", "cancel", "cancelled", "delete", "deleted"]
-            }
-          }
-        }
+      prisma.shop.findMany({
+        where: { userId: session.id },
+        select: { name: true }
       })
     ]);
 
+    const shopNames = new Set(systemShops.map(s => s.name.trim()));
+    const mappings = config?.maiyatianShopMappings || [];
+    let hasUnresolvedShops = false;
+    for (const mapping of mappings) {
+      const localName = String(mapping.localShopName || "").trim();
+      if (localName && !shopNames.has(localName)) {
+        hasUnresolvedShops = true;
+        break;
+      }
+    }
+
     return NextResponse.json({
       ...config,
-      hasUnresolvedShops: unresolvedCount > 0
+      hasUnresolvedShops
     });
   } catch (error) {
     console.error("Failed to load order integration config:", error);
@@ -63,22 +67,26 @@ export async function POST(request: NextRequest) {
       console.error("Failed to auto-fix history shop orders on config save:", err);
     }
 
-    // 重新统计是否依然有未能成功绑定店铺的有效订单
-    const unresolvedCount = await prisma.autoPickOrder.count({
-      where: {
-        userId: session.id,
-        shopId: null,
-        NOT: {
-          status: {
-            in: ["已取消", "已删除", "cancel", "cancelled", "delete", "deleted"]
-          }
-        }
-      }
+    // 重新比对保存后的门店映射与现存店铺列表，判断是否存在失效映射
+    const systemShops = await prisma.shop.findMany({
+      where: { userId: session.id },
+      select: { name: true }
     });
+    const shopNames = new Set(systemShops.map(s => s.name.trim()));
+    const mappings = saved?.maiyatianShopMappings || [];
+    
+    let hasUnresolvedShops = false;
+    for (const mapping of mappings) {
+      const localName = String(mapping.localShopName || "").trim();
+      if (localName && !shopNames.has(localName)) {
+        hasUnresolvedShops = true;
+        break;
+      }
+    }
 
     return NextResponse.json({
       ...saved,
-      hasUnresolvedShops: unresolvedCount > 0
+      hasUnresolvedShops
     });
   } catch (error) {
     console.error("Failed to save order integration config:", error);
