@@ -430,8 +430,29 @@ function normalizePluginBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, "");
 }
 
+function normalizeComparableApiKey(value: string) {
+  let normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  normalized = normalized.replace(/^['"`]+|['"`]+$/g, "").trim();
+
+  const envStyleMatch = normalized.match(/^(?:export\s+)?(?:MYSHOP_API_KEY|X_API_KEY|AUTO_PICK_API_KEY)\s*=\s*(.+)$/i);
+  if (envStyleMatch?.[1]) {
+    normalized = envStyleMatch[1].trim();
+  }
+
+  const bearerMatch = normalized.match(/^Bearer\s+(.+)$/i);
+  if (bearerMatch?.[1]) {
+    normalized = bearerMatch[1].trim();
+  }
+
+  return normalized.replace(/^['"`]+|['"`]+$/g, "").trim();
+}
+
 function normalizeInboundApiKey(value: string) {
-  return value.trim();
+  return normalizeComparableApiKey(value);
 }
 
 function normalizeMaiyatianCookie(value: string) {
@@ -1703,7 +1724,8 @@ async function syncAutoPickPluginCookie(config: AutoPickIntegrationConfig) {
 }
 
 async function findUserIdByManualIntegrationKey(apiKey: string) {
-  if (!apiKey) return null;
+  const normalizedApiKey = normalizeComparableApiKey(apiKey);
+  if (!normalizedApiKey) return null;
 
   const users = await prisma.user.findMany({
     select: {
@@ -1717,7 +1739,7 @@ async function findUserIdByManualIntegrationKey(apiKey: string) {
       ? user.permissions as AutoPickConfigPayload
       : {};
     const config = normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
-    if (config.inboundApiKey && config.inboundApiKey === apiKey) {
+    if (config.inboundApiKey && normalizeComparableApiKey(config.inboundApiKey) === normalizedApiKey) {
       return user.id;
     }
   }
@@ -1730,7 +1752,8 @@ export function generateAutoPickApiKey() {
 }
 
 async function isManualIntegrationKeyTaken(apiKey: string, excludeUserId?: string) {
-  if (!apiKey) return false;
+  const normalizedApiKey = normalizeComparableApiKey(apiKey);
+  if (!normalizedApiKey) return false;
 
   const users = await prisma.user.findMany({
     select: {
@@ -1748,7 +1771,7 @@ async function isManualIntegrationKeyTaken(apiKey: string, excludeUserId?: strin
       ? user.permissions as AutoPickConfigPayload
       : {};
     const config = normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
-    if (config.inboundApiKey && config.inboundApiKey === apiKey) {
+    if (config.inboundApiKey && normalizeComparableApiKey(config.inboundApiKey) === normalizedApiKey) {
       return true;
     }
   }
@@ -1766,7 +1789,7 @@ function normalizeWebhookBinding(input: unknown): AutoPickWebhookBinding | null 
   }
 
   const record = input as Record<string, unknown>;
-  const key = String(record.key || "").trim();
+  const key = normalizeComparableApiKey(String(record.key || ""));
   const userId = String(record.userId || "").trim();
   const email = String(record.email || "").trim().toLowerCase();
   const label = String(record.label || "").trim();
@@ -1851,22 +1874,23 @@ async function fetchAutoPickPluginJson<T>(userId: string, pathname: string, init
 
 export function getRequestApiKey(headers: Headers, searchParams?: URLSearchParams) {
   const headerKey = headers.get("x-api-key") || headers.get("x-auto-pick-key");
-  if (headerKey) return headerKey.trim();
+  if (headerKey) return normalizeComparableApiKey(headerKey);
 
   const authorization = headers.get("authorization") || "";
   const bearerMatch = authorization.match(/^Bearer\s+(.+)$/i);
   if (bearerMatch?.[1]) {
-    return bearerMatch[1].trim();
+    return normalizeComparableApiKey(bearerMatch[1]);
   }
 
-  return searchParams?.get("key")?.trim() || "";
+  return normalizeComparableApiKey(searchParams?.get("key") || "");
 }
 
 export async function resolveAutoPickTargetUserId(apiKey?: string) {
-  if (apiKey) {
+  const normalizedApiKey = normalizeComparableApiKey(apiKey || "");
+  if (normalizedApiKey) {
     const credential = await prisma.autoPickApiKey.findFirst({
       where: {
-        keyHash: hashAutoPickApiKey(apiKey),
+        keyHash: hashAutoPickApiKey(normalizedApiKey),
         revokedAt: null,
       },
       select: {
@@ -1879,8 +1903,8 @@ export async function resolveAutoPickTargetUserId(apiKey?: string) {
     }
   }
 
-  if (apiKey) {
-    const manualUserId = await findUserIdByManualIntegrationKey(apiKey);
+  if (normalizedApiKey) {
+    const manualUserId = await findUserIdByManualIntegrationKey(normalizedApiKey);
     if (manualUserId) {
       return manualUserId;
     }
@@ -1888,8 +1912,8 @@ export async function resolveAutoPickTargetUserId(apiKey?: string) {
 
   const bindings = getAutoPickWebhookBindings();
 
-  if (apiKey) {
-    const matched = bindings.find((item) => item.key === apiKey);
+  if (normalizedApiKey) {
+    const matched = bindings.find((item) => normalizeComparableApiKey(item.key) === normalizedApiKey);
     if (matched?.userId) {
       const user = await prisma.user.findUnique({
         where: { id: matched.userId },
@@ -1920,11 +1944,12 @@ export function isAutoPickWebhookApiKeyAllowed(apiKey: string) {
 }
 
 export async function isAutoPickWebhookApiKeyAuthorized(apiKey: string) {
-  if (!apiKey) return false;
+  const normalizedApiKey = normalizeComparableApiKey(apiKey);
+  if (!normalizedApiKey) return false;
 
   const existing = await prisma.autoPickApiKey.findFirst({
     where: {
-      keyHash: hashAutoPickApiKey(apiKey),
+      keyHash: hashAutoPickApiKey(normalizedApiKey),
       revokedAt: null,
     },
     select: { id: true },
@@ -1934,21 +1959,22 @@ export async function isAutoPickWebhookApiKeyAuthorized(apiKey: string) {
     return true;
   }
 
-  const manualUserId = await findUserIdByManualIntegrationKey(apiKey);
+  const manualUserId = await findUserIdByManualIntegrationKey(normalizedApiKey);
   if (manualUserId) {
     return true;
   }
 
   const bindings = getAutoPickWebhookBindings();
-  return bindings.some((item) => item.key === apiKey);
+  return bindings.some((item) => normalizeComparableApiKey(item.key) === normalizedApiKey);
 }
 
 export async function markAutoPickApiKeyUsed(apiKey: string) {
-  if (!apiKey) return;
+  const normalizedApiKey = normalizeComparableApiKey(apiKey);
+  if (!normalizedApiKey) return;
 
   await prisma.autoPickApiKey.updateMany({
     where: {
-      keyHash: hashAutoPickApiKey(apiKey),
+      keyHash: hashAutoPickApiKey(normalizedApiKey),
       revokedAt: null,
     },
     data: {
