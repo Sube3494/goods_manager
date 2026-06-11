@@ -118,7 +118,8 @@ export async function GET(req: NextRequest) {
         // 所有平台的总配送费统一加到“美团闪购”的刷单到手金额中，避免京东和淘宝暴露
         const platformName = "美团闪购";
 
-        const deliveryFee = readDeliveryFee(order.delivery);
+        // 订单的配送费以“分”为单位，需除以 100 转换成“元”再累加到以“元”为单位的刷单到手金额中
+        const deliveryFee = readDeliveryFee(order.delivery) / 100;
         if (deliveryFee <= 0) continue;
 
         const key = `${shopName}__${platformName}`;
