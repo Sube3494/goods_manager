@@ -113,6 +113,7 @@ export function AllOrdersView({
       if (status !== "all") params.set("status", status);
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
+      if (shop !== "all") params.set("shop", shop);
       if (shop === "all" && !silent) {
         params.set("_metrics", "1");
       }

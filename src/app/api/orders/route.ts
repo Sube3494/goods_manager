@@ -679,8 +679,26 @@ export async function GET(request: NextRequest) {
     const hasDelivery = toBooleanFilter(searchParams.get("hasDelivery"));
     const mainSystemSelfDelivery = toBooleanFilter(searchParams.get("mainSystemSelfDelivery"));
 
+    const shopFilter = String(searchParams.get("shop") || "").trim();
+    let shopIdFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
+    if (shopFilter && shopFilter !== "all") {
+      const targetShop = await prisma.shop.findFirst({
+        where: {
+          userId: session.id,
+          name: shopFilter,
+        },
+        select: { id: true },
+      });
+      if (targetShop) {
+        shopIdFilter = { shopId: targetShop.id };
+      } else {
+        shopIdFilter = { shopId: "non-existent-shop-id-fallback" };
+      }
+    }
+
     const baseWhere: Prisma.AutoPickOrderWhereInput = {
       userId: session.id,
+      ...(shopIdFilter || {}),
       ...(startDate || endDate ? {
         orderTime: {
           ...(startDate ? { gte: parseAsShanghaiTime(startDate) } : {}),

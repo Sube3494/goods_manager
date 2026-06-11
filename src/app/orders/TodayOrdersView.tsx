@@ -90,6 +90,7 @@ export function TodayOrdersView({
       if (query.trim()) params.set("query", query.trim());
       if (platform !== "all") params.set("platform", platform);
       if (status !== "all") params.set("status", status);
+      if (shop !== "all") params.set("shop", shop);
       if (silent) params.set("_lite", "1");
 
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
@@ -112,7 +113,7 @@ export function TodayOrdersView({
       isFetchingRef.current = false;
       setIsLoading(false);
     }
-  }, [platform, query, status, todayDate, showToast]);
+  }, [platform, query, shop, status, todayDate, showToast]);
 
   // 外部刷新信号监听
   useEffect(() => {
