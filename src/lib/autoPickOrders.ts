@@ -4074,6 +4074,7 @@ type InsufficientAutoPickStockItem = {
   productId: string | null;
   shopProductId: string | null;
   name: string;
+  image: string | null;
   quantity: number;
   availableQuantity: number;
   missingQuantity: number;
@@ -4461,6 +4462,8 @@ export async function createOutboundFromAutoPickOrder(
             select: {
               productName: true,
               stock: true,
+              productImage: true,
+              product: { select: { image: true } },
               shop: { select: { name: true } },
             },
           }),
@@ -4472,6 +4475,7 @@ export async function createOutboundFromAutoPickOrder(
             productId: item.productId,
             shopProductId: item.shopProductId,
             name: String(shopProduct?.productName || "未命名商品").trim() || "未命名商品",
+            image: shopProduct?.productImage || shopProduct?.product?.image || null,
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,
@@ -4494,7 +4498,7 @@ export async function createOutboundFromAutoPickOrder(
           }),
           tx.product.findUnique({
             where: { id: item.productId },
-            select: { name: true, stock: true },
+            select: { name: true, stock: true, image: true },
           }),
         ]);
         const currentBatchStock = aggregateResult._sum.remainingQuantity || 0;
@@ -4504,6 +4508,7 @@ export async function createOutboundFromAutoPickOrder(
             productId: item.productId,
             shopProductId: null,
             name: String(product?.name || "未命名商品").trim() || "未命名商品",
+            image: product?.image || null,
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,
