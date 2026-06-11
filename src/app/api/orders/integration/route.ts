@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import {
   getAutoPickIntegrationConfigByUserId,
   normalizeAutoPickIntegrationConfig,
@@ -16,8 +17,25 @@ export async function GET() {
   }
 
   try {
-    const config = await getAutoPickIntegrationConfigByUserId(session.id);
-    return NextResponse.json(config);
+    const [config, unresolvedCount] = await Promise.all([
+      getAutoPickIntegrationConfigByUserId(session.id),
+      prisma.autoPickOrder.count({
+        where: {
+          userId: session.id,
+          shopId: null,
+          NOT: {
+            status: {
+              in: ["已取消", "已删除", "cancel", "cancelled", "delete", "deleted"]
+            }
+          }
+        }
+      })
+    ]);
+
+    return NextResponse.json({
+      ...config,
+      hasUnresolvedShops: unresolvedCount > 0
+    });
   } catch (error) {
     console.error("Failed to load order integration config:", error);
     return NextResponse.json({
@@ -45,7 +63,23 @@ export async function POST(request: NextRequest) {
       console.error("Failed to auto-fix history shop orders on config save:", err);
     }
 
-    return NextResponse.json(saved);
+    // 重新统计是否依然有未能成功绑定店铺的有效订单
+    const unresolvedCount = await prisma.autoPickOrder.count({
+      where: {
+        userId: session.id,
+        shopId: null,
+        NOT: {
+          status: {
+            in: ["已取消", "已删除", "cancel", "cancelled", "delete", "deleted"]
+          }
+        }
+      }
+    });
+
+    return NextResponse.json({
+      ...saved,
+      hasUnresolvedShops: unresolvedCount > 0
+    });
   } catch (error) {
     console.error("Failed to save order integration config:", error);
     return NextResponse.json({

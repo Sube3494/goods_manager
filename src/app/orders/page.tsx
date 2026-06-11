@@ -1085,6 +1085,7 @@ export default function OrdersPage() {
   const [maiyatianShops, setMaiyatianShops] = useState<AutoPickMaiyatianShop[]>([]);
   const [localShops, setLocalShops] = useState<LocalShopOption[]>([]);
   const [isIntegrationOpen, setIsIntegrationOpen] = useState(false);
+  const [hasUnresolvedShops, setHasUnresolvedShops] = useState(false);
   const [isBrushSyncPickerOpen, setIsBrushSyncPickerOpen] = useState(false);
   const [isTestingPlugin, setIsTestingPlugin] = useState(false);
   const [isTestingCookie, setIsTestingCookie] = useState(false);
@@ -1297,6 +1298,7 @@ export default function OrdersPage() {
 
       const nextConfig = readIntegrationConfigResponse(data);
       setIntegrationConfig(nextConfig);
+      setHasUnresolvedShops(Boolean(data?.hasUnresolvedShops));
       setSavedIntegrationDigest(serializeIntegrationConfig({
         pluginBaseUrl: nextConfig.pluginBaseUrl,
         inboundApiKey: nextConfig.inboundApiKey,
@@ -1422,6 +1424,7 @@ export default function OrdersPage() {
       }
       const savedConfig = readIntegrationConfigResponse(data);
       setIntegrationConfig(savedConfig);
+      setHasUnresolvedShops(Boolean(data?.hasUnresolvedShops));
       setSavedIntegrationDigest(serializeIntegrationConfig({
         pluginBaseUrl: savedConfig.pluginBaseUrl,
         inboundApiKey: savedConfig.inboundApiKey,
@@ -1708,10 +1711,16 @@ export default function OrdersPage() {
                 <button
                   type="button"
                   onClick={() => setIsIntegrationOpen(true)}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="relative inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
                   <Settings2 size={15} />
                   对接配置
+                  {hasUnresolvedShops && (
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.5)]"></span>
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
