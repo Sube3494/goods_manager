@@ -28,7 +28,9 @@ export async function POST(request: NextRequest) {
     if (!await isAutoPickWebhookApiKeyAuthorized(requestApiKey)) {
       console.warn("Auto-pick webhook rejected: unauthorized api key", {
         path: request.nextUrl.pathname,
+        keyLength: requestApiKey.length,
         keyPrefix: requestApiKey.slice(0, 8),
+        keySuffix: requestApiKey.length > 8 ? requestApiKey.slice(-8) : "",
       });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
