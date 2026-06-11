@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   console.log("POST /api/orders/fix-history-shops triggered, url:", request.url);
-  const session = await getAuthorizedUser("settlement:manage");
+  const session = await getAuthorizedUser("order:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }

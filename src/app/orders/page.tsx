@@ -1038,6 +1038,7 @@ export default function OrdersPage() {
 
   const modalRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedIntegrationRef = useRef(false);
+  const hasFixedHistoryShopRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState<OrdersTab>("today");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -1288,35 +1289,6 @@ export default function OrdersPage() {
     };
   }, [isBrushSyncPickerOpen, isIntegrationOpen]);
 
-  const fetchIntegrationConfig = useCallback(async () => {
-    try {
-      const response = await fetch("/api/orders/integration", { cache: "no-store" });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data?.error || "加载对接配置失败");
-      }
-
-      const nextConfig = readIntegrationConfigResponse(data);
-      setIntegrationConfig(nextConfig);
-      setHasUnresolvedShops(Boolean(data?.hasUnresolvedShops));
-      setSavedIntegrationDigest(serializeIntegrationConfig({
-        pluginBaseUrl: nextConfig.pluginBaseUrl,
-        inboundApiKey: nextConfig.inboundApiKey,
-        maiyatianCookie: nextConfig.maiyatianCookie,
-        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
-        selfDeliveryTiming: nextConfig.selfDeliveryTiming,
-        defaultBrushCommission: nextConfig.defaultBrushCommission,
-      }));
-      setSavedMappingsDigest(serializeMaiyatianMappings({
-        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
-      }));
-      hasLoadedIntegrationRef.current = true;
-    } catch (error) {
-      console.error("Failed to fetch order integration config:", error);
-      showToast(error instanceof Error ? error.message : "加载对接配置失败", "error");
-    }
-  }, [showToast]);
-
   const fetchLocalShops = useCallback(async (options?: { silent?: boolean }) => {
     try {
       const response = await fetch("/api/orders/integration/local-shops", { cache: "no-store" });
@@ -1349,6 +1321,65 @@ export default function OrdersPage() {
       }
     }
   }, [showToast]);
+
+  const repairHistoryShopOrders = useCallback(async (options?: { silent?: boolean }) => {
+    if (hasFixedHistoryShopRef.current) return;
+    hasFixedHistoryShopRef.current = true;
+
+    try {
+      const response = await fetch("/api/orders/fix-history-shops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "修复历史订单店铺归属失败");
+      }
+
+      const updatedCount = Number(data?.updatedCount || 0);
+      if (updatedCount > 0) {
+        showToast(`已自动补齐 ${updatedCount} 单历史订单的店铺归属`, "success");
+        void fetchLocalShops({ silent: true });
+        triggerParentRefresh();
+      }
+    } catch (error) {
+      hasFixedHistoryShopRef.current = false;
+      console.error("Failed to repair history shop orders:", error);
+      if (!options?.silent) {
+        showToast(error instanceof Error ? error.message : "修复历史订单店铺归属失败", "error");
+      }
+    }
+  }, [fetchLocalShops, showToast, triggerParentRefresh]);
+
+  const fetchIntegrationConfig = useCallback(async () => {
+    try {
+      const response = await fetch("/api/orders/integration", { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "加载对接配置失败");
+      }
+
+      const nextConfig = readIntegrationConfigResponse(data);
+      setIntegrationConfig(nextConfig);
+      setHasUnresolvedShops(Boolean(data?.hasUnresolvedShops));
+      setSavedIntegrationDigest(serializeIntegrationConfig({
+        pluginBaseUrl: nextConfig.pluginBaseUrl,
+        inboundApiKey: nextConfig.inboundApiKey,
+        maiyatianCookie: nextConfig.maiyatianCookie,
+        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
+        selfDeliveryTiming: nextConfig.selfDeliveryTiming,
+        defaultBrushCommission: nextConfig.defaultBrushCommission,
+      }));
+      setSavedMappingsDigest(serializeMaiyatianMappings({
+        maiyatianShopMappings: nextConfig.maiyatianShopMappings,
+      }));
+      hasLoadedIntegrationRef.current = true;
+      void repairHistoryShopOrders({ silent: true });
+    } catch (error) {
+      console.error("Failed to fetch order integration config:", error);
+      showToast(error instanceof Error ? error.message : "加载对接配置失败", "error");
+    }
+  }, [repairHistoryShopOrders, showToast]);
 
   useEffect(() => {
     void fetchLocalShops({ silent: true });
