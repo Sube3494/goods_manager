@@ -6,37 +6,27 @@ import { normalizeAutoPickIntegrationConfig, resolveAutoPickMatchedShopName } fr
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
+import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 
-function startOfDay(input: Date) {
-  const date = new Date(input);
-  date.setHours(0, 0, 0, 0);
-  return date;
+const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
+
+function formatDateKey(date: Date | string) {
+  return formatLocalDate(date).replace(/\//g, "-");
 }
 
-function endOfDay(input: Date) {
-  const date = new Date(input);
-  date.setHours(23, 59, 59, 999);
-  return date;
-}
-
-function formatDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatDateLabel(date: Date) {
-  return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+function formatDateLabel(date: Date | string) {
+  const key = formatDateKey(date);
+  return key.slice(5);
 }
 
 function buildDateSeries(start: Date, end: Date) {
   const list: Array<{ date: string; label: string }> = [];
-  const cursor = startOfDay(start);
-  const last = startOfDay(end);
-  while (cursor <= last) {
+  let cursorMs = parseAsShanghaiTime(formatDateKey(start)).getTime();
+  const lastMs = parseAsShanghaiTime(formatDateKey(end)).getTime();
+  while (cursorMs <= lastMs) {
+    const cursor = new Date(cursorMs);
     list.push({ date: formatDateKey(cursor), label: formatDateLabel(cursor) });
-    cursor.setDate(cursor.getDate() + 1);
+    cursorMs += SHANGHAI_DAY_MS;
   }
   return list;
 }
@@ -96,13 +86,15 @@ export async function GET(request: NextRequest) {
     });
     const threshold = settings?.lowStockThreshold ?? 10;
 
-    const endDate = request.nextUrl.searchParams.get("endDate")
-      ? endOfDay(new Date(request.nextUrl.searchParams.get("endDate")!))
-      : endOfDay(new Date());
+    const endDateKey = (request.nextUrl.searchParams.get("endDate") || formatDateKey(new Date())).trim();
+    let startDateKey = (request.nextUrl.searchParams.get("startDate") || "").trim();
+    if (!startDateKey) {
+      const defaultStart = new Date(parseAsShanghaiTime(endDateKey).getTime() - 29 * SHANGHAI_DAY_MS);
+      startDateKey = formatDateKey(defaultStart);
+    }
 
-    let startDate = request.nextUrl.searchParams.get("startDate")
-      ? startOfDay(new Date(request.nextUrl.searchParams.get("startDate")!))
-      : startOfDay(new Date(endDate.getTime() - 29 * 24 * 60 * 60 * 1000));
+    const endDate = parseAsShanghaiTime(`${endDateKey} 23:59:59`);
+    let startDate = parseAsShanghaiTime(startDateKey);
 
     if (rangeMode === "all") {
       const [firstPurchase, firstOutbound, firstBrush, firstSettlement, firstShopProduct, firstAutoPickOrder] = await Promise.all([
@@ -180,7 +172,7 @@ export async function GET(request: NextRequest) {
       ].filter((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime()));
 
       if (candidates.length > 0) {
-        startDate = startOfDay(new Date(Math.min(...candidates.map((item) => item.getTime()))));
+        startDate = parseAsShanghaiTime(formatDateKey(new Date(Math.min(...candidates.map((item) => item.getTime())))));
       }
     }
     perf.lap("range-bootstrap");
