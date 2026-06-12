@@ -8,8 +8,29 @@ import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
+import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
 
 export const dynamic = "force-dynamic";
+
+type OutboundLookupRow = {
+  id: string;
+  note: string | null;
+  items: Array<{
+    id: string;
+    productId: string | null;
+    shopProductId: string | null;
+    quantity: number;
+    costSnapshot?: unknown;
+    shopProduct: {
+      productName: string | null;
+      costPrice: number;
+    } | null;
+    product: {
+      name: string;
+      costPrice: number;
+    } | null;
+  }>;
+};
 
 function toBooleanFilter(value: string | null) {
   if (value === "true") return true;
@@ -911,8 +932,10 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .map((orderNo) => `平台单号: ${orderNo}`);
 
-    const outboundRows = outboundNoteNeedles.length > 0
-      ? await prisma.outboundOrder.findMany({
+    const outboundRows: OutboundLookupRow[] = [];
+    if (outboundNoteNeedles.length > 0) {
+      try {
+        outboundRows.push(...await prisma.outboundOrder.findMany({
           where: {
             userId: session.id,
             OR: outboundNoteNeedles.map((needle) => ({
@@ -947,8 +970,49 @@ export async function GET(request: NextRequest) {
           orderBy: {
             createdAt: "desc",
           },
-        })
-      : [];
+        }));
+      } catch (error) {
+        if (!isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
+          throw error;
+        }
+
+        outboundRows.push(...await prisma.outboundOrder.findMany({
+          where: {
+            userId: session.id,
+            OR: outboundNoteNeedles.map((needle) => ({
+              note: { contains: needle, mode: "insensitive" as const },
+            })),
+          },
+          select: {
+            id: true,
+            note: true,
+            items: {
+              select: {
+                id: true,
+                productId: true,
+                shopProductId: true,
+                quantity: true,
+                shopProduct: {
+                  select: {
+                    productName: true,
+                    costPrice: true,
+                  },
+                },
+                product: {
+                  select: {
+                    name: true,
+                    costPrice: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        }));
+      }
+    }
     perf.lap("outbound-lookup");
 
     const userAddresses = userProfile && Array.isArray(userProfile.shippingAddresses)

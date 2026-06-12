@@ -128,7 +128,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[13px] font-medium leading-5 tracking-tight text-foreground sm:truncate sm:leading-normal">
+                  <p className="truncate text-[13px] font-medium leading-5 tracking-tight text-foreground sm:leading-normal">
                     {productName}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
@@ -201,9 +201,9 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, delay: index * 0.03 }}
-              className="group flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5"
+              className="group min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5"
             >
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border text-[10px] font-black tabular-nums shadow-inner",
                   index < 3
@@ -221,10 +221,8 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
                     </div>
                   )}
                 </div>
-              </div>
-              <div className="min-w-0 flex-1">
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[13px] font-medium leading-5 tracking-tight text-foreground transition-colors group-hover:text-primary sm:truncate sm:leading-normal">
+                  <p className="truncate text-[13px] font-medium leading-5 tracking-tight text-foreground transition-colors group-hover:text-primary sm:leading-normal">
                     {item.product.name}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
@@ -262,7 +260,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
   };
 
   return (
-    <section className={cardClass}>
+    <section className={cn(cardClass, "min-w-0 overflow-x-clip")}>
       <div className="flex items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
         <div className="min-w-0 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4">

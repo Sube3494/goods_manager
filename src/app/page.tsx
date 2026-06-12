@@ -159,7 +159,7 @@ export default function Home() {
   }
 
   return (
-    <div className="relative px-2 sm:px-1">
+    <div className="relative min-w-0 overflow-x-clip px-2 sm:px-1">
       <div className="animate-in fade-in slide-in-from-bottom-4 space-y-5 duration-700 sm:space-y-8">
         <section className="overflow-hidden rounded-[24px] border border-black/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,244,245,0.78)_48%,rgba(239,246,255,0.78)_100%)] px-4 py-4 shadow-xs dark:border-white/10 dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03)_48%,rgba(14,165,233,0.05)_100%)] sm:px-5">
           <div className="flex items-end justify-between gap-3">

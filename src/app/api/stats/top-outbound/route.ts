@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
           ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
         },
       },
-      include: {
+      select: {
+        productId: true,
+        shopProductId: true,
+        quantity: true,
         outboundOrder: {
           select: {
             date: true,
@@ -42,8 +45,8 @@ export async function GET(request: NextRequest) {
               }
             }
           }
-        }
-      }
+        },
+      },
     });
 
     const aggregateMap = new Map<string, {

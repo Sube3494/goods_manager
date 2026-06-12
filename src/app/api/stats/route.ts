@@ -7,6 +7,7 @@ import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
+import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -62,6 +63,20 @@ function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
 }
 
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "其他"] as const;
+
+type OutboundCostLookupRow = {
+  note: string | null;
+  items: Array<{
+    quantity: number;
+    costSnapshot?: unknown;
+    shopProduct: {
+      costPrice: number;
+    } | null;
+    product: {
+      costPrice: number;
+    } | null;
+  }>;
+};
 
 export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
@@ -423,8 +438,10 @@ export async function GET(request: NextRequest) {
         .map((order) => String(order.orderNo || "").trim())
         .filter(Boolean)
     ));
-    const outboundOrdersForCost = outboundLookupOrderNos.length > 0
-      ? await prisma.outboundOrder.findMany({
+    const outboundOrdersForCost: OutboundCostLookupRow[] = [];
+    if (outboundLookupOrderNos.length > 0) {
+      try {
+        outboundOrdersForCost.push(...await prisma.outboundOrder.findMany({
           where: {
             userId: user.id,
             OR: outboundLookupOrderNos.map((orderNo) => ({
@@ -450,8 +467,40 @@ export async function GET(request: NextRequest) {
               },
             },
           },
-        })
-      : [];
+        }));
+      } catch (error) {
+        if (!isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
+          throw error;
+        }
+
+        outboundOrdersForCost.push(...await prisma.outboundOrder.findMany({
+          where: {
+            userId: user.id,
+            OR: outboundLookupOrderNos.map((orderNo) => ({
+              note: { contains: `平台单号: ${orderNo}` },
+            })),
+          },
+          select: {
+            note: true,
+            items: {
+              select: {
+                quantity: true,
+                shopProduct: {
+                  select: {
+                    costPrice: true,
+                  },
+                },
+                product: {
+                  select: {
+                    costPrice: true,
+                  },
+                },
+              },
+            },
+          },
+        }));
+      }
+    }
     const outboundMetaByOrderNo = new Map<string, { productCost: number; missingCostItemCount: number }>();
     outboundOrdersForCost.forEach((outbound) => {
       const orderNo = extractOrderNoFromNote(outbound.note);

@@ -246,8 +246,8 @@ export function DataOverview({
 
   return (
     <div className="space-y-5 sm:space-y-8">
-      <section className="rounded-[24px] border border-black/8 bg-zinc-50/45 px-4 py-3 shadow-xs dark:border-white/10 dark:bg-white/4">
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="min-w-0 overflow-hidden rounded-[24px] border border-black/8 bg-zinc-50/45 px-4 py-3 shadow-xs dark:border-white/10 dark:bg-white/4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="col-span-1 space-y-2">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">店铺范围</label>
             <CustomSelect
@@ -354,7 +354,7 @@ export function DataOverview({
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2.5">
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
               <CompactMetric label="真单" value={int(trueOrders)} hint={`占比 ${percent(trueShare)}`} tone="success" />
               <CompactMetric label="刷单" value={int(brushOrders)} hint={`占比 ${percent(brushShare)}`} tone="danger" />
               <CompactMetric label="其他" value={int(cancelledLikeGap)} hint="取消/未归类" />
@@ -362,7 +362,7 @@ export function DataOverview({
           </div>
         </div>
 
-        <div className="mt-3.5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           <CompactMetric label="平台扣费" value={money(data?.platformCommission)} hint="平台佣金与扣点" />
           <CompactMetric label="配送支出" value={money(data?.deliveryExpense)} hint="配送相关成本" />
           <CompactMetric label="推广支出" value={money(data?.promotionExpense)} hint="活动与推广消耗" />
