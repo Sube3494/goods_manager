@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { getAuthorizedUser } from "@/lib/auth";
+import { parseFactoryShipmentNote } from "@/lib/utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,10 @@ export async function GET() {
         include: {
           items: {
             include: {
-              product: true
+              product: true,
+              productVariant: true,
+              shopProduct: true,
+              shopProductVariant: true,
             }
           }
         }
@@ -116,15 +120,44 @@ export async function GET() {
     // 5. Outbound Orders
     const outboundData: Record<string, string | number>[] = [];
     outboundOrders.forEach(order => {
+      const parsedNote = parseFactoryShipmentNote(order.note);
       order.items.forEach(item => {
-        if (!item.product) return;
+        const productName =
+          item.shopProduct?.productName ||
+          item.product?.name ||
+          "未知商品";
+        const sku =
+          item.shopProductVariant?.sku ||
+          item.productVariant?.sku ||
+          item.variantSku ||
+          item.shopProduct?.sku ||
+          item.product?.sku ||
+          "";
+        const variantName =
+          item.shopProductVariant?.variantName ||
+          item.productVariant?.variantName ||
+          item.variantName ||
+          "";
+
         outboundData.push({
           '单号': order.id,
           '日期': formatDate(order.date),
           '类型': order.type,
+          '状态': order.status || '',
+          '收件人': parsedNote.recipientName || '',
+          '手机号': parsedNote.recipientPhone || '',
+          '收件地址': parsedNote.recipientAddress || '',
+          '货款状态': parsedNote.paymentStatus || '',
+          '发货单号': parsedNote.trackingEntries.map((entry) => entry.trackingNumber).filter(Boolean).join(' ; '),
+          '物流公司': parsedNote.trackingEntries.map((entry) => entry.logisticsName).filter(Boolean).join(' ; '),
           '备注': order.note || '',
-          '商品名称': item.product.name,
-          'SKU': item.product.sku || '',
+          '商品名称': productName,
+          '规格': variantName,
+          'SKU': sku,
+          'productId': item.productId || '',
+          'productVariantId': item.productVariantId || '',
+          'shopProductId': item.shopProductId || '',
+          'shopProductVariantId': item.shopProductVariantId || '',
           '数量': item.quantity,
           '单价': item.price || 0,
           '总计': item.quantity * (item.price || 0)
