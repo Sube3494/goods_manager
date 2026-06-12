@@ -716,7 +716,7 @@ export async function GET(request: NextRequest) {
     const mainSystemSelfDelivery = toBooleanFilter(searchParams.get("mainSystemSelfDelivery"));
 
     const shopFilter = String(searchParams.get("shop") || "").trim();
-    let shopIdFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
+    let shopWhereFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
     if (shopFilter && shopFilter !== "all") {
       const targetShop = await prisma.shop.findFirst({
         where: {
@@ -725,16 +725,19 @@ export async function GET(request: NextRequest) {
         },
         select: { id: true },
       });
-      if (targetShop) {
-        shopIdFilter = { shopId: targetShop.id };
-      } else {
-        shopIdFilter = { shopId: "non-existent-shop-id-fallback" };
+      const shopClauses: Prisma.AutoPickOrderWhereInput[] = [
+        { rawPayload: { path: ["systemMeta", "resolvedShop", "name"], equals: shopFilter } },
+      ];
+      if (targetShop?.id) {
+        shopClauses.unshift({ shopId: targetShop.id });
+        shopClauses.push({ rawPayload: { path: ["systemMeta", "resolvedShop", "id"], equals: targetShop.id } });
       }
+      shopWhereFilter = { OR: shopClauses };
     }
 
     const baseWhere: Prisma.AutoPickOrderWhereInput = {
       userId: session.id,
-      ...(shopIdFilter || {}),
+      ...(shopWhereFilter || {}),
       ...(startDate || endDate ? {
         orderTime: {
           ...(startDate ? { gte: parseAsShanghaiTime(startDate) } : {}),
