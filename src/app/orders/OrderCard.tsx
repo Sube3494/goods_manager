@@ -749,6 +749,123 @@ export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" |
   );
 }
 
+function formatCurrencyInputFromCents(value: number | null | undefined) {
+  return (Number(value || 0) / 100).toFixed(2);
+}
+
+function parseCurrencyInputToCents(value: string) {
+  const normalized = value.trim().replace(/,/g, "");
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d+(\.\d{0,2})?$/.test(normalized)) {
+    return null;
+  }
+
+  const numeric = Number(normalized);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return null;
+  }
+
+  return Math.round(numeric * 100);
+}
+
+function OrderAmountEditModal({
+  order,
+  onClose,
+  onSave,
+}: {
+  order: AutoPickOrder;
+  onClose: () => void;
+  onSave: (values: { expectedIncome: number }) => Promise<boolean>;
+}) {
+  const { showToast } = useToast();
+  const [expectedIncome, setExpectedIncome] = useState(() => formatCurrencyInputFromCents(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission)));
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    const nextExpectedIncome = parseCurrencyInputToCents(expectedIncome);
+
+    if (nextExpectedIncome == null) {
+      showToast("请输入有效的到手金额", "error");
+      return;
+    }
+
+    setIsSaving(true);
+    const ok = await onSave({
+      expectedIncome: nextExpectedIncome,
+    });
+    setIsSaving(false);
+    if (ok) {
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-100000 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => { if (!isSaving) onClose(); }} />
+      <div className="relative w-full max-w-sm rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98">
+        <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-foreground">修改商家到手</h3>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">只覆盖京东订单的到手金额，实付保持系统原值不变。</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/4"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 pb-6">
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商家到手</span>
+            <div className="mt-2 flex items-center rounded-2xl border border-black/8 bg-white/88 px-3 dark:border-white/10 dark:bg-white/5">
+              <span className="text-sm font-bold text-muted-foreground">¥</span>
+              <input
+                value={expectedIncome}
+                onChange={(event) => setExpectedIncome(event.target.value)}
+                inputMode="decimal"
+                placeholder="0.00"
+                className="h-12 w-full bg-transparent px-2 text-sm font-semibold text-foreground outline-none"
+              />
+            </div>
+          </label>
+
+          <p className="rounded-2xl border border-amber-500/15 bg-amber-500/8 px-4 py-3 text-xs leading-5 text-amber-800 dark:text-amber-300">
+            适合修正京东订单智能抓取错误的到手金额，保存后统计也会按这个值走。
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl border border-black/8 bg-white/85 px-4 text-sm font-bold text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-sm font-bold text-background transition-all hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
+            >
+              {isSaving ? <Loader2 size={15} className="animate-spin" /> : null}
+              保存到手
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function DetailStat({
   label,
   value,
@@ -914,6 +1031,8 @@ export function OrderCard({
 }) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
+  const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
+  const [isSavingAmount, setIsSavingAmount] = useState(false);
   const { showToast } = useToast();
 
   const handleUpdateBrush = useCallback(async (val: boolean) => {
@@ -940,6 +1059,31 @@ export function OrderCard({
     }
   }, [order.id, order.isMainSystemSelfDelivery, showToast, onRefresh]);
 
+  const handleSaveExpectedIncome = useCallback(async ({ expectedIncome }: { expectedIncome: number }) => {
+    try {
+      setIsSavingAmount(true);
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedIncome }),
+      });
+      if (res.ok) {
+        showToast("京东到手金额修改成功", "success");
+        onRefresh?.();
+        return true;
+      }
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || "修改失败", "error");
+      return false;
+    } catch (err) {
+      console.error("更新订单到手金额失败", err);
+      showToast("网络请求失败，请稍后重试", "error");
+      return false;
+    } finally {
+      setIsSavingAmount(false);
+    }
+  }, [order.id, showToast, onRefresh]);
+
   const profitTooltipRef = useRef<HTMLDivElement | null>(null);
   const itemCount = getItemCount(order.items);
   const completed = isCompletedStatus(order.status);
@@ -963,6 +1107,7 @@ export function OrderCard({
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
+  const isJdOrder = String(order.platform || "").includes("京东");
   const pureProfitTooltipRows = hasPureProfit
     ? (order.isMainSystemSelfDelivery
       ? [
@@ -1005,7 +1150,8 @@ export function OrderCard({
   }, [isProfitTooltipOpen]);
 
   return (
-    <article className="overflow-visible rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/4 sm:rounded-[30px]">
+    <>
+      <article className="overflow-visible rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/4 sm:rounded-[30px]">
       <div className="border-b border-black/6 px-3.5 py-3.5 dark:border-white/6 sm:px-5 sm:py-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
@@ -1194,10 +1340,25 @@ export function OrderCard({
                       <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</div>
                       <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</div>
                     </div>
-                    <div className="min-w-0 text-right">
-                      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</div>
-                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
-                    </div>
+                    {isJdOrder ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsAmountEditorOpen(true)}
+                        disabled={isSavingAmount}
+                        className="min-w-0 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-right transition-all hover:border-black/12 hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4"
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          {isSavingAmount ? <Loader2 size={11} className="animate-spin text-muted-foreground" /> : null}
+                          <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
+                        </div>
+                        <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
+                      </button>
+                    ) : (
+                      <div className="min-w-0 text-right">
+                        <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</div>
+                        <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
+                      </div>
+                    )}
                     <div className="col-span-2 flex min-w-0 items-center justify-between border-t border-black/6 pt-2 dark:border-white/8">
                       <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
                       <span className="truncate text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
@@ -1210,10 +1371,23 @@ export function OrderCard({
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
                     <span className="truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
                   </div>
-                  <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
-                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
-                    <span className="truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
-                  </div>
+                  {isJdOrder ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsAmountEditorOpen(true)}
+                      disabled={isSavingAmount}
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition-all hover:border-black/12 hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0"
+                    >
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
+                      {isSavingAmount ? <Loader2 size={12} className="shrink-0 animate-spin text-muted-foreground" /> : null}
+                    </button>
+                  ) : (
+                    <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
+                    </div>
+                  )}
                   <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:col-span-1 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
                     <span className="truncate text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
@@ -1553,7 +1727,7 @@ export function OrderCard({
                 <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">金额信息</h3>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
-                  <DetailStat label="预计到手" value={toCurrency(expectedIncome)} />
+                  <DetailStat label={isJdOrder ? "京东到手" : "预计到手"} value={toCurrency(expectedIncome)} />
                   <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
                   <DetailStat label="纯利润" value={hasPureProfit ? toCurrency(pureProfit) : (productCostStatusText || "-")} />
                   <div className="col-span-2">
@@ -1578,6 +1752,18 @@ export function OrderCard({
           </div>
         </div>
       ) : null}
-    </article>
+      </article>
+      {isAmountEditorOpen && isJdOrder ? (
+        <OrderAmountEditModal
+          order={order}
+          onClose={() => {
+            if (!isSavingAmount) {
+              setIsAmountEditorOpen(false);
+            }
+          }}
+          onSave={handleSaveExpectedIncome}
+        />
+      ) : null}
+    </>
   );
 }

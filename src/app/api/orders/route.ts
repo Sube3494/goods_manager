@@ -127,6 +127,11 @@ type AutoPickSystemMeta = {
     id?: string;
     name?: string;
   };
+  manualAmountOverride?: {
+    expectedIncome?: number | null;
+    updatedAt?: string;
+    updatedBy?: string;
+  };
 };
 
 function toAutoPickBaseProductName(value: string | null | undefined) {
@@ -212,6 +217,28 @@ function readAutoPickSystemMeta(rawPayload: unknown): AutoPickSystemMeta | null 
   }
 
   return candidate as AutoPickSystemMeta;
+}
+
+function readManualAmountOverride(rawPayload: unknown) {
+  const systemMeta = readAutoPickSystemMeta(rawPayload);
+  const candidate = systemMeta?.manualAmountOverride;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+
+  const expectedIncome = Number(candidate.expectedIncome);
+  const updatedAt = String(candidate.updatedAt || "").trim() || null;
+  const updatedBy = String(candidate.updatedBy || "").trim() || null;
+
+  if (!Number.isFinite(expectedIncome)) {
+    return null;
+  }
+
+  return {
+    expectedIncome: Math.round(expectedIncome),
+    updatedAt,
+    updatedBy,
+  };
 }
 
 function readResolvedAutoPickShop(rawPayload: unknown) {
@@ -380,8 +407,17 @@ function resolveIncomeMetrics(
   platform: string | null | undefined,
   expectedIncome: number | null,
   actualPaid: number,
-  fallbackCommission: number
+  fallbackCommission: number,
+  options?: { preferExplicitExpectedIncome?: boolean }
 ) {
+  if (options?.preferExplicitExpectedIncome && Number.isFinite(Number(expectedIncome))) {
+    const resolvedExpectedIncome = Math.round(Number(expectedIncome));
+    return {
+      expectedIncome: resolvedExpectedIncome,
+      platformCommission: Math.round(resolvedExpectedIncome - Number(actualPaid || 0)),
+    };
+  }
+
   if (isJDPlatform(platform)) {
     const settledBase = Math.max(0, Math.round(Number(actualPaid || 0) - 100));
     const platformCommission = Math.max(0, Math.round(settledBase * 0.06));
@@ -1219,10 +1255,22 @@ export async function GET(request: NextRequest) {
     const brushCommission = Math.round((integrationConfig.defaultBrushCommission || 0) * 100);
 
     const enrichedOrders = orders.map((order) => {
-      const expectedIncome = typeof order.expectedIncome === "number"
-        ? order.expectedIncome
-        : readExpectedIncomeFromRawPayload(order.rawPayload);
-      const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
+      const manualAmountOverride = readManualAmountOverride(order.rawPayload);
+      const actualPaid = order.actualPaid;
+      const expectedIncome = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.expectedIncome))
+        ? Number(manualAmountOverride.expectedIncome)
+        : (typeof order.expectedIncome === "number"
+          ? order.expectedIncome
+          : readExpectedIncomeFromRawPayload(order.rawPayload));
+      const metrics = resolveIncomeMetrics(
+        order.platform,
+        expectedIncome,
+        actualPaid,
+        manualAmountOverride
+          ? Math.round(Number(expectedIncome || 0) - Number(actualPaid || 0))
+          : order.platformCommission,
+        { preferExplicitExpectedIncome: Boolean(manualAmountOverride) }
+      );
       const deleted = isAutoPickOrderDeletedStatus(order.status);
       const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress);
       const otherPickup = isAutoPickOtherPickupOrder(order.rawPayload);
@@ -1243,6 +1291,7 @@ export async function GET(request: NextRequest) {
         isDeleted: deleted,
         isSubscribe: readIsSubscribeFromRawPayload(order.rawPayload),
         status: businessStatus || order.status,
+        actualPaid,
         expectedIncome: metrics.expectedIncome,
         platformCommission: metrics.platformCommission,
         completedAt: order.autoCompleteJob?.completedAt?.toISOString() || readCompletedAtFromRawPayload(order.rawPayload),

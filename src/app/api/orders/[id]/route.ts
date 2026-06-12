@@ -15,10 +15,20 @@ export async function PATCH(
 
     const { id } = await context.params;
     const body = await request.json().catch(() => ({}));
-    
-    // 期望接收 { isMainSystemSelfDelivery: boolean }
-    if (body.isMainSystemSelfDelivery === undefined) {
+
+    const hasBrushToggle = body.isMainSystemSelfDelivery !== undefined;
+    const nextExpectedIncome = Number(body.expectedIncome);
+    const hasExpectedIncome = Number.isFinite(nextExpectedIncome);
+    const hasAmountEdit = hasExpectedIncome;
+
+    if (!hasBrushToggle && !hasAmountEdit) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
+    }
+
+    if (hasAmountEdit) {
+      if (nextExpectedIncome < 0) {
+        return NextResponse.json({ error: "金额不能小于 0" }, { status: 400 });
+      }
     }
 
     const order = await prisma.autoPickOrder.findFirst({
@@ -28,6 +38,9 @@ export async function PATCH(
       },
       select: {
         id: true,
+        actualPaid: true,
+        expectedIncome: true,
+        platformCommission: true,
         rawPayload: true,
       },
     });
@@ -48,18 +61,48 @@ export async function PATCH(
       ? systemMeta.mainSystemSelfDelivery as Record<string, any>
       : {};
 
-    // 更新 mainSystemSelfDelivery.triggered
+    const manualAmountOverride = systemMeta.manualAmountOverride && typeof systemMeta.manualAmountOverride === "object" && !Array.isArray(systemMeta.manualAmountOverride)
+      ? systemMeta.manualAmountOverride as Record<string, any>
+      : {};
+
+    const actualPaid = order.actualPaid;
+    const expectedIncome = hasExpectedIncome ? Math.round(nextExpectedIncome) : order.expectedIncome;
+    const platformCommission = hasAmountEdit
+      ? Math.round(Number(expectedIncome || 0) - Number(actualPaid || 0))
+      : order.platformCommission;
+
     await prisma.autoPickOrder.update({
       where: { id: order.id },
       data: {
+        ...(hasAmountEdit
+          ? {
+              actualPaid,
+              expectedIncome,
+              platformCommission,
+            }
+          : {}),
         rawPayload: {
           ...rawPayload,
           systemMeta: {
             ...systemMeta,
-            mainSystemSelfDelivery: {
-              ...mainSystemSelfDelivery,
-              triggered: Boolean(body.isMainSystemSelfDelivery),
-            },
+            ...(hasBrushToggle
+              ? {
+                  mainSystemSelfDelivery: {
+                    ...mainSystemSelfDelivery,
+                    triggered: Boolean(body.isMainSystemSelfDelivery),
+                  },
+                }
+              : {}),
+            ...(hasAmountEdit
+              ? {
+                  manualAmountOverride: {
+                    ...manualAmountOverride,
+                    expectedIncome,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: String(user.name || user.email || user.id),
+                  },
+                }
+              : {}),
           },
         } as Prisma.InputJsonValue,
       },
@@ -67,7 +110,10 @@ export async function PATCH(
 
     return NextResponse.json({
       ok: true,
-      isMainSystemSelfDelivery: Boolean(body.isMainSystemSelfDelivery),
+      isMainSystemSelfDelivery: hasBrushToggle ? Boolean(body.isMainSystemSelfDelivery) : undefined,
+      actualPaid,
+      expectedIncome,
+      platformCommission,
     });
   } catch (error) {
     console.error("Failed to patch order:", error);
