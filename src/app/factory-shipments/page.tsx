@@ -24,6 +24,7 @@ import {
   Search,
   Truck,
   Wallet,
+  Download,
   X,
   Eye,
   Trash2,
@@ -66,6 +67,45 @@ interface SelectedShipmentItem {
   logisticsName?: string;
   price?: number;
   shippingFee?: number;
+}
+
+async function blobToDataUrl(blob: Blob) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to read blob as data URL"));
+      }
+    };
+    reader.onerror = () => reject(reader.error || new Error("Failed to read blob"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getExcelImageSource(imageUrl?: string | null) {
+  if (!imageUrl) return null;
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
+    const mimeType = blob.type.toLowerCase();
+    const extension =
+      mimeType.includes("png") ? "png" :
+      mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpeg" :
+      null;
+
+    if (!extension) return null;
+
+    const base64 = await blobToDataUrl(blob);
+    return { base64, extension: extension as "png" | "jpeg" };
+  } catch (error) {
+    console.error("Failed to prepare export image:", imageUrl, error);
+    return null;
+  }
 }
 
 function getLooseProductVariantLabel(product: Product | null | undefined) {
@@ -3137,6 +3177,7 @@ export default function FactoryShipmentsPage() {
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [detailOrder, setDetailOrder] = useState<OutboundOrder | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -3468,6 +3509,371 @@ export default function FactoryShipmentsPage() {
     };
   }, [shipmentOrders]);
 
+  const handleExportAllShipments = useCallback(async () => {
+    if (shipmentOrders.length === 0) {
+      showToast("暂无发货记录可导出", "info");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const { saveAs } = await import("file-saver");
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "goods";
+      workbook.created = new Date();
+
+      const summarySheet = workbook.addWorksheet("发货汇总", {
+        views: [{ state: "frozen", ySplit: 1 }],
+      });
+      const detailSheet = workbook.addWorksheet("发货明细", {
+        views: [{ state: "frozen", ySplit: 1 }],
+      });
+
+      const summaryHeaders = [
+        "序号",
+        "发货日期",
+        "单号",
+        "发货状态",
+        "收件人",
+        "手机号",
+        "收件地址",
+        "货款状态",
+        "补偿状态",
+        "物流公司",
+        "发货单号",
+        "商品数",
+        "总件数",
+        "总金额",
+        "备注",
+      ];
+
+      const detailHeaders = [
+        "序号",
+        "商品图片",
+        "商品名称",
+        "SKU",
+        "数量",
+        "单价",
+        "运费",
+        "小计",
+        "发货日期",
+        "单号",
+        "发货状态",
+        "收件人",
+        "手机号",
+        "收件地址",
+        "货款状态",
+        "补偿状态",
+        "物流公司",
+        "发货单号",
+        "备注",
+      ];
+
+      const summaryHeaderRow = summarySheet.addRow(summaryHeaders);
+      const detailHeaderRow = detailSheet.addRow(detailHeaders);
+
+      const headerStyle = {
+        font: { bold: true, color: { argb: "FFFFFFFF" }, name: "微软雅黑", size: 11 },
+        fill: { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF1D4ED8" } },
+        alignment: { horizontal: "center" as const, vertical: "middle" as const, wrapText: true },
+      };
+
+      summaryHeaderRow.height = 26;
+      detailHeaderRow.height = 26;
+      summaryHeaderRow.eachCell((cell) => {
+        cell.style = headerStyle;
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFBFDBFE" } },
+          left: { style: "thin", color: { argb: "FFBFDBFE" } },
+          bottom: { style: "thin", color: { argb: "FFBFDBFE" } },
+          right: { style: "thin", color: { argb: "FFBFDBFE" } },
+        };
+      });
+      detailHeaderRow.eachCell((cell) => {
+        cell.style = headerStyle;
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFBFDBFE" } },
+          left: { style: "thin", color: { argb: "FFBFDBFE" } },
+          bottom: { style: "thin", color: { argb: "FFBFDBFE" } },
+          right: { style: "thin", color: { argb: "FFBFDBFE" } },
+        };
+      });
+
+      summarySheet.columns = [
+        { key: "index", width: 8 },
+        { key: "date", width: 14 },
+        { key: "id", width: 22 },
+        { key: "status", width: 12 },
+        { key: "recipient", width: 12 },
+        { key: "phone", width: 16 },
+        { key: "address", width: 52 },
+        { key: "payment", width: 12 },
+        { key: "compensation", width: 12 },
+        { key: "logistics", width: 18 },
+        { key: "tracking", width: 26 },
+        { key: "itemCount", width: 10 },
+        { key: "quantity", width: 10 },
+        { key: "amount", width: 14 },
+        { key: "remark", width: 32 },
+      ];
+
+      detailSheet.columns = [
+        { key: "index", width: 8 },
+        { key: "image", width: 16 },
+        { key: "name", width: 38 },
+        { key: "sku", width: 18 },
+        { key: "quantity", width: 9 },
+        { key: "price", width: 12 },
+        { key: "shippingFee", width: 12 },
+        { key: "subtotal", width: 14 },
+        { key: "date", width: 14 },
+        { key: "id", width: 22 },
+        { key: "status", width: 12 },
+        { key: "recipient", width: 12 },
+        { key: "phone", width: 16 },
+        { key: "address", width: 40 },
+        { key: "payment", width: 12 },
+        { key: "compensation", width: 12 },
+        { key: "logistics", width: 18 },
+        { key: "tracking", width: 24 },
+        { key: "remark", width: 28 },
+      ];
+
+      const estimateWrappedRowHeight = (values: string[], widthBudget: number, base = 24, lineHeight = 18, max = 90) => {
+        const longest = values.reduce((maxLength, value) => Math.max(maxLength, String(value || "").trim().length), 0);
+        if (longest <= widthBudget) return base;
+        const lines = Math.min(4, Math.ceil(longest / widthBudget));
+        return Math.min(max, Math.max(base, base + (lines - 1) * lineHeight));
+      };
+
+      const summaryCenterColumns = new Set(["A", "B", "C", "D", "E", "F", "H", "I", "J", "K", "L", "M", "N"]);
+      const summaryWrapColumns = new Set(["G", "O"]);
+      const detailCenterColumns = new Set(["A", "B", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "P", "Q", "R", "S"]);
+      const detailWrapColumns = new Set(["C", "O", "T"]);
+
+      const detailImageTasks: Array<Promise<{
+        rowNumber: number;
+        image: { base64: string; extension: "png" | "jpeg" } | null;
+      }>> = [];
+
+      let detailIndex = 1;
+      shipmentOrders.forEach((order, orderIndex) => {
+        const parsed = parseFactoryShipmentNote(order.note);
+        const displayStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
+        const formattedDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
+        const logisticsNames = Array.from(new Set(
+          (parsed.trackingEntries || []).map((entry) => String(entry.logisticsName || "").trim()).filter(Boolean)
+        )).join(" / ");
+        const trackingNumbers = Array.from(new Set(
+          (parsed.trackingEntries || []).map((entry) => String(entry.trackingNumber || "").trim()).filter(Boolean)
+        )).join(" / ");
+        const totalQuantity = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+        const totalAmount = getOrderTotalAmount(order);
+
+        const summaryRow = summarySheet.addRow([
+          orderIndex + 1,
+          formattedDate,
+          order.id,
+          displayStatus,
+          parsed.recipientName || "",
+          parsed.recipientPhone || "",
+          parsed.recipientAddress || "",
+          parsed.paymentStatus || "",
+          parsed.compensationStatus || "",
+          logisticsNames,
+          trackingNumbers,
+          order.items.length,
+          totalQuantity,
+          totalAmount,
+          parsed.remark || "",
+        ]);
+        summaryRow.height = estimateWrappedRowHeight(
+          [parsed.recipientAddress || "", parsed.remark || "", trackingNumbers],
+          22,
+          24,
+          16,
+          72
+        );
+
+        order.items.forEach((item) => {
+          const normalizedItemIds = {
+            productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
+            productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
+            shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
+            shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
+          };
+          const itemKey = getItemKey(normalizedItemIds);
+          const trackingEntry = parsed.trackingEntries.find((entry) => entry.itemKey === itemKey);
+          const imageUrl =
+            item.shopProductVariant?.image ||
+            item.productVariant?.image ||
+            item.shopProduct?.image ||
+            item.product?.image ||
+            "";
+          const productName =
+            item.shopProductVariant?.variantName
+              ? `${item.shopProduct?.name || item.product?.name || "未知商品"} / ${item.shopProductVariant.variantName}`
+              : item.productVariant?.variantName
+                ? `${item.product?.name || "未知商品"} / ${item.productVariant.variantName}`
+                : item.variantName
+                  ? `${item.shopProduct?.name || item.product?.name || "未知商品"} / ${item.variantName}`
+                  : item.shopProduct?.name || item.product?.name || "未知商品";
+          const variantLabel =
+            item.shopProductVariant?.variantName ||
+            item.productVariant?.variantName ||
+            item.variantName ||
+            "";
+          const itemPrice =
+            Number(item.price) ||
+            Number(item.shopProductVariant?.salePrice) ||
+            Number(item.productVariant?.salePrice) ||
+            Number(item.shopProduct?.costPrice) ||
+            Number(item.product?.costPrice) ||
+            0;
+          const shippingFee = Number(trackingEntry?.shippingFee) || 0;
+          const subtotal = item.quantity * itemPrice + shippingFee;
+
+          const detailRow = detailSheet.addRow([
+            detailIndex++,
+            "",
+            productName,
+            item.shopProductVariant?.sku || item.productVariant?.sku || item.variantSku || item.shopProduct?.sku || item.product?.sku || "",
+            item.quantity || 0,
+            itemPrice,
+            shippingFee,
+            subtotal,
+            formattedDate,
+            order.id,
+            displayStatus,
+            parsed.recipientName || "",
+            parsed.recipientPhone || "",
+            parsed.recipientAddress || "",
+            parsed.paymentStatus || "",
+            parsed.compensationStatus || "",
+            trackingEntry?.logisticsName || "",
+            trackingEntry?.trackingNumber || "",
+            parsed.remark || "",
+          ]);
+          detailRow.height = Math.max(
+            78,
+            estimateWrappedRowHeight(
+              [parsed.recipientAddress || "", productName, parsed.remark || ""],
+              20,
+              78,
+              14,
+              120
+            )
+          );
+
+          detailImageTasks.push(
+            getExcelImageSource(imageUrl).then((image) => ({
+              rowNumber: detailRow.number,
+              image,
+            }))
+          );
+        });
+      });
+
+      summarySheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: Math.max(1, summarySheet.rowCount), column: summaryHeaders.length },
+      };
+      detailSheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: Math.max(1, detailSheet.rowCount), column: detailHeaders.length },
+      };
+
+      summarySheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          const columnLetter = cell.address.replace(/\d+/g, "");
+          cell.font = { ...cell.font, name: "微软雅黑" };
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: rowNumber === 1 ? "center" : summaryCenterColumns.has(columnLetter) ? "center" : "left",
+            wrapText: rowNumber === 1 ? true : summaryWrapColumns.has(columnLetter),
+          };
+          if (rowNumber > 1) {
+            cell.border = {
+              top: { style: "thin", color: { argb: "FFE5E7EB" } },
+              left: { style: "thin", color: { argb: "FFE5E7EB" } },
+              bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+              right: { style: "thin", color: { argb: "FFE5E7EB" } },
+            };
+            if (rowNumber % 2 === 0) {
+              cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+            }
+          }
+        });
+      });
+
+      detailSheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          const columnLetter = cell.address.replace(/\d+/g, "");
+          cell.font = { ...cell.font, name: "微软雅黑" };
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: rowNumber === 1 ? "center" : detailCenterColumns.has(columnLetter) ? "center" : "left",
+            wrapText: rowNumber === 1 ? true : detailWrapColumns.has(columnLetter),
+          };
+          if (rowNumber > 1) {
+            cell.border = {
+              top: { style: "thin", color: { argb: "FFE5E7EB" } },
+              left: { style: "thin", color: { argb: "FFE5E7EB" } },
+              bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+              right: { style: "thin", color: { argb: "FFE5E7EB" } },
+            };
+            if (rowNumber % 2 === 0) {
+              cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFCFCFD" } };
+            }
+          }
+        });
+      });
+
+      ["N"].forEach((column) => {
+        summarySheet.getColumn(column).numFmt = "¥#,##0.00";
+      });
+      ["F", "G", "H"].forEach((column) => {
+        detailSheet.getColumn(column).numFmt = "¥#,##0.00";
+      });
+
+      const preparedImages = await Promise.all(detailImageTasks);
+      preparedImages.forEach(({ rowNumber, image }) => {
+        if (!image) {
+          detailSheet.getCell(`B${rowNumber}`).value = "无图";
+          detailSheet.getCell(`B${rowNumber}`).alignment = { horizontal: "center", vertical: "middle" };
+          return;
+        }
+
+        const imageId = workbook.addImage({
+          base64: image.base64,
+          extension: image.extension,
+        });
+
+        detailSheet.addImage(imageId, {
+          tl: { col: 1.15, row: rowNumber - 1 + 0.12 },
+          ext: { width: 72, height: 72 },
+          editAs: "oneCell",
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const timestamp = format(new Date(), "yyyyMMdd_HHmmss");
+      saveAs(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `发货记录全量导出_${timestamp}.xlsx`
+      );
+      showToast(`已导出 ${shipmentOrders.length} 张发货单`, "success");
+    } catch (error) {
+      console.error("Failed to export factory shipments:", error);
+      showToast("导出失败，请重试", "error");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [shipmentOrders, showToast]);
+
   const totalItems = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -3519,6 +3925,15 @@ export default function FactoryShipmentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => void handleExportAllShipments()}
+            disabled={isExporting || shipmentOrders.length === 0}
+            className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-border bg-white px-4 text-xs font-bold text-foreground shadow-sm transition-all hover:bg-muted/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 md:h-10 md:px-5 md:text-sm dark:border-white/10 dark:bg-white/5"
+          >
+            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            {isExporting ? "导出中..." : "全量导出"}
+          </button>
           {selectedOrderIds.length > 0 && (
             <button
               type="button"
