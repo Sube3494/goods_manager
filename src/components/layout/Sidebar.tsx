@@ -101,7 +101,31 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
 
     updateIndicator();
     window.addEventListener("resize", updateIndicator);
-    return () => window.removeEventListener("resize", updateIndicator);
+
+    const frameId = window.requestAnimationFrame(updateIndicator);
+    const settleTimer = window.setTimeout(updateIndicator, 240);
+
+    let resizeObserver: ResizeObserver | null = null;
+    const container = navContainerRef.current;
+    const activeHref = activeNavItem?.href;
+    const activeTarget = activeHref ? itemRefs.current[activeHref] : null;
+
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => updateIndicator());
+      if (container) {
+        resizeObserver.observe(container);
+      }
+      if (activeTarget) {
+        resizeObserver.observe(activeTarget);
+      }
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateIndicator);
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(settleTimer);
+      resizeObserver?.disconnect();
+    };
   }, [activeNavItem, isCollapsed, visibleNavItems]);
 
   if (isLoading) return null; // Or a skeleton
