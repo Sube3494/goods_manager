@@ -3,9 +3,146 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { InventoryService as OutboundInventoryService } from "@/services/inventoryService";
-import { buildFactoryShipmentNote } from "@/lib/utils";
+import { buildFactoryShipmentNote, parseFactoryShipmentNote, type FactoryShipmentTrackingEntry } from "@/lib/utils";
 import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
 import { Prisma } from "../../../../../prisma/generated-client";
+
+type ShipmentItemIdentity = {
+  productId?: string | null;
+  productVariantId?: string | null;
+  shopProductId?: string | null;
+  shopProductVariantId?: string | null;
+};
+
+function getShipmentItemKey(item: ShipmentItemIdentity) {
+  return item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "";
+}
+
+function getShipmentItemAliases(item: ShipmentItemIdentity) {
+  return Array.from(
+    new Set(
+      [
+        item.shopProductVariantId,
+        item.productVariantId,
+        item.shopProductId,
+        item.productId,
+      ].filter((value): value is string => typeof value === "string" && value.trim() !== "")
+    )
+  );
+}
+
+function hasTrackingNumber(entry: Pick<FactoryShipmentTrackingEntry, "trackingNumber"> | null | undefined) {
+  return Boolean(entry?.trackingNumber?.trim());
+}
+
+function normalizeTrackingEntry(
+  entry: FactoryShipmentTrackingEntry | null | undefined,
+  itemKeyOverride?: string
+): FactoryShipmentTrackingEntry | null {
+  if (!entry) return null;
+
+  const itemKey = (itemKeyOverride || entry.itemKey || "").trim();
+  if (!itemKey) return null;
+
+  const logisticsName = entry.logisticsName?.trim() || "";
+  const trackingNumber = entry.trackingNumber?.trim() || "";
+  const shippingFee = Number(entry.shippingFee) || 0;
+
+  if (!trackingNumber && !logisticsName && shippingFee <= 0) {
+    return null;
+  }
+
+  return {
+    itemKey,
+    itemName: entry.itemName?.trim() || undefined,
+    logisticsName,
+    trackingNumber,
+    shippingFee,
+  };
+}
+
+function mergeFactoryShipmentTrackingEntries(
+  existingEntries: FactoryShipmentTrackingEntry[],
+  incomingEntries: FactoryShipmentTrackingEntry[],
+  existingItems: ShipmentItemIdentity[],
+  nextItems: ShipmentItemIdentity[]
+) {
+  const existingEntryMap = new Map<string, FactoryShipmentTrackingEntry>();
+  for (const entry of existingEntries) {
+    const normalizedEntry = normalizeTrackingEntry(entry);
+    if (normalizedEntry) {
+      existingEntryMap.set(normalizedEntry.itemKey, normalizedEntry);
+    }
+  }
+
+  const incomingEntryMap = new Map<string, FactoryShipmentTrackingEntry>();
+  for (const entry of incomingEntries) {
+    const normalizedEntry = normalizeTrackingEntry(entry);
+    if (normalizedEntry) {
+      incomingEntryMap.set(normalizedEntry.itemKey, normalizedEntry);
+    }
+  }
+
+  const existingItemByAlias = new Map<string, ShipmentItemIdentity>();
+  for (const item of existingItems) {
+    for (const alias of getShipmentItemAliases(item)) {
+      existingItemByAlias.set(alias, item);
+    }
+  }
+
+  const mergedEntries: FactoryShipmentTrackingEntry[] = [];
+  for (const item of nextItems) {
+    const nextKey = getShipmentItemKey(item);
+    if (!nextKey) continue;
+
+    const incomingEntry = incomingEntryMap.get(nextKey);
+    const aliases = getShipmentItemAliases(item);
+    const matchedExistingItem = aliases
+      .map((alias) => existingItemByAlias.get(alias))
+      .find((candidate): candidate is ShipmentItemIdentity => Boolean(candidate));
+    const carryOverEntry = matchedExistingItem
+      ? getShipmentItemAliases(matchedExistingItem)
+          .map((alias) => existingEntryMap.get(alias))
+          .find((candidate): candidate is FactoryShipmentTrackingEntry => Boolean(candidate))
+      : undefined;
+
+    const baseEntry = incomingEntry || carryOverEntry;
+    if (!baseEntry) continue;
+
+    const finalEntry = normalizeTrackingEntry(baseEntry, nextKey);
+    if (finalEntry) {
+      mergedEntries.push(finalEntry);
+    }
+  }
+
+  return mergedEntries;
+}
+
+function deriveFactoryShipmentStatusFromTrackingEntries(
+  items: ShipmentItemIdentity[],
+  trackingEntries: FactoryShipmentTrackingEntry[],
+  fallbackStatus: string
+) {
+  if (fallbackStatus === "Returned" || fallbackStatus === "已退回") {
+    return fallbackStatus;
+  }
+  if (items.length === 0) {
+    return fallbackStatus || "待发货";
+  }
+
+  const shippedKeys = new Set(
+    trackingEntries
+      .filter((entry) => hasTrackingNumber(entry))
+      .map((entry) => entry.itemKey)
+  );
+  const shippedCount = items.filter((item) => {
+    const itemKey = getShipmentItemKey(item);
+    return itemKey ? shippedKeys.has(itemKey) : false;
+  }).length;
+
+  if (shippedCount === 0) return "待发货";
+  return shippedCount === items.length ? "已发货" : "部分发货";
+}
 
 /**
  * 实现“退货入库”逻辑 (对冲出库)
@@ -312,8 +449,35 @@ export async function PUT(
         throw new Error("订单不存在或无权限");
       }
 
-      // 决定最终的发货状态
-      const finalStatus = status !== undefined ? status : existingOrder.status;
+      const isFactoryShipment = existingOrder.type === "FactoryShipment";
+      const existingParsedNote = isFactoryShipment ? parseFactoryShipmentNote(existingOrder.note) : null;
+      const nextShipmentItems: ShipmentItemIdentity[] = (normalizedItems || existingOrder.items).map((item) => ({
+        productId: item.productId || null,
+        productVariantId: item.productVariantId || null,
+        shopProductId: item.shopProductId || null,
+        shopProductVariantId: item.shopProductVariantId || null,
+      }));
+      const mergedTrackingEntries = notePayload && isFactoryShipment
+        ? mergeFactoryShipmentTrackingEntries(
+            existingParsedNote?.trackingEntries || [],
+            Array.isArray(notePayload.trackingEntries) ? notePayload.trackingEntries : [],
+            existingOrder.items,
+            nextShipmentItems
+          )
+        : Array.isArray(notePayload?.trackingEntries)
+          ? notePayload.trackingEntries
+          : [];
+
+      // 决定最终的发货状态。厂家发货单以合并后的单号记录为准，避免编辑商品时把已发货信息覆盖丢失。
+      const finalStatus = isFactoryShipment
+        ? deriveFactoryShipmentStatusFromTrackingEntries(
+            nextShipmentItems,
+            mergedTrackingEntries,
+            status !== undefined ? status : existingOrder.status
+          )
+        : status !== undefined
+          ? status
+          : existingOrder.status;
 
       const canKeepShipmentExtras = finalStatus === "已发货" || finalStatus === "部分发货";
 
@@ -331,7 +495,7 @@ export async function PUT(
           paymentStatus: notePayload.paymentStatus || "未支付",
           compensationStatus: finalCompensationStatus,
           recipientAddress: notePayload.recipientAddress || "",
-          trackingEntries: Array.isArray(notePayload.trackingEntries) ? notePayload.trackingEntries : [],
+          trackingEntries: mergedTrackingEntries,
           remark: notePayload.remark || "",
           compensationLogisticsName: finalLogisticsName,
           compensationTrackingNumber: finalTrackingNumber,
@@ -340,7 +504,6 @@ export async function PUT(
       }
 
       if (normalizedItems) {
-        const isFactoryShipment = existingOrder.type === "FactoryShipment";
         const wasDeducted = !isFactoryShipment || existingOrder.status === "已发货" || existingOrder.status === "部分发货";
         const willBeDeducted = !isFactoryShipment || finalStatus === "已发货" || finalStatus === "部分发货";
 
@@ -476,7 +639,7 @@ export async function PUT(
       return await tx.outboundOrder.update({
         where: { id },
         data: {
-          ...(status !== undefined && { status }),
+          status: finalStatus,
           ...(note !== undefined && { note }),
         },
       });
