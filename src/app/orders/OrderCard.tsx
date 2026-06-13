@@ -1341,18 +1341,20 @@ export function OrderCard({
                       <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</div>
                     </div>
                     {isJdOrder ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsAmountEditorOpen(true)}
-                        disabled={isSavingAmount}
-                        className="min-w-0 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-right transition-all hover:border-black/12 hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4"
-                      >
-                        <div className="flex items-center justify-end gap-2">
-                          {isSavingAmount ? <Loader2 size={11} className="animate-spin text-muted-foreground" /> : null}
-                          <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
-                        </div>
-                        <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
-                      </button>
+                      <div className="min-w-0 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setIsAmountEditorOpen(true)}
+                          disabled={isSavingAmount}
+                          className="inline-flex w-full flex-col items-end rounded-xl text-right transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <div className="flex items-center justify-end gap-2">
+                            {isSavingAmount ? <Loader2 size={11} className="animate-spin text-muted-foreground" /> : null}
+                            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
+                          </div>
+                          <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
+                        </button>
+                      </div>
                     ) : (
                       <div className="min-w-0 text-right">
                         <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</div>
