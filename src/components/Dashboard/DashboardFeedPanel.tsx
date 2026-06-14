@@ -115,7 +115,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
           return (
             <div
               key={item.id}
-              className="flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
+              className="min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20 sm:h-10 sm:w-10 sm:rounded-lg">
@@ -128,13 +128,13 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium leading-5 tracking-tight text-foreground sm:leading-normal">
+                  <p className="overflow-hidden text-ellipsis break-all text-[13px] font-medium leading-5 tracking-tight text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:block sm:truncate sm:leading-normal">
                     {productName}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
                     {item.purchaseOrder?.shopName ? (
                       <>
-                        <span className="rounded-full bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 text-muted-foreground font-medium">{item.purchaseOrder.shopName}</span>
+                        <span className="max-w-full truncate rounded-full bg-slate-100 px-1.5 py-0.5 font-medium text-muted-foreground dark:bg-white/5">{item.purchaseOrder.shopName}</span>
                         <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                       </>
                     ) : null}
@@ -261,8 +261,8 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
 
   return (
     <section className={cn(cardClass, "min-w-0 overflow-x-clip")}>
-      <div className="flex items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
-        <div className="min-w-0 flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:flex-nowrap sm:px-5">
+        <div className="min-w-0 flex flex-1 items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4">
             {headerMeta.icon}
           </div>
@@ -275,7 +275,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
         {headerMeta.onAction ? (
           <button
             onClick={headerMeta.onAction}
-            className="group inline-flex items-center gap-1 rounded-full border border-black/8 px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground dark:border-white/10"
+            className="group inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-black/8 px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground dark:border-white/10"
           >
             {headerMeta.actionLabel}
             <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
@@ -289,12 +289,13 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
       </div>
 
       <div className="border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
-        <div className="inline-flex max-w-full rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
+        <div className="overflow-x-auto">
+          <div className="inline-flex min-w-full rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 sm:min-w-0">
           <button
             type="button"
             onClick={() => setActiveTab("inbound")}
             className={cn(
-              `${tabClass} min-w-[88px] justify-center`,
+              `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
               activeTab === "inbound"
                 ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
                 : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
@@ -306,7 +307,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
             type="button"
             onClick={() => setActiveTab("top")}
             className={cn(
-              `${tabClass} min-w-[88px] justify-center`,
+              `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
               activeTab === "top"
                 ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
                 : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
@@ -314,6 +315,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
           >
             热销榜
           </button>
+          </div>
         </div>
       </div>
 

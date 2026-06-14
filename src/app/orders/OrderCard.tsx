@@ -1346,7 +1346,7 @@ export function OrderCard({
                           type="button"
                           onClick={() => setIsAmountEditorOpen(true)}
                           disabled={isSavingAmount}
-                          className="inline-flex w-full flex-col items-end rounded-xl text-right transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex w-full flex-col items-end rounded-xl text-right transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <div className="flex items-center justify-end gap-2">
                             {isSavingAmount ? <Loader2 size={11} className="animate-spin text-muted-foreground" /> : null}
