@@ -327,7 +327,8 @@ export function parseFactoryShipmentNote(note: string | undefined | null): Parse
   const compensationLogisticsMatch = rawNote.match(/\[补偿单号:(.*?)\]/);
   const compensationItemsMatch = rawNote.match(/\[补偿货品:(.*?)\]/);
   const addressMatch = rawNote.match(/地址:\s*([^|]+)/);
-  const trackingMatch = rawNote.match(/单号:\s*(.*?)(?:\s*\|\s*备注:|$)/);
+  // 只解析独立的 `| 单号:` 段，避免误匹配到 `[补偿单号:...]`
+  const trackingMatch = rawNote.match(/(?:\|\s*单号:\s*)(.*?)(?:\s*\|\s*备注:|$)/);
   const remarkMatch = rawNote.match(/备注:\s*(.*)$/);
 
   result.recipientName = recipientMatch?.[1]?.trim() || "";
