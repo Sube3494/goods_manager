@@ -89,6 +89,22 @@ interface PromotionPlatformAmounts {
   amountOther: number;
 }
 
+interface PromotionPlatformInputValues {
+  amountMeituan: string;
+  amountJingdong: string;
+  amountTaobao: string;
+  amountOther: string;
+}
+
+function formatPromotionInputValue(value: number) {
+  return value === 0 ? "" : String(value);
+}
+
+function parsePromotionInputValue(rawValue: string) {
+  const parsed = Number.parseFloat(rawValue);
+  return Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
+}
+
 interface DayData {
   promotionAmount: number;
   amountMeituan: number;
@@ -175,6 +191,12 @@ export function PromotionCalendarModal({
     amountJingdong: 0,
     amountTaobao: 0,
     amountOther: 0,
+  });
+  const [editInputs, setEditInputs] = useState<PromotionPlatformInputValues>({
+    amountMeituan: "",
+    amountJingdong: "",
+    amountTaobao: "",
+    amountOther: "",
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -349,12 +371,24 @@ export function PromotionCalendarModal({
         amountTaobao: currentData.amountTaobao || 0,
         amountOther: currentData.amountOther || 0,
       });
+      setEditInputs({
+        amountMeituan: formatPromotionInputValue(currentData.amountMeituan || 0),
+        amountJingdong: formatPromotionInputValue(currentData.amountJingdong || 0),
+        amountTaobao: formatPromotionInputValue(currentData.amountTaobao || 0),
+        amountOther: formatPromotionInputValue(currentData.amountOther || 0),
+      });
     } else {
       setEditVals({
         amountMeituan: 0,
         amountJingdong: 0,
         amountTaobao: 0,
         amountOther: 0,
+      });
+      setEditInputs({
+        amountMeituan: "",
+        amountJingdong: "",
+        amountTaobao: "",
+        amountOther: "",
       });
     }
   }, [selectedShopName, shopExpenses]);
@@ -389,10 +423,17 @@ export function PromotionCalendarModal({
 
   // 字段修改输入
   const handleFieldChange = (key: keyof PromotionPlatformAmounts, rawValue: string) => {
-    const parsed = parseFloat(rawValue);
+    if (!/^\d*(\.\d{0,2})?$/.test(rawValue)) {
+      return;
+    }
+    const parsed = parsePromotionInputValue(rawValue);
+    setEditInputs((prev) => ({
+      ...prev,
+      [key]: rawValue,
+    }));
     setEditVals((prev) => ({
       ...prev,
-      [key]: isNaN(parsed) ? 0 : Math.max(0, parsed),
+      [key]: parsed,
     }));
   };
 
@@ -889,11 +930,11 @@ export function PromotionCalendarModal({
                   <span className="w-10 shrink-0 text-sm text-foreground">{row.label}</span>
                   <span className="text-sm text-muted-foreground">¥</span>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
+                    pattern="^\d*(\.\d{0,2})?$"
                     placeholder="0.00"
-                    value={editVals[row.key] === 0 ? "" : String(editVals[row.key])}
+                    value={editInputs[row.key]}
                     onChange={(e) => handleFieldChange(row.key, e.target.value)}
                     disabled={isSaving}
                     onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
