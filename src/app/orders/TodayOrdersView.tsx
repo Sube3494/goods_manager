@@ -7,9 +7,11 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
+import { getBaseAutoPickStatusDisplay } from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
   OrderCardErrorBoundary,
+  isCompletedStatus,
   summarizeOrders,
   isCancelledStatus,
   isAbnormalStatus,
@@ -316,17 +318,21 @@ export function TodayOrdersView({
   }, [orders, shop]);
 
   const todayCompletedOrders = useMemo(() => {
-    return filteredOrders.filter((order) => order.status === "done" || order.status === "配送完成");
+    return filteredOrders.filter((order) => isCompletedStatus(order.status));
   }, [filteredOrders]);
 
   const todayCancelledOrders = useMemo(() => {
-    return filteredOrders.filter((order) => isCancelledStatus(order.status));
+    return filteredOrders.filter((order) => {
+      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
+      return isCancelledStatus(order.status) || displayStatus === "已删除";
+    });
   }, [filteredOrders]);
 
   const todayPendingOrders = useMemo(() => {
-    return filteredOrders.filter(
-      (order) => order.status !== "done" && order.status !== "配送完成" && !isCancelledStatus(order.status)
-    );
+    return filteredOrders.filter((order) => {
+      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
+      return !isCompletedStatus(order.status) && !isCancelledStatus(order.status) && displayStatus !== "已删除";
+    });
   }, [filteredOrders]);
 
   const displayedSummary = useMemo(() => {
