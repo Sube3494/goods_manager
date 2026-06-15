@@ -90,11 +90,12 @@ export async function POST(request: NextRequest) {
     const finalOrderTime = orderTime ? parseAsShanghaiTime(orderTime) : new Date();
 
     // 金额换算（元转分）
-    // 注意：传入的 actualPaid 为商品本身总价（不含配送费），因此顾客总实付需加上配送费
+    // 线下订单里 actualPaid 表示顾客支付的商品金额；
+    // deliveryFee 表示商家承担的配送支出，不应加到顾客实付里。
     const goodsCents = Math.round(Number(actualPaid) * 100);
     const deliveryCents = Math.round(Number(deliveryFee) * 100);
-    const actualPaidCents = goodsCents + deliveryCents; // 顾客总实收 = 商品本身金额 + 配送费
-    const expectedIncomeCents = goodsCents; // 商家实际预期收入 = 商品本身金额
+    const actualPaidCents = goodsCents; // 顾客实付 = 商品金额
+    const expectedIncomeCents = goodsCents; // 商家到手 = 商品金额（配送费作为后续支出单独扣减）
 
     // 构造 payload 信息，包括 resolvedShop 信息，保证 createOutboundFromAutoPickOrder 出库时直接命中店铺
     const rawPayload = {
@@ -186,6 +187,7 @@ export async function POST(request: NextRequest) {
     let outboundResult = null;
     if (autoOutbound) {
       try {
+        const attemptedAt = new Date().toISOString();
         const result = await createOutboundFromAutoPickOrder(session.id, order.id, {
           requireCompleted: false,
           preferredMappedShopName: shop.name,
@@ -206,7 +208,7 @@ export async function POST(request: NextRequest) {
                   ...rawPayload.systemMeta,
                   autoOutbound: {
                     status: "success",
-                    attemptedAt: new Date().toISOString(),
+                    attemptedAt,
                     resolvedAt: new Date().toISOString(),
                     outboundOrderId: result.outboundOrderId,
                   },
@@ -215,10 +217,35 @@ export async function POST(request: NextRequest) {
             },
           });
         } else {
+          const failureMessage = result.reason === "no-items"
+            ? "订单没有可生成出库的商品"
+            : result.reason === "insufficient-stock"
+              ? (
+                  Array.isArray(result.insufficientItems) && result.insufficientItems.length > 0
+                    ? `库存不足，请先创建采购单：${result.insufficientItems.map((item) => `${item.name} 缺 ${item.missingQuantity} 件`).join("；")}`
+                    : "库存不足，请先创建采购单"
+                )
+              : "自动生成出库单失败";
           outboundResult = {
             success: false,
             reason: result.reason,
           };
+          await prisma.autoPickOrder.update({
+            where: { id: order.id },
+            data: {
+              rawPayload: {
+                ...rawPayload,
+                systemMeta: {
+                  ...rawPayload.systemMeta,
+                  autoOutbound: {
+                    status: "failed",
+                    attemptedAt,
+                    error: failureMessage,
+                  },
+                },
+              },
+            },
+          }).catch(() => null);
         }
       } catch (outboundErr) {
         console.error("Auto outbound failed for manual offline order:", outboundErr);

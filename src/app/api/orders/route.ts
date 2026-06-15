@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 type OutboundLookupRow = {
   id: string;
   note: string | null;
+  status?: string | null;
   items: Array<{
     id: string;
     productId: string | null;
@@ -938,6 +939,9 @@ export async function GET(request: NextRequest) {
         outboundRows.push(...await prisma.outboundOrder.findMany({
           where: {
             userId: session.id,
+            status: {
+              not: "Returned",
+            },
             OR: outboundNoteNeedles.map((needle) => ({
               note: { contains: needle, mode: "insensitive" as const },
             })),
@@ -945,6 +949,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             note: true,
+            status: true,
             items: {
               select: {
                 id: true,
@@ -979,6 +984,9 @@ export async function GET(request: NextRequest) {
         outboundRows.push(...await prisma.outboundOrder.findMany({
           where: {
             userId: session.id,
+            status: {
+              not: "Returned",
+            },
             OR: outboundNoteNeedles.map((needle) => ({
               note: { contains: needle, mode: "insensitive" as const },
             })),
@@ -986,6 +994,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             note: true,
+            status: true,
             items: {
               select: {
                 id: true,

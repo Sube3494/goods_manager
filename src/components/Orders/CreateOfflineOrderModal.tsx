@@ -140,7 +140,7 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
       return;
     }
     if (!actualPaid || isNaN(Number(actualPaid)) || Number(actualPaid) < 0) {
-      showToast("请输入有效的顾客实付金额", "error");
+      showToast("请输入有效的商品金额", "error");
       return;
     }
     if (isNaN(Number(deliveryFee)) || Number(deliveryFee) < 0) {
@@ -346,10 +346,10 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
 
               {/* 两栏并排金额 */}
               <div className="grid gap-4 grid-cols-2">
-                {/* 顾客实付 */}
+                {/* 商品金额 */}
                 <div className="space-y-1.5">
                   <label className={labelTextClass}>
-                    <span>顾客实付 (元)</span>
+                    <span>商品金额 (元)</span>
                     <span className="text-red-500">*</span>
                   </label>
                   <div className={inputContainerClass}>
@@ -361,16 +361,17 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
                       required
                       value={actualPaid}
                       onChange={(e) => setActualPaid(e.target.value)}
-                      placeholder="商品总金额 (不含配送费)"
+                      placeholder="商品总金额，不含配送费"
                       className={inputElClass}
                     />
                   </div>
+                  <p className="text-[11px] text-muted-foreground/70">这里填顾客支付的商品金额，配送费不会加到顾客实付里</p>
                 </div>
 
-                {/* 配送费 */}
+                {/* 配送支出 */}
                 <div className="space-y-1.5">
                   <label className={labelTextClass}>
-                    <span>配送费 (元)</span>
+                    <span>配送支出 (元)</span>
                   </label>
                   <div className={inputContainerClass}>
                     <span className="text-muted-foreground/60 font-black text-sm select-none shrink-0 w-3.5 text-center">¥</span>
@@ -380,10 +381,11 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
                       min="0"
                       value={deliveryFee}
                       onChange={(e) => setDeliveryFee(e.target.value)}
-                      placeholder="0.00"
+                      placeholder="你承担的配送成本"
                       className={inputElClass}
                     />
                   </div>
+                  <p className="text-[11px] text-muted-foreground/70">这笔钱是商家支出，会参与利润扣减</p>
                 </div>
               </div>
 

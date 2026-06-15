@@ -29,6 +29,7 @@ import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { createPortal } from "react-dom";
 import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig } from "@/lib/types";
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
@@ -1033,6 +1034,8 @@ export function OrderCard({
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
   const [isSavingAmount, setIsSavingAmount] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeletingOffline, setIsDeletingOffline] = useState(false);
   const { showToast } = useToast();
 
   const handleUpdateBrush = useCallback(async (val: boolean) => {
@@ -1081,6 +1084,39 @@ export function OrderCard({
       return false;
     } finally {
       setIsSavingAmount(false);
+    }
+  }, [order.id, showToast, onRefresh]);
+
+  const handleDeleteOfflineOrder = useCallback(async () => {
+    try {
+      setIsDeletingOffline(true);
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: "线下订单录入有误，作废并回滚出库",
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "作废失败", "error");
+        return;
+      }
+
+      const returnedOutboundCount = Number(data.returnedOutboundCount || 0);
+      showToast(
+        returnedOutboundCount > 0
+          ? `线下订单已作废，并回滚 ${returnedOutboundCount} 张出库单`
+          : "线下订单已作废",
+        "success"
+      );
+      onRefresh?.();
+    } catch (err) {
+      console.error("作废线下订单失败", err);
+      showToast("网络请求失败，请稍后重试", "error");
+    } finally {
+      setIsDeletingOffline(false);
     }
   }, [order.id, showToast, onRefresh]);
 
@@ -1501,7 +1537,9 @@ export function OrderCard({
           <div className={cn(
             "grid gap-2 lg:min-w-110",
             order.platform === "线下交易"
-              ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
+              ? deleted
+                ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
+                : "grid-cols-2 sm:grid-cols-2 lg:min-w-0 lg:w-64 ml-auto"
               : "grid-cols-4 sm:grid-cols-4"
           )}>
             <ActionButton
@@ -1511,6 +1549,15 @@ export function OrderCard({
               mobileIconOnly={order.platform !== "线下交易"}
               title={expanded ? "收起详情" : "展开详情"}
             />
+            {order.platform === "线下交易" && !deleted ? (
+              <ActionButton
+                label={isDeletingOffline ? "作废中" : "作废"}
+                icon={isDeletingOffline ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                onClick={() => setIsDeleteConfirmOpen(true)}
+                disabled={isDeletingOffline || Boolean(actingId)}
+                title="作废这张录错的线下订单，并自动回滚关联出库库存"
+              />
+            ) : null}
             {order.platform !== "线下交易" && (
               <>
                 <ActionButton
@@ -1766,6 +1813,22 @@ export function OrderCard({
           onSave={handleSaveExpectedIncome}
         />
       ) : null}
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => {
+          if (!isDeletingOffline) {
+            setIsDeleteConfirmOpen(false);
+          }
+        }}
+        onConfirm={() => {
+          void handleDeleteOfflineOrder();
+        }}
+        title="作废线下订单"
+        message="这会把这张线下订单标记为已删除；如果已经生成出库单，系统会同步回滚库存。这个操作用于处理录错订单。"
+        confirmLabel="确认作废"
+        cancelLabel="取消"
+        variant="danger"
+      />
     </>
   );
 }
