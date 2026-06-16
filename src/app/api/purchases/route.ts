@@ -198,7 +198,8 @@ export async function POST(request: Request) {
       trackingData,
       paymentVouchers,
       shippingAddress,
-      shopName
+      shopName,
+      note,
     } = body;
 
 
@@ -230,6 +231,7 @@ export async function POST(request: Request) {
           trackingData: trackingData || [],
           shippingAddress: shippingAddress || "",
           shopName: shopName || "",
+          note: String(note || "").trim() || null,
           userId: session.id,
           items: {
             create: sanitizedItems.map((item: PurchaseOrderItem) => ({

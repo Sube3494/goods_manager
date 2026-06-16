@@ -24,7 +24,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { sortPurchaseItems } from "@/lib/pinyin";
 import { filterPurchases, isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
-import { isAutoInboundOrderLike } from "@/lib/purchaseOrderTypes";
+import { isAutoInboundOrderLike, isOrderShortagePurchaseLike } from "@/lib/purchaseOrderTypes";
 import NextImage from "next/image";
 
 function sortPurchasesByRecency(items: PurchaseOrder[]) {
@@ -70,7 +70,7 @@ function isAutoCreatedPurchaseOrder(order: Pick<PurchaseOrder, "id">) {
 }
 
 function shouldHideFromPurchaseManagement(order: Pick<PurchaseOrder, "id" | "type" | "note">) {
-  return isAutoCreatedPurchaseOrder(order) || isAutoInboundOrderLike(order);
+  return isAutoCreatedPurchaseOrder(order) || isAutoInboundOrderLike(order) || isOrderShortagePurchaseLike(order);
 }
 
 function PurchaseMetricCard({

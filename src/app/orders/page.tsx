@@ -49,6 +49,7 @@ import {
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
+import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "all";
@@ -1639,12 +1640,17 @@ export default function OrdersPage() {
   }, []);
 
   const savePurchaseDraft = useCallback(async (data: PurchaseOrder) => {
+    const existingNote = String(data.note || "").trim();
+    const taggedNote = existingNote.includes(ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD)
+      ? existingNote
+      : [ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, existingNote].filter(Boolean).join(" | ");
     const response = await fetch("/api/purchases", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...data,
         status: "Received",
+        note: taggedNote,
       }),
     });
     const payload = await response.json().catch(() => ({}));
