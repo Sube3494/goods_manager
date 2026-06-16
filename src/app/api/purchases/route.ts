@@ -6,7 +6,7 @@ import { Prisma } from "../../../../prisma/generated-client";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
-import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
+import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 
@@ -102,26 +102,14 @@ export async function GET(request: Request) {
       andWhere.push({ type });
     } else {
       andWhere.push({
-        AND: [
-          {
-            NOT: {
-              OR: [
-                { type: "Inbound" },
-                { type: AUTO_INBOUND_TYPE },
-                { type: "Return" },
-                { type: "InternalReturn" },
-              ],
-            },
-          },
-          {
-            NOT: {
-              OR: [
-                { type: AUTO_INBOUND_TYPE },
-                { note: { contains: AUTO_INBOUND_NOTE_KEYWORD } },
-              ],
-            },
-          },
-        ],
+        NOT: {
+          OR: [
+            { type: "Inbound" },
+            { type: AUTO_INBOUND_TYPE },
+            { type: "Return" },
+            { type: "InternalReturn" },
+          ],
+        },
       });
     }
     if (productId) {
