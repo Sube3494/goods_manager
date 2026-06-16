@@ -7,7 +7,7 @@
  */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DataOverview } from "@/components/Dashboard/DataOverview";
@@ -36,6 +36,7 @@ export default function Home() {
   const [shopOptions, setShopOptions] = useState<Shop[]>([]);
   const [selectedShopName, setSelectedShopName] = useState("");
   const todayDate = initialEnd;
+  const latestStatsRequestRef = useRef(0);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -54,6 +55,8 @@ export default function Home() {
   const fetchData = useCallback(async (quiet = false) => {
     if (!user) return; // Don't fetch if not logged in
 
+    const requestId = latestStatsRequestRef.current + 1;
+    latestStatsRequestRef.current = requestId;
     setIsLoading(true);
     try {
       const query = new URLSearchParams();
@@ -66,6 +69,9 @@ export default function Home() {
       const res = await fetch(`/api/stats?${query.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
+        if (latestStatsRequestRef.current !== requestId) {
+          return;
+        }
         setStatsData(data);
         if (rangePreset === "all") {
           if (data?.rangeStart) setStartDate(data.rangeStart);
@@ -76,13 +82,21 @@ export default function Home() {
           showToast("系统同步完成", "success");
         }
       } else {
+        if (latestStatsRequestRef.current !== requestId) {
+          return;
+        }
         if (!quiet) showToast("同步失败，请重试", "error");
       }
     } catch (error) {
+      if (latestStatsRequestRef.current !== requestId) {
+        return;
+      }
       console.error("Dashboard data fetch failed:", error);
       if (!quiet) showToast("网络请求失败", "error");
     } finally {
-      setIsLoading(false);
+      if (latestStatsRequestRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
   }, [endDate, rangePreset, selectedShopName, startDate, user, showToast]);
 
