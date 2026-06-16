@@ -24,6 +24,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { sortPurchaseItems } from "@/lib/pinyin";
 import { filterPurchases, isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
+import { isAutoInboundOrderLike } from "@/lib/purchaseOrderTypes";
 import NextImage from "next/image";
 
 function sortPurchasesByRecency(items: PurchaseOrder[]) {
@@ -66,6 +67,10 @@ function formatCurrency(value: number) {
 
 function isAutoCreatedPurchaseOrder(order: Pick<PurchaseOrder, "id">) {
   return order.id.startsWith("PO-AUTO-");
+}
+
+function shouldHideFromPurchaseManagement(order: Pick<PurchaseOrder, "id" | "type" | "note">) {
+  return isAutoCreatedPurchaseOrder(order) || isAutoInboundOrderLike(order);
 }
 
 function PurchaseMetricCard({
@@ -400,7 +405,7 @@ function PurchasesContent() {
   };
 
   const visiblePurchases = useMemo(() => {
-    return purchases.filter((purchase) => !isAutoCreatedPurchaseOrder(purchase));
+    return purchases.filter((purchase) => !shouldHideFromPurchaseManagement(purchase));
   }, [purchases]);
 
   const filteredPurchases = useMemo(() => {
