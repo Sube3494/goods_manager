@@ -204,7 +204,7 @@ export default function ShelfLifeDashboard() {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
             <Clock className="text-primary animate-pulse" size={32} /> 
-            <span className="font-extrabold">保质期与临期库存</span>
+            <span>保质期与临期库存</span>
           </h1>
           <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-2xl font-medium">
             智能化监控商品保质期状态，自动判定临期预警，保障食品与货品品质安全。
@@ -220,21 +220,21 @@ export default function ShelfLifeDashboard() {
           <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-red-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">已过期</span>
+            <span className="text-[10px] sm:text-[11px] tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">已过期</span>
             <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-red-500 to-red-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-red-500 to-red-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.expired.count || 0}
             </span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">批次变质</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80">批次变质</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>损失估值</span>
-            <span className="font-bold text-red-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.expired.value.toFixed(1)}</span>
+            <span className="text-red-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.expired.value.toFixed(1)}</span>
           </div>
         </div>
 
@@ -244,21 +244,21 @@ export default function ShelfLifeDashboard() {
           <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-orange-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">严重临期</span>
+            <span className="text-[10px] sm:text-[11px] tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">严重临期</span>
             <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></span>
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.critical.count || 0}
             </span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">批次处理</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80">批次处理</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>过期风险</span>
-            <span className="font-bold text-orange-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.critical.value.toFixed(1)}</span>
+            <span className="text-orange-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.critical.value.toFixed(1)}</span>
           </div>
         </div>
 
@@ -268,21 +268,21 @@ export default function ShelfLifeDashboard() {
           <AlertCircle className="absolute right-[-15px] bottom-[-15px] text-amber-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">临期提醒</span>
+            <span className="text-[10px] sm:text-[11px] tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">临期提醒</span>
             <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.warning.count || 0}
             </span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">批次警报</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80">批次警报</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>预警成本</span>
-            <span className="font-bold text-amber-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.warning.value.toFixed(1)}</span>
+            <span className="text-amber-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.warning.value.toFixed(1)}</span>
           </div>
         </div>
 
@@ -292,21 +292,21 @@ export default function ShelfLifeDashboard() {
           <CheckCircle className="absolute right-[-15px] bottom-[-15px] text-emerald-500/3 pointer-events-none scale-110 sm:scale-150 h-20 w-20 sm:h-28 sm:w-28 transition-transform duration-500 group-hover:scale-170 group-hover:rotate-12" />
           
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">安全在库</span>
+            <span className="text-[10px] sm:text-[11px] tracking-wider sm:tracking-widest text-muted-foreground/80 uppercase">安全在库</span>
             <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl font-black bg-linear-to-r from-emerald-500 to-emerald-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-emerald-500 to-emerald-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
               {isLoadingStats ? "..." : stats?.summary.safe.count || 0}
             </span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground/80 font-bold">在库安全</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground/80">在库安全</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>总在库货值</span>
-            <span className="font-bold text-emerald-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.safe.value.toFixed(1)}</span>
+            <span className="text-emerald-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.safe.value.toFixed(1)}</span>
           </div>
         </div>
       </div>
@@ -317,10 +317,10 @@ export default function ShelfLifeDashboard() {
             
             {/* 列表头部与快速过滤器面板 */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <h2 className="text-lg text-foreground flex items-center gap-2">
                 <FileText size={18} className="text-primary" />
-                <span className="font-extrabold tracking-tight">保质期库存批次台账</span>
-                <span className="text-[10px] text-muted-foreground font-mono bg-black/5 dark:bg-white/10 px-2.5 py-0.5 rounded-full font-bold">{totalBatches} 行</span>
+                <span className="tracking-tight">保质期库存批次台账</span>
+                <span className="text-[10px] text-muted-foreground font-mono bg-black/5 dark:bg-white/10 px-2.5 py-0.5 rounded-full">{totalBatches} 行</span>
               </h2>
             </div>
 
@@ -334,7 +334,7 @@ export default function ShelfLifeDashboard() {
                   placeholder="搜索商品名、SKU店内码、简拼..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-10 pl-10 pr-8 rounded-full bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-white/15 focus:border-primary/30 dark:focus:border-white/20 transition-all placeholder:text-muted-foreground/60 font-semibold"
+                  className="w-full h-10 pl-10 pr-8 rounded-full bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-white/15 focus:border-primary/30 dark:focus:border-white/20 transition-all placeholder:text-muted-foreground/60"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground">
@@ -356,7 +356,7 @@ export default function ShelfLifeDashboard() {
                           ...shops.map(s => ({ value: s.id, label: s.name }))
                         ]
                   }
-                  triggerClassName="rounded-full h-10 px-4 text-xs text-foreground font-bold border-black/5 dark:border-white/10 bg-white dark:bg-white/5"
+                  triggerClassName="rounded-full h-10 px-4 text-xs text-foreground border-black/5 dark:border-white/10 bg-white dark:bg-white/5"
                 />
               </div>
 
@@ -372,7 +372,7 @@ export default function ShelfLifeDashboard() {
                     { value: "warning", label: "临期提醒" },
                     { value: "safe", label: "安全在库" }
                   ]}
-                  triggerClassName="rounded-full h-10 px-4 text-xs text-foreground font-bold border-black/5 dark:border-white/10 bg-white dark:bg-white/5"
+                  triggerClassName="rounded-full h-10 px-4 text-xs text-foreground border-black/5 dark:border-white/10 bg-white dark:bg-white/5"
                 />
               </div>
 
@@ -390,7 +390,7 @@ export default function ShelfLifeDashboard() {
                       setSelectedShop("all");
                     }
                   }}
-                  className="h-10 px-4 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-xs shrink-0 whitespace-nowrap"
+                  className="h-10 px-4 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs hover:bg-primary/10 transition-all active:scale-95 shadow-xs shrink-0 whitespace-nowrap"
                 >
                   <RotateCcw size={13} />
                   <span>重置</span>
@@ -420,7 +420,7 @@ export default function ShelfLifeDashboard() {
                   <div className="hidden md:block rounded-2xl border border-black/5 dark:border-white/10 bg-white/20 dark:bg-white/2 overflow-hidden backdrop-blur-md">
                     <table className="w-full text-left border-collapse table-auto text-[11px]">
                       <thead>
-                        <tr className="border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 text-muted-foreground text-[9.5px] font-bold uppercase tracking-widest">
+                        <tr className="border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 text-muted-foreground text-[9.5px] uppercase tracking-widest">
                           <th className="px-3 py-2.5 w-[5%] text-center whitespace-nowrap">序号</th>
                           <th className="px-3 py-2.5 w-[24%] text-center">商品</th>
                           <th className="px-3 py-2.5 w-[12%] text-center">店铺</th>
@@ -447,7 +447,7 @@ export default function ShelfLifeDashboard() {
                               )}
                             >
                               {/* 序号 */}
-                              <td className="px-3 py-2.5 text-center font-mono font-bold text-muted-foreground/60 w-[5%] text-[10px]">
+                              <td className="px-3 py-2.5 text-center font-mono text-muted-foreground/60 w-[5%] text-[10px]">
                                 {index + 1}
                               </td>
 
@@ -465,7 +465,7 @@ export default function ShelfLifeDashboard() {
                                       />
                                     ) : (
                                       <div className={cn(
-                                        "h-full w-full flex items-center justify-center font-bold text-[10px] uppercase overflow-hidden",
+                                        "h-full w-full flex items-center justify-center text-[10px] uppercase overflow-hidden",
                                         isExpired && "bg-red-500/10 text-red-500",
                                         isCritical && "bg-orange-500/10 text-orange-500",
                                         isWarning && "bg-amber-500/10 text-amber-500",
@@ -483,7 +483,7 @@ export default function ShelfLifeDashboard() {
 
                               {/* 店铺 */}
                               <td className="px-3 py-2.5 text-center">
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/5 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/10 dark:border-blue-500/20 text-[10px] font-bold whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/5 text-blue-500 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-500/10 dark:border-blue-500/20 text-[10px] whitespace-nowrap">
                                   <Store size={10.5} className="shrink-0 text-blue-500 dark:text-blue-400" />
                                   {batch.shopName}
                                 </span>
@@ -491,7 +491,7 @@ export default function ShelfLifeDashboard() {
 
                               {/* 生产日期 */}
                               <td className="px-3 py-2.5 text-center whitespace-nowrap">
-                                <span className="font-mono font-bold text-foreground/80">
+                                <span className="font-mono text-foreground/80">
                                   {batch.productionDate || "—"}
                                 </span>
                               </td>
@@ -500,7 +500,7 @@ export default function ShelfLifeDashboard() {
                               <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                 <div className="flex flex-col items-center justify-center gap-0.5">
                                   <span className={cn(
-                                    "text-[10px] font-extrabold flex items-center gap-1.5",
+                                    "text-[10px] flex items-center gap-1.5",
                                     isExpired && "text-red-500",
                                     isCritical && "text-orange-500",
                                     isWarning && "text-amber-500",
@@ -523,7 +523,7 @@ export default function ShelfLifeDashboard() {
                                       </>
                                     )}
                                   </span>
-                                  <span className="text-[8px] text-muted-foreground/50 font-bold font-mono">到期: {batch.expirationDate}</span>
+                                  <span className="text-[8px] text-muted-foreground/50 font-mono">到期: {batch.expirationDate}</span>
                                 </div>
                               </td>
 
@@ -531,7 +531,7 @@ export default function ShelfLifeDashboard() {
                               <td className="px-3 py-2.5 text-center whitespace-nowrap">
                                 <div className="flex flex-col items-center justify-center font-mono gap-1">
                                   <div className="flex items-baseline gap-0.5 leading-none">
-                                    <span className="text-[11px] font-extrabold text-foreground">{batch.remainingStock}</span>
+                                    <span className="text-[11px] text-foreground">{batch.remainingStock}</span>
                                     <span className="text-[9.5px] text-muted-foreground/60">/ {batch.quantity} 件</span>
                                   </div>
                                   {/* 2px 高度的超精细进度条 */}
@@ -560,7 +560,7 @@ export default function ShelfLifeDashboard() {
                                       setAdjustRemark(batch.remark);
                                       setIsAdjustModalOpen(true);
                                     }}
-                                    className="flex items-center justify-center gap-1 text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-2.5 py-1 rounded-lg transition-all active:scale-95 cursor-pointer mx-auto"
+                                    className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-2.5 py-1 rounded-lg transition-all active:scale-95 cursor-pointer mx-auto"
                                     title="报废核销或更正库存"
                                   >
                                     <Edit3 size={10.5} />
@@ -606,7 +606,7 @@ export default function ShelfLifeDashboard() {
                                   />
                                 ) : (
                                   <div className={cn(
-                                    "h-full w-full flex items-center justify-center font-bold text-xs uppercase overflow-hidden",
+                                    "h-full w-full flex items-center justify-center text-xs uppercase overflow-hidden",
                                     isExpired && "bg-red-500/10 text-red-500",
                                     isCritical && "bg-orange-500/10 text-orange-500",
                                     isWarning && "bg-amber-500/10 text-amber-500",
@@ -617,7 +617,7 @@ export default function ShelfLifeDashboard() {
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <span className="text-[11px] font-bold text-foreground/90 leading-snug group-hover:text-primary transition-colors flex items-center gap-1.5" title={batch.productName}>
+                                <span className="text-[11px] text-foreground/90 leading-snug group-hover:text-primary transition-colors flex items-center gap-1.5" title={batch.productName}>
                                   <span className="inline-block font-mono bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded-sm text-[9px] text-muted-foreground shrink-0">#{index + 1}</span>
                                   <span className="truncate">{batch.productName}</span>
                                 </span>
@@ -630,7 +630,7 @@ export default function ShelfLifeDashboard() {
 
                             <div className="shrink-0 text-right">
                               <span className={cn(
-                                "inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold border leading-none",
+                                "inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] border leading-none",
                                 isExpired && "bg-red-500/10 text-red-500 border-red-500/10",
                                 isCritical && "bg-orange-500/10 text-orange-500 border-orange-500/10 animate-pulse",
                                 isWarning && "bg-amber-500/10 text-amber-500 border-amber-500/10",
@@ -638,16 +638,16 @@ export default function ShelfLifeDashboard() {
                               )}>
                                 {isExpired ? ('已过期 ' + Math.abs(batch.remainingDays) + '天') : ('剩余 ' + batch.remainingDays + '天')}
                               </span>
-                              <span className="text-[8px] text-muted-foreground/50 block font-mono font-bold mt-1">生产: {batch.productionDate || "—"}</span>
-                              <span className="text-[8px] text-muted-foreground/50 block font-mono font-bold mt-0.5">到期: {batch.expirationDate}</span>
+                              <span className="text-[8px] text-muted-foreground/50 block font-mono mt-1">生产: {batch.productionDate || "—"}</span>
+                              <span className="text-[8px] text-muted-foreground/50 block font-mono mt-0.5">到期: {batch.expirationDate}</span>
                             </div>
                           </div>
 
                           {/* 2. 卡片中段：在库状态及进度条 */}
                           <div className="flex flex-col gap-1 w-full mt-0.5">
                             <div className="flex items-center justify-between text-[10px]">
-                              <span className="text-muted-foreground font-semibold">在库状态</span>
-                              <span className="font-mono font-bold text-foreground">{batch.remainingStock} / {batch.quantity} 件</span>
+                              <span className="text-muted-foreground">在库状态</span>
+                              <span className="font-mono text-foreground">{batch.remainingStock} / {batch.quantity} 件</span>
                             </div>
                             <div className="w-full h-1 bg-black/5 dark:bg-white/10 rounded-full overflow-hidden mt-0.5">
                               <div 
@@ -673,7 +673,7 @@ export default function ShelfLifeDashboard() {
                                   setAdjustRemark(batch.remark);
                                   setIsAdjustModalOpen(true);
                                 }}
-                                className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all active:scale-95 border border-black/5 dark:border-white/10"
+                                className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all active:scale-95 border border-black/5 dark:border-white/10"
                               >
                                 <Edit3 size={11} />
                                 <span>调整/核销</span>
@@ -689,7 +689,7 @@ export default function ShelfLifeDashboard() {
                     <button 
                       onClick={() => void fetchBatches(false)}
                       disabled={isLoadingBatches}
-                      className="w-full h-11 flex items-center justify-center gap-2 border border-dashed border-black/10 dark:border-white/10 hover:border-primary/30 rounded-full hover:bg-black/5 dark:hover:bg-white/5 font-bold text-xs text-muted-foreground hover:text-foreground transition-all active:scale-98 disabled:opacity-50"
+                      className="w-full h-11 flex items-center justify-center gap-2 border border-dashed border-black/10 dark:border-white/10 hover:border-primary/30 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-xs text-muted-foreground hover:text-foreground transition-all active:scale-98 disabled:opacity-50"
                     >
                       {isLoadingBatches ? (
                         <>
@@ -727,9 +727,9 @@ export default function ShelfLifeDashboard() {
               className="relative w-full max-w-md rounded-3xl border border-black/5 dark:border-white/10 bg-white/95 dark:bg-[#0b111e]/98 backdrop-blur-xl p-6 shadow-2xl flex flex-col"
             >
               <div className="mb-4 flex items-center justify-between shrink-0">
-                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <h3 className="text-lg text-foreground flex items-center gap-2">
                   <Edit3 size={18} className="text-primary" />
-                  <span className="font-extrabold tracking-tight">批次在库库存调整与核销</span>
+                  <span className="tracking-tight">批次在库库存调整与核销</span>
                 </h3>
                 <button onClick={() => setIsAdjustModalOpen(false)} className="rounded-full p-1.5 hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground transition-colors">
                   <X size={18} />
@@ -756,8 +756,8 @@ export default function ShelfLifeDashboard() {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[10px] text-muted-foreground leading-none font-bold uppercase tracking-wider">当前修改商品</p>
-                      <p className="text-xs font-semibold text-foreground mt-1 leading-snug line-clamp-2" title={activeAdjustBatch.productName}>
+                      <p className="text-[10px] text-muted-foreground leading-none uppercase tracking-wider">当前修改商品</p>
+                      <p className="text-xs text-foreground mt-1 leading-snug line-clamp-2" title={activeAdjustBatch.productName}>
                         {activeAdjustBatch.productName}
                       </p>
                     </div>
@@ -767,19 +767,19 @@ export default function ShelfLifeDashboard() {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-[11px]">
                     <div className="col-span-2 border-b border-black/5 dark:border-white/5 pb-2">
                       <span className="text-muted-foreground block leading-normal mb-0.5">批次号 / 单号</span>
-                      <span className="font-mono font-bold text-foreground break-all select-all">{activeAdjustBatch.purchaseOrderId || activeAdjustBatch.batchNo || "—"}</span>
+                      <span className="font-mono text-foreground break-all select-all">{activeAdjustBatch.purchaseOrderId || activeAdjustBatch.batchNo || "—"}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block leading-normal mb-0.5">所属店铺</span>
-                      <span className="font-bold text-foreground">{activeAdjustBatch.shopName}</span>
+                      <span className="text-foreground">{activeAdjustBatch.shopName}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block leading-normal mb-0.5">原始到货</span>
-                      <span className="font-bold text-foreground font-mono">{activeAdjustBatch.quantity} 件</span>
+                      <span className="text-foreground font-mono">{activeAdjustBatch.quantity} 件</span>
                     </div>
                     <div className="col-span-2 border-t border-black/5 dark:border-white/5 pt-2 mt-0.5">
                       <span className="text-muted-foreground block leading-normal mb-0.5">生产日期</span>
-                      <span className="font-bold text-foreground font-mono">{activeAdjustBatch.productionDate || "未填"}</span>
+                      <span className="text-foreground font-mono">{activeAdjustBatch.productionDate || "未填"}</span>
                     </div>
                   </div>
 
@@ -787,16 +787,16 @@ export default function ShelfLifeDashboard() {
                   <div className="flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-3 text-[11px]">
                     <div>
                       <span className="text-muted-foreground block leading-normal">保质到期日</span>
-                      <span className="font-bold text-foreground font-mono">{activeAdjustBatch.expirationDate}</span>
+                      <span className="text-foreground font-mono">{activeAdjustBatch.expirationDate}</span>
                     </div>
                     <div className="text-right">
                       {activeAdjustBatch.status === "expired" ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400 border border-red-500/10 dark:border-red-500/20 font-bold">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400 border border-red-500/10 dark:border-red-500/20">
                           已过期
                         </span>
                       ) : (
                         <span className={cn(
-                          "inline-flex items-center px-2 py-0.5 rounded-md font-bold border",
+                          "inline-flex items-center px-2 py-0.5 rounded-md border",
                           activeAdjustBatch.status === "critical" && "bg-orange-500/10 text-orange-500 dark:bg-orange-500/20 dark:text-orange-400 border-orange-500/10 dark:border-orange-500/20",
                           activeAdjustBatch.status === "warning" && "bg-amber-500/10 text-amber-500 dark:bg-amber-500/20 dark:text-amber-400 border-amber-500/10 dark:border-amber-500/20",
                           activeAdjustBatch.status === "safe" && "bg-emerald-500/10 text-emerald-500 dark:bg-emerald-500/20 dark:text-emerald-400 border-emerald-500/10 dark:border-emerald-500/20"
@@ -809,7 +809,7 @@ export default function ShelfLifeDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider block">
                     在库剩余库存数量 (输入 0 代表报废核销)
                   </label>
                   <input 
@@ -821,7 +821,7 @@ export default function ShelfLifeDashboard() {
                     className="w-full h-11 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 px-4 text-foreground font-mono text-sm outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-white/15 focus:border-primary/30 dark:focus:border-white/20 transition-all"
                   />
                   {adjustStock === 0 && (
-                    <div className="text-[10px] text-red-500 font-semibold flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 p-2.5 rounded-lg animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="text-[10px] text-red-500 flex items-center gap-1.5 bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 p-2.5 rounded-lg animate-in fade-in slide-in-from-top-1 duration-200">
                       <AlertCircle size={12} strokeWidth={3} className="shrink-0" />
                       <span>警告: 数量设为 0 后，该批次将执行核销下架，不再占用在库货值！</span>
                     </div>
@@ -829,7 +829,7 @@ export default function ShelfLifeDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">更新备注</label>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wider block">更新备注</label>
                   <input 
                     type="text"
                     placeholder="例如: 变质损耗/数据更正..."
@@ -843,7 +843,7 @@ export default function ShelfLifeDashboard() {
               <div className="flex gap-3 pt-6 border-t border-black/5 dark:border-white/5 shrink-0 mt-6">
                 <button
                   onClick={() => setIsAdjustModalOpen(false)}
-                  className="flex-1 h-10 rounded-full border border-black/10 dark:border-white/10 text-xs sm:text-sm font-bold text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95"
+                  className="flex-1 h-10 rounded-full border border-black/10 dark:border-white/10 text-xs sm:text-sm text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95"
                 >
                   取消
                 </button>
@@ -851,7 +851,7 @@ export default function ShelfLifeDashboard() {
                   onClick={handleAdjustBatch}
                   disabled={isAdjustingBatch || adjustStock === ""}
                   className={cn(
-                    "flex-1 h-10 rounded-full text-xs sm:text-sm font-bold shadow-xs transition-all active:scale-95 disabled:opacity-50",
+                    "flex-1 h-10 rounded-full text-xs sm:text-sm shadow-xs transition-all active:scale-95 disabled:opacity-50",
                     adjustStock === 0 
                       ? "bg-red-500 text-white shadow-red-500/20 hover:shadow-red-500/40" 
                       : "bg-primary text-primary-foreground shadow-primary/20 hover:shadow-primary/45"

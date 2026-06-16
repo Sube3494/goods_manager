@@ -212,7 +212,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
     >
       {icon}
       {label}
@@ -251,7 +251,7 @@ function IntegrationModal({
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
   const [showInboundApiKey, setShowInboundApiKey] = useState(false);
   const [copiedCallback, setCopiedCallback] = useState(false);
-  const pillButtonClass = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-[11px] font-black text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 sm:min-h-9 sm:rounded-full sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-white/5 dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
+  const pillButtonClass = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-[11px] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 sm:min-h-9 sm:rounded-full sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-white/5 dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
     value: item.name,
     label: `${item.name}${item.isDefault ? "（默认）" : ""}`,
@@ -297,10 +297,10 @@ function IntegrationModal({
       >
         <div className="flex items-start justify-between gap-4 px-5 pb-0 pt-5 sm:px-7 sm:pt-7">
           <div className="min-w-0">
-            <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground dark:border-white/10 dark:bg-white/4">
+            <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground dark:border-white/10 dark:bg-white/4">
               Auto Pick
             </div>
-            <h2 className="mt-3 text-2xl font-black tracking-tight text-foreground">订单对接配置</h2>
+            <h2 className="mt-3 text-2xl tracking-tight text-foreground">订单对接配置</h2>
             <p className="mt-2 text-sm text-muted-foreground">脚本负责监听订单和执行动作，主系统这里只保留回调配置和门店映射。</p>
           </div>
           <button
@@ -316,7 +316,7 @@ function IntegrationModal({
           <div className="grid gap-5 lg:grid-cols-[420px_minmax(0,1fr)]">
             <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-1">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统回调地址</div>
+                <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">系统回调地址</div>
                 <button
                   type="button"
                   onClick={() => void copyCallbackUrl()}
@@ -335,7 +335,7 @@ function IntegrationModal({
             <div className="rounded-[20px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-1">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
                   <p className="mt-1 text-xs text-muted-foreground">这里只用于读取麦芽田门店，方便你做门店映射。</p>
                 </div>
                 <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
@@ -384,7 +384,7 @@ function IntegrationModal({
 
             <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-2">
               <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">脚本地址</div>
+                <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">脚本地址</div>
                 <input
                   value={integrationConfig.pluginBaseUrl}
                   onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
@@ -394,7 +394,7 @@ function IntegrationModal({
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">主系统通过这个地址调用 `auto-pick` 脚本。</p>
               </div>
               <div className="mt-4 min-w-0 border-t border-black/8 pt-4 dark:border-white/10">
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">回调密钥</div>
+                <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">回调密钥</div>
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
                   <input
                     type={showInboundApiKey ? "text" : "password"}
@@ -420,7 +420,7 @@ function IntegrationModal({
             <div className="rounded-[20px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">麦芽田门店绑定</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">麦芽田门店绑定</div>
                   <p className="mt-1 text-xs text-muted-foreground">读取麦芽田发货门店后，在这里手动映射到系统门店。</p>
                 </div>
                 <button
@@ -456,7 +456,7 @@ function IntegrationModal({
                         <div className="min-w-0">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="text-sm font-semibold leading-5 text-foreground">{shop.name}</div>
+                              <div className="text-sm leading-5 text-foreground">{shop.name}</div>
                               <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                                 {shop.address}
                               </div>
@@ -465,7 +465,7 @@ function IntegrationModal({
                               </div>
                             </div>
                             <span className={cn(
-                              "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
+                              "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.14em]",
                               isMappingInvalid
                                 ? "border border-rose-500/20 bg-rose-500/12 text-rose-600 dark:text-rose-400 animate-pulse"
                                 : mapped
@@ -476,14 +476,14 @@ function IntegrationModal({
                             </span>
                           </div>
                           {isMappingInvalid ? (
-                            <div className="mt-2.5 text-[11px] text-rose-500 font-bold">⚠️ 原绑定的系统门店 “{mapped.localShopName}” 已在管理中被删除或重命名！</div>
+                            <div className="mt-2.5 text-[11px] text-rose-500">⚠️ 原绑定的系统门店 “{mapped.localShopName}” 已在管理中被删除或重命名！</div>
                           ) : !mapped?.localShopName ? (
                             <div className="mt-2.5 text-[11px] text-muted-foreground">还没绑定系统门店。</div>
                           ) : null}
                         </div>
 
                         <div className="rounded-2xl border border-black/8 bg-black/2 p-2.5 dark:border-white/10 dark:bg-white/3">
-                          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
+                          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
                           {(() => {
                             const finalOptions = [{ value: "", label: "暂不映射" }, ...localShopOptions];
                             if (mapped?.localShopName && !localShopOptions.some(opt => opt.value === mapped.localShopName)) {
@@ -518,7 +518,7 @@ function IntegrationModal({
                             );
                           })()}
                           {isMappingInvalid ? (
-                            <div className="mt-2 text-[11px] text-rose-500 font-bold">请在此处重新选择一个有效的系统门店并保存。</div>
+                            <div className="mt-2 text-[11px] text-rose-500">请在此处重新选择一个有效的系统门店并保存。</div>
                           ) : !mapped?.localShopName ? (
                             <div className="mt-2 text-[11px] text-muted-foreground">选择后会固定这条映射。</div>
                           ) : null}
@@ -537,10 +537,10 @@ function IntegrationModal({
             <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-3 lg:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">自配完成时间</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">自配完成时间</div>
                   <p className="mt-1 text-[11px] text-muted-foreground">按环节输入分钟数。</p>
                 </div>
-                <div className="shrink-0 rounded-full border border-black/8 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-foreground dark:border-white/10 dark:bg-white/6">
+                <div className="shrink-0 rounded-full border border-black/8 bg-white/70 px-2.5 py-1 text-[10px] text-foreground dark:border-white/10 dark:bg-white/6">
                   当前公式: {timingTotalLabel}
                 </div>
               </div>
@@ -554,7 +554,7 @@ function IntegrationModal({
                 ].map((item) => (
                   <label key={item.key} className="rounded-xl border border-black/8 bg-white/78 px-3 py-2.5 dark:border-white/10 dark:bg-white/4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs font-semibold text-foreground">{item.label}</div>
+                      <div className="text-xs text-foreground">{item.label}</div>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
@@ -579,7 +579,7 @@ function IntegrationModal({
             <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-4 lg:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">自动推送刷单佣金</div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">自动推送刷单佣金</div>
                   <p className="mt-1 text-[11px] text-muted-foreground">订单自动同步刷单时，系统将采用此处设定的佣金金额。</p>
                 </div>
               </div>
@@ -721,8 +721,8 @@ function BrushSyncPickerModal({
       >
         <div className="flex items-start justify-between gap-3 border-b border-black/6 px-4 py-4 dark:border-white/6 sm:px-6 sm:py-5">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">同步刷单</div>
-            <h2 className="mt-1.5 text-xl font-black tracking-tight text-foreground sm:mt-2 sm:text-2xl">选择要纳入刷单的订单</h2>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">同步刷单</div>
+            <h2 className="mt-1.5 text-xl tracking-tight text-foreground sm:mt-2 sm:text-2xl">选择要纳入刷单的订单</h2>
             <p className="mt-1.5 text-xs leading-5 text-muted-foreground sm:mt-2 sm:text-sm">优先按流水号挑单，也可以搜订单号、店铺、地址或商品名。</p>
           </div>
           <button
@@ -748,14 +748,14 @@ function BrushSyncPickerModal({
             <button
               type="button"
               onClick={toggleVisibleSelection}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 sm:px-4 sm:text-sm"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 sm:px-4 sm:text-sm"
             >
               {allVisibleSelected ? "取消当前" : "全选当前"}
             </button>
             <button
               type="button"
               onClick={() => onSetSelected([])}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 sm:px-4 sm:text-sm"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 sm:px-4 sm:text-sm"
             >
               清空
             </button>
@@ -792,8 +792,8 @@ function BrushSyncPickerModal({
 
           <div className="mt-3 rounded-2xl border border-black/8 bg-black/2 px-3.5 py-3 text-sm dark:border-white/10 dark:bg-white/3 sm:px-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-muted-foreground">当前可选 {filteredOrders.length} 单</span>
-              <span className="font-semibold text-foreground">已选 {selectedCount} 单</span>
+              <span className="text-muted-foreground">当前可选 <span className="font-bold text-foreground">{filteredOrders.length}</span> 单</span>
+              <span className="text-foreground">已选 <span className="font-bold">{selectedCount}</span> 单</span>
             </div>
             <div className="mt-1 text-[11px] leading-5 text-muted-foreground">只显示已完成且符合刷单同步条件的订单</div>
           </div>
@@ -825,10 +825,10 @@ function BrushSyncPickerModal({
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <span className="inline-flex h-6 items-center rounded-full border border-black/8 bg-black/3 px-2 text-[12px] font-black text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-sm">
+                      <span className="inline-flex h-6 items-center rounded-full border border-black/8 bg-black/3 px-2 text-[12px] font-bold text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-sm">
                         流水 #{order.dailyPlatformSequence || 0}
                       </span>
-                      <span className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-semibold text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-xs">
+                      <span className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-full border border-black/8 bg-black/3 px-2 text-[11px] text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-xs">
                         <Image
                           src={platformMeta.iconSrc}
                           alt={platformMeta.iconAlt}
@@ -840,12 +840,12 @@ function BrushSyncPickerModal({
                         <span className="truncate">{platformLabel}</span>
                       </span>
                       {order.matchedShopName ? (
-                        <span className="inline-flex h-6 max-w-full items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 dark:text-sky-400 sm:h-7 sm:px-2.5 sm:text-xs">
+                        <span className="inline-flex h-6 max-w-full items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2 text-[11px] text-sky-700 dark:text-sky-400 sm:h-7 sm:px-2.5 sm:text-xs">
                           {order.matchedShopName}
                         </span>
                       ) : null}
                       {order.isMainSystemSelfDelivery ? (
-                        <span className="inline-flex h-6 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-semibold text-rose-600 dark:text-rose-400 sm:h-7 sm:px-2.5 sm:text-xs">
+                        <span className="inline-flex h-6 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] text-rose-600 dark:text-rose-400 sm:h-7 sm:px-2.5 sm:text-xs">
                           已标记刷单
                         </span>
                       ) : null}
@@ -871,7 +871,7 @@ function BrushSyncPickerModal({
         <div className="border-t border-black/6 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0))] dark:border-white/6 sm:px-6 sm:py-4 sm:pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-sm text-muted-foreground">已选 <span className="font-black text-foreground">{selectedCount}</span> 单</div>
+              <div className="text-sm text-muted-foreground">已选 <span className="font-bold text-foreground">{selectedCount}</span> 单</div>
               <div className="flex items-center gap-1.5 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-white/5">
                 <span className="text-xs text-muted-foreground shrink-0">佣金</span>
                 <input
@@ -890,7 +890,7 @@ function BrushSyncPickerModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-4 text-sm font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-4 text-sm text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
             >
               取消
             </button>
@@ -898,7 +898,7 @@ function BrushSyncPickerModal({
               type="button"
               onClick={() => onConfirm(parseFloat(commission) || 0)}
               disabled={selectedCount === 0 || isSubmitting}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-foreground px-4 text-sm font-black text-background transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-foreground px-4 text-sm text-background transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black"
             >
               {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
               同步所选
@@ -922,8 +922,8 @@ function MetricCard({
 }) {
   return (
     <div className="rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
-      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{value}</div>
+      <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-[30px] font-bold leading-none tracking-tight text-foreground">{value}</div>
       <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
@@ -957,17 +957,17 @@ function PromotionMetricCard({
     <>
       <div className="group relative rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 transition-all duration-300">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
+          <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-black text-primary hover:underline cursor-pointer"
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-primary hover:underline cursor-pointer"
           >
             录入/编辑
           </button>
         </div>
         <div
           onClick={() => setIsModalOpen(true)}
-          className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground cursor-pointer hover:opacity-85 transition-opacity duration-200"
+          className="mt-2 text-[30px] font-bold leading-none tracking-tight text-foreground cursor-pointer hover:opacity-85 transition-opacity duration-200"
         >
           ¥{amount.toFixed(2)}
         </div>
@@ -1662,9 +1662,9 @@ export default function OrdersPage() {
         <div className="fixed top-4 left-4 right-4 z-999999 rounded-2xl border border-rose-500 bg-rose-50 p-4 text-xs text-rose-700 shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:bg-rose-950/90 dark:text-rose-200 flex items-start gap-3">
           <span className="text-base shrink-0">🚨</span>
           <div className="min-w-0 flex-1">
-            <h4 className="font-bold">页面运行出错</h4>
+            <h4>页面运行出错</h4>
             <p className="mt-1 font-mono break-all leading-relaxed">{pageError}</p>
-            <button onClick={() => setPageError(null)} className="mt-2 text-[10px] font-bold text-rose-900 underline hover:no-underline dark:text-rose-100">关闭提示</button>
+            <button onClick={() => setPageError(null)} className="mt-2 text-[10px] text-rose-900 underline hover:no-underline dark:text-rose-100">关闭提示</button>
           </div>
         </div>
       )}
@@ -1674,7 +1674,7 @@ export default function OrdersPage() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">订单管理</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">订单管理</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {activeTab === "today" ? "聚焦今天待处理订单" : "按时间和状态回看订单"}
                 </p>
@@ -1685,7 +1685,7 @@ export default function OrdersPage() {
                   type="button"
                   onClick={syncOrders}
                   disabled={isBulkSyncing || isSubComponentLoading}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
                   {isBulkSyncing ? <Loader2 size={15} className="animate-spin" /> : <ArrowUpRight size={15} />}
                   一键同步
@@ -1695,7 +1695,7 @@ export default function OrdersPage() {
                   type="button"
                   onClick={openBrushSyncPicker}
                   disabled={isBulkBrushSyncing || isSubComponentLoading}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
                   {isBulkBrushSyncing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                   同步刷单
@@ -1703,7 +1703,7 @@ export default function OrdersPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateOfflineOpen(true)}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
                   <Plus size={15} />
                   录入线下
@@ -1711,7 +1711,7 @@ export default function OrdersPage() {
                 <button
                   type="button"
                   onClick={() => setIsIntegrationOpen(true)}
-                  className="relative inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="relative inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
                   <Settings2 size={15} />
                   对接配置
@@ -1730,7 +1730,7 @@ export default function OrdersPage() {
                 type="button"
                 onClick={() => setActiveTab("today")}
                 className={cn(
-                  "flex-1 rounded-lg px-5 py-2.5 text-sm font-black transition-all sm:min-w-35",
+                  "flex-1 rounded-lg px-5 py-2.5 text-sm transition-all sm:min-w-35",
                   activeTab === "today"
                     ? "bg-foreground text-background dark:bg-white dark:text-black"
                     : "text-muted-foreground hover:text-foreground"
@@ -1742,7 +1742,7 @@ export default function OrdersPage() {
                 type="button"
                 onClick={() => setActiveTab("all")}
                 className={cn(
-                  "flex-1 rounded-lg px-5 py-2.5 text-sm font-black transition-all sm:min-w-35",
+                  "flex-1 rounded-lg px-5 py-2.5 text-sm transition-all sm:min-w-35",
                   activeTab === "all"
                     ? "bg-foreground text-background dark:bg-white dark:text-black"
                     : "text-muted-foreground hover:text-foreground"
@@ -1756,24 +1756,24 @@ export default function OrdersPage() {
               <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
-                    <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
+                    <div className="mt-2 text-[30px] font-bold leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
                     {activeTab !== "today" && (
                       <p className="mt-2 text-xs text-muted-foreground">当前筛选共 {activeTotal} 单</p>
                     )}
                   </div>
                   <div className="flex min-w-24.5 max-w-31.5 flex-col items-stretch gap-1">
-                    <div className="inline-flex items-center justify-between rounded-full border border-sky-500/18 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-700 dark:text-sky-400">
+                    <div className="inline-flex items-center justify-between rounded-full border border-sky-500/18 bg-sky-500/10 px-2.5 py-1 text-[10px] text-sky-700 dark:text-sky-400">
                       <span className="truncate pr-2">真单</span>
-                      <span className="shrink-0">{activeOverview.trueOrderCount} 单</span>
+                      <span className="shrink-0 font-bold">{activeOverview.trueOrderCount} 单</span>
                     </div>
-                    <div className="inline-flex items-center justify-between rounded-full border border-rose-500/18 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-400">
+                    <div className="inline-flex items-center justify-between rounded-full border border-rose-500/18 bg-rose-500/10 px-2.5 py-1 text-[10px] text-rose-700 dark:text-rose-400">
                       <span className="truncate pr-2">刷单</span>
-                      <span className="shrink-0">{activeOverview.brushCount} 单</span>
+                      <span className="shrink-0 font-bold">{activeOverview.brushCount} 单</span>
                     </div>
-                    <div className="inline-flex items-center justify-between rounded-full border border-slate-500/18 bg-slate-500/10 px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                    <div className="inline-flex items-center justify-between rounded-full border border-slate-500/18 bg-slate-500/10 px-2.5 py-1 text-[10px] text-slate-600 dark:text-slate-400">
                       <span className="truncate pr-2">取消</span>
-                      <span className="shrink-0">{activeOverview.cancelledCount} 单</span>
+                      <span className="shrink-0 font-bold">{activeOverview.cancelledCount} 单</span>
                     </div>
                   </div>
                 </div>

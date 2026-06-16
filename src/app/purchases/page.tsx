@@ -64,6 +64,10 @@ function formatCurrency(value: number) {
   })}`;
 }
 
+function isAutoCreatedPurchaseOrder(order: Pick<PurchaseOrder, "id">) {
+  return order.id.startsWith("PO-AUTO-");
+}
+
 function PurchaseMetricCard({
   label,
   value,
@@ -81,8 +85,8 @@ function PurchaseMetricCard({
     <div className="rounded-[18px] border border-black/8 bg-white/76 px-3 py-2.5 shadow-xs dark:border-white/10 dark:bg-white/5 sm:px-3.5 sm:py-3">
       <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px] sm:tracking-[0.14em]">{label}</div>
-          <div className="mt-1 text-[18px] font-black leading-none tracking-tight text-foreground sm:mt-1.5 sm:text-[24px]">{value}</div>
+          <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px] sm:tracking-[0.14em]">{label}</div>
+          <div className="mt-1 text-[18px] font-bold leading-none tracking-tight text-foreground sm:mt-1.5 sm:text-[24px]">{value}</div>
           <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-muted-foreground sm:mt-1.5 sm:text-[11px]">{hint}</p>
         </div>
         <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border sm:h-9 sm:w-9", accentClassName)}>
@@ -395,17 +399,21 @@ function PurchasesContent() {
     }
   };
 
+  const visiblePurchases = useMemo(() => {
+    return purchases.filter((purchase) => !isAutoCreatedPurchaseOrder(purchase));
+  }, [purchases]);
+
   const filteredPurchases = useMemo(() => {
-    return filterPurchases(purchases, { searchQuery, statusFilter, shopFilter });
-  }, [purchases, searchQuery, statusFilter, shopFilter]);
+    return filterPurchases(visiblePurchases, { searchQuery, statusFilter, shopFilter });
+  }, [visiblePurchases, searchQuery, statusFilter, shopFilter]);
 
   const statsPurchases = useMemo(() => {
-    return filterPurchases(purchases, {
+    return filterPurchases(visiblePurchases, {
       searchQuery,
       statusFilter: "All",
       shopFilter,
     });
-  }, [purchases, searchQuery, shopFilter]);
+  }, [visiblePurchases, searchQuery, shopFilter]);
 
   const purchaseStats = useMemo(() => {
     const totalAmount = statsPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
@@ -432,7 +440,7 @@ function PurchasesContent() {
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
-  const selectedPurchases = purchases.filter((purchase) => selectedPurchaseIds.includes(purchase.id));
+  const selectedPurchases = visiblePurchases.filter((purchase) => selectedPurchaseIds.includes(purchase.id));
 
   useEffect(() => {
     setCurrentPage(1);
@@ -837,7 +845,7 @@ function PurchasesContent() {
           <div className="flex items-center gap-2 shrink-0">
             <button 
               onClick={handleCreate}
-              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all active:scale-95"
+              className="h-9 md:h-10 flex items-center gap-2 rounded-full bg-primary px-4 md:px-6 text-xs md:text-sm text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all active:scale-95"
             >
               <Plus size={16} className="md:w-4.5 md:h-4.5" />
               新建采购单
@@ -941,15 +949,15 @@ function PurchasesContent() {
                     </button>
                   </div>
                 </th>
-                <th className="w-[52px] px-1 py-3 text-xs font-bold text-foreground text-center whitespace-nowrap align-middle lg:w-[64px] lg:px-0">
+                <th className="w-[52px] px-1 py-3 text-xs text-foreground text-center whitespace-nowrap align-middle lg:w-[64px] lg:px-0">
                   <div className="flex justify-center">序号</div>
                 </th>
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">归属店铺</th>
-                <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">商品与数量</th>
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">交易金额</th>
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">状态</th>
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">下单时间</th>
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">操作</th>
+                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">归属店铺</th>
+                <th className="px-5 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">商品与数量</th>
+                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">交易金额</th>
+                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">状态</th>
+                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">下单时间</th>
+                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -993,7 +1001,7 @@ function PurchasesContent() {
                     </td>
                     <td className="px-4 py-4 text-center">
                       {po.shopName ? (
-                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1 text-[10px] font-bold text-primary">
+                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1 text-[10px] text-primary">
                               <Store size={10} />
                               <span className="truncate">{po.shopName}</span>
                           </span>
@@ -1020,7 +1028,7 @@ function PurchasesContent() {
                                 <span className="truncate text-[10px] font-medium leading-none text-foreground/80">
                                   {item.name}
                                 </span>
-                                <span className="shrink-0 text-[10px] font-black leading-none text-primary">
+                                <span className="shrink-0 text-[10px] font-bold leading-none text-primary">
                                   x{item.quantity}
                                 </span>
                               </div>
@@ -1032,15 +1040,15 @@ function PurchasesContent() {
                                 +{po.items.length - summary.items.length}
                               </div>
                             )}
-                            <div className="w-full text-center text-[10px] font-bold text-muted-foreground">
-                              共 {po.items.length} 项，数量 {summary.totalQuantity}
+                            <div className="w-full text-center text-[10px] text-muted-foreground">
+                              共 <span className="font-bold text-foreground">{po.items.length}</span> 项，数量 <span className="font-bold text-foreground">{summary.totalQuantity}</span>
                             </div>
                           </div>
                         );
                       })()}
                     </td>
                     <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center text-foreground font-bold">
+                      <div className="flex items-center justify-center font-bold text-foreground">
                         <span className="mr-0.5 opacity-60">￥</span>
                         {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
@@ -1088,7 +1096,7 @@ function PurchasesContent() {
                <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-6 text-muted-foreground/50 border border-dashed border-border group-hover:scale-110 transition-transform duration-500">
                  <ShoppingBag size={40} strokeWidth={1.5} />
                </div>
-               <h3 className="text-xl font-bold text-foreground">暂无采购记录</h3>
+               <h3 className="text-xl text-foreground">暂无采购记录</h3>
                <p className="text-muted-foreground text-sm mt-2 max-w-70 leading-relaxed">
                  {searchQuery || statusFilter !== 'Confirmed' || shopFilter !== 'All' ? '当前筛选条件下没有找到记录，尝试调整筛选或搜索关键词。' : '还没有采购记录，点击右上角“新建采购单”开始。'}
                </p>
@@ -1137,10 +1145,10 @@ function PurchasesContent() {
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-black text-foreground dark:bg-white/8 dark:text-white">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-bold text-foreground dark:bg-white/8 dark:text-white">
                           {(currentPage - 1) * pageSize + index + 1}
                         </span>
-                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-1 text-[11px] font-bold text-primary dark:bg-white/6 dark:text-white">
+                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-1 text-[11px] text-primary dark:bg-white/6 dark:text-white">
                           <Store size={12} />
                           <span className="max-w-[180px] truncate">{po.shopName || "未指定店铺"}</span>
                         </div>
@@ -1156,7 +1164,7 @@ function PurchasesContent() {
 
                 <div className="space-y-2.5">
                     <div className="rounded-[18px] border border-border/40 bg-muted/25 p-2.5 dark:border-white/6 dark:bg-white/[0.04]">
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/80">商品与数量</div>
+                      <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80">商品与数量</div>
                       {(() => {
                         const summary = formatPurchaseItemsSummary(po);
                         return (
@@ -1178,7 +1186,7 @@ function PurchasesContent() {
                                   <span className="max-w-[140px] truncate text-[10px] font-medium leading-none text-foreground/85">
                                     {item.name}
                                   </span>
-                                  <span className="shrink-0 text-[10px] font-black leading-none text-primary">
+                                  <span className="shrink-0 text-[10px] font-bold leading-none text-primary">
                                     x{item.quantity}
                                   </span>
                                 </div>
@@ -1186,12 +1194,12 @@ function PurchasesContent() {
                                 <div className="col-span-2 text-xs text-muted-foreground">暂无商品</div>
                               )}
                             </div>
-                            <div className="flex items-center justify-between rounded-xl bg-white/70 px-2.5 py-2 text-[10px] font-bold text-muted-foreground dark:bg-white/[0.06]">
+                            <div className="flex items-center justify-between rounded-xl bg-white/70 px-2.5 py-2 text-[10px] text-muted-foreground dark:bg-white/[0.06]">
                               <span>
-                                共 {po.items.length} 项
-                                {summary.hasMore ? ` · 另有 ${po.items.length - summary.items.length} 项` : ""}
+                                共 <span className="font-bold text-foreground">{po.items.length}</span> 项
+                                {summary.hasMore ? <> · 另有 <span className="font-bold text-foreground">{po.items.length - summary.items.length}</span> 项</> : ""}
                               </span>
-                              <span>数量 {summary.totalQuantity}</span>
+                              <span>数量 <span className="font-bold text-foreground">{summary.totalQuantity}</span></span>
                             </div>
                           </div>
                         );
@@ -1200,8 +1208,8 @@ function PurchasesContent() {
 
                     <div className="flex items-center gap-2 border-t border-border/30 pt-2 dark:border-white/6">
                       <div className="flex h-12 min-w-0 flex-1 flex-col justify-center rounded-2xl border border-border/40 bg-muted/25 px-3 dark:border-white/6 dark:bg-white/[0.04]">
-                        <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">交易金额</div>
-                        <div className="mt-0.5 text-[18px] font-black leading-none tracking-tight text-foreground">
+                        <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground/75">交易金额</div>
+                        <div className="mt-0.5 text-[18px] font-bold leading-none tracking-tight text-foreground">
                           {formatCurrency(po.totalAmount)}
                         </div>
                       </div>
@@ -1231,7 +1239,7 @@ function PurchasesContent() {
                <div className="h-16 w-16 rounded-full bg-muted/30 flex items-center justify-center mb-4 text-muted-foreground/50 border border-dashed border-border transition-transform duration-500">
                  <ShoppingBag size={32} />
                </div>
-               <h3 className="text-lg font-bold text-foreground">暂无采购记录</h3>
+               <h3 className="text-lg text-foreground">暂无采购记录</h3>
                <p className="text-muted-foreground text-xs mt-1 max-w-60">
                  {searchQuery || statusFilter !== 'Confirmed' || shopFilter !== 'All' ? '未找到匹配结果，尝试更改筛选条件或搜索关键词。' : '您目前还没有任何采购订单，立即创建一个吧。'}
                </p>
