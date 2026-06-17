@@ -14,7 +14,8 @@
     "audit:brush-cleanup": "bun scripts/audit_brush_inventory_cleanup.js",
     "cleanup:inactive-brush-products": "bun scripts/cleanup_inactive_brush_products.js",
     "migrate:purchase-items": "bun scripts/migrate-purchase-items.ts",
-    "backfill:legacy-inbound-costs": "bun scripts/backfill-legacy-inbound-costs.ts"
+    "backfill:legacy-inbound-costs": "bun scripts/backfill-legacy-inbound-costs.ts",
+    "backfill:purchase-order-dates": "bun scripts/backfill-purchase-order-dates.ts"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",

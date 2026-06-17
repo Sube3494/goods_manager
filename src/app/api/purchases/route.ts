@@ -10,6 +10,7 @@ import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
+import { parseAsShanghaiTime } from "@/lib/dateUtils";
 
 async function resolvePurchaseOrderResponse<T extends {
   status?: string;
@@ -236,7 +237,7 @@ export async function POST(request: Request) {
           id: orderId,
           type: type || undefined,
           status: normalizedStatus,
-          date: date ? new Date(date) : new Date(),
+          date: date ? parseAsShanghaiTime(date) : new Date(),
           totalAmount: normalizedTotalAmount,
           shippingFees: normalizedShippingFees,
           extraFees: normalizedExtraFees,
