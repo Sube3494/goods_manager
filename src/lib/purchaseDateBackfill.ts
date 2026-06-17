@@ -12,7 +12,7 @@ export type PurchaseDateBackfillOptions = {
   orderId?: string | null;
   from?: string | null;
   to?: string | null;
-  mode?: "strict" | "all-before-fix";
+  mode?: "strict" | "shanghai-day-mismatch" | "all-before-fix";
   toleranceMinutes?: number;
   includeTypes?: string[] | null;
   limit?: number | null;
@@ -21,7 +21,7 @@ export type PurchaseDateBackfillOptions = {
 type CandidateOrder = Awaited<ReturnType<typeof loadPurchaseOrders>>[number];
 
 type CandidateMatch = {
-  anchor: "createdAt" | "updatedAt";
+  anchor: "createdAt" | "updatedAt" | "shanghaiDayMismatch";
   diffMs: number;
   deltaFromTargetMs: number;
 };
@@ -123,6 +123,19 @@ function inspectOrder(order: CandidateOrder, options: PurchaseDateBackfillOption
     };
   }
 
+  if (mode === "shanghai-day-mismatch") {
+    const match = inspectShanghaiDayMismatchCandidate(order);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      order,
+      match,
+      nextDate: new Date(order.date.getTime() - EIGHT_HOURS_MS),
+    };
+  }
+
   const beforeFixUpperBound = parseArgsDate(options.to, "to");
   if (beforeFixUpperBound && order.createdAt.getTime() > beforeFixUpperBound.getTime()) {
     return null;
@@ -145,6 +158,77 @@ function formatDeltaMs(deltaMs: number) {
 
 function formatUtc(date: Date) {
   return date.toISOString();
+}
+
+function getShanghaiParts(date: Date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const values = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  ) as Record<string, string>;
+
+  return {
+    dayKey: `${values.year}-${values.month}-${values.day}`,
+    hour: Number(values.hour || 0),
+  };
+}
+
+function getShanghaiDayDiff(left: Date, right: Date) {
+  const leftParts = getShanghaiParts(left);
+  const rightParts = getShanghaiParts(right);
+  if (leftParts.dayKey === rightParts.dayKey) {
+    return 0;
+  }
+
+  const leftDay = Date.UTC(
+    Number(leftParts.dayKey.slice(0, 4)),
+    Number(leftParts.dayKey.slice(5, 7)) - 1,
+    Number(leftParts.dayKey.slice(8, 10))
+  );
+  const rightDay = Date.UTC(
+    Number(rightParts.dayKey.slice(0, 4)),
+    Number(rightParts.dayKey.slice(5, 7)) - 1,
+    Number(rightParts.dayKey.slice(8, 10))
+  );
+
+  return Math.round((leftDay - rightDay) / (24 * 60 * 60 * 1000));
+}
+
+function inspectShanghaiDayMismatchCandidate(order: CandidateOrder): CandidateMatch | null {
+  const dateParts = getShanghaiParts(order.date);
+  const createdParts = getShanghaiParts(order.createdAt);
+  const dayDiff = getShanghaiDayDiff(order.date, order.createdAt);
+  const diffMs = order.date.getTime() - order.createdAt.getTime();
+
+  if (dayDiff !== 1) {
+    return null;
+  }
+
+  if (dateParts.hour > 7) {
+    return null;
+  }
+
+  if (createdParts.hour < 8) {
+    return null;
+  }
+
+  return {
+    anchor: "shanghaiDayMismatch",
+    diffMs,
+    deltaFromTargetMs: Math.abs(diffMs - EIGHT_HOURS_MS),
+  };
 }
 
 export async function runPurchaseDateBackfill(options: PurchaseDateBackfillOptions = {}) {

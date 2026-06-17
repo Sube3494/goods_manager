@@ -24,7 +24,7 @@ function parseArgs(argv: string[]) {
     orderId: args.get("orderId") || null,
     from: args.get("from") || null,
     to: args.get("to") || null,
-    mode: (args.get("mode") as "strict" | "all-before-fix" | undefined) || "strict",
+    mode: (args.get("mode") as "strict" | "shanghai-day-mismatch" | "all-before-fix" | undefined) || "strict",
     toleranceMinutes: args.get("toleranceMinutes") ? Number(args.get("toleranceMinutes")) : undefined,
     includeTypes: includeTypesRaw
       ? includeTypesRaw.split(",").map((item) => item.trim()).filter(Boolean)
