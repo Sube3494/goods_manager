@@ -9,6 +9,7 @@ import { FinanceMath } from "@/lib/math";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
+import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 
 async function resolvePurchaseOrderResponse<T extends {
   status?: string;
@@ -215,6 +216,20 @@ export async function POST(request: Request) {
 
     const purchase = await prisma.$transaction(async (tx) => {
       const sanitizedItems = await sanitizePurchaseOrderItemSuppliers(tx, Array.isArray(items) ? items : []);
+      const normalizedShippingFees = FinanceMath.add(Number(shippingFees) || 0, 0);
+      const normalizedExtraFees = FinanceMath.add(Number(extraFees) || 0, 0);
+      const normalizedDiscountAmount = FinanceMath.add(Number(discountAmount) || 0, 0);
+      const costAllocatedItems = allocateShippingToPurchaseItems(
+        sanitizedItems,
+        normalizedShippingFees,
+        normalizedExtraFees
+      );
+      const normalizedTotalAmount = calculatePurchaseOrderTotalAmount({
+        items: sanitizedItems,
+        shippingFees: normalizedShippingFees,
+        extraFees: normalizedExtraFees,
+        discountAmount: normalizedDiscountAmount,
+      });
 
       const p = await tx.purchaseOrder.create({
         data: {
@@ -222,10 +237,10 @@ export async function POST(request: Request) {
           type: type || undefined,
           status: normalizedStatus,
           date: date ? new Date(date) : new Date(),
-          totalAmount: FinanceMath.add(Number(totalAmount) || 0, 0),
-          shippingFees: FinanceMath.add(Number(shippingFees) || 0, 0),
-          extraFees: FinanceMath.add(Number(extraFees) || 0, 0),
-          discountAmount: FinanceMath.add(Number(discountAmount) || 0, 0),
+          totalAmount: normalizedTotalAmount,
+          shippingFees: normalizedShippingFees,
+          extraFees: normalizedExtraFees,
+          discountAmount: normalizedDiscountAmount,
 
           paymentVouchers: paymentVouchers || [],
           trackingData: trackingData || [],
@@ -234,7 +249,7 @@ export async function POST(request: Request) {
           note: String(note || "").trim() || null,
           userId: session.id,
           items: {
-            create: sanitizedItems.map((item: PurchaseOrderItem) => ({
+            create: costAllocatedItems.map((item: PurchaseOrderItem) => ({
               productId: item.productId || null,
               shopProductId: item.shopProductId || null,
               supplierId: item.supplierId,
@@ -257,7 +272,7 @@ export async function POST(request: Request) {
 
       // 如果状态是 Received，更新店铺商品成本价，并调用同步物理库存 (原子事务)
       if (normalizedStatus === "Received") {
-        for (const item of sanitizedItems) {
+        for (const item of costAllocatedItems) {
           if (item.shopProductId) {
             const incomingCost = FinanceMath.add(Number(item.costPrice) || 0, 0);
             if (incomingCost > 0) {

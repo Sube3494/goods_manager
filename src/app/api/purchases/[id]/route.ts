@@ -5,6 +5,7 @@ import { FinanceMath } from "@/lib/math";
 import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 import { Prisma } from "../../../../../prisma/generated-client";
+import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 
 function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
   const nextStock = currentStock - revertQty;
@@ -195,7 +196,16 @@ export async function PUT(
         }
         const existingItemsById = new Map(existingPurchase.items.map((item) => [item.id, item] as const));
         const costPriceByPurchaseOrderItemId = new Map<string, number>();
-        let nextItemsTotalAmount = 0;
+        const normalizedShippingFees = shippingFees !== undefined
+          ? FinanceMath.add(Number(shippingFees) || 0, 0)
+          : Number(existingPurchase.shippingFees || 0);
+        const normalizedExtraFees = extraFees !== undefined
+          ? FinanceMath.add(Number(extraFees) || 0, 0)
+          : Number(existingPurchase.extraFees || 0);
+        const normalizedDiscountAmount = discountAmount !== undefined
+          ? FinanceMath.add(Number(discountAmount) || 0, 0)
+          : Number(existingPurchase.discountAmount || 0);
+        const validatedItems: PurchaseOrderItemType[] = [];
 
         for (const rawItem of items as PurchaseOrderItemType[]) {
           const itemId = String(rawItem.id || "").trim();
@@ -211,14 +221,24 @@ export async function PUT(
             || (rawItem.shopProductId || null) !== (existingItem.shopProductId || null)) {
             throw new Error("已入库批次补录成本时不能修改关联商品");
           }
-          const nextCostPrice = FinanceMath.add(Number(rawItem.costPrice) || 0, 0);
-          costPriceByPurchaseOrderItemId.set(existingItem.id, nextCostPrice);
-          nextItemsTotalAmount = FinanceMath.add(
-            nextItemsTotalAmount,
-            FinanceMath.multiply(nextCostPrice, nextQuantity)
-          );
+          validatedItems.push({
+            ...rawItem,
+            id: existingItem.id,
+            quantity: nextQuantity,
+            costPrice: FinanceMath.add(Number(rawItem.costPrice) || 0, 0),
+          });
         }
 
+        const allocatedItems = allocateShippingToPurchaseItems(
+          validatedItems,
+          normalizedShippingFees,
+          normalizedExtraFees
+        );
+        for (const item of allocatedItems) {
+          if (item.id) {
+            costPriceByPurchaseOrderItemId.set(item.id, FinanceMath.add(Number(item.costPrice) || 0, 0));
+          }
+        }
         if (existingItemsById.size !== costPriceByPurchaseOrderItemId.size) {
           throw new Error("已入库批次补录成本时需要保留完整的原始明细");
         }
@@ -239,9 +259,15 @@ export async function PUT(
         await tx.purchaseOrder.update({
           where: { id },
           data: {
-            totalAmount: totalAmount !== undefined
-              ? FinanceMath.add(Number(totalAmount), 0)
-              : nextItemsTotalAmount,
+            shippingFees: shippingFees !== undefined ? normalizedShippingFees : undefined,
+            extraFees: extraFees !== undefined ? normalizedExtraFees : undefined,
+            discountAmount: discountAmount !== undefined ? normalizedDiscountAmount : undefined,
+            totalAmount: calculatePurchaseOrderTotalAmount({
+              items: validatedItems,
+              shippingFees: normalizedShippingFees,
+              extraFees: normalizedExtraFees,
+              discountAmount: normalizedDiscountAmount,
+            }),
           },
         });
 
@@ -311,15 +337,39 @@ export async function PUT(
       const sanitizedItems = items
         ? await sanitizePurchaseOrderItemSuppliers(tx, Array.isArray(items) ? items : [])
         : null;
+      const normalizedShippingFees = shippingFees !== undefined
+        ? FinanceMath.add(Number(shippingFees) || 0, 0)
+        : Number(existingPurchase.shippingFees || 0);
+      const normalizedExtraFees = extraFees !== undefined
+        ? FinanceMath.add(Number(extraFees) || 0, 0)
+        : Number(existingPurchase.extraFees || 0);
+      const normalizedDiscountAmount = discountAmount !== undefined
+        ? FinanceMath.add(Number(discountAmount) || 0, 0)
+        : Number(existingPurchase.discountAmount || 0);
+      const allocatedItems = sanitizedItems
+        ? allocateShippingToPurchaseItems(
+            sanitizedItems,
+            normalizedShippingFees,
+            normalizedExtraFees
+          )
+        : null;
+      const normalizedTotalAmount = sanitizedItems
+        ? calculatePurchaseOrderTotalAmount({
+            items: sanitizedItems,
+            shippingFees: normalizedShippingFees,
+            extraFees: normalizedExtraFees,
+            discountAmount: normalizedDiscountAmount,
+          })
+        : undefined;
 
       const p = await tx.purchaseOrder.update({
         where: { id },
         data: {
           status: nextStatus,
-          totalAmount: totalAmount !== undefined ? FinanceMath.add(Number(totalAmount), 0) : undefined,
-          shippingFees: shippingFees !== undefined ? FinanceMath.add(Number(shippingFees), 0) : undefined,
-          extraFees: extraFees !== undefined ? FinanceMath.add(Number(extraFees), 0) : undefined,
-          discountAmount: discountAmount !== undefined ? FinanceMath.add(Number(discountAmount), 0) : undefined,
+          totalAmount: normalizedTotalAmount,
+          shippingFees: shippingFees !== undefined ? normalizedShippingFees : undefined,
+          extraFees: extraFees !== undefined ? normalizedExtraFees : undefined,
+          discountAmount: discountAmount !== undefined ? normalizedDiscountAmount : undefined,
 
           paymentVouchers: paymentVouchers !== undefined ? paymentVouchers : undefined,
           trackingData: trackingData !== undefined ? trackingData : undefined,
@@ -329,7 +379,7 @@ export async function PUT(
           ...(sanitizedItems && {
             items: {
               deleteMany: {},
-              create: sanitizedItems.map((item: PurchaseOrderItemType) => ({
+              create: (allocatedItems || []).map((item: PurchaseOrderItemType) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 supplierId: item.supplierId,

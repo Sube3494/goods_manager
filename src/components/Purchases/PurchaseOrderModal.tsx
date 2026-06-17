@@ -1278,43 +1278,48 @@ export function PurchaseOrderModal({
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
                         {/* Fee Pills Group - Horizontal Scroll on Mobile */}
                         {!isSystemGenerated && formData.type !== "Inbound" && (
-                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-2 px-2 py-0.5 sm:mx-0 sm:px-0 sm:py-0">
-                                <FeePill 
-                                    icon={Truck}
-                                    label="运费"
-                                    value={formData.shippingFees}
-                                    inputValue={shippingFeeInput}
-                                    onChange={(val: string) => {
-                                        setShippingFeeInput(val);
-                                        setFormData(prev => ({...prev, shippingFees: parseFloat(val) || 0}));
-                                    }}
-                                    readOnly={effectiveReadOnly}
-                                    colorClass="hover:border-orange-500/30"
-                                />
-                                <FeePill 
-                                    icon={Plus}
-                                    label="其它"
-                                    value={formData.extraFees}
-                                    inputValue={extraFeeInput}
-                                    onChange={(val: string) => {
-                                        setExtraFeeInput(val);
-                                        setFormData(prev => ({...prev, extraFees: parseFloat(val) || 0}));
-                                    }}
-                                    readOnly={effectiveReadOnly}
-                                    colorClass="hover:border-blue-500/30"
-                                />
-                                <FeePill 
-                                    icon={Minus}
-                                    label="折扣"
-                                    value={formData.discountAmount || 0}
-                                    inputValue={discountInput}
-                                    onChange={(val: string) => {
-                                        setDiscountInput(val);
-                                        setFormData(prev => ({...prev, discountAmount: parseFloat(val) || 0}));
-                                    }}
-                                    readOnly={effectiveReadOnly}
-                                    colorClass="bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40"
-                                />
+                            <div className="flex flex-col gap-2 min-w-0">
+                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-2 px-2 py-0.5 sm:mx-0 sm:px-0 sm:py-0">
+                                    <FeePill 
+                                        icon={Truck}
+                                        label="运费"
+                                        value={formData.shippingFees}
+                                        inputValue={shippingFeeInput}
+                                        onChange={(val: string) => {
+                                            setShippingFeeInput(val);
+                                            setFormData(prev => ({...prev, shippingFees: parseFloat(val) || 0}));
+                                        }}
+                                        readOnly={effectiveReadOnly}
+                                        colorClass="hover:border-orange-500/30"
+                                    />
+                                    <FeePill 
+                                        icon={Plus}
+                                        label="其它"
+                                        value={formData.extraFees}
+                                        inputValue={extraFeeInput}
+                                        onChange={(val: string) => {
+                                            setExtraFeeInput(val);
+                                            setFormData(prev => ({...prev, extraFees: parseFloat(val) || 0}));
+                                        }}
+                                        readOnly={effectiveReadOnly}
+                                        colorClass="hover:border-blue-500/30"
+                                    />
+                                    <FeePill 
+                                        icon={Minus}
+                                        label="折扣"
+                                        value={formData.discountAmount || 0}
+                                        inputValue={discountInput}
+                                        onChange={(val: string) => {
+                                            setDiscountInput(val);
+                                            setFormData(prev => ({...prev, discountAmount: parseFloat(val) || 0}));
+                                        }}
+                                        readOnly={effectiveReadOnly}
+                                        colorClass="bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40"
+                                    />
+                                </div>
+                                <p className="px-2 text-[10px] leading-4 text-muted-foreground sm:px-0 sm:text-[11px]">
+                                    运费和其它费用会按采购单总件数自动均摊到单件成本，折扣仅抵扣整单金额。
+                                </p>
                             </div>
                         )}
 

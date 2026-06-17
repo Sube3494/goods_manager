@@ -4,6 +4,7 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { Prisma } from "../../../../../prisma/generated-client";
+import { calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 
 type ParsedOutboundSnapshotBatch = {
   purchaseOrderItemId: string;
@@ -314,18 +315,18 @@ export async function POST(request: Request) {
           const allOrderItems = await tx.purchaseOrderItem.findMany({
             where: { purchaseOrderId: order.id },
           });
-          
-          let newTotalAmount = 0;
-          for (const item of allOrderItems) {
-            const price = item.costPrice || 0;
-            const qty = item.quantity || 0;
-            newTotalAmount = FinanceMath.add(newTotalAmount, FinanceMath.multiply(price, qty));
-          }
 
           await tx.purchaseOrder.update({
             where: { id: order.id },
             data: {
-              totalAmount: newTotalAmount,
+              totalAmount: calculatePurchaseOrderTotalAmount({
+                items: allOrderItems.map((item) => ({
+                  quantity: item.quantity || 0,
+                  costPrice: item.costPrice || 0,
+                })),
+                extraFees: order.extraFees || 0,
+                discountAmount: order.discountAmount || 0,
+              }),
             },
           });
         }
