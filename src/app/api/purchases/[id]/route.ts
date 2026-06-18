@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PurchaseOrderItem as PurchaseOrderItemType } from "@/lib/types";
 import { FinanceMath } from "@/lib/math";
-import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
+import { sanitizePurchaseOrderItems } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
@@ -336,7 +336,7 @@ export async function PUT(
       }
 
       const sanitizedItems = items
-        ? await sanitizePurchaseOrderItemSuppliers(tx, Array.isArray(items) ? items : [])
+        ? await sanitizePurchaseOrderItems(tx, Array.isArray(items) ? items : [])
         : null;
       const normalizedShippingFees = shippingFees !== undefined
         ? FinanceMath.add(Number(shippingFees) || 0, 0)

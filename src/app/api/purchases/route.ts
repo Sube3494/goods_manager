@@ -7,7 +7,7 @@ import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
-import { sanitizePurchaseOrderItemSuppliers } from "@/lib/purchaseOrderItems";
+import { sanitizePurchaseOrderItems } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
@@ -216,7 +216,7 @@ export async function POST(request: Request) {
     const normalizedStatus = status === "Draft" ? "Confirmed" : (status || "Confirmed");
 
     const purchase = await prisma.$transaction(async (tx) => {
-      const sanitizedItems = await sanitizePurchaseOrderItemSuppliers(tx, Array.isArray(items) ? items : []);
+      const sanitizedItems = await sanitizePurchaseOrderItems(tx, Array.isArray(items) ? items : []);
       const normalizedShippingFees = FinanceMath.add(Number(shippingFees) || 0, 0);
       const normalizedExtraFees = FinanceMath.add(Number(extraFees) || 0, 0);
       const normalizedDiscountAmount = FinanceMath.add(Number(discountAmount) || 0, 0);
