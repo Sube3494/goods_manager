@@ -223,7 +223,7 @@ const PurchaseItemRow = memo(({
                             <input 
                                 type="number" 
                                 step="0.01"
-                                value={item.costPrice || ""}
+                                value={item.costPrice ?? ""}
                                 onChange={(e) => onUpdate(itemKey, "costPrice", e.target.value)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                             />
@@ -246,7 +246,7 @@ const PurchaseItemRow = memo(({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={item.quantity && item.costPrice ? Number((item.quantity * item.costPrice).toFixed(2)) : ""}
+                                value={item.quantity ? Number((item.quantity * (item.costPrice ?? 0)).toFixed(2)) : ""}
                                 onChange={(e) => onUpdate(itemKey, "lineTotal", e.target.value)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs text-right no-spinner"
                             />

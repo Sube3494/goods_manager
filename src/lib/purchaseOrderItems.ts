@@ -47,6 +47,12 @@ export async function sanitizePurchaseOrderItems<T extends PurchaseOrderItemWith
     ),
   ];
 
+  const shopProductLookupIds = [
+    ...new Set(
+      [...normalizedShopProductIds, ...normalizedProductIds].filter(Boolean),
+    ),
+  ];
+
   const [suppliers, shopProducts, products] = await Promise.all([
     normalizedSupplierIds.length > 0
       ? tx.supplier.findMany({
@@ -58,10 +64,10 @@ export async function sanitizePurchaseOrderItems<T extends PurchaseOrderItemWith
           },
         })
       : Promise.resolve([]),
-    normalizedShopProductIds.length > 0
+    shopProductLookupIds.length > 0
       ? tx.shopProduct.findMany({
           where: {
-            id: { in: normalizedShopProductIds },
+            id: { in: shopProductLookupIds },
           },
           select: {
             id: true,
@@ -87,8 +93,12 @@ export async function sanitizePurchaseOrderItems<T extends PurchaseOrderItemWith
 
   return items.map((item) => {
     const supplierId = normalizeSupplierId(item.supplierId);
-    const shopProductId = normalizeEntityId(item.shopProductId);
+    const rawShopProductId = normalizeEntityId(item.shopProductId);
     const requestedProductId = normalizeEntityId(item.productId);
+    const legacyShopProduct = !rawShopProductId && requestedProductId && !validProductIds.has(requestedProductId)
+      ? shopProductMap.get(requestedProductId) || null
+      : null;
+    const shopProductId = rawShopProductId || legacyShopProduct?.id || null;
     const linkedShopProduct = shopProductId ? shopProductMap.get(shopProductId) : null;
 
     if (shopProductId && !linkedShopProduct) {
