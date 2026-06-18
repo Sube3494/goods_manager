@@ -18,6 +18,8 @@ FROM oven/bun:1-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 ENV npm_config_registry="https://registry.npmmirror.com"
+ENV PRISMA_ENGINES_MIRROR="https://npmmirror.com/mirrors/prisma"
+ENV PRISMA_BINARIES_MIRROR="https://npmmirror.com/mirrors/prisma"
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
@@ -30,7 +32,8 @@ ARG NEXT_PUBLIC_AMAP_KEY
 ARG NEXT_PUBLIC_AMAP_SECURITY_CODE
 ENV NEXT_PUBLIC_AMAP_KEY=$NEXT_PUBLIC_AMAP_KEY
 ENV NEXT_PUBLIC_AMAP_SECURITY_CODE=$NEXT_PUBLIC_AMAP_SECURITY_CODE
-RUN bun run build
+RUN --mount=type=cache,id=prisma-engines,target=/root/.cache/prisma \
+    bun run build
 
 # ================================
 # Stage 3: 运行时
