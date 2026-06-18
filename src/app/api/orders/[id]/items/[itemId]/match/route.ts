@@ -124,6 +124,7 @@ export async function PATCH(
     let shopProductSku: string | null = null;
     let shopProductImage: string | null = null;
     let shopProductLinkedProductId: string | null = null;
+    let matchedShopProductId: string | null = null;
 
     if (!product) {
       const shopProduct = await prisma.shopProduct.findFirst({
@@ -154,6 +155,7 @@ export async function PATCH(
       });
 
       if (shopProduct) {
+        matchedShopProductId = shopProduct.id;
         // 优先用 ShopProduct 自身的信息，再用关联的 Product 兜底
         shopProductName = shopProduct.productName || shopProduct.product?.name || null;
         shopProductSku = shopProduct.sku || shopProduct.product?.sku || null;
@@ -184,7 +186,8 @@ export async function PATCH(
       name: resolvedName,
       sku: resolvedSku,
       image: rawImage ? storage.resolveUrl(rawImage) : null,
-      sourceType: "product" as const,
+      sourceType: matchedShopProductId ? "shopProduct" as const : "product" as const,
+      shopProductId: matchedShopProductId,
       shopName: null,
       isManual: true,
     };
@@ -217,6 +220,7 @@ export async function PATCH(
             sku: matchedProduct.sku,
             image: matchedProduct.image,
             sourceType: matchedProduct.sourceType,
+            shopProductId: matchedProduct.shopProductId,
             shopName: matchedProduct.shopName,
             ...(autoMatchedProduct ? { autoMatchedProduct } : {}),
           },

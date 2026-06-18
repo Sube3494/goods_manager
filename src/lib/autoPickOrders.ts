@@ -128,6 +128,7 @@ type AutoPickManualMatchedProductMeta = {
   sku?: string | null;
   image?: string | null;
   sourceType?: "product" | "shopProduct";
+  shopProductId?: string | null;
   shopName?: string | null;
 };
 
@@ -2977,6 +2978,7 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
     sku: String(manual.sku || "").trim() || null,
     image: String(manual.image || "").trim() || null,
     sourceType: manual.sourceType === "shopProduct" ? "shopProduct" as const : "product" as const,
+    shopProductId: String(manual.shopProductId || "").trim() || null,
     shopName: String(manual.shopName || "").trim() || null,
   };
 }
@@ -4237,24 +4239,42 @@ async function resolveOutboundItemsForAutoPickOrder(
 
     for (const normalizedSku of skuParts) {
       if (manualMatchedProduct?.id) {
-        let manualShopProductId: string | null = null;
-        if (internalShop?.id) {
-          const matchedShopProduct = await tx.shopProduct.findFirst({
-            where: {
-              shopId: internalShop.id,
-              OR: [
-                { productId: manualMatchedProduct.id },
-                { sourceProductId: manualMatchedProduct.id },
-              ],
-            },
-            select: { id: true },
-            orderBy: { updatedAt: "desc" },
-          });
-          manualShopProductId = matchedShopProduct?.id || null;
+        const storedManualShopProductId = String(manualMatchedProduct.shopProductId || "").trim() || null;
+        let manualShopProductId: string | null = storedManualShopProductId;
+        let manualResolvedProductId: string | null =
+          manualMatchedProduct.sourceType === "shopProduct" ? null : manualMatchedProduct.id;
+
+        const matchedShopProduct = await tx.shopProduct.findFirst({
+          where: {
+            shop: { userId },
+            ...(internalShop?.id ? { shopId: internalShop.id } : {}),
+            OR: [
+              ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
+              { id: manualMatchedProduct.id },
+              { productId: manualMatchedProduct.id },
+              { sourceProductId: manualMatchedProduct.id },
+            ],
+          },
+          select: {
+            id: true,
+            productId: true,
+            sourceProductId: true,
+          },
+          orderBy: { updatedAt: "desc" },
+        });
+
+        if (matchedShopProduct) {
+          manualShopProductId = matchedShopProduct.id;
+          manualResolvedProductId = String(
+            matchedShopProduct.productId
+            || matchedShopProduct.sourceProductId
+            || manualResolvedProductId
+            || ""
+          ).trim() || null;
         }
 
         resolvedItems.push({
-          productId: manualMatchedProduct.id,
+          productId: manualResolvedProductId,
           shopProductId: manualShopProductId,
           quantity: Math.max(1, Number(item.quantity || 1) || 1),
           price: perResolvedPrice,
