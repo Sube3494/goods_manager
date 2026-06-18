@@ -811,6 +811,7 @@ export async function GET(request: NextRequest) {
     };
 
     const cancelledWhere = buildStatusWhere("已取消");
+    const deletedWhere = buildStatusWhere("已删除");
 
     const [orders, total, platformRows, statusRows, userProfile, cancelledTotal, brushTotal, summaryOrders] = await Promise.all([
       prisma.autoPickOrder.findMany({
@@ -895,7 +896,10 @@ export async function GET(request: NextRequest) {
         : prisma.autoPickOrder.count({
             where: {
               ...where,
-              ...(cancelledWhere || {}),
+              OR: [
+                ...(cancelledWhere ? [cancelledWhere] : []),
+                ...(deletedWhere ? [deletedWhere] : []),
+              ],
             },
           }),
       !includeMetrics
@@ -903,7 +907,16 @@ export async function GET(request: NextRequest) {
         : prisma.autoPickOrder.count({
             where: {
               ...where,
-              ...(cancelledWhere ? { NOT: cancelledWhere } : {}),
+              ...(cancelledWhere || deletedWhere
+                ? {
+                    NOT: {
+                      OR: [
+                        ...(cancelledWhere ? [cancelledWhere] : []),
+                        ...(deletedWhere ? [deletedWhere] : []),
+                      ],
+                    },
+                  }
+                : {}),
               rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true },
             },
           }),
@@ -1253,7 +1266,8 @@ export async function GET(request: NextRequest) {
           const expectedIncome = order.expectedIncome;
           const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
-          if (!cancelled) {
+          const deleted = isAutoPickOrderDeletedStatus(order.status);
+          if (!cancelled && !deleted) {
             acc.receivedAmount += Math.max(0, Number(metrics.expectedIncome || 0));
             acc.platformCommission += metrics.platformCommission;
             acc.validOrderCount += 1;

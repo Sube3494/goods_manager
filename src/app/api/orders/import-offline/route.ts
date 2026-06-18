@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { createOutboundFromAutoPickOrder } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
+import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 
 export const dynamic = "force-dynamic";
 
@@ -249,9 +250,11 @@ export async function POST(request: NextRequest) {
         }
       } catch (outboundErr) {
         console.error("Auto outbound failed for manual offline order:", outboundErr);
+        const outboundMessage = getOutboundOrderItemSchemaErrorMessage(outboundErr)
+          || (outboundErr instanceof Error ? outboundErr.message : "自动生成出库单失败");
         outboundResult = {
           success: false,
-          error: outboundErr instanceof Error ? outboundErr.message : "自动生成出库单失败",
+          error: outboundMessage,
         };
         // 记录出库失败状态到订单的 systemMeta 属性中
         await prisma.autoPickOrder.update({
@@ -261,13 +264,13 @@ export async function POST(request: NextRequest) {
               ...rawPayload,
               systemMeta: {
                 ...rawPayload.systemMeta,
-                autoOutbound: {
-                  status: "failed",
-                  attemptedAt: new Date().toISOString(),
-                  error: outboundErr instanceof Error ? outboundErr.message : "出库处理异常",
+                  autoOutbound: {
+                    status: "failed",
+                    attemptedAt: new Date().toISOString(),
+                    error: outboundMessage,
+                  },
                 },
               },
-            },
           },
         }).catch(() => null);
       }

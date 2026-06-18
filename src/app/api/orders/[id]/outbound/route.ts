@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUserAny } from "@/lib/auth";
 import { createOutboundFromAutoPickOrder } from "@/lib/autoPickOrders";
+import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   } catch (error) {
     console.error("Failed to create outbound from auto-pick order:", error);
     return NextResponse.json({
-      error: error instanceof Error ? error.message : "Failed to create outbound order",
+      error: getOutboundOrderItemSchemaErrorMessage(error)
+        || (error instanceof Error ? error.message : "Failed to create outbound order"),
     }, { status: 500 });
   }
 }

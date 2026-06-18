@@ -5,6 +5,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { InventoryService } from "@/services/inventoryService";
 import { FinanceMath } from "@/lib/math";
 import { getStorageStrategy } from "@/lib/storage";
+import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
  
 interface OutboundItem {
   productId: string;
@@ -155,7 +156,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to process outbound order";
+    const message = getOutboundOrderItemSchemaErrorMessage(error)
+      || (error instanceof Error ? error.message : "Failed to process outbound order");
     console.error("Outbound processing failed:", error);
     return NextResponse.json({ error: message }, { status: 500 });
   }

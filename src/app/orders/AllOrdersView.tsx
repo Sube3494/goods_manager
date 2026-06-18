@@ -13,6 +13,7 @@ import {
   OrderCardErrorBoundary,
   summarizeOrders,
   isCancelledStatus,
+  isDeletedStatus,
   isAbnormalStatus,
   isBrushSyncEligibleOrder,
   getOrderActionErrorMessage
@@ -327,8 +328,8 @@ export function AllOrdersView({
         cancelledCount: overview.cancelledCount,
       };
     }
-    const cancelledCount = filteredOrders.filter((item) => isCancelledStatus(item.status)).length;
-    const validOrders = filteredOrders.filter((item) => !isCancelledStatus(item.status));
+    const cancelledCount = filteredOrders.filter((item) => isCancelledStatus(item.status) || isDeletedStatus(item.status)).length;
+    const validOrders = filteredOrders.filter((item) => !isCancelledStatus(item.status) && !isDeletedStatus(item.status));
     const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status)).length;
     const trueOrderCount = Math.max(0, validOrders.length - brushCount);
     return {

@@ -15,6 +15,7 @@ import {
   Loader2,
   MapPin,
   Package2,
+  Pencil,
   RefreshCw,
   Search,
   Settings2,
@@ -166,7 +167,7 @@ export function getDeliveryFee(delivery: unknown) {
 
 export function summarizeOrders(orders: AutoPickOrder[]) {
   return orders.reduce((acc, order) => {
-    if (!isCancelledStatus(order.status)) {
+    if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
       acc.receivedAmount += Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
       acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
       acc.validOrderCount += 1;
@@ -331,6 +332,10 @@ export function isCompletedStatus(status?: string | null) {
 
 export function isCancelledStatus(status?: string | null) {
   return isAutoPickOrderCancelledStatus(status);
+}
+
+export function isDeletedStatus(status?: string | null) {
+  return getBaseAutoPickStatusDisplay(status) === "已删除";
 }
 
 export function isTerminalStatus(status?: string | null) {
@@ -1031,12 +1036,34 @@ export function OrderCard({
   onRefresh?: () => void;
 }) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
+  const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
   const [isSavingAmount, setIsSavingAmount] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingOffline, setIsDeletingOffline] = useState(false);
   const { showToast } = useToast();
+  const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearProfitTooltipHoverTimeout = useCallback(() => {
+    if (profitTooltipHoverTimeoutRef.current) {
+      clearTimeout(profitTooltipHoverTimeoutRef.current);
+      profitTooltipHoverTimeoutRef.current = null;
+    }
+  }, []);
+
+  const openProfitTooltipHover = useCallback(() => {
+    clearProfitTooltipHoverTimeout();
+    setIsProfitTooltipHovering(true);
+  }, [clearProfitTooltipHoverTimeout]);
+
+  const closeProfitTooltipHover = useCallback(() => {
+    clearProfitTooltipHoverTimeout();
+    profitTooltipHoverTimeoutRef.current = setTimeout(() => {
+      setIsProfitTooltipHovering(false);
+      profitTooltipHoverTimeoutRef.current = null;
+    }, 180);
+  }, [clearProfitTooltipHoverTimeout]);
 
   const handleUpdateBrush = useCallback(async (val: boolean) => {
     if (val === order.isMainSystemSelfDelivery) return;
@@ -1142,6 +1169,7 @@ export function OrderCard({
   const deliveryFee = getDeliveryFee(order.delivery);
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
+  const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
   const pureProfitTooltipRows = hasPureProfit
@@ -1154,14 +1182,14 @@ export function OrderCard({
           { label: "预计到手", value: toCurrency(expectedIncome) },
           { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
           { label: "减配送费", value: toCurrency(deliveryFee) },
-          { label: "减货品成本", value: toCurrency(productCost) },
+          { label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost },
         ])
     : productCostStatusText
       ? [
           { label: "预计到手", value: toCurrency(expectedIncome) },
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
-          { label: "货品成本", value: productCostStatusText },
+          { label: "货品成本", value: productCostStatusText, editable: canEditProductCost },
         ]
       : [];
   const sourceLabel = getOrderSourceLabel(order);
@@ -1171,6 +1199,14 @@ export function OrderCard({
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
   const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
+  const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
+
+  const handleProfitTooltipTriggerClick = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 640) {
+      return;
+    }
+    setIsProfitTooltipOpen((current) => !current);
+  }, []);
 
   useEffect(() => {
     if (!isProfitTooltipOpen) return;
@@ -1184,6 +1220,12 @@ export function OrderCard({
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [isProfitTooltipOpen]);
+
+  useEffect(() => {
+    return () => {
+      clearProfitTooltipHoverTimeout();
+    };
+  }, [clearProfitTooltipHoverTimeout]);
 
   return (
     <>
@@ -1240,12 +1282,17 @@ export function OrderCard({
                   ) : null}
                   <StatusBadge order={order} />
                   {completed && (hasPureProfit || order.productCostStatus === "pending-backfill") ? (
-                    <div ref={profitTooltipRef} className="group/profit relative">
+                    <div
+                      ref={profitTooltipRef}
+                      className="group/profit relative"
+                      onMouseEnter={openProfitTooltipHover}
+                      onMouseLeave={closeProfitTooltipHover}
+                    >
                       {hasPureProfit ? (
                         <button
                           type="button"
-                          onClick={() => setIsProfitTooltipOpen((current) => !current)}
-                          aria-expanded={isProfitTooltipOpen}
+                          onClick={handleProfitTooltipTriggerClick}
+                          aria-expanded={isProfitTooltipVisible}
                           className={cn(
                             "inline-flex h-7 min-w-0 items-center gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-none transition-all hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
                             pureProfit >= 0
@@ -1268,6 +1315,7 @@ export function OrderCard({
                       )}
                       {pureProfitTooltipRows.length > 0 ? (
                         <>
+                          <div className="pointer-events-none absolute left-1/2 top-full hidden h-4 w-[280px] -translate-x-1/2 sm:block" />
                           {isProfitTooltipOpen ? (
                             <div
                               className="fixed inset-0 z-40 bg-slate-950/42 backdrop-blur-[2px] sm:hidden"
@@ -1275,8 +1323,8 @@ export function OrderCard({
                             />
                           ) : null}
                           <div className={cn(
-                            "pointer-events-none fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-[48%] overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left opacity-0 shadow-[0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-md transition-all duration-150 dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:pointer-events-none sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-[280px] sm:max-h-none sm:-translate-x-1/2 sm:translate-y-1 sm:overflow-visible sm:opacity-0 sm:group-hover/profit:translate-y-0 sm:group-hover/profit:opacity-100",
-                            isProfitTooltipOpen && "pointer-events-auto -translate-y-1/2 opacity-100 sm:pointer-events-auto sm:translate-y-0 sm:opacity-100"
+                            "pointer-events-none fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-[48%] overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left opacity-0 shadow-[0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-md transition-all duration-150 dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-[280px] sm:max-h-none sm:-translate-x-1/2 sm:translate-y-1 sm:overflow-visible",
+                            isProfitTooltipVisible && "pointer-events-auto -translate-y-1/2 opacity-100 sm:translate-y-0"
                           )}>
                           <div className="hidden absolute left-12 top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block sm:left-1/2 sm:-translate-x-1/2" />
                           <button
@@ -1311,8 +1359,22 @@ export function OrderCard({
                                     {row.label}
                                   </span>
                                 </div>
-                                <span className="shrink-0 font-semibold text-slate-950 dark:text-white">
-                                  {row.value}
+                                <span className="flex shrink-0 items-center gap-1.5 font-semibold text-slate-950 dark:text-white">
+                                  <span>{row.value}</span>
+                                  {row.editable ? (
+                                    <button
+                                      type="button"
+                                      aria-label="修改货品成本"
+                                      title="修改货品成本"
+                                      onClick={() => {
+                                        setIsProfitTooltipOpen(false);
+                                        onOpenCostBackfill(order);
+                                      }}
+                                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500/22 bg-sky-500/10 text-sky-700 transition-all hover:border-sky-500/38 hover:bg-sky-500/16 dark:text-sky-300"
+                                    >
+                                      <Pencil size={11} className="shrink-0" />
+                                    </button>
+                                  ) : null}
                                 </span>
                               </div>
                             ))}

@@ -10,6 +10,7 @@ import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
+import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -4714,13 +4715,14 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
 
     return result;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "自动出库失败";
+    const message = getOutboundOrderItemSchemaErrorMessage(error)
+      || (error instanceof Error ? error.message : "自动出库失败");
     await updateAutoPickOrderAutoOutboundState(userId, orderId, {
       status: "failed",
       attemptedAt,
       error: message.slice(0, 1000),
     }).catch(() => null);
-    throw error;
+    throw new Error(message);
   }
 }
 
