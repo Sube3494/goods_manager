@@ -173,7 +173,7 @@ export interface AutoPickMatchedProductRef {
 export interface AutoPickOrder {
   id: string;
   userId: string;
-  sourceId: string;
+  sourceId?: string;
   shopId?: string | null;
   deliveryId?: string | null;
   city?: number | null;
@@ -250,6 +250,8 @@ export interface AutoPickOrder {
   lastSyncedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  detailLoaded?: boolean;
+  detailLoading?: boolean;
 }
 
 export interface AutoPickApiKey {
@@ -463,6 +465,7 @@ export interface StatsData {
   productCost?: number;
   promotionExpense?: number;
   brushExpense?: number;
+  operatingExpense?: number;
   otherExpense?: number;
   netProfit?: number;
   platformMatrix?: DashboardPlatformMatrix;
@@ -521,6 +524,7 @@ export interface DashboardBusinessTrendPoint {
   brushOrderCount: number;
   productCost: number;
   brushExpense: number;
+  operatingExpense?: number;
 }
 
 export type BrushStatus = "Draft" | "Completed";
