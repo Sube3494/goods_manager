@@ -151,12 +151,6 @@ function PurchasesContent() {
     replaceCurrentSearch(pathname, params);
   }, [searchParams, pathname]);
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(handle);
-  }, []);
-
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -834,8 +828,6 @@ function PurchasesContent() {
     document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
     document.body.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
-
-  if (!mounted) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">

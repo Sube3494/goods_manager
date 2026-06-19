@@ -1155,6 +1155,7 @@ export function OrderCard({
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
   const pickup = Boolean(order.isPickup) || order.platform === "线下交易";
+  const hideDeletedOfflineIncome = deleted && order.platform === "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = !pickup && order.isMainSystemSelfDelivery;
@@ -1165,6 +1166,10 @@ export function OrderCard({
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
   const productCostStatusText = getProductCostStatusText(order);
+  const expectedIncomeDisplay = hideDeletedOfflineIncome ? "-" : toCurrency(expectedIncome);
+  const pureProfitDisplay = hideDeletedOfflineIncome
+    ? "-"
+    : (hasPureProfit ? toCurrency(pureProfit) : (productCostStatusText || "-"));
   const serviceFeeRate = Number(order.serviceFeeRate || 0);
   const deliveryFee = getDeliveryFee(order.delivery);
   const productCost = Number(order.productCost || 0);
@@ -1200,6 +1205,9 @@ export function OrderCard({
   const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
   const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
+  const closeProfitTooltip = useCallback(() => {
+    setIsProfitTooltipOpen(false);
+  }, []);
 
   const handleProfitTooltipTriggerClick = useCallback(() => {
     if (typeof window !== "undefined" && window.innerWidth >= 640) {
@@ -1213,13 +1221,13 @@ export function OrderCard({
 
     const handlePointerDown = (event: PointerEvent) => {
       if (!profitTooltipRef.current?.contains(event.target as Node)) {
-        setIsProfitTooltipOpen(false);
+        closeProfitTooltip();
       }
     };
 
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [isProfitTooltipOpen]);
+  }, [closeProfitTooltip, isProfitTooltipOpen]);
 
   useEffect(() => {
     return () => {
@@ -1319,7 +1327,11 @@ export function OrderCard({
                           {isProfitTooltipOpen ? (
                             <div
                               className="fixed inset-0 z-40 bg-slate-950/42 backdrop-blur-[2px] sm:hidden"
-                              onClick={() => setIsProfitTooltipOpen(false)}
+                              onPointerDown={(event) => {
+                                event.preventDefault();
+                                closeProfitTooltip();
+                              }}
+                              onClick={closeProfitTooltip}
                             />
                           ) : null}
                           <div className={cn(
@@ -1329,7 +1341,15 @@ export function OrderCard({
                           <div className="hidden absolute left-12 top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block sm:left-1/2 sm:-translate-x-1/2" />
                           <button
                             type="button"
-                            onClick={() => setIsProfitTooltipOpen(false)}
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              closeProfitTooltip();
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              closeProfitTooltip();
+                            }}
                             className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition-colors hover:text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-white/55 dark:hover:text-white sm:hidden"
                             aria-label="关闭利润计算"
                           >
@@ -1450,13 +1470,13 @@ export function OrderCard({
                             {isSavingAmount ? <Loader2 size={11} className="animate-spin text-muted-foreground" /> : null}
                             <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
                           </div>
-                          <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
+                          <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{expectedIncomeDisplay}</div>
                         </button>
                       </div>
                     ) : (
                       <div className="min-w-0 text-right">
                         <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</div>
-                        <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</div>
+                        <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{expectedIncomeDisplay}</div>
                       </div>
                     )}
                     <div className="col-span-2 flex min-w-0 items-center justify-between border-t border-black/6 pt-2 dark:border-white/8">
@@ -1479,13 +1499,13 @@ export function OrderCard({
                       className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition-all hover:border-black/12 hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0"
                     >
                       <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
-                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{expectedIncomeDisplay}</span>
                       {isSavingAmount ? <Loader2 size={12} className="shrink-0 animate-spin text-muted-foreground" /> : null}
                     </button>
                   ) : (
                     <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
                       <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
-                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(expectedIncome)}</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{expectedIncomeDisplay}</span>
                     </div>
                   )}
                   <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:col-span-1 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
@@ -1838,9 +1858,9 @@ export function OrderCard({
                 <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">金额信息</h3>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
-                  <DetailStat label={isJdOrder ? "京东到手" : "预计到手"} value={toCurrency(expectedIncome)} />
+                  <DetailStat label={isJdOrder ? "京东到手" : "预计到手"} value={expectedIncomeDisplay} />
                   <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
-                  <DetailStat label="纯利润" value={hasPureProfit ? toCurrency(pureProfit) : (productCostStatusText || "-")} />
+                  <DetailStat label="纯利润" value={pureProfitDisplay} />
                   <div className="col-span-2">
                     <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
                   </div>

@@ -182,7 +182,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                                 </div>
                             </div>
                             <p className="text-sm text-muted-foreground font-medium animate-pulse tracking-wide">
-                                正在准备腾荣科技空间...
+                                正在准备 PickNote 空间...
                             </p>
                         </div>
                     ) : (

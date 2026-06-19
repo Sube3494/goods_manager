@@ -37,6 +37,9 @@ const PurchaseItemRow = memo(({
     suppliers, 
     onUpdate, 
     onRemove,
+    costPriceInput,
+    onCostPriceInputChange,
+    onCostPriceInputBlur,
     allowCostEdit,
     isChecked,
     onToggle,
@@ -48,6 +51,9 @@ const PurchaseItemRow = memo(({
     suppliers: Supplier[];
     onUpdate: (productId: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => void;
     onRemove: (productId: string) => void;
+    costPriceInput?: string;
+    onCostPriceInputChange?: (productId: string, value: string) => void;
+    onCostPriceInputBlur?: (productId: string) => void;
     allowCostEdit?: boolean;
     isChecked?: boolean;
     onToggle?: (productId: string) => void;
@@ -223,8 +229,9 @@ const PurchaseItemRow = memo(({
                             <input 
                                 type="number" 
                                 step="0.01"
-                                value={item.costPrice ?? ""}
-                                onChange={(e) => onUpdate(itemKey, "costPrice", e.target.value)}
+                                value={costPriceInput ?? ""}
+                                onChange={(e) => onCostPriceInputChange?.(itemKey, e.target.value)}
+                                onBlur={() => onCostPriceInputBlur?.(itemKey)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                             />
                         </div>
@@ -393,6 +400,7 @@ export function PurchaseOrderModal({
   const [shippingFeeInput, setShippingFeeInput] = useState(initialData?.shippingFees?.toString() || "0");
   const [extraFeeInput, setExtraFeeInput] = useState(initialData?.extraFees?.toString() || "0");
   const [discountInput, setDiscountInput] = useState(initialData?.discountAmount?.toString() || "0");
+  const [costPriceDrafts, setCostPriceDrafts] = useState<Record<string, string>>({});
 
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
@@ -600,6 +608,8 @@ export function PurchaseOrderModal({
             setFormData({ ...initialData, items: sortedItems });
             setShippingFeeInput(initialData.shippingFees?.toString() || "0");
             setExtraFeeInput(initialData.extraFees?.toString() || "0");
+            setDiscountInput(initialData.discountAmount?.toString() || "0");
+            setCostPriceDrafts({});
         } else {
             const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
             
@@ -621,6 +631,8 @@ export function PurchaseOrderModal({
             }));
             setShippingFeeInput("0");
             setExtraFeeInput("0");
+            setDiscountInput("0");
+            setCostPriceDrafts({});
         }
     }, 0);
 
@@ -697,6 +709,12 @@ export function PurchaseOrderModal({
   };
 
   const removeItem = useCallback((itemKey: string) => {
+    setCostPriceDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
     setFormData(prev => ({
       ...prev,
       items: prev.items.filter(item => getPurchaseItemKey(item) !== itemKey)
@@ -748,6 +766,24 @@ export function PurchaseOrderModal({
       return { ...prev, items: newItems };
     });
   }, [getPurchaseItemKey]);
+
+  const handleCostPriceInputChange = useCallback((itemKey: string, value: string) => {
+    setCostPriceDrafts((prev) => ({ ...prev, [itemKey]: value }));
+    updateItem(itemKey, "costPrice", value);
+  }, [updateItem]);
+
+  const handleCostPriceInputBlur = useCallback((itemKey: string) => {
+    setCostPriceDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      const draftValue = next[itemKey];
+      delete next[itemKey];
+      if (draftValue === "") {
+        updateItem(itemKey, "costPrice", 0);
+      }
+      return next;
+    });
+  }, [updateItem]);
 
   const inferStatus = (currentData: PurchaseOrder): PurchaseStatus => {
     if (currentData.status === "Received") return "Received";
@@ -1218,6 +1254,9 @@ export function PurchaseOrderModal({
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
+                                    costPriceInput={costPriceDrafts[getPurchaseItemKey(item)] ?? String(item.costPrice ?? "")}
+                                    onCostPriceInputChange={handleCostPriceInputChange}
+                                    onCostPriceInputBlur={handleCostPriceInputBlur}
                                     allowCostEdit={canBackfillReceivedCosts}
                                     isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
                                     onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}

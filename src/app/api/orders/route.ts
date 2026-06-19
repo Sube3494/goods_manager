@@ -1403,6 +1403,10 @@ export async function GET(request: NextRequest) {
       ).trim();
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
+      const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
+      const safeExpectedIncome = hiddenDeletedOfflineIncome
+        ? null
+        : (typeof order.expectedIncome === "number" ? order.expectedIncome : null);
       const serviceFeeRate = order.platform === "线下交易"
         ? 0
         : (shopRateMap.get(matchedShopName) ?? 0.06);
@@ -1415,14 +1419,17 @@ export async function GET(request: NextRequest) {
         : missingCostItemCount > 0
           ? "pending-backfill" as const
           : "ready" as const;
-      const pureProfit = order.isMainSystemSelfDelivery
+      const pureProfit = hiddenDeletedOfflineIncome
+        ? null
+        : order.isMainSystemSelfDelivery
         ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
         : (productCostStatus === "ready"
-          ? Math.round(Number(order.expectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
           : null);
 
       return {
         ...order,
+        expectedIncome: safeExpectedIncome,
         matchedShopId,
         matchedShopName,
         autoOutboundStatus: autoOutboundMeta.status,

@@ -23,7 +23,6 @@ export default function BrushPlansPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingPlan, setEditingPlan] = useState<BrushOrderPlan | null>(null);
-    const [mounted, setMounted] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterDate, setFilterDate] = useState("");
     const [filterShop, setFilterShop] = useState("");
@@ -64,7 +63,6 @@ export default function BrushPlansPage() {
     }, [showToast, filterShop, filterPlatform]); // Added filterShop, filterPlatform to dependencies
 
     useEffect(() => {
-        setMounted(true);
         fetchPlans();
     }, [fetchPlans]);
 
@@ -184,8 +182,6 @@ export default function BrushPlansPage() {
             ),
         }));
     }, [filteredPlans]);
-
-    if (!mounted) return null;
 
     if (!canManage && !isLoading && plans.length === 0) {
         return (

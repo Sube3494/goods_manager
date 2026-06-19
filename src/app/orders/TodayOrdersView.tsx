@@ -130,7 +130,19 @@ export function TodayOrdersView({
 
   // 2. SSE 与轮询监听逻辑
   useEffect(() => {
-    const source = new EventSource("/api/orders/events");
+    if (typeof window === "undefined" || typeof EventSource === "undefined") {
+      sseHealthyRef.current = false;
+      return;
+    }
+
+    let source: EventSource;
+    try {
+      source = new EventSource("/api/orders/events");
+    } catch (error) {
+      console.warn("EventSource is unavailable, falling back to polling.", error);
+      sseHealthyRef.current = false;
+      return;
+    }
 
     const queueRefresh = () => {
       if (document.visibilityState !== "visible") return;

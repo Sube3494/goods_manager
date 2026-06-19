@@ -39,7 +39,6 @@ export default function BrushOrdersPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isBatchEditModalOpen, setIsBatchEditModalOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -253,7 +252,6 @@ export default function BrushOrdersPage() {
   }, []);
 
   useEffect(() => {
-    setMounted(true);
     fetchData();
   }, [fetchData]);
 
@@ -481,8 +479,6 @@ export default function BrushOrdersPage() {
   };
 
 
-
-  if (!mounted) return null;
 
   return (
     <div className="space-y-8 pb-20">
