@@ -62,6 +62,22 @@ function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
   return Boolean((marker as Record<string, unknown>).triggered);
 }
 
+function isVoidedOfflineOrder(order: {
+  platform?: string | null;
+  rawPayload?: unknown;
+  status?: string | null;
+}) {
+  if (String(order.platform || "").trim() !== "线下交易") {
+    return false;
+  }
+  if (isAutoPickOrderDeletedStatus(order.status)) {
+    return true;
+  }
+  const systemMeta = readAutoPickSystemMeta(order.rawPayload);
+  const voided = systemMeta?.manualOfflineVoided;
+  return Boolean(voided && typeof voided === "object" && !Array.isArray(voided));
+}
+
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "其他"] as const;
 
 type OutboundCostLookupRow = {
@@ -435,6 +451,7 @@ export async function GET(request: NextRequest) {
       );
     const outboundLookupOrderNos = Array.from(new Set(
       filteredAutoPickOrdersInRange
+        .filter((order) => !isVoidedOfflineOrder(order))
         .map((order) => String(order.orderNo || "").trim())
         .filter(Boolean)
     ));
@@ -531,7 +548,9 @@ export async function GET(request: NextRequest) {
     let productCost = 0;
 
     filteredAutoPickOrdersInRange.forEach((order) => {
-      const isCancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+      const isCancelled = isAutoPickOrderCancelledStatus(order.status)
+        || isAutoPickOrderDeletedStatus(order.status)
+        || isVoidedOfflineOrder(order);
       if (!isCancelled) {
         const paidYuan = (order.actualPaid || 0) / 100;
         const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
@@ -638,7 +657,9 @@ export async function GET(request: NextRequest) {
       const platformPoint = platformTrendMaps.get(platform)?.get(key);
       const current = platformBuckets.get(platform) || { trueOrderCount: 0, brushOrderCount: 0 };
       const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-      const isOther = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+      const isOther = isAutoPickOrderCancelledStatus(order.status)
+        || isAutoPickOrderDeletedStatus(order.status)
+        || isVoidedOfflineOrder(order);
 
       if (point) {
         if (isBrush) {
