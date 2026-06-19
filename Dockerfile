@@ -1,7 +1,7 @@
 # ================================
 # Stage 1: 依赖安装
 # ================================
-FROM oven/bun:1-alpine AS deps
+FROM oven/bun:1.3.14-alpine AS deps
 WORKDIR /app
 ENV npm_config_registry="https://registry.npmmirror.com"
 ENV PRISMA_ENGINES_MIRROR="https://npmmirror.com/mirrors/prisma"
@@ -14,7 +14,7 @@ RUN --mount=type=cache,id=bun-install,target=/root/.bun/install/cache \
 # ================================
 # Stage 2: 构建
 # ================================
-FROM oven/bun:1-alpine AS builder
+FROM oven/bun:1.3.14-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 ENV npm_config_registry="https://registry.npmmirror.com"
@@ -38,7 +38,7 @@ RUN --mount=type=cache,id=prisma-engines,target=/root/.cache/prisma \
 # ================================
 # Stage 3: 运行时
 # ================================
-FROM oven/bun:1-alpine AS runner
+FROM oven/bun:1.3.14-alpine AS runner
 WORKDIR /app
 
 # Prisma 在 Alpine 上需要 openssl；postgresql-client 提供 psql 用于自动建库；su-exec 用于降权
