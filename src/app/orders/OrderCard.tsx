@@ -912,10 +912,16 @@ export function ProductStripItem({
   display,
   onEditMatch,
   showEditMatch = false,
+  matchedProduct,
+  showMatchStatus = false,
+  onClearManualMatch,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number };
   onEditMatch?: () => void;
   showEditMatch?: boolean;
+  matchedProduct?: AutoPickOrderItem['matchedProduct'];
+  showMatchStatus?: boolean;
+  onClearManualMatch?: () => void;
 }) {
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -939,20 +945,41 @@ export function ProductStripItem({
         <div className="line-clamp-2 wrap-break-word text-[13px] font-medium leading-4.5 text-foreground sm:text-sm sm:leading-5 sm:line-clamp-1">
           {display.name}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1">
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1">
           <span>{display.sku}</span>
           <span>x{display.quantity}</span>
+          {showMatchStatus ? (
+            <span className={cn(
+              "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
+              matchedProduct
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
+            )}>
+              {matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : "未匹配"}
+            </span>
+          ) : null}
         </div>
       </div>
-      {showEditMatch && onEditMatch ? (
-        <button
-          type="button"
-          onClick={onEditMatch}
-          className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-2.5 text-[11px] font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
-        >
-          改匹配
-        </button>
-      ) : null}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {showMatchStatus && matchedProduct?.isManual && onClearManualMatch ? (
+          <button
+            type="button"
+            onClick={onClearManualMatch}
+            className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-2.5 text-[11px] font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
+          >
+            恢复自动
+          </button>
+        ) : null}
+        {showEditMatch && onEditMatch ? (
+          <button
+            type="button"
+            onClick={onEditMatch}
+            className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-2.5 text-[11px] font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
+          >
+            改匹配
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1579,6 +1606,9 @@ export function OrderCard({
                     display={display}
                     showEditMatch={displayIndex === 0}
                     onEditMatch={() => onOpenMatchEditor(order, item)}
+                    matchedProduct={item.matchedProduct}
+                    showMatchStatus={displayIndex === 0}
+                    onClearManualMatch={() => onClearManualMatch(order, item)}
                   />
                 ))
               )}
@@ -1768,52 +1798,6 @@ export function OrderCard({
                 <DetailStat label={pickup ? "取货时间" : "最晚送达"} value={deadlineDisplay} />
               </div>
               <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
-                <div className="rounded-[18px] border border-black/6 bg-black/2 p-3 dark:border-white/8 dark:bg-white/3">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">商品匹配</div>
-                    <div className="text-xs text-muted-foreground">卡片商品行可直接改</div>
-                  </div>
-                  <div className="grid gap-2">
-                    {order.items.map((item, index) => (
-                      <div key={item.id || `${item.productNo || item.productName}-${index}`} className="rounded-2xl border border-black/6 bg-white/80 p-3 dark:border-white/8 dark:bg-white/4">
-                        <div className="flex flex-col gap-2">
-                          <div className="min-w-0">
-                            <div className="text-sm font-bold text-foreground">{item.matchedProduct?.name || "未匹配到系统商品"}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              原始商品：{item.productName || "未命名商品"}{item.productNo ? ` / ${item.productNo}` : ""}
-                            </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
-                              <span className={cn(
-                                "inline-flex items-center rounded-full px-2 py-1 font-bold",
-                                item.matchedProduct
-                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                              )}>
-                                {item.matchedProduct ? (item.matchedProduct.isManual ? "手动匹配" : "自动匹配") : "未匹配"}
-                              </span>
-                              {item.matchedProduct?.sku ? (
-                                <span className="text-muted-foreground">SKU {item.matchedProduct.sku}</span>
-                              ) : null}
-                              <span className="text-muted-foreground">x{item.quantity}</span>
-                            </div>
-                          </div>
-                          {item.matchedProduct?.isManual ? (
-                            <div className="flex shrink-0 items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => onClearManualMatch(order, item)}
-                                className="inline-flex h-9 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 hover:text-foreground dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 dark:hover:text-white"
-                              >
-                                恢复自动
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-2.5">
                   <DetailBlock label="系统门店" value={order.matchedShopName || "-"} />
                   <DetailBlock label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
