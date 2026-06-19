@@ -198,16 +198,50 @@ export function TodayOrdersView({
     };
   }, [fetchOrders]);
 
-  // 3. 卡片操作与事件回调
-  const toggleExpanded = (orderId: string) => {
-    setExpandedIds((current) => (
-      current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]
-    ));
-  };
-
   const patchOrder = useCallback((orderId: string, updater: (order: AutoPickOrder) => AutoPickOrder) => {
     setOrders((current) => current.map((order) => (order.id === orderId ? updater(order) : order)));
   }, []);
+
+  const ensureOrderDetail = useCallback(async (orderId: string) => {
+    const target = orders.find((item) => item.id === orderId);
+    if (!target || target.detailLoaded || target.detailLoading) {
+      return;
+    }
+
+    patchOrder(orderId, (order) => ({ ...order, detailLoading: true }));
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.order) {
+        throw new Error(data?.error || "读取订单详情失败");
+      }
+      patchOrder(orderId, (order) => ({
+        ...order,
+        ...data.order,
+        delivery: data.order.delivery ?? order.delivery,
+        detailLoaded: true,
+        detailLoading: false,
+      }));
+    } catch (error) {
+      patchOrder(orderId, (order) => ({ ...order, detailLoading: false }));
+      showToast(error instanceof Error ? error.message : "读取订单详情失败", "error");
+    }
+  }, [orders, patchOrder, showToast]);
+
+  // 3. 卡片操作与事件回调
+  const toggleExpanded = (orderId: string) => {
+    let shouldLoadDetail = false;
+    setExpandedIds((current) => {
+      if (current.includes(orderId)) {
+        return current.filter((id) => id !== orderId);
+      }
+      shouldLoadDetail = true;
+      return [...current, orderId];
+    });
+    if (shouldLoadDetail) {
+      void ensureOrderDetail(orderId);
+    }
+  };
 
   const runAction = async (orderId: string, action: OrderAction) => {
     setActingId(`${orderId}:${action}`);
@@ -265,17 +299,9 @@ export function TodayOrdersView({
       if (action === "sync-brush") {
         showToast("同步刷单成功！已更新标记", "success");
         patchOrder(orderId, (order) => {
-          const raw = (order as unknown as { rawPayload?: Record<string, unknown> }).rawPayload || {};
-          const systemMeta = (raw.systemMeta as Record<string, unknown>) || {};
           return {
             ...order,
-            rawPayload: {
-              ...raw,
-              systemMeta: {
-                ...systemMeta,
-                mainSystemSelfDelivery: { triggered: true },
-              },
-            },
+            isMainSystemSelfDelivery: true,
           } as AutoPickOrder;
         });
       } else {

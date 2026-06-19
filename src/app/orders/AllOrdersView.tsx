@@ -37,7 +37,7 @@ interface AllOrdersViewProps {
   localShops: Array<{ id: string; name: string; address: string }>;
 }
 
-const ALL_ORDERS_BATCH_SIZE = 50;
+const ALL_ORDERS_BATCH_SIZE = 20;
 
 export function AllOrdersView({
   refreshTrigger,
@@ -86,8 +86,10 @@ export function AllOrdersView({
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const isFetchingRef = useRef(false);
+  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
 
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
+  const hasMore = meta.page < meta.totalPages;
 
   // 获取全部订单列表
   const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number }) => {
@@ -187,16 +189,81 @@ export function AllOrdersView({
     }
   }, [endDate, startDate, todayDate]);
 
-  // 卡片操作与事件回调
-  const toggleExpanded = (orderId: string) => {
-    setExpandedIds((current) => (
-      current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]
-    ));
-  };
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (!hasMore || isLoading || isLoadingMore) {
+      return;
+    }
+    const target = loadMoreTriggerRef.current;
+    if (!target) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting || isFetchingRef.current) {
+          return;
+        }
+        void fetchOrders({ append: true, targetPage: currentPage + 1 });
+      },
+      {
+        root: null,
+        rootMargin: "240px 0px",
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [currentPage, fetchOrders, hasMore, isLoading, isLoadingMore]);
 
   const patchOrder = useCallback((orderId: string, updater: (order: AutoPickOrder) => AutoPickOrder) => {
     setOrders((current) => current.map((order) => (order.id === orderId ? updater(order) : order)));
   }, []);
+
+  const ensureOrderDetail = useCallback(async (orderId: string) => {
+    const target = orders.find((item) => item.id === orderId);
+    if (!target || target.detailLoaded || target.detailLoading) {
+      return;
+    }
+
+    patchOrder(orderId, (order) => ({ ...order, detailLoading: true }));
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.order) {
+        throw new Error(data?.error || "读取订单详情失败");
+      }
+      patchOrder(orderId, (order) => ({
+        ...order,
+        ...data.order,
+        delivery: data.order.delivery ?? order.delivery,
+        detailLoaded: true,
+        detailLoading: false,
+      }));
+    } catch (error) {
+      patchOrder(orderId, (order) => ({ ...order, detailLoading: false }));
+      showToast(error instanceof Error ? error.message : "读取订单详情失败", "error");
+    }
+  }, [orders, patchOrder, showToast]);
+
+  // 卡片操作与事件回调
+  const toggleExpanded = (orderId: string) => {
+    let shouldLoadDetail = false;
+    setExpandedIds((current) => {
+      if (current.includes(orderId)) {
+        return current.filter((id) => id !== orderId);
+      }
+      shouldLoadDetail = true;
+      return [...current, orderId];
+    });
+    if (shouldLoadDetail) {
+      void ensureOrderDetail(orderId);
+    }
+  };
 
   const runAction = async (orderId: string, action: OrderAction) => {
     setActingId(`${orderId}:${action}`);
@@ -254,17 +321,9 @@ export function AllOrdersView({
       if (action === "sync-brush") {
         showToast("同步刷单成功！已更新标记", "success");
         patchOrder(orderId, (order) => {
-          const raw = (order as unknown as { rawPayload?: Record<string, unknown> }).rawPayload || {};
-          const systemMeta = (raw.systemMeta as Record<string, unknown>) || {};
           return {
             ...order,
-            rawPayload: {
-              ...raw,
-              systemMeta: {
-                ...systemMeta,
-                mainSystemSelfDelivery: { triggered: true },
-              },
-            },
+            isMainSystemSelfDelivery: true,
           } as AutoPickOrder;
         });
       } else {
@@ -490,15 +549,21 @@ export function AllOrdersView({
         {!isLoading && filteredOrders.length > 0 ? (
           <div className="flex justify-center pt-2">
             {meta.page < meta.totalPages ? (
-              <button
-                type="button"
-                onClick={() => void fetchOrders({ append: true, targetPage: currentPage + 1 })}
-                disabled={isLoadingMore}
-                className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-5 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
-              >
-                <ChevronDown size={15} />
-                {isLoadingMore ? "加载中..." : `继续加载 ${remainingOrderCount} 单`}
-              </button>
+              <div className="flex w-full flex-col items-center gap-2">
+                <div ref={loadMoreTriggerRef} className="h-4 w-full" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => void fetchOrders({ append: true, targetPage: currentPage + 1 })}
+                  disabled={isLoadingMore}
+                  className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-5 py-2.5 text-sm font-black text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                >
+                  {isLoadingMore ? <Loader2 size={15} className="animate-spin" /> : <ChevronDown size={15} />}
+                  {isLoadingMore ? "正在自动加载..." : `继续加载 ${remainingOrderCount} 单`}
+                </button>
+                <div className="text-xs text-muted-foreground">
+                  滑动到底部会自动继续加载，按钮可手动补触发
+                </div>
+              </div>
             ) : (
               <div className="text-sm text-muted-foreground">全部订单已加载完成</div>
             )}

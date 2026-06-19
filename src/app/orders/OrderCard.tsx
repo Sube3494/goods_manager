@@ -910,8 +910,12 @@ export function DetailBlock({
 
 export function ProductStripItem({
   display,
+  onEditMatch,
+  showEditMatch = false,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number };
+  onEditMatch?: () => void;
+  showEditMatch?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -940,6 +944,15 @@ export function ProductStripItem({
           <span>x{display.quantity}</span>
         </div>
       </div>
+      {showEditMatch && onEditMatch ? (
+        <button
+          type="button"
+          onClick={onEditMatch}
+          className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-2.5 text-[11px] font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
+        >
+          改匹配
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1331,7 +1344,7 @@ export function OrderCard({
                           <div className="pointer-events-none absolute left-1/2 top-full hidden h-4 w-[280px] -translate-x-1/2 sm:block" />
                           {isProfitTooltipOpen ? (
                             <div
-                              className="fixed inset-0 z-40 bg-slate-950/42 backdrop-blur-[2px] sm:hidden"
+                              className="fixed inset-0 z-40 bg-slate-950/42 sm:hidden"
                               onPointerDown={(event) => {
                                 event.preventDefault();
                                 closeProfitTooltip();
@@ -1339,118 +1352,119 @@ export function OrderCard({
                               onClick={closeProfitTooltip}
                             />
                           ) : null}
-                          <div className={cn(
-                            "pointer-events-none fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-[48%] overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left opacity-0 shadow-[0_22px_60px_rgba(15,23,42,0.22)] backdrop-blur-md transition-all duration-150 dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-[280px] sm:max-h-none sm:-translate-x-1/2 sm:translate-y-1 sm:overflow-visible",
-                            isProfitTooltipVisible && "pointer-events-auto -translate-y-1/2 opacity-100 sm:translate-y-0"
-                          )}>
-                          <div className="hidden absolute left-12 top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block sm:left-1/2 sm:-translate-x-1/2" />
-                          <button
-                            type="button"
-                            onPointerDown={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              closeProfitTooltip();
-                            }}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              closeProfitTooltip();
-                            }}
-                            className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition-colors hover:text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-white/55 dark:hover:text-white sm:hidden"
-                            aria-label="关闭利润计算"
-                          >
-                            <X size={14} />
-                          </button>
-                          <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 pb-2 pr-10 dark:border-white/8 sm:items-center sm:pr-0">
-                            <div className="min-w-0">
-                              <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 dark:text-white/45">
-                                利润拆解
-                              </div>
-                              <div className="mt-0.5 text-[13px] font-semibold text-slate-900 dark:text-white">
-                                {hasPureProfit ? "这单的纯利润计算" : "这单的成本状态"}
+                          {isProfitTooltipVisible ? (
+                            <div className={cn(
+                              "fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-[280px] sm:max-h-none sm:-translate-x-1/2 sm:translate-y-0 sm:overflow-visible"
+                            )}>
+                            <div className="hidden absolute left-12 top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block sm:left-1/2 sm:-translate-x-1/2" />
+                            <button
+                              type="button"
+                              onPointerDown={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                closeProfitTooltip();
+                              }}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                closeProfitTooltip();
+                              }}
+                              className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition-colors hover:text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-white/55 dark:hover:text-white sm:hidden"
+                              aria-label="关闭利润计算"
+                            >
+                              <X size={14} />
+                            </button>
+                            <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 pb-2 pr-10 dark:border-white/8 sm:items-center sm:pr-0">
+                              <div className="min-w-0">
+                                <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 dark:text-white/45">
+                                  利润拆解
+                                </div>
+                                <div className="mt-0.5 text-[13px] font-semibold text-slate-900 dark:text-white">
+                                  {hasPureProfit ? "这单的纯利润计算" : "这单的成本状态"}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="mt-3 space-y-2">
-                            {pureProfitTooltipRows.map((row, index) => (
-                              <div
-                                key={row.label}
-                                className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2 text-[12px] leading-5 dark:bg-white/5"
-                              >
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-500 shadow-sm dark:bg-white/10 dark:text-white/55">
-                                    {index + 1}
-                                  </span>
-                                  <span className="truncate text-slate-600 dark:text-white/68">
-                                    {row.label}
+                            <div className="mt-3 space-y-2">
+                              {pureProfitTooltipRows.map((row, index) => (
+                                <div
+                                  key={row.label}
+                                  className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2 text-[12px] leading-5 dark:bg-white/5"
+                                >
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-500 shadow-sm dark:bg-white/10 dark:text-white/55">
+                                      {index + 1}
+                                    </span>
+                                    <span className="truncate text-slate-600 dark:text-white/68">
+                                      {row.label}
+                                    </span>
+                                  </div>
+                                  <span className="flex shrink-0 items-center gap-1.5 font-semibold text-slate-950 dark:text-white">
+                                    <span>{row.value}</span>
+                                    {row.editable ? (
+                                      <button
+                                        type="button"
+                                        aria-label="修改货品成本"
+                                        title="修改货品成本"
+                                        onClick={() => {
+                                          setIsProfitTooltipOpen(false);
+                                          onOpenCostBackfill(order);
+                                        }}
+                                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500/22 bg-sky-500/10 text-sky-700 transition-all hover:border-sky-500/38 hover:bg-sky-500/16 dark:text-sky-300"
+                                      >
+                                        <Pencil size={11} className="shrink-0" />
+                                      </button>
+                                    ) : null}
                                   </span>
                                 </div>
-                                <span className="flex shrink-0 items-center gap-1.5 font-semibold text-slate-950 dark:text-white">
-                                  <span>{row.value}</span>
-                                  {row.editable ? (
-                                    <button
-                                      type="button"
-                                      aria-label="修改货品成本"
-                                      title="修改货品成本"
-                                      onClick={() => {
-                                        setIsProfitTooltipOpen(false);
-                                        onOpenCostBackfill(order);
-                                      }}
-                                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500/22 bg-sky-500/10 text-sky-700 transition-all hover:border-sky-500/38 hover:bg-sky-500/16 dark:text-sky-300"
-                                    >
-                                      <Pencil size={11} className="shrink-0" />
-                                    </button>
-                                  ) : null}
+                              ))}
+                            </div>
+                            {hasPureProfit && productCostBreakdown.length > 0 ? (
+                              <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/8 dark:bg-white/4">
+                                <div className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-white/45">
+                                  货品成本明细
+                                </div>
+                                <div className="mt-2 space-y-2">
+                                  {productCostBreakdown.map((item, index) => (
+                                    <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
+                                      <div className="min-w-0">
+                                        <div className="truncate font-medium text-slate-900 dark:text-white">
+                                          {item.name}
+                                        </div>
+                                        <div className="mt-0.5 text-[11px] text-slate-500 dark:text-white/45">
+                                          x{item.quantity} · {toCurrency(item.unitCost)}/件
+                                        </div>
+                                      </div>
+                                      <div className="shrink-0 font-semibold text-slate-900 dark:text-white">
+                                        {toCurrency(item.totalCost)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                            <div className={cn(
+                              "mt-3 rounded-xl border px-3 py-2.5",
+                              hasPureProfit
+                                ? (pureProfit >= 0
+                                  ? "border-emerald-500/20 bg-emerald-500/8 dark:border-emerald-500/20 dark:bg-emerald-500/10"
+                                  : "border-rose-500/20 bg-rose-500/8 dark:border-rose-500/20 dark:bg-rose-500/10")
+                                : "border-orange-500/20 bg-orange-500/8 dark:border-orange-500/20 dark:bg-orange-500/10"
+                            )}>
+                              <div className="flex items-center justify-between gap-4 text-[13px]">
+                                <span className="whitespace-nowrap font-semibold text-slate-900 dark:text-white">
+                                  {hasPureProfit ? "最终纯利润" : "当前状态"}
+                                </span>
+                                <span className={cn(
+                                  "whitespace-nowrap text-[15px] font-bold",
+                                  hasPureProfit
+                                    ? (pureProfit >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300")
+                                    : "text-orange-700 dark:text-orange-300"
+                                )}>
+                                  {hasPureProfit ? toCurrency(pureProfit) : productCostStatusText}
                                 </span>
                               </div>
-                            ))}
-                          </div>
-                          {hasPureProfit && productCostBreakdown.length > 0 ? (
-                            <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/8 dark:bg-white/4">
-                              <div className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-white/45">
-                                货品成本明细
-                              </div>
-                              <div className="mt-2 space-y-2">
-                                {productCostBreakdown.map((item, index) => (
-                                  <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
-                                    <div className="min-w-0">
-                                      <div className="truncate font-medium text-slate-900 dark:text-white">
-                                        {item.name}
-                                      </div>
-                                      <div className="mt-0.5 text-[11px] text-slate-500 dark:text-white/45">
-                                        x{item.quantity} · {toCurrency(item.unitCost)}/件
-                                      </div>
-                                    </div>
-                                    <div className="shrink-0 font-semibold text-slate-900 dark:text-white">
-                                      {toCurrency(item.totalCost)}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                            </div>
                             </div>
                           ) : null}
-                          <div className={cn(
-                            "mt-3 rounded-xl border px-3 py-2.5",
-                            hasPureProfit
-                              ? (pureProfit >= 0
-                                ? "border-emerald-500/20 bg-emerald-500/8 dark:border-emerald-500/20 dark:bg-emerald-500/10"
-                                : "border-rose-500/20 bg-rose-500/8 dark:border-rose-500/20 dark:bg-rose-500/10")
-                              : "border-orange-500/20 bg-orange-500/8 dark:border-orange-500/20 dark:bg-orange-500/10"
-                          )}>
-                            <div className="flex items-center justify-between gap-4 text-[13px]">
-                              <span className="whitespace-nowrap font-semibold text-slate-900 dark:text-white">
-                                {hasPureProfit ? "最终纯利润" : "当前状态"}
-                              </span>
-                              <span className={cn(
-                                "whitespace-nowrap text-[15px] font-bold",
-                                hasPureProfit
-                                  ? (pureProfit >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300")
-                                  : "text-orange-700 dark:text-orange-300"
-                              )}>
-                                {hasPureProfit ? toCurrency(pureProfit) : productCostStatusText}
-                              </span>
-                            </div>
-                          </div>
-                          </div>
                         </>
                       ) : null}
                     </div>
@@ -1563,6 +1577,8 @@ export function OrderCard({
                   <ProductStripItem
                     key={`${item.productNo || item.productName}-${index}-${display.sku}-${displayIndex}`}
                     display={display}
+                    showEditMatch={displayIndex === 0}
+                    onEditMatch={() => onOpenMatchEditor(order, item)}
                   />
                 ))
               )}
@@ -1698,6 +1714,12 @@ export function OrderCard({
 
       {expanded ? (
         <div className="border-t border-black/6 bg-zinc-50/60 px-3.5 py-4 dark:border-white/6 dark:bg-white/2.5 sm:px-5 sm:py-5">
+          {order.detailLoading && !order.detailLoaded ? (
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/5">
+              <Loader2 size={13} className="animate-spin" />
+              正在加载订单详情...
+            </div>
+          ) : null}
           <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/4 sm:rounded-3xl sm:p-4">
               <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">系统信息</h3>
@@ -1749,12 +1771,12 @@ export function OrderCard({
                 <div className="rounded-[18px] border border-black/6 bg-black/2 p-3 dark:border-white/8 dark:bg-white/3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">商品匹配</div>
-                    <div className="text-xs text-muted-foreground">可直接手动改</div>
+                    <div className="text-xs text-muted-foreground">卡片商品行可直接改</div>
                   </div>
                   <div className="grid gap-2">
                     {order.items.map((item, index) => (
                       <div key={item.id || `${item.productNo || item.productName}-${index}`} className="rounded-2xl border border-black/6 bg-white/80 p-3 dark:border-white/8 dark:bg-white/4">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex flex-col gap-2">
                           <div className="min-w-0">
                             <div className="text-sm font-bold text-foreground">{item.matchedProduct?.name || "未匹配到系统商品"}</div>
                             <div className="mt-1 text-xs text-muted-foreground">
@@ -1775,8 +1797,8 @@ export function OrderCard({
                               <span className="text-muted-foreground">x{item.quantity}</span>
                             </div>
                           </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {item.matchedProduct?.isManual ? (
+                          {item.matchedProduct?.isManual ? (
+                            <div className="flex shrink-0 items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => onClearManualMatch(order, item)}
@@ -1784,15 +1806,8 @@ export function OrderCard({
                               >
                                 恢复自动
                               </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => onOpenMatchEditor(order, item)}
-                              className="inline-flex h-9 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 hover:text-foreground dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 dark:hover:text-white"
-                            >
-                              改匹配
-                            </button>
-                          </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -1819,7 +1834,7 @@ export function OrderCard({
                   />
                   <DetailStat
                     label="原始 ID"
-                    value={order.sourceId}
+                    value={order.sourceId || "-"}
                     valueClassName="break-all text-[13px] sm:text-sm"
                   />
                 </div>
