@@ -1206,15 +1206,20 @@ export function OrderCard({
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
   const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
   const closeProfitTooltip = useCallback(() => {
+    clearProfitTooltipHoverTimeout();
+    setIsProfitTooltipHovering(false);
     setIsProfitTooltipOpen(false);
-  }, []);
+  }, [clearProfitTooltipHoverTimeout]);
 
   const handleProfitTooltipTriggerClick = useCallback(() => {
-    if (typeof window !== "undefined" && window.innerWidth >= 640) {
-      return;
-    }
-    setIsProfitTooltipOpen((current) => !current);
-  }, []);
+    clearProfitTooltipHoverTimeout();
+    setIsProfitTooltipOpen((current) => {
+      if (current) {
+        setIsProfitTooltipHovering(false);
+      }
+      return !current;
+    });
+  }, [clearProfitTooltipHoverTimeout]);
 
   useEffect(() => {
     if (!isProfitTooltipOpen) return;
