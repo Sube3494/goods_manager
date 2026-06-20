@@ -2021,54 +2021,52 @@ export default function OrdersPage() {
               </div>
 
               {/* 平台纯利润分布卡片 */}
-              <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-col w-full">
-                    <div className="flex items-center justify-between sm:block">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">纯利润</div>
-                      <div className={cn(
-                        "sm:hidden text-[22px] font-bold leading-none tracking-tight",
-                        activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-                      )}>
-                        {toCurrency(activeSummary.pureProfit)}
-                      </div>
-                    </div>
+              <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
+                <div className="flex flex-col w-full">
+                  <div className="flex items-center justify-between sm:block">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">纯利润</div>
                     <div className={cn(
-                      "hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight",
+                      "sm:hidden text-[22px] font-bold leading-none tracking-tight",
                       activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                     )}>
                       {toCurrency(activeSummary.pureProfit)}
                     </div>
-                    <div className="mt-1 text-[10px] text-muted-foreground sm:mt-1.5 sm:text-xs">
-                      {activeTab === "today" ? "今日各平台纯利润汇总" : "当前筛选各平台纯利润汇总"}
-                    </div>
                   </div>
-                  {activeSummary.platformProfit && Object.entries(activeSummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
-                    <div className="mt-2 flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
-                      {Object.entries(activeSummary.platformProfit)
-                        .sort((a, b) => b[1].amount - a[1].amount)
-                        .map(([platform, info]) => {
-                        if (info.amount === 0) return null;
-                        const meta = getPlatformBadgeMeta(platform);
-                        return (
-                          <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-3 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
-                            <span className="flex items-center gap-1.5 min-w-0">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                              <span className="truncate font-medium">{platform}</span>
-                            </span>
-                            <span className={cn(
-                              "font-bold shrink-0",
-                              info.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-                            )}>
-                              {toCurrency(info.amount)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
+                  <div className={cn(
+                    "hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight",
+                    activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                  )}>
+                    {toCurrency(activeSummary.pureProfit)}
+                  </div>
+                  <div className="mt-1.5 text-xs text-muted-foreground">
+                    {activeTab === "today" ? "今日各平台纯利润汇总" : "当前筛选各平台纯利润汇总"}
+                  </div>
                 </div>
+                {activeSummary.platformProfit && Object.entries(activeSummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
+                  <div className="flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
+                    {Object.entries(activeSummary.platformProfit)
+                      .sort((a, b) => b[1].amount - a[1].amount)
+                      .map(([platform, info]) => {
+                      if (info.amount === 0) return null;
+                      const meta = getPlatformBadgeMeta(platform);
+                      return (
+                        <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-3 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            <span className="truncate font-medium">{platform}</span>
+                          </span>
+                          <span className={cn(
+                            "font-bold shrink-0",
+                            info.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                          )}>
+                            {toCurrency(info.amount)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
 
               {/* 最右侧：配送费和推广费垂直列 */}
@@ -2097,9 +2095,16 @@ export default function OrdersPage() {
                   </>
                 ) : (
                   <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
-                      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">{toCurrency(activeSummary.totalDeliveryFee)}</div>
+                    <div className="flex flex-col w-full">
+                      <div className="flex items-center justify-between sm:block">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
+                        <div className="sm:hidden text-[22px] font-bold leading-none tracking-tight text-foreground">
+                          {toCurrency(activeSummary.totalDeliveryFee)}
+                        </div>
+                      </div>
+                      <div className="hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
+                        {toCurrency(activeSummary.totalDeliveryFee)}
+                      </div>
                       <div className="mt-1.5 text-xs text-muted-foreground">当前筛选各平台汇总</div>
                     </div>
                     <div className="flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
