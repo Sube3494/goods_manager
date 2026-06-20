@@ -1432,7 +1432,7 @@ export function OrderCard({
                       )}
                       {pureProfitTooltipRows.length > 0 ? (
                         <>
-                          <div className="pointer-events-none absolute left-1/2 top-full hidden h-4 w-[280px] -translate-x-1/2 sm:block" />
+                          <div className="pointer-events-none absolute left-1/2 top-full hidden h-4 w-70 -translate-x-1/2 sm:block" />
                           {isProfitTooltipOpen ? (
                             <div
                               className="fixed inset-0 z-40 bg-slate-950/42 sm:hidden"
@@ -1445,7 +1445,7 @@ export function OrderCard({
                           ) : null}
                           {isProfitTooltipVisible ? (
                             <div className={cn(
-                              "fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-[280px] sm:max-h-none sm:-translate-x-1/2 sm:translate-y-0 sm:overflow-visible"
+                              "fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-70 sm:max-h-none sm:-translate-x-1/2 sm:translate-y-0 sm:overflow-visible"
                             )}>
                             <div className="hidden absolute left-12 top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block sm:left-1/2 sm:-translate-x-1/2" />
                             <button
