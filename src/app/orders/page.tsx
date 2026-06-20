@@ -2039,7 +2039,9 @@ export default function OrdersPage() {
                   </div>
                   {activeSummary.platformProfit && Object.entries(activeSummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
                     <div className="mt-2 flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
-                      {Object.entries(activeSummary.platformProfit).map(([platform, info]) => {
+                      {Object.entries(activeSummary.platformProfit)
+                        .sort((a, b) => b[1].amount - a[1].amount)
+                        .map(([platform, info]) => {
                         if (info.amount === 0) return null;
                         const meta = getPlatformBadgeMeta(platform);
                         return (
