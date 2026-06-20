@@ -483,9 +483,7 @@ export function AllOrdersView({
       {/* 筛选栏 */}
       <section className="rounded-3xl border border-black/8 bg-zinc-50/45 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/4">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">筛选</div>
-          </div>
+
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]">
             <div className="flex items-center gap-2 min-w-0">
