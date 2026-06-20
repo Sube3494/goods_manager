@@ -2023,18 +2023,24 @@ export default function OrdersPage() {
               {/* 平台纯利润分布卡片 */}
               <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
                 <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-row items-center justify-between sm:flex-col sm:items-start sm:justify-start">
-                    <div className="flex flex-col">
+                  <div className="flex flex-col w-full">
+                    <div className="flex items-center justify-between sm:block">
                       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">纯利润</div>
-                      <div className="mt-1 text-[10px] text-muted-foreground sm:mt-1.5 sm:text-xs">
-                        {activeTab === "today" ? "今日各平台纯利润汇总" : "当前筛选各平台纯利润汇总"}
+                      <div className={cn(
+                        "sm:hidden text-[22px] font-bold leading-none tracking-tight",
+                        activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                      )}>
+                        {toCurrency(activeSummary.pureProfit)}
                       </div>
                     </div>
                     <div className={cn(
-                      "text-[22px] sm:text-[26px] font-bold leading-none tracking-tight sm:mt-2",
+                      "hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight",
                       activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                     )}>
                       {toCurrency(activeSummary.pureProfit)}
+                    </div>
+                    <div className="mt-1 text-[10px] text-muted-foreground sm:mt-1.5 sm:text-xs">
+                      {activeTab === "today" ? "今日各平台纯利润汇总" : "当前筛选各平台纯利润汇总"}
                     </div>
                   </div>
                   {activeSummary.platformProfit && Object.entries(activeSummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
