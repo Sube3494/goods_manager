@@ -78,7 +78,7 @@ function isVoidedOfflineOrder(order: {
   return Boolean(voided && typeof voided === "object" && !Array.isArray(voided));
 }
 
-const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "其他"] as const;
+const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "线下交易"] as const;
 
 type OutboundCostLookupRow = {
   note: string | null;
@@ -632,11 +632,11 @@ export async function GET(request: NextRequest) {
 
     const normalizePlatform = (value: string | null | undefined) => {
       const raw = String(value || "").trim();
-      if (!raw) return "其他";
+      if (!raw) return "线下交易";
       if (raw.includes("美团")) return "美团";
       if (raw.includes("京东")) return "京东";
       if (raw.includes("淘宝") || raw.includes("天猫")) return "淘宝";
-      return "其他";
+      return "线下交易";
     };
 
     const platformBuckets = new Map<string, { trueOrderCount: number; brushOrderCount: number }>();

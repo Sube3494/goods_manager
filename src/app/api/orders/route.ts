@@ -1273,7 +1273,7 @@ export async function GET(request: NextRequest) {
             acc.platformCommission += metrics.platformCommission;
             acc.validOrderCount += 1;
 
-            const platform = order.platform || "其他";
+            const platform = order.platform || "线下交易";
             if (!acc.platformReceived[platform]) {
               acc.platformReceived[platform] = { amount: 0, count: 0 };
             }
@@ -1351,7 +1351,7 @@ export async function GET(request: NextRequest) {
 
     if (includeMetrics) {
       for (const order of summaryOrders) {
-        const platform = order.platform || "其他";
+        const platform = order.platform || "线下交易";
         const cancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
         if (cancelled) {
           cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;

@@ -253,7 +253,7 @@ export function DataOverview({
     { value: "美团", label: "美团" },
     { value: "京东", label: "京东" },
     { value: "淘宝", label: "淘宝" },
-    { value: "其他", label: "其他" },
+    { value: "线下交易", label: "线下交易" },
   ];
   const profitTrend = profitPlatform === "all" ? businessTrend : (platformBusinessTrend[profitPlatform] || []);
   const orderTrend = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);

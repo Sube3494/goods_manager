@@ -79,7 +79,7 @@ const PROMOTION_PLATFORM_ROWS = [
   { key: "amountMeituan" as const, label: "美团", logo: "/platform/美团.svg" },
   { key: "amountJingdong" as const, label: "京东", logo: "/platform/京东.svg" },
   { key: "amountTaobao" as const, label: "淘宝", logo: "/platform/淘宝.svg" },
-  { key: "amountOther" as const, label: "其他", logo: "/platform/其他.svg" },
+  { key: "amountOther" as const, label: "线下交易", logo: "/platform/其他.svg" },
 ];
 
 interface PromotionPlatformAmounts {

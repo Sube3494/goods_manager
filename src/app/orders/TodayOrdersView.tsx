@@ -376,7 +376,7 @@ export function TodayOrdersView({
     const cancelledPlatformCounts: Record<string, number> = {};
 
     for (const item of filteredOrders) {
-      const platform = item.platform || "其他";
+      const platform = item.platform || "线下交易";
       const cancelled = isCancelledStatus(item.status) || isDeletedStatus(item.status);
       if (cancelled) {
         cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
